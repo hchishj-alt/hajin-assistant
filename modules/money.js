@@ -1,0 +1,119 @@
+import { h, ic, clear, toast, head, seg, modal, form, todayStr, fmtDate, colorFor, confirmBox, download, tile, ring, won, COLORS } from '../js/ui.js';
+import * as db from '../js/db.js';
+import * as brain from '../js/brain.js';
+import { FIELDS, EXP_CAT_LIST } from '../js/fields.js';
+
+let month = todayStr().slice(0, 7), stF = '';
+const ST = { todo: ['정산 전', 'warn'], submitted: ['제출함', 'acc'], done: ['정산 완료', 'ok'] };
+export default {
+  async render(root) {
+    const body = h('div');
+    const quick = h('input', { placeholder: '"택시 12,300원 법인카드 #이터니아"처럼 적고 Enter', 'aria-label': '지출 추가' });
+    quick.addEventListener('keydown', async e => {
+      if (e.key !== 'Enter' || e.isComposing || !quick.value.trim()) return;
+      const p = brain.interpret('지출: ' + quick.value.trim())[0];
+      const tags = brain.parseTags(quick.value);
+      if (!p.data.amount) { toast('금액을 못 찾았어요. "12000원"처럼 적어 주세요'); return; }
+      await db.put('expenses', { ...p.data, title: p.data.title.replace(/#\S+/g, '').trim(), project: p.data.project || tags[0] || '', status: 'todo' });
+      quick.value = ''; toast(`${p.data.amount.toLocaleString()}원 · ${p.data.category}`); draw();
+    });
+    root.append(head('비용 처리', '쓰자마자 적고, 정산 상태까지 한눈에.',
+      h('button.btn.sm.ghost', { onclick: setBudget }, ic('target', 14), '예산'),
+      h('button.btn.sm.ghost', { onclick: exportCsv }, ic('download', 14), '엑셀(CSV)'),
+      h('button.btn.sm.ghost', { onclick: printReport }, ic('file', 14), '지출결의서'),
+      h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '지출')),
+      h('div.quick', { style: { marginBottom: '12px' } }, ic('receipt'), quick), body);
+    await draw();
+
+    async function draw() {
+      clear(body);
+      const all = await db.list('expenses');
+      const xs = all.filter(e => (e.date || '').startsWith(month));
+      const sum = xs.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const pendSum = all.filter(e => e.status !== 'done' && e.pay !== '법인카드').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const budget = await db.kvGet('budget', 0);
+      const prevM = new Date(month + '-01'); prevM.setMonth(prevM.getMonth() - 1);
+      const prevKey = `${prevM.getFullYear()}-${String(prevM.getMonth() + 1).padStart(2, '0')}`;
+      const prev = all.filter(e => (e.date || '').startsWith(prevKey)).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const diff = prev ? Math.round((sum - prev) / prev * 100) : null;
+      body.append(h('div.row.between', { style: { marginBottom: '12px' } },
+        h('div.row', h('button.btn.icon.ghost', { 'aria-label': '이전 달', onclick: () => shift(-1) }, ic('left')), h('h2', `${+month.slice(0, 4)}년 ${+month.slice(5)}월`), h('button.btn.icon.ghost', { 'aria-label': '다음 달', onclick: () => shift(1) }, ic('right'))),
+        seg([['', '전체'], ['todo', '정산 전'], ['submitted', '제출함'], ['done', '완료']], stF, v => { stF = v; draw(); })));
+      body.append(h('div.tiles', { style: { marginBottom: '14px' } },
+        tile('wallet', shortWon(sum), diff == null ? '이번 달 지출' : `지난달 대비 ${diff > 0 ? '+' : ''}${diff}%`, diff > 20 ? 'warn' : ''),
+        tile('receipt', xs.length, '건수'),
+        tile('clock', shortWon(pendSum), '돌려받을 돈 (개인 결제)', pendSum ? 'warn' : 'ok'),
+        tile('target', budget ? Math.round(sum / budget * 100) + '%' : '–', budget ? `예산 ${shortWon(budget)}` : '예산 미설정', budget && sum > budget ? 'bad' : 'ok')));
+      // 분류별
+      const byCat = {}; xs.forEach(e => (byCat[e.category || '기타'] = (byCat[e.category || '기타'] || 0) + (Number(e.amount) || 0)));
+      const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+      const stack = h('div', { style: { display: 'flex', height: '14px', borderRadius: '99px', overflow: 'hidden', background: 'var(--bg2)', margin: '4px 0 12px' } }, cats.map(([c, v], i) => h('div', { title: `${c} ${v.toLocaleString()}원`, style: { width: (v / sum * 100) + '%', background: COLORS[i % COLORS.length], transition: 'width .6s var(--spring)' } })));
+      const byProj = {}; xs.forEach(e => e.project && (byProj[e.project] = (byProj[e.project] || 0) + (Number(e.amount) || 0)));
+      body.append(h('div.grid.g2', { style: { marginBottom: '14px' } },
+        h('div.card', h('div.card-h', h('h3', ic('grid'), '분류별')), sum ? stack : null, cats.length ? h('div.list', cats.map(([c, v], i) => h('div.li', h('span.dot', { style: { background: COLORS[i % COLORS.length] } }), h('div.grow.small', c), h('span.mono.small', v.toLocaleString() + '원'), h('span.faint.tiny.mono', { style: { width: '38px', textAlign: 'right' } }, Math.round(v / sum * 100) + '%')))) : h('div.empty', '이번 달 지출이 없어요')),
+        h('div.card', h('div.card-h', h('h3', ic('briefcase'), '프로젝트별')), Object.keys(byProj).length ? h('div.stack', Object.entries(byProj).sort((a, b) => b[1] - a[1]).map(([p, v]) => h('div', h('div.row.between.small', h('span', p), h('span.mono', v.toLocaleString() + '원')), h('div.bar', h('i', { style: { width: (v / sum * 100) + '%', background: colorFor(p) } }))))) : h('div.empty', '#프로젝트를 붙이면 여기서 모여요'))));
+      // 목록
+      const list = xs.filter(e => !stF || (e.status || 'todo') === stF).sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
+      const c = h('div.card');
+      const sel = new Set();
+      const bulk = h('div.row.hide', { style: { marginBottom: '8px' } }, h('span.small.muted.grow'), ...Object.entries(ST).map(([k, [l]]) => h('button.btn.sm', { onclick: async () => { for (const id of sel) await db.patch(id, { status: k }); toast(`${sel.size}건 → ${l}`); draw(); } }, l)));
+      c.append(bulk);
+      let d0 = '';
+      if (!list.length) c.append(h('div.empty', '해당하는 지출이 없어요'));
+      for (const e of list) {
+        if (e.date !== d0) { d0 = e.date; c.append(h('div.faint.tiny', { style: { padding: '8px 4px 2px', fontWeight: 650 } }, fmtDate(e.date))); }
+        const cb = h('input', { type: 'checkbox', 'aria-label': '선택', onchange: () => { cb.checked ? sel.add(e.id) : sel.delete(e.id); bulk.classList.toggle('hide', !sel.size); bulk.firstChild.textContent = `${sel.size}건 선택`; } });
+        const [sl, st] = ST[e.status || 'todo'];
+        c.append(h('div.li', cb, h('div.ti', { style: { width: '32px', height: '32px', borderRadius: '9px', display: 'grid', placeItems: 'center', background: 'var(--bg2)' } }, ic(catIcon(e.category), 16)),
+          h('div.grow', { style: { cursor: 'pointer' }, onclick: () => edit(e) }, h('div.t.small', e.title), h('div.faint.tiny', [e.category, e.pay, e.project].filter(Boolean).join(' · '))),
+          e.receiptKey ? ic('image', 14) : null, h('span.chip.' + st, sl), h('span.mono', { style: { fontWeight: 650, minWidth: '86px', textAlign: 'right' } }, (Number(e.amount) || 0).toLocaleString())));
+      }
+      body.append(c);
+    }
+    function shift(n) { const d = new Date(month + '-01'); d.setMonth(d.getMonth() + n); month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; draw(); }
+    async function edit(e = { date: todayStr(), status: 'todo', pay: '개인카드', category: '기타' }) {
+      const rec = h('div.row', { style: { marginTop: '6px' } });
+      let receiptKey = e.receiptKey || null;
+      const drawRec = async () => { clear(rec); if (receiptKey) { const b = await db.getBlob(receiptKey); if (b) rec.append(h('img', { src: URL.createObjectURL(b), style: { width: '80px', height: '80px', objectFit: 'cover', borderRadius: '10px' } })); } rec.append(h('label.btn.sm', ic('camera', 14), receiptKey ? '영수증 바꾸기' : '영수증 사진', h('input', { type: 'file', accept: 'image/*', capture: 'environment', style: { display: 'none' }, onchange: async ev => { const f = ev.target.files[0]; if (f) { receiptKey = await db.putBlob(await shrink(f)); drawRec(); } } }))); };
+      drawRec();
+      modal(e.id ? '지출 고치기' : '새 지출', close => {
+        const f = form(FIELDS.expense, e, async v => { if (!v.category || v.category === '기타') v.category = brain.guessCategory(v.title); await db.put('expenses', { ...e, ...v, receiptKey }); close(); draw(); }, { extra: rec });
+        if (e.id) f.querySelector('.modal-f').prepend(h('button.btn.danger', { type: 'button', onclick: async () => { if (await confirmBox('지울까요?', '지우기')) { await db.remove(e.id); close(); draw(); } } }, ic('trash', 14), '지우기'));
+        return f;
+      });
+    }
+    async function setBudget() { const cur = await db.kvGet('budget', 0); modal('한 달 예산', close => form([{ k: 'budget', label: '예산(원)', type: 'number' }], { budget: cur }, async v => { await db.kvSet('budget', v.budget || 0); close(); draw(); })); }
+    async function exportCsv() {
+      const xs = (await db.list('expenses')).filter(e => (e.date || '').startsWith(month)).sort((a, b) => a.date.localeCompare(b.date));
+      const rows = [['날짜', '내용', '분류', '금액', '결제수단', '프로젝트', '상태', '메모'], ...xs.map(e => [e.date, e.title, e.category, e.amount, e.pay, e.project || '', ST[e.status || 'todo'][0], (e.memo || '').replace(/\n/g, ' ')])];
+      download(`지출_${month}.csv`, '﻿' + rows.map(r => r.map(x => `"${String(x ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n'), 'text/csv');
+    }
+    async function printReport() {
+      const xs = (await db.list('expenses')).filter(e => (e.date || '').startsWith(month) && e.status !== 'done').sort((a, b) => a.date.localeCompare(b.date));
+      const sum = xs.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const name = await db.kvGet('name', '하진');
+      const imgs = [];
+      for (const e of xs) if (e.receiptKey) { const b = await db.getBlob(e.receiptKey); if (b) imgs.push([e, await db.blobToDataURL(b)]); }
+      const w = window.open('', '_blank');
+      if (!w) { toast('팝업이 막혔어요'); return; }
+      w.document.write(`<!doctype html><meta charset="utf-8"><title>지출결의서 ${month}</title><style>body{font-family:Pretendard,system-ui,sans-serif;padding:32px;color:#111}h1{font-size:22px;text-align:center;letter-spacing:.3em}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}td,th{border:1px solid #999;padding:6px 8px}th{background:#f2f2f2}.r{text-align:right}.sign{display:flex;justify-content:flex-end;gap:0;margin-top:10px}.sign div{border:1px solid #999;width:80px;height:70px;text-align:center;font-size:12px;padding-top:4px}.imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:20px}.imgs img{width:100%}@media print{button{display:none}}</style>
+<button onclick="print()">인쇄 / PDF 저장</button><h1>지 출 결 의 서</h1><div class="sign"><div>작성</div><div>검토</div><div>승인</div></div>
+<p>기간: ${month} · 신청자: ${name} · 합계: <b>${sum.toLocaleString()}원</b></p><table><tr><th>날짜</th><th>내용</th><th>분류</th><th>결제</th><th>프로젝트</th><th class="r">금액</th></tr>${xs.map(e => `<tr><td>${e.date}</td><td>${esc(e.title)}</td><td>${e.category}</td><td>${e.pay}</td><td>${esc(e.project || '')}</td><td class="r">${(+e.amount).toLocaleString()}</td></tr>`).join('')}<tr><th colspan="5">합계</th><th class="r">${sum.toLocaleString()}</th></tr></table>
+${imgs.length ? `<h3>영수증</h3><div class="imgs">${imgs.map(([e, src]) => `<figure><img src="${src}"><figcaption>${e.date} ${esc(e.title)}</figcaption></figure>`).join('')}</div>` : ''}`);
+      w.document.close();
+    }
+  },
+};
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const shortWon = n => n >= 10000 ? (Math.round(n / 1000) / 10).toLocaleString() + '만' : n.toLocaleString();
+const catIcon = c => ({ 식비: 'cake', 교통: 'right', 재료비: 'palette', 소프트웨어: 'cloud', 장비: 'camera', 회의비: 'users', 마케팅: 'trend', 교육: 'book', 인건비: 'user' }[c] || 'receipt');
+// 영수증 사진은 1600px로 줄여서 저장 (용량 절약)
+export async function shrink(file, max = 1600) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = bmp.width * k; c.height = bmp.height * k;
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+  } catch { return file; }
+}

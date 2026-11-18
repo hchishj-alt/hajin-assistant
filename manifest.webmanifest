@@ -1,0 +1,21 @@
+{
+  "name": "하진 비서",
+  "short_name": "하진 비서",
+  "description": "하진만의 개인 비서 — 일정·회의·기획·인맥·비용·SNS를 한곳에",
+  "start_url": "./#/today",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f2",
+  "theme_color": "#4b5bff",
+  "lang": "ko",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "비서", "url": "./#/assistant" },
+    { "name": "회의 녹음", "url": "./#/meetings/new" },
+    { "name": "확인 대기함", "url": "./#/inbox" }
+  ]
+}

@@ -1,0 +1,54 @@
+import { h, ic, modal, form, toast, md } from './ui.js';
+import * as store from './store.js';
+import { FIELDS, describe } from './fields.js';
+
+export function confBars(c) {
+  const n = Math.round((c || 0.5) * 4);
+  return h('span.conf', { title: `확신도 ${Math.round((c || .5) * 100)}%` }, [0, 1, 2, 3].map(i => h('i' + (i < n ? '.on' : ''))));
+}
+
+// 확인 대기함 카드 하나. onDone(status) 호출
+export function draftCard(d, onDone) {
+  const k = store.KINDS[d.kind] || { label: d.kind, icon: 'file' };
+  const el = h('div.draft');
+  const title = d.kind === 'summary' ? (d.data.title || '요약') : (d.data.title || d.data.name || '(제목 없음)');
+  const body = h('div.grow',
+    h('div.row.nowrap', h('span.chip.acc', k.label), confBars(d.confidence), h('span.faint.tiny', d.origin === 'meeting' ? '회의에서' : d.origin === 'voice' ? '음성에서' : d.origin === 'palette' ? '빠른 입력' : '')),
+    h('div.t', { style: { marginTop: '4px', fontWeight: 650 } }, title),
+    d.kind === 'summary' ? summaryView(d.data) : h('div.faint.small', describe(d.kind, d.data)),
+    d.source && d.kind !== 'summary' ? h('div.faint.tiny', { style: { marginTop: '4px' } }, '“' + d.source.slice(0, 120) + (d.source.length > 120 ? '…' : '') + '”') : null,
+    h('div.row', { style: { marginTop: '8px', gap: '6px' } },
+      h('button.btn.sm.pri', { onclick: async () => { await store.approve(d); finish('approved'); } }, ic('check', 14), '확정'),
+      d.kind !== 'summary' ? h('button.btn.sm', { onclick: () => edit() }, ic('edit', 14), '고치기') : null,
+      d.kind !== 'summary' ? kindMenu() : null,
+      h('button.btn.sm.ghost', { onclick: async () => { await store.reject(d); finish('rejected'); } }, '버리기')));
+  el.append(h('div.k', ic(k.icon)), body);
+
+  function finish(st) {
+    el.classList.add(st === 'approved' ? 'done' : 'gone');
+    el.querySelectorAll('button').forEach(b => (b.disabled = true));
+    if (st === 'approved') toast(`${k.label} 확정했어요`);
+    onDone && onDone(st, el);
+  }
+  function edit() {
+    const fields = FIELDS[d.kind] || FIELDS.note;
+    modal(`${k.label} 고치기`, close => form(fields, d.data, async vals => {
+      const merged = { ...d.data, ...vals };
+      await store.approve(d, merged);
+      close(); finish('approved');
+    }, { submitLabel: '고쳐서 확정' }));
+  }
+  function kindMenu() {
+    const sel = h('select.in', { style: { width: 'auto', padding: '4px 8px', fontSize: '13px' }, onchange: async () => { const nd = await store.changeKind(d, sel.value); toast(`${store.KINDS[sel.value].label}(으)로 바꿨어요. 다음부터 비슷한 말은 이렇게 알아들을게요.`); const repl = draftCard(nd, onDone); el.replaceWith(repl); } },
+      Object.entries(store.KINDS).filter(([key, v]) => v.col && key !== 'meeting').map(([key, v]) => h('option', { value: key, selected: key === d.kind }, v.label)));
+    return sel;
+  }
+  return el;
+}
+
+export function summaryView(s) {
+  const sec = (t, arr, icn) => arr && arr.length ? h('div', { style: { marginTop: '8px' } }, h('div.small', { style: { fontWeight: 650, display: 'flex', gap: '6px', alignItems: 'center' } }, ic(icn, 14), t, h('span.faint', arr.length)), h('ul', { style: { margin: '4px 0', paddingLeft: '18px' } }, arr.map(x => h('li.small', typeof x === 'string' ? x : x.title)))) : null;
+  return h('div',
+    s.keywords?.length ? h('div.chips', { style: { marginTop: '6px' } }, s.keywords.map(k => h('span.chip', '#' + k))) : null,
+    sec('요약', s.summary, 'sparkles'), sec('결정', s.decisions, 'check'), sec('할 일', s.actions, 'check2'), sec('질문·고민', s.questions, 'msg'), sec('아이디어', s.ideas, 'bulb'));
+}
