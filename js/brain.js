@@ -337,7 +337,7 @@ function interpretOne(s, base, ctx) {
   }
   if (t.length <= 24 && /^(오늘|내일|모레|이번\s*주|다음\s*주|이번\s*달|지난\s*달|이번주|다음주|이번달)?\s*(남은\s*|밀린\s*)?(일정|스케줄|빈\s*시간|할\s*일|할일|지출|비용|작업\s*시간|대기함|확인할\s*것)\s*(은|는|좀)?\s*\??$/.test(t)) return [{ kind: 'query', data: { q: t, when: w }, label: '찾아보기', confidence: 0.9 }];
   // 이동
-  const nav = t.match(/^(캘린더|일정|할\s*일|회의|기획|인맥|연락처|비용|지출|스타트업|SNS|스튜디오|피그마|설정|확인\s*대기함|대기함)\s*(열어|가자|으로|로)?\s*(줘)?$/i);
+  const nav = t.match(/^(캘린더|일정|할\s*일|회의|회의록|기획|기획\s*보드|인맥|연락처|비용|지출|스타트업|SNS|스튜디오|피그마|설정|자가\s*점검|팀|확인\s*대기함|대기함)\s*(열어|가자|으로|로|화면)?\s*(줘)?$/i);
   if (nav) return [{ kind: 'nav', data: { to: nav[1] }, label: '이동', confidence: 0.9 }];
 
   return [build(guessKind())];
@@ -348,10 +348,10 @@ function interpretOne(s, base, ctx) {
     if (urls.length && /(레퍼런스|참고|ref|무드|영감|예시|느낌)/i.test(t)) return 'reference';
     if (urls.length) return 'reference';
     if (/(목표|OKR|KR|핵심\s*결과|분기)/i.test(t)) return 'okr';
-    if (/(지원사업|공모전|정부지원|창업지원|예비창업|초기창업|IR|투자|데모데이|액셀러레이터|TIPS|팁스)/i.test(t)) return 'grant';
+    if (/(지원사업|공모전|공모|정부지원|창업지원|예비창업|초기창업|액셀러레이터|TIPS|팁스)/i.test(t) || (/(IR|투자\s*유치|데모데이)/.test(t) && !ACTION.test(t))) return 'grant';
     if (/(릴스|쇼츠|틱톡|유튜브|인스타|브이로그|썸네일|업로드|게시물|피드)/.test(t) && /(올리|찍|만들|편집|콘텐츠|아이디어|기획)/.test(t)) return 'sns';
-    if (/(\d+\s*(시간|분)\s*(동안)?\s*(작업|했|함|공부|운동|집중))|작업\s*(했|함|기록)/.test(t) && !w.date) return 'timelog';
-    if (w.time && /(회의|미팅|약속|만나|만남|수업|면접|발표|전시|촬영|병원|저녁|점심|콜|통화|줌|zoom|meet|일정|스케줄|행사|세미나|오픈|마감식)/i.test(t)) return 'event';
+    if ((/\d+(\.\d+)?\s*(시간|분)/.test(t) && /(했음|했다|했어|했고|함$|완료|끝냄|작업|공부|집중)/.test(t) && !w.time) || /작업\s*(했|함|기록)/.test(t)) return 'timelog';
+    if ((w.time || w.date) && /(회의|미팅|약속|만나|만남|수업|면접|발표|전시|촬영|병원|저녁|점심|콜|통화|줌|zoom|meet|일정|스케줄|행사|세미나|오픈|마감식|파티|회식|생일|여행|공연|콘서트|(?<!업)데이트|식사|모임|스터디|레슨|강의|워크숍|휴가)/i.test(t) && !(isDeadline(t) && ACTION.test(t))) return 'event';
     if (w.time && !ACTION.test(t)) return 'event';
     if (/(회의|미팅|약속|만나|수업|면접|발표|행사|세미나|전시)/.test(t) && w.date) return 'event';
     if (IDEA.test(t) || /(떠올|생각났|영감)/.test(t)) return 'idea';
@@ -364,7 +364,7 @@ function interpretOne(s, base, ctx) {
     const bw = body === t ? w : parseWhen(body, base);
     const cleanTitle = strip(body, bw.hits);
     switch (kind) {
-      case 'event': return { kind, label: '일정', confidence: bw.time ? 0.9 : 0.7, data: { title: cleanTitle || '일정', date: bw.date || ymd(base), start: bw.time || '', end: bw.end || '', place: placeOf(body), tags } };
+      case 'event': { const rep = /매일|날마다/.test(body) ? 'daily' : /평일마다|매\s*평일|평일\s*매일/.test(body) ? 'weekdays' : /매주|주마다/.test(body) ? 'weekly' : /매달|매월|달마다/.test(body) ? 'monthly' : ''; return { kind, label: rep ? '반복 일정' : '일정', confidence: bw.time ? 0.9 : 0.7, data: { repeat: rep, title: cleanTitle.replace(/(매일|날마다|평일마다|매\s*평일|매주|주마다|매달|매월|달마다)\s*/g, '').trim() || '일정', date: bw.date || ymd(base), start: bw.time || '', end: bw.end || '', place: placeOf(body), tags } }; }
       case 'task': return { kind, label: '할 일', confidence: 0.75, data: { title: cleanTask(cleanTitle) || cleanTitle || body, due: bw.date || '', time: isDeadline(body) ? '' : (bw.time || ''), priority: /(급|급함|asap|ASAP|중요|빨리|꼭|반드시|!!)/.test(body) ? 'high' : 'normal', project: projectOf(body, ctx), tags } };
       case 'expense': { const amt = parseMoney(body) || 0; return { kind, label: '지출', confidence: 0.85, data: { title: strip(body.replace(/(\d+(?:\.\d+)?\s*만\s*(\d+\s*천)?\s*원?|\d[\d,]*\s*원|₩\s*[\d,]+)/g, ''), bw.hits).replace(/(법인\s*카드|회사\s*카드|개인\s*카드|카드|현금|계좌\s*이체)/g, '').replace(/(결제|샀다|샀어|썼다|썼어|지출|냈다|냈어|했다)\s*$/, '').replace(/\s+/g, ' ').trim() || '지출', amount: amt, date: bw.date || ymd(base), category: guessCategory(body), project: projectOf(body, ctx), pay: /(법인|회사|팀)\s*카드/.test(body) ? '법인카드' : /(현금)/.test(body) ? '현금' : '개인카드' } }; }
       case 'contact': { const ph = parsePhone(body), em = parseEmail(body); let name = body.replace(ph ? /(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/ : /$^/, '').replace(em || /$^/, '').replace(/(번호|전화|연락처|이메일|메일|저장|추가|해줘|해 줘)/g, ' ').trim(); const nm = (name.match(/[가-힣]{2,4}|[A-Za-z]+(?:\s[A-Za-z]+)?/) || [''])[0]; const rest = name.replace(nm, '').replace(/\s+/g, ' ').trim(); return { kind, label: '연락처', confidence: 0.85, data: { name: nm, phone: ph || '', email: em || '', org: (rest.match(/([가-힣A-Za-z0-9]+)\s*(회사|대표|팀장|매니저|PD|디자이너|교수|님)?/) || [''])[0], memo: rest, tags } }; }

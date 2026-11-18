@@ -30,6 +30,12 @@ export async function answer(q, base = new Date()) {
     const slots = await store.freeSlots(d);
     return { text: slots.length ? `${r ? r[2] : '오늘'} 비는 시간은 ${slots.length}칸이에요.` : '비는 시간이 없어요.', items: slots.map(s => ({ icon: 'clock', title: `${s.start} – ${s.end}`, sub: `${s.mins}분`, route: 'calendar' })) };
   }
+  if (/(회의|미팅)/.test(q) && /(내용|정리|요약|뭐였|결정|얘기)/.test(q)) {
+    let ms = (await db.list('meetings')).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    if (r) ms = ms.filter(m => (m.date || '') >= r[0] && (m.date || '') <= r[1]);
+    const items = ms.slice(0, 6).map(m => { const s = m.summaryConfirmed ? m.summary : m.summaryDraft; return { icon: 'mic', title: m.title + (m.summaryConfirmed ? '' : ' (요약 확인 전)'), sub: (s?.decisions?.[0] || s?.summary?.[0] || '').slice(0, 80), route: 'meetings/' + m.id }; });
+    return { text: items.length ? `${r ? r[2] + ' ' : ''}회의 ${items.length}개예요. 눌러서 정리를 보세요.` : '해당하는 회의록이 없어요.', items };
+  }
   if (/(일정|스케줄|약속|회의\s*언제|미팅)/.test(q)) {
     const [a, b, label] = r || [today, ymd(addD(base, 6)), '앞으로 7일'];
     const all = await db.list('events');
