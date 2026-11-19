@@ -21,7 +21,9 @@ export default {
 
     root.append(
       sec('나', 'user', h('div.grid.g2', h('label.f', '부를 이름', nameIn), h('label.f', '하루 집중 목표(시간)', goalIn))),
-      sec('화면', 'palette', h('div.row', seg([['auto', '시스템'], ['light', '밝게'], ['dark', '어둡게']], theme, async v => { await db.kvSet('theme', v); applyTheme(v); go('settings'); }), h('label.row.small', '포인트 색', accIn), h('button.btn.sm.ghost', { onclick: async () => { await db.kvSet('accent', null); document.documentElement.style.removeProperty('--acc'); go('settings'); } }, '기본 색'))),
+      sec('화면 · 색 조합', 'palette',
+        h('div.row', { style: { marginBottom: '12px' } }, seg([['auto', '시스템 따라'], ['light', '밝게'], ['dark', '어둡게']], theme, async v => { await db.kvSet('theme', v); await applyTheme(v); go('settings'); })),
+        await palettePicker()),
       sec('알림', 'bell', h('p.small.muted', '일정 10분 전(일정마다 바꿀 수 있어요)과 집중 타이머 끝을 알려요. 폰에서는 홈 화면에 설치한 뒤 켜 주세요.'),
         h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm', { onclick: async () => { const r = await Notification?.requestPermission?.(); toast(r === 'granted' ? '알림을 켰어요' : '알림이 꺼져 있어요. 브라우저 설정에서 허용해 주세요.'); } }, '알림 켜기'), h('span.chip', 'Notification' in window ? (Notification.permission === 'granted' ? '켜짐' : '꺼짐') : '지원 안 함'))),
       await syncSection(params[0] === 'sync'),
@@ -135,4 +137,18 @@ async function syncSection(focus) {
   off = sync.onState(() => { if (!document.body.contains(box)) { off?.(); return; } draw(); });
   await draw();
   return box;
+}
+
+// ── 색 조합 고르기 ──
+async function palettePicker() {
+  const T = await import('../js/theme.js');
+  const cur = await T.current();
+  const dark = T.isDark(await db.kvGet('theme', 'auto'));
+  const pick = async id => { await db.kvSet('palette', id); await db.kvSet('accent', null); await applyTheme(); go('settings'); };
+  const sw = (id, p) => { const [bg, card, ink, acc] = dark ? p.dark : p.light; return h('button.palb' + (cur.id === id ? '.on' : ''), { onclick: () => pick(id), 'aria-pressed': cur.id === id }, h('div.pv', { style: { background: bg } }, h('i', { style: { background: card } }), h('i', { style: { background: ink, opacity: .85 } }), h('i', { style: { background: acc } })), h('b', p.name), h('span', p.note)); };
+  const tint = h('input', { type: 'color', value: cur.tint, oninput: async () => { await db.kvSet('palTint', tint.value); await db.kvSet('palette', 'custom'); await db.kvSet('accent', null); applyTheme(); } });
+  const acc = h('input', { type: 'color', value: cur.cacc, oninput: async () => { await db.kvSet('palAcc', acc.value); await db.kvSet('palette', 'custom'); await db.kvSet('accent', null); applyTheme(); } });
+  return h('div',
+    h('div.pals', Object.entries(T.PALETTES).map(([id, p]) => sw(id, p)), sw('custom', T.customPalette(cur.tint, cur.cacc))),
+    h('div.row', { style: { marginTop: '12px', gap: '14px', flexWrap: 'wrap' } }, h('span.small', { style: { fontWeight: 650 } }, '내 조합 만들기'), h('label.row.small', '배경 톤', tint), h('label.row.small', '포인트', acc), h('span.faint.tiny', '고르면 밝게·어둡게 둘 다 자동으로 맞춰요. 글자가 안 보일 조합은 알아서 보정해요.')));
 }

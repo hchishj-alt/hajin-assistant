@@ -137,13 +137,8 @@ export async function openPalette() {
 }
 
 // ── 테마 ──
-export async function applyTheme(t) {
-  t = t || (await db.kvGet('theme', 'auto'));
-  if (t === 'auto') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.setAttribute('data-theme', t);
-  const acc = await db.kvGet('accent', null);
-  if (acc) document.documentElement.style.setProperty('--acc', acc);
-}
+export { applyTheme } from './theme.js';
+import { applyTheme } from './theme.js';
 
 // ── 자동 업데이트 ──
 async function setupSW() {
