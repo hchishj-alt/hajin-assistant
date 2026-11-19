@@ -6,6 +6,8 @@ export const FIELDS = {
     { k: 'title', label: '제목', full: true },
     { k: 'date', label: '날짜', type: 'date' },
     { k: 'place', label: '장소' },
+    { k: 'who', label: '누구랑' },
+    { k: 'addr', label: '주소 (자동으로 찾음)', full: true },
     { k: 'start', label: '시작', type: 'time' },
     { k: 'end', label: '끝', type: 'time' },
     { k: 'repeat', label: '반복', type: 'select', options: [['', '안 함'], ['daily', '매일'], ['weekdays', '평일'], ['weekly', '매주'], ['monthly', '매월']] },
@@ -96,7 +98,7 @@ export const FIELDS = {
 // 보기용 한 줄 요약
 export function describe(kind, d) {
   const p = [];
-  if (kind === 'event') { if (d.date) p.push(d.date.slice(5).replace('-', '/')); if (d.start) p.push(d.start + (d.end ? '–' + d.end : '')); if (d.place) p.push(d.place); }
+  if (kind === 'event') { if (d.date) p.push(d.date.slice(5).replace('-', '/')); if (d.start) p.push(d.start + (d.end ? '–' + d.end : '')); if (d.place) p.push(d.area && !d.place.includes(d.area) ? `${d.place} (${d.area})` : d.place); else if (d.area) p.push(d.area); if (d.who) p.push(d.who + '와 함께'); if (d.addr) p.push(d.addr); }
   if (kind === 'task') { if (d.due) p.push('마감 ' + d.due.slice(5).replace('-', '/')); if (d.who) p.push('담당 ' + d.who); if (d.priority === 'high') p.push('중요'); if (d.project) p.push(d.project); }
   if (kind === 'expense') { p.push((Number(d.amount) || 0).toLocaleString() + '원'); if (d.category) p.push(d.category); if (d.pay) p.push(d.pay); }
   if (kind === 'contact') { if (d.phone) p.push(d.phone); if (d.org) p.push(d.org); if (d.email) p.push(d.email); }

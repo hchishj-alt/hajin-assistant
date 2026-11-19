@@ -369,7 +369,7 @@ function interpretOne(s, base, ctx) {
     const bw = body === t ? w : parseWhen(body, base);
     const cleanTitle = strip(body, bw.hits);
     switch (kind) {
-      case 'event': { const rep = /매일|날마다/.test(body) ? 'daily' : /평일마다|매\s*평일|평일\s*매일/.test(body) ? 'weekdays' : /매주|주마다/.test(body) ? 'weekly' : /매달|매월|달마다/.test(body) ? 'monthly' : ''; return { kind, label: rep ? '반복 일정' : '일정', confidence: bw.time ? 0.9 : 0.7, data: { repeat: rep, title: cleanTitle.replace(/(매일|날마다|평일마다|매\s*평일|매주|주마다|매달|매월|달마다)\s*/g, '').trim() || '일정', date: bw.date || ymd(base), start: bw.time || '', end: bw.end || '', place: placeOf(body), tags } }; }
+      case 'event': { const rep = /매일|날마다/.test(body) ? 'daily' : /평일마다|매\s*평일|평일\s*매일/.test(body) ? 'weekdays' : /매주|주마다/.test(body) ? 'weekly' : /매달|매월|달마다/.test(body) ? 'monthly' : ''; const r0 = { kind, label: rep ? '반복 일정' : '일정', confidence: bw.time ? 0.9 : 0.7, data: { repeat: rep, title: cleanTitle.replace(/(매일|날마다|평일마다|매\s*평일|매주|주마다|매달|매월|달마다)\s*/g, '').trim() || '일정', date: bw.date || ymd(base), start: bw.time || '', end: bw.end || '', place: placeOf(body), tags } }; const ev = r0.data; const pp = eventParts(ev.title, ctx.people || []); if (pp) { ev.title = pp.title; if (pp.who) ev.who = pp.who; if (pp.place) ev.place = pp.place; if (pp.area) ev.area = pp.area; } return r0; }
       case 'task': { const who0 = findAssignee(body, ctx.people || []); const who = who0 === '나' ? '' : who0; return { kind, label: '할 일', confidence: 0.75, data: { who, title: cleanTask(cleanTitle, who) || cleanTitle || body, due: bw.date || '', time: isDeadline(body) ? '' : (bw.time || ''), priority: /(급|급함|asap|ASAP|중요|빨리|꼭|반드시|!!)/.test(body) ? 'high' : 'normal', project: projectOf(body, ctx), tags } }; }
       case 'expense': { const amt = parseMoney(body) || 0; return { kind, label: '지출', confidence: 0.85, data: { title: strip(body.replace(/(\d+(?:\.\d+)?\s*만\s*(\d+\s*천)?\s*원?|\d[\d,]*\s*원|₩\s*[\d,]+)/g, ''), bw.hits).replace(/(법인\s*카드|회사\s*카드|개인\s*카드|카드|현금|계좌\s*이체)/g, '').replace(/(결제|샀다|샀어|썼다|썼어|지출|냈다|냈어|했다)\s*$/, '').replace(/\s+/g, ' ').trim() || '지출', amount: amt, date: bw.date || ymd(base), category: guessCategory(body), project: projectOf(body, ctx), pay: /(법인|회사|팀)\s*카드/.test(body) ? '법인카드' : /(현금)/.test(body) ? '현금' : '개인카드' } }; }
       case 'contact': { const ph = parsePhone(body), em = parseEmail(body); let name = body.replace(ph ? /(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/ : /$^/, '').replace(em || /$^/, '').replace(/(번호|전화|연락처|이메일|메일|저장|추가|해줘|해 줘)/g, ' ').trim(); const nm = (name.match(/[가-힣]{2,4}|[A-Za-z]+(?:\s[A-Za-z]+)?/) || [''])[0]; const rest = name.replace(nm, '').replace(/\s+/g, ' ').trim(); return { kind, label: '연락처', confidence: 0.85, data: { name: nm, phone: ph || '', email: em || '', org: (rest.match(/([가-힣A-Za-z0-9]+)\s*(회사|대표|팀장|매니저|PD|디자이너|교수|님)?/) || [''])[0], memo: rest, tags } }; }
@@ -388,6 +388,23 @@ function interpretOne(s, base, ctx) {
     for (const hh of hits || []) r = r.replace(hh, ' ');
     return r.replace(/#[\p{L}\p{N}_]+/gu, '').replace(/^(일정|할일|메모)\s*[:：]/, '').replace(/(에|에서|부터|까지)\s*$/, '').replace(/\s*(잡아\s*줘|추가해\s*줘|등록해\s*줘|넣어\s*줘|기록해\s*줘|저장해\s*줘|해줘|있음|있어|있다)\s*$/, '').replace(/\s+/g, ' ').trim().replace(/^(까지|부터|에서|에|은|는|쯤|경)\s+/, '').trim();
   }
+}
+// "서충주 수집오빠랑 충주본색 전시 방문" → 누구랑 수집오빠 · 지역 서충주 · 장소 충주본색 · 제목 충주본색 전시 방문
+const KIN = '오빠|언니|누나|형|형님|씨|님|쌤|선생님|교수님|대표님|팀장님|실장님|작가님|감독님|엄마|아빠|친구|동생|선배|후배|이모|삼촌|할머니|할아버지|사장님|피디님|PD님';
+const AREA = /^((서|동|남|북)?[가-힣]{1,3}(시|군|구|동|읍|면|도)|서충주|충주|서울|홍대|강남|성수|합정|연남|망원|이태원|한남|을지로|종로|대학로|잠실|여의도|판교|분당|일산|부산|해운대|대전|대구|광주|인천|수원|청주|제주|전주|춘천|강릉|원주|천안|세종|울산|창원|포항|경주|여수|목포)$/;
+const DOING = /(?:\s|^)((?:전시|공연|영화|팝업|박람회|페어|콘서트|축제|행사)?\s*(?:방문|관람|구경|보기|보러\s*가기|미팅|회의|촬영|답사|식사|점심|저녁|약속|모임|견학|투어|상담|인터뷰|수업|강의|워크숍|설치|철수|회식|데이트|나들이|여행|전시|공연|팝업))$/;
+export function eventParts(title, people = []) {
+  let t = String(title || '').trim(); if (!t) return null; let who = '', area = '', place = '';
+  const names = people.filter(Boolean).map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const wm = t.match(new RegExp(`(^|\\s)(${names ? '(?:' + names + ')(?:님|씨)?|' : ''}[가-힣A-Za-z]{1,6}\\s?(?:${KIN}))(?:이랑|랑|하고|와|과)(?:\\s*(?:같이|함께))?(?=\\s|$)`)) || t.match(/(^|\s)([가-힣A-Za-z]{2,6})(?:이랑|랑|하고|와|과)\s*(?:같이|함께)(?=\s|$)/);
+  if (wm) { who = wm[2]; t = (t.slice(0, wm.index) + ' ' + t.slice(wm.index + wm[0].length)).replace(/\s+/g, ' ').trim(); }
+  const words = t.split(' ');
+  if (words.length > 1 && AREA.test(words[0].replace(/(에서|에)$/, ''))) { area = words.shift().replace(/(에서|에)$/, ''); t = words.join(' '); }
+  const dm = t.match(DOING);
+  if (dm && dm.index > 0) { const head = t.slice(0, dm.index).trim().replace(/(에서|에|으로|로)$/, ''); if (head && head.split(' ').length <= 3 && !/(하|되)$/.test(head) && /(방문|관람|구경|보기|가기|견학|투어|답사|전시|공연|팝업|나들이|여행|데이트)$/.test(dm[1])) place = head; }
+  if (!who && !area && !place) return null;
+  if (who && t.length <= 3) t = `${who} ${t}`.trim();
+  return { title: t || title, who, area, place: place || '' };
 }
 function placeOf(s) { const m = s.match(/([가-힣A-Za-z0-9]+(?:역|카페|센터|빌딩|학교|대학교|캠퍼스|사무실|스튜디오|홀|관|층|호|점))(?:에서|서)?/); return m ? m[1] : ''; }
 function projectOf(s, ctx) { for (const p of ctx.projects || []) if (p && s.includes(p)) return p; const m = s.match(/\[([^\]]+)\]/); return m ? m[1] : ''; }

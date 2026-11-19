@@ -30,6 +30,10 @@ export default {
       await syncSection(params[0] === 'sync'),
       await extSection(params[0] === 'ext'),
       await learnedSection(),
+      sec('장소 찾기', 'pin', h('p.small.muted', '일정에 장소를 말하면 실제 주소를 찾아 붙여요. 키 없이도 큰 장소는 찾고, 카카오 무료 키를 넣으면 가게·전시장까지 찾아요. 키는 이 기기에만 저장돼요.'),
+        (() => { const i = h('input.in', { type: 'password', placeholder: '카카오 REST API 키 (선택)', autocomplete: 'off', 'aria-label': '카카오 REST API 키' }); db.kvGet('secret:kakao', '').then(v => (i.value = v || '')); const out = h('span.faint.tiny');
+          return h('div.stack', h('div.row', { style: { gap: '6px' } }, h('div.grow', i), h('button.btn.sm', { onclick: async () => { await db.kvSet('secret:kakao', i.value.trim()); out.textContent = '찾는 중…'; const PL = await import('../js/place.js'); const hit = await PL.lookup('서울시청'); out.textContent = hit ? `잘 돼요: ${hit.name} · ${hit.addr} (${hit.by})` : '찾지 못했어요. 키나 인터넷 연결을 확인해 주세요.'; } }, '저장하고 시험')), out,
+            h('p.faint.tiny', '키 받는 곳: ', h('a', { href: 'https://developers.kakao.com/console/app', target: '_blank', rel: 'noopener' }, 'Kakao Developers'), ' → 앱 만들기 → 앱 키의 REST API 키 복사, 플랫폼(Web)에 이 앱 주소 등록.')); })()),
       sec('데이터', 'shield',
         h('p.small.muted', `모든 기록은 이 기기 안에만 있어요. ${est ? `사용 ${(est.usage / 1e6).toFixed(1)}MB` : ''}${persisted ? ' · 자동 삭제 방지 켜짐' : ''}`),
         h('div.row', { style: { marginTop: '8px' } },

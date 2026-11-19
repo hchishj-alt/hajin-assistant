@@ -8,6 +8,8 @@ export function confBars(c) {
 }
 
 // 확인 대기함 카드 하나. onDone(status) 호출
+function placeRow(e) { const q = [e.area && !(e.place || '').includes(e.area) ? e.area : '', e.place].filter(Boolean).join(' '); const a = (href, t) => h('a.chip', { href, target: '_blank', rel: 'noopener' }, ic('pin', 12), t);
+  return h('div.chips', { style: { marginTop: '6px' } }, e.addr ? h('span.faint.tiny', `${e.placeBy || '지도'}에서 찾은 주소예요`) : h('span.faint.tiny', '주소는 못 찾았어요. 지도에서 확인해 주세요'), e.mapUrl ? a(e.mapUrl, '장소 정보') : null, a('https://map.naver.com/p/search/' + encodeURIComponent(q), '네이버 지도'), a('https://map.kakao.com/?q=' + encodeURIComponent(q), '카카오맵')); }
 export function draftCard(d, onDone) {
   const k = store.KINDS[d.kind] || { label: d.kind, icon: 'file' };
   const el = h('div.draft');
@@ -16,6 +18,7 @@ export function draftCard(d, onDone) {
     h('div.row.nowrap', h('span.chip.acc', k.label), confBars(d.confidence), h('span.faint.tiny', d.origin === 'meeting' ? '회의에서' : d.origin === 'voice' ? '음성에서' : d.origin === 'palette' ? '빠른 입력' : '')),
     h('div.t', { style: { marginTop: '4px', fontWeight: 650 } }, title),
     d.kind === 'summary' ? summaryView(d.data) : h('div.faint.small', describe(d.kind, d.data)),
+    d.kind === 'event' && (d.data.place || d.data.area) ? placeRow(d.data) : null,
     d.source && d.kind !== 'summary' ? h('div.faint.tiny', { style: { marginTop: '4px' } }, '“' + d.source.slice(0, 120) + (d.source.length > 120 ? '…' : '') + '”') : null,
     h('div.row', { style: { marginTop: '8px', gap: '6px' } },
       h('button.btn.sm.pri', { onclick: async () => { await store.approve(d); finish('approved'); } }, ic('check', 14), '확정'),
