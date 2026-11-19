@@ -17,7 +17,8 @@ export const TEMPLATES = {
 let tab = 'docs', projF = '';
 export default {
   async render(root, params) {
-    if (params[0]) { const it = await db.get(params[0]); if (it?.col === 'refs') tab = 'refs'; else return editor(root, params[0]); }
+    if (params[0] === 'projects') tab = 'projects';
+    else if (params[0]) { const it = await db.get(params[0]); if (it?.col === 'refs') tab = 'refs'; else return editor(root, params[0]); }
     const body = h('div');
     root.append(head('기획 보드', '메모·아이디어·기획서·레퍼런스를 한곳에. 쓰면 키워드와 비슷한 기록을 찾아 줘요.',
       h('button.btn.sm', { onclick: newProject }, ic('grid', 14), '프로젝트'),
@@ -62,15 +63,20 @@ export default {
       if (tab === 'refs') { tab = 'docs'; go('archive' + (projF ? '/p/' + encodeURIComponent(projF) : '')); return; }
       if (tab === 'projects') {
         const g = h('div.grid.gauto');
-        const tasks = await db.list('tasks'); const exps = await db.list('expenses'); const logs = await db.list('timelogs');
-        for (const p of projects) {
+        const tasks = await db.list('tasks'); const exps = await db.list('expenses'); const logs = await db.list('timelogs'); const stats = new Map((await store.projectStats()).map(x => [x.name, x]));
+        const md2 = s => s ? `${+s.slice(5, 7)}/${+s.slice(8, 10)}` : ''; const sw = n => n >= 10000 ? (Math.round(n / 1000) / 10).toLocaleString() + '만' : n.toLocaleString();
+        for (const p of projects) { const st = stats.get(p.name) || {};
           const t = tasks.filter(x => x.project === p.name), done = t.filter(x => x.done).length;
           const spend = exps.filter(x => x.project === p.name).reduce((s, x) => s + (Number(x.amount) || 0), 0);
           const m = logs.filter(x => x.project === p.name).reduce((s, x) => s + (x.minutes || 0), 0);
           g.append(h('div.card', h('div.row', h('span.dot', { style: { background: p.color || colorFor(p.name), width: '12px', height: '12px' } }), h('h3.grow', p.name), h('span.chip', p.status || '진행')),
             p.desc ? h('p.faint.small', { style: { marginTop: '4px' } }, p.desc) : null,
             h('div.bar', { style: { margin: '10px 0 6px' } }, h('i', { style: { width: (t.length ? done / t.length * 100 : 0) + '%' } })),
-            h('div.row.between.tiny.faint', h('span', `할 일 ${done}/${t.length}`), h('span', `${Math.round(m / 60)}시간`), h('span', `${spend.toLocaleString()}원`)),
+            h('div.row.between.tiny.faint', h('span', `할 일 ${done}/${t.length}`), st.late ? h('span.chip.bad', `밀림 ${st.late}`) : null, m >= 30 ? h('span', `${Math.round(m / 60)}시간`) : null, h('span', `쓴 돈 ${spend.toLocaleString()}원`)),
+            st.next ? h('div.small', { style: { marginTop: '8px' } }, ic('check2', 14), ` 다음 마감 ${md2(st.next.due)} · ${st.next.title}${st.next.who ? ' (' + st.next.who + ')' : ''}`) : null,
+            st.nextEv ? h('div.small', { style: { marginTop: '4px' } }, ic('calendar', 14), ` 다음 일정 ${md2(st.nextEv.date)}${st.nextEv.endDate && st.nextEv.endDate > st.nextEv.date ? '~' + md2(st.nextEv.endDate) : ''} · ${st.nextEv.title}`) : null,
+            st.got || st.due ? h('div.small', { style: { marginTop: '4px' } }, ic('receipt', 14), ` 받은 돈 ${sw(st.got)} · 받을 돈 ${sw(st.due)} · 남는 돈 ${sw(st.got + st.due - st.out)}`) : null,
+            st.who && st.who.length ? h('div.chips', { style: { marginTop: '6px' } }, st.who.slice(0, 5).map(([n, c]) => h('span.chip', `${n} ${c}`))) : null,
             h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm', { onclick: () => { projF = p.name; tab = 'docs'; draw(); } }, '문서'), h('button.btn.sm.ghost', { onclick: () => newProject(p) }, ic('edit', 14)))));
         }
         if (!projects.length) g.append(h('div.card', h('div.empty', '프로젝트를 만들면 할 일·지출·작업 시간이 프로젝트별로 모여요')));

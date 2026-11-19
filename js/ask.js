@@ -49,11 +49,24 @@ export async function smart(q, base = new Date(), r = null) {
     for (const n of await store.teammateNames()) if (!cnt.has(n)) cnt.set(n, { n: 0, late: 0 });
     const rows = [...cnt.entries()].sort((a, b) => b[1].n - a[1].n); if (!rows.length) return { text: '남은 할 일이 없어서 다들 여유 있어요.', items: [] };
     const top = rows[0], low = rows.at(-1);
-    return { text: `${top[0]} 님이 남은 일 ${top[1].n}개로 가장 바빠요${top[1].late ? ` (밀린 것 ${top[1].late}개)` : ''}.${rows.length > 1 && low[1].n < top[1].n ? ` 새 일은 ${low[0]} 님(${low[1].n}개)에게 맡기는 게 좋아요.` : ''}`, items: rows.map(([n, c]) => ({ icon: 'user', title: n, sub: `남은 일 ${c.n}개${c.late ? ` · 밀림 ${c.late}개` : ''}`, route: 'tasks' })) };
+    const nim = (n, j) => n === '나' ? (j === '이' ? '내가' : '나') : `${n} 님${j || ''}`;
+    return { text: `${nim(top[0], '이')} 남은 일 ${top[1].n}개로 가장 바빠요${top[1].late ? ` (밀린 것 ${top[1].late}개)` : ''}.${rows.length > 1 && low[1].n < top[1].n ? (low[0] === '나' ? ` 남은 일이 가장 적은 건 나(${low[1].n}개)예요.` : ` 새 일은 ${nim(low[0])}(${low[1].n}개)에게 맡기는 게 좋아요.`) : ''}`, items: rows.map(([n, c]) => ({ icon: 'user', title: n, sub: `남은 일 ${c.n}개${c.late ? ` · 밀림 ${c.late}개` : ''}`, route: 'tasks' })) };
   }
 
   // 프로젝트 진행 상황, 프로젝트에 쓴 돈
-  const proj = projects.sort((a, b) => b.length - a.length).find(p => Q.includes(key(p))) || (brain.projectMatch(q, projects) || {}).name || '';
+  const pg = brain.projectGuess(q, projects);
+  const proj = projects.sort((a, b) => b.length - a.length).find(p => Q.includes(key(p))) || pg.name || '';
+  const inP = (x, p) => x.project === p || key(x.title).includes(key(p));
+  const sumA = a => a.reduce((s2, x) => s2 + (Number(x.amount) || 0), 0);
+  const cash = async p => { const inc = (await db.list('incomes')).filter(x => inP(x, p)), exp = (await db.list('expenses')).filter(x => inP(x, p)); const got = sumA(inc.filter(x => x.status === 'got')), due = sumA(inc.filter(x => x.status !== 'got')), out = sumA(exp); return { got, due, out, left: got + due - out, n: inc.length + exp.length }; };
+  const prog = p => { const ts = [...tasks, ...pTasks].filter(t => inP(t, p)); const left = ts.filter(t => !t.done).sort((a, b) => (a.due || '9').localeCompare(b.due || '9')); return { all: ts.length, done: ts.length - left.length, left, late: left.filter(t => t.due && t.due < today).length, next: left.find(t => t.due) }; };
+  // 프로젝트별로 한눈에: 진행, 또는 돈(받은 돈·받을 돈·쓴 돈·남는 돈)
+  { const many = !proj && pg.many && pg.many.length > 1 ? pg.many : null; const allQ = /프로젝트\s*별|전체\s*프로젝트|프로젝트\s*(전체|전부|다|현황|상황|정리|요약)/.test(q);
+    if ((allQ || many) && projects.length) { const ps = many || projects; const moneyQ = /(돈|수익|매출|비용|지출|정산|얼마|남는|남아|남았|이익|마진|예산)/.test(q) && !/할\s*일/.test(q);
+      if (moneyQ) { let rows = []; for (const p of ps) rows.push([p, await cash(p)]); if (rows.some(([, c]) => c.n)) rows = rows.filter(([, c]) => c.n); const tot = rows.reduce((s2, [, c]) => s2 + c.left, 0);
+        return { text: `${many ? '이름이 겹치는 ' : ''}프로젝트 ${rows.length}개의 돈이에요. 받은 돈과 받을 돈에서 쓴 돈을 빼면 모두 ${won(tot)} 남아요.`, items: rows.map(([p, c]) => ({ icon: 'receipt', title: p, sub: c.n ? `받음 ${won(c.got)} · 받을 돈 ${won(c.due)} · 씀 ${won(c.out)} · 남는 돈 ${won(c.left)}` : '아직 적힌 돈이 없어요', route: 'plan' })) }; }
+      if (allQ || /(어디까지|진행|상황|현황|얼마나|남았|어때|어떻게|됐|끝났|정리|할\s*일|마감)/.test(q) || key(q).length <= 6) { const rows = ps.map(p => [p, prog(p)]);
+        return { text: `${many ? '그 이름이 들어간 ' : ''}프로젝트 ${rows.length}개예요. ${rows.filter(([, g]) => g.late).length ? `밀린 일이 있는 곳은 ${rows.filter(([, g]) => g.late).map(([p]) => p).join(', ')}이에요.` : '밀린 일은 없어요.'}`, items: rows.map(([p, g]) => ({ icon: 'folder', title: p, sub: g.all ? `할 일 ${g.done}/${g.all} 끝남${g.late ? ` · 밀림 ${g.late}` : ''}${g.next ? ` · 다음 마감 ${md(g.next.due)} ${g.next.title}${g.next.who ? '(' + g.next.who + ')' : ''}` : ''}` : '아직 묶인 할 일이 없어요', route: 'plan' })) }; } } }
 
   // 주간 점검: 이번 주에 끝낸 것, 남은 것, 밀린 것, 다음 주 일정
   if (/(주간|이번\s*주|금주|지난\s*주)\s*(점검|보고|리포트|결산|회고|정리)/.test(q)) {
@@ -83,8 +96,8 @@ export async function smart(q, base = new Date(), r = null) {
     const sum = a => a.reduce((s2, x) => s2 + (Number(x.amount) || 0), 0);
     return { text: due.length ? `받을 돈은 ${won(sum(due))} (${due.length}건)이에요.${due.filter(x => x.date && x.date < today).length ? ` 받기로 한 날이 지난 게 ${due.filter(x => x.date && x.date < today).length}건 있어요.` : ''}${got.length ? ` 지금까지 받은 돈은 ${won(sum(got))}이에요.` : ''}` : (got.length ? `받을 돈은 다 받았어요. 지금까지 ${won(sum(got))} 받았어요.` : '적어 둔 받을 돈이 없어요. “오로라 계약금 300만원 25일 입금 예정”처럼 말해 주세요.'), items: due.concat(got.slice(0, 3)).slice(0, 12).map(x => ({ icon: 'wallet', title: x.title, sub: [won(x.amount), x.status === 'got' ? '받음' : x.date ? '받는 날 ' + md(x.date) : '날짜 미정', x.from].filter(Boolean).join(' · '), route: 'money' })) };
   }
-  if (proj && /(얼마|썼|지출|비용|예산)/.test(q)) { const xs = (await db.list('expenses')).filter(e => e.project === proj || key(e.title).includes(key(proj))); const sum = xs.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-    return { text: `“${proj}”에 지금까지 ${won(sum)} 썼어요 (${xs.length}건).`, items: xs.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 10).map(e => ({ icon: 'receipt', title: e.title, sub: `${won(e.amount)} · ${md(e.date)}`, route: 'money' })) }; }
+  if (proj && /(얼마|썼|지출|비용|예산|돈|수익|남는|남아)/.test(q)) { const xs = (await db.list('expenses')).filter(e => inP(e, proj)); const sum = xs.reduce((s, e) => s + (Number(e.amount) || 0), 0); const c = await cash(proj);
+    return { text: `“${proj}”에 지금까지 ${won(sum)} 썼어요 (${xs.length}건).${c.got || c.due ? ` 받은 돈 ${won(c.got)}, 받을 돈 ${won(c.due)}이라 지금 계산으로는 ${won(c.left)} 남아요.` : ''}`, items: xs.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 10).map(e => ({ icon: 'receipt', title: e.title, sub: `${won(e.amount)} · ${md(e.date)}`, route: 'money' })) }; }
   if (proj && (/(어디까지|진행|상황|현황|얼마나|남았|어때|어떻게|됐|끝났|정리|할\s*일|마감|일정)/.test(q) || key(q) === key(proj))) { const ts = [...tasks, ...pTasks].filter(t => t.project === proj || key(t.title).includes(key(proj))), done = ts.filter(t => t.done).length, left = ts.filter(t => !t.done), late = left.filter(t => t.due && t.due < today); const next = left.filter(t => t.due && t.due >= today).sort((a, b) => a.due.localeCompare(b.due))[0];
     const evs = (await db.list('events')).filter(e => (e.project === proj || key(e.title).includes(key(proj))) && e.date >= today).sort((a, b) => a.date.localeCompare(b.date));
     return { text: ts.length ? `“${proj}”은 할 일 ${ts.length}개 중 ${done}개 끝났어요 (${Math.round(done / ts.length * 100)}%).${late.length ? ` 밀린 게 ${late.length}개 있어요.` : ''}${next ? ` 다음 마감은 ${md(next.due)} “${next.title}”${next.who ? `(${next.who})` : ''}이에요.` : ''}` : `“${proj}”에 묶인 할 일이 아직 없어요.`, items: [...late, ...left.filter(t => !late.includes(t)).sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))].slice(0, 10).map(t => taskItem(t, today)).concat(evs.slice(0, 3).map(evItem)) }; }

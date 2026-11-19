@@ -7,7 +7,9 @@ const KIN = /(오빠|언니|누나|형|엄마|아빠|어머니|아버지|할머�
 export const LABEL = { work: '팀 업무', personal: '개인' };
 // who = 같이 하는 사람, team = 팀원 이름 목록
 export function guess(text, { who = '', team = [] } = {}) {
-  const t = String(text || ''); let p = 0, w = 0;
+  let t = String(text || ''); let p = 0, w = 0;
+  if (/(?<![A-Za-z])PT(?![A-Za-z])/.test(t) && !/(헬스|운동|트레이너|센터|필라테스|회차|받으러|받기|받음|\d+\s*회)/.test(t)) t = t.replace(/(?<![A-Za-z])PT(?![A-Za-z])/g, '발표'); // 경쟁 PT, PT 리허설
+  if (/(본사|시공|철수|리허설|프리오픈|팝업|컨펌|(?<![A-Za-z])OT(?![A-Za-z])|클라이언트|브랜드팀|대행사|제일기획|대관|입점|큐시트|케이터링|인플루언서)/.test(t)) w += 1;
   if (PERSONAL.test(t)) p += 1;
   if (WORK.test(t)) w += 1;
   const names = team.filter(Boolean).flatMap(n => /^[가-힣]{3,4}$/.test(n) ? [n, n.slice(1)] : [n]);

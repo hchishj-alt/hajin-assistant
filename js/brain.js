@@ -92,16 +92,17 @@ export function parseWhen(text, base = new Date()) {
     else if ((m = hit(t.match(/(이번\s*주|이번주|금주)\s*(중에|중으로|중|에)(?=\s|$)/)))) { const fri = addD(b, -((b.getDay() + 6) % 7) + 4); date = fri < b ? b : fri; vague = true; }
     else if ((m = hit(t.match(/(이번\s*주말|주말)/)))) date = addD(b, b.getDay() === 0 ? 0 : 6 - b.getDay());
     else if ((m = hit(t.match(/(이번\s*달|이달)\s*(말|안)/)))) date = new Date(b.getFullYear(), b.getMonth() + 1, 0);
-    else if ((m = hit(t.match(/(다음\s*달|담달)\s*(초|말)?/)))) date = m[2] === '말' ? new Date(b.getFullYear(), b.getMonth() + 2, 0) : m[2] ? new Date(b.getFullYear(), b.getMonth() + 1, 1) : addM(1);
-    else if ((m = hit(t.match(/(?<![\d월/.박xX×*]|[xX×*]\s)(\d{1,2})\s*일(?![\d간정])(?!\s*(?:필요|걸|소요|동안|정도|치|연장|추가|더|남|만에|째|차|이내|씩|짜리))(?!\s*\d+(?:\.\d+)?\s*만|\s*\d[\d,]*\s*(?:원|천))(?=\s|까지|에|날|$|,)/)))) {
+    else if ((m = hit(t.match(/(다음\s*달|담달)\s*(초|말|부터)?/)))) date = m[2] === '말' ? new Date(b.getFullYear(), b.getMonth() + 2, 0) : m[2] ? new Date(b.getFullYear(), b.getMonth() + 1, 1) : addM(1);
+    else if ((m = hit(t.match(/(?<![\d월/.박xX×*]|[xX×*]\s)(\d{1,2})\s*일(?![\d간정])(?!\s*(?:필요|걸|소요|동안|정도|치|연장|추가|더|남|만에|째|차|이내|씩|짜리))(?!\s*\d+(?:\.\d+)?\s*만|\s*\d[\d,]*\s*(?:원|천))(?=\s|까지|에|날|$|,)/))) && !(/(하루|일당|1일)\s*[\d,.]+\s*(만|천)?\s*(\d+\s*천)?\s*원?\s*(씩)?\s*\d{1,3}\s*일/.test(t) && hits.pop())) {
       const da = +m[1];
       if (da >= 1 && da <= 31) { for (let k = 0; k < 4; k++) { date = new Date(b.getFullYear(), b.getMonth() + k, da); if (date.getDate() === da && date >= b) break; } } // 31일이 없는 달은 건너뜀
     }
   }
 
   if (date && !endDate) { const last = hits.find(x => /\d\s*일$|\d{1,2}[/.]\d{1,2}$/.test(x)); if (last) { const rest = t.slice(t.indexOf(last) + last.length); const em = rest.match(/^\s*(?:~|-|부터)?\s*(?:(\d{1,2})[/.])?(\d{1,2})(?:\s*일)?(?:까지)?(?![\d:시/.])/); if (em && (/^\s*(~|-|부터)/.test(em[0]) || /일/.test(em[0])) && +em[2] >= 1 && +em[2] <= 31) { const e = new Date(date.getFullYear(), em[1] ? +em[1] - 1 : date.getMonth(), +em[2]); if (e > date && e - date < 15 * 864e5) { endDate = e; hits.push(em[0].trim()); } } } }
+  if (date && !endDate) { const last = hits.find(x => /\d\s*일$/.test(x)); if (last) { const rest = t.slice(t.indexOf(last) + last.length); const em = rest.match(/^\s*\(?[월화수목금토일]?(?:요일)?\)?\s*(?:이랑|랑|하고|와|과|,|·)\s*(?:(\d{1,2})\s*월\s*)?(\d{1,2})\s*일(?:\s*\(?[월화수목금토일](?:요일)?\)?)?/); if (em) { const e = new Date(date.getFullYear(), em[1] ? +em[1] - 1 : date.getMonth(), +em[2]); if (Math.round((e - date) / 864e5) === 1) { endDate = e; hits.push(em[0].trim()); } } } }
   // 시간
-  const early = /(집합|콜\s*타임|슛|출발|기상|일출|첫\s*차|조식|콜(?=\s|$|,))/.test(t); // 현장 말은 아침 시간
+  const early = /(집합|콜\s*타임|슛|출발|기상|일출|첫\s*차|조식|(?<!컨펌\s?|확인\s?|피드백\s?|화상\s?|전화\s?|줌\s?|수정본\s?|보고\s?)콜(?=\s|$|,))/.test(t); // 현장 말은 아침 시간
   const ampm = s => /밤/.test(s) ? 'night' : /오후|저녁|pm|PM/.test(s) ? 'pm' : /오전|아침|새벽|am|AM/.test(s) ? 'am' : /점심|낮/.test(s) ? 'noon' : '';
   const toH = (h, ap) => {
     h = +h;
@@ -164,7 +165,7 @@ export function parseMoney(text) {
   return null;
 }
 // 단위 없이 쓴 금액: "택시비 12800 법카", "KTX 59,800 왕복"
-export function bareAmount(text) { const m = String(text).replace(/(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/g, ' ').match(/(?<![\d.,:/#-])(\d{1,3}(?:,\d{3})+|\d{4,7})(?![\d.,:/]|\s*(?:년|월|일|시|분|초|명|개|장|건|회|번|호|층|차|px|mm|cm|kg|km|TB|GB|tb|gb|%|원|만|천)(?![가-힣]))/); return m ? +m[1].replace(/,/g, '') : null; }
+export function bareAmount(text) { const m = String(text).replace(/\d{3,}\s*[xX×*]\s*\d{3,}(\s*[xX×*]\s*\d+)?\s*(mm|cm|m|px)?/g, ' ').replace(/\d+\s*(mm|cm|px)\s*[xX×*]\s*\d+\s*(mm|cm|px)?/g, ' ').replace(/(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/g, ' ').match(/(?<![\d.,:/#-])(\d{1,3}(?:,\d{3})+|\d{4,7})(?![\d.,:/]|\s*(?:년|월|일|시|분|초|명|개|장|건|회|번|호|층|차|px|mm|cm|kg|km|TB|GB|tb|gb|%|원|만|천)(?![가-힣]))/); return m ? +m[1].replace(/,/g, '') : null; }
 export function parsePhone(text) { const m = text.match(/(01[016789]|02|0[3-6]\d)[\s.-]?(\d{3,4})[\s.-]?(\d{4})/); return m ? `${m[1]}-${m[2]}-${m[3]}` : null; }
 export function parseEmail(text) { const m = text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/); return m ? m[0] : null; }
 export function parseUrls(text) { return text.match(/https?:\/\/[^\s)]+/g) || []; }
@@ -311,7 +312,8 @@ export function cleanTask(s, who = '') {
   r = r.replace(/^(나|저)(는|도)?\s+(?=\S)/, '').replace(/\s*(아직|여태|결국)?\s*(못|안)\s*(함|했어요?|했음|했다|끝냄|끝냈어요?|보냄|보냈어요?|한\s*상태)\s*$/, '').replace(/(봐|와|써|꿔|춰|겨|려|워|져|쳐|여|켜)\s*(주세요|줘|주라|줄래)\s*$/, (m0, a) => ({ 봐: '보', 와: '오', 써: '쓰', 꿔: '꾸', 춰: '추', 겨: '기', 려: '리', 워: '우', 져: '지', 쳐: '치', 여: '이', 켜: '키' }[a]) + '기');
   if (who && who !== '나') r = r.replace(new RegExp('(^|\\s)' + who.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(팀장|실장|선배|후배|대리|과장|피디|PD|대표|감독|작가)?(님|씨)?(이가|이|가|은|는|께서|한테|에게|께)?\\s*[:：]?\\s*'), ' ').trim().replace(/([가-힣])(은|는)\s+(하기로\S*|하기|맡기로\S*|담당)\s*$/, '$1');
   r = r.replace(/(다음\s*주|이번\s*주|담주|다담주|다다음\s*주)?\s*[월화수목금토일](요일|욜)(까지|에|부터)?/g, ' ')
-    .replace(/(오늘|내일|모레|글피|다음\s*주|이번\s*주|\d+월\s*\d+일|\d{1,2}\/\d{1,2}|오전|오후|저녁|아침|\d+시(\s*반|\s*\d+분)?)(까지|에|부터)?/g, ' ')
+    .replace(/(?<![가-힣])(오늘|내일|모레|글피|오전|오후|저녁|아침)(까지|에|부터)?(?![가-힣])|(다음\s*주|이번\s*주|\d+월\s*\d+일|\d{1,2}\/\d{1,2}|\d+시(\s*반|\s*\d+분)?)(까지|에|부터)?/g, ' ')
+    .replace(/(^|\s)(밤|새벽|낮|점심)(까지|부터)(?=\s|$)/g, ' ')
     .replace(/\s(까지|에)\s/g, ' ')
     .replace(/(제가|내가|저는|나는|우리가|저희가)\s*/g, '')
     .replace(/[.!~]+$/, '').replace(/\s+/g, ' ').trim()
@@ -320,7 +322,7 @@ export function cleanTask(s, who = '') {
   r = r.replace(/(\S+?)하?(해\s*주세요|해\s*줘|해\s*주라|하기로\s*\S*|해야\s*\S*|할\s*것|합시다|하자|할게요?|해요|했어요|합니다)$/, (m, a) => a + (/하$/.test(a) ? '기' : '하기'))
     .replace(/(\S+?)[어아]?\s*(주세요|줘|주라|드리기|드려요|드릴게요)$/, '$1기')
     .replace(/(\S+?)(기로\s*\S*|야\s*(해|돼|함|됨|겠다)\S*|ㄹ게요?)$/, '$1기')
-    .replace(/(했음|했다|했어|함|됨|임)$/, '').trim();
+    .replace(/\s+(할게요?|하겠음|하겠습니다|맡을게요?|맡음|달래|해\s*달래|해달래)$/, '').replace(/(했음|했다|했어|(?<!명|보관|우편|사서|수거|투표|응모|건의|편지|메일|구급|경|군)함|(?<!안|작)됨|(?<!프레|게|타|모|라|클레|책|담|선|후|부|취|위|역|해|분|디|퍼|패러다|맥|헬|스트)임)$/, '').trim();
   return r.replace(/^[,.:：\s]+|[,.\s]+$/g, '');
 }
 
@@ -362,12 +364,13 @@ const uniqBy = (a, f) => { const s = new Set(); return a.filter(x => { const k =
 
 // ── 비용 카테고리 ────────────────────────────────────────────
 export const EXP_CATS = {
-  식비: /(점심|저녁|아침|밥|식사|식당|배달|커피|카페|스타벅스|음료|간식|회식|치킨|피자|빵|편의점|마라|국밥|떡볶이)/,
+  식비: /(점심|저녁|아침|밥|식사|식대|식당|배달|커피|카페|스타벅스|음료|간식|회식|치킨|피자|빵|편의점|마라|국밥|떡볶이)/,
   교통: /(택시|버스|지하철|기차|ktx|KTX|srt|SRT|주유|기름|주차|톨게이트|카카오T|우버|항공|비행기|교통)/,
   재료비: /(재료|인쇄|출력|프린트|제본|원단|화방|문구|폼보드|아크릴|굿즈|샘플|목업|촬영소품|소품)/,
   소프트웨어: /(구독|어도비|adobe|피그마|figma|노션|notion|클로드|claude|chatgpt|gpt|구글|google|클라우드|서버|도메인|호스팅|앱스토어|플러그인|폰트|unity|유니티|언리얼)/i,
   장비: /(노트북|모니터|키보드|마우스|태블릿|아이패드|카메라|렌즈|조명|마이크|삼각대|하드|ssd|SSD|케이블|충전기)/,
-  회의비: /(회의|미팅|대관|스터디룸|공간|장소)/,
+  대관·시공: /(대관|임대료|임차|시공|철거|설치비|집기\s*대여|렌탈|부스\s*제작)/,
+  회의비: /(회의|미팅|스터디룸|공간|장소)/,
   마케팅: /(광고|홍보|인스타|instagram|유튜브|부스트|협찬|현수막|포스터|전단|명함)/,
   교육: /(강의|수강|책|도서|세미나|컨퍼런스|교육|클래스|튜토리얼)/,
   인건비: /(외주|인건비|알바|용역|사례비|강사비|페이)/,
@@ -383,7 +386,7 @@ export function guessCategory(text) {
 export function interpret(input, ctx = {}) {
   input = String(input == null ? '' : input).replace(/[ \t]{3,}/g, '  '); ctx = { ...ctx, people: (ctx.people || []).filter(x => typeof x === 'string' && x) };
   const base = ctx.base || new Date();
-  const blk = noticeBlock(input, base, ctx) || bulletBlock(input, base, ctx); if (blk) return blk;
+  const blk = noticeBlock(input, base, ctx) || bulletBlock(input, base, ctx); if (blk) return blk.map(r => polish({ src: input, ...r }, ctx));
   const parts = splitCommands(input).flatMap(p => splitList(p, base, ctx)).flatMap(p => splitPeople(p, base, ctx));
   const out = [];
   for (const p of parts) {
@@ -407,7 +410,7 @@ export function interpret(input, ctx = {}) {
       out.push({ ...r, src: p.trim() }); prev = r;
     }
   }
-  return out;
+  return out.map(r => polish(r, ctx));
 }
 // 뒤 조각에 시각만 있으면 앞 조각의 날짜를 물려줌: "내일 10시 미팅하고 3시에 답사" → 답사도 내일
 function carryDate(prev, cur, base) { const cw = parseWhen(cur, base); if (!cw.hits.length || !cw.hits.every(isTimeHit)) return cur; const dh = parseWhen(prev, base).hits.find(x => !isTimeHit(x)); return dh ? `${dh} ${cur}` : cur; }
@@ -459,6 +462,34 @@ function bulletBlock(input, base, ctx) {
   return items.map(l => { const t = l.replace(B, '').trim(); return kind === 'buy'
     ? { kind, label: '살 것', confidence: 0.7, src: l, data: { title: t, url: '', price: parseMoney(t) || 0, qty: 1, need: 'must' } }
     : { kind, label: '할 일', confidence: 0.75, src: l, data: { title: t.slice(0, 80), who: who === '나' ? '' : who, due, time: '', priority: 'normal', project: projectOf(input, ctx), tags: [], ...(title0 ? { memo: title0.slice(0, 60) } : {}) } }; });
+}
+// 회의록 붙여넣기: 첫 줄에 '○○ 회의록'(쌍점 없어도 됨), 아래에 줄마다 한 가지
+// "민서: 굿즈 후보 3개 다음주 금요일까지" → 민서 할 일, "다음 회의 12월 1일 오후 2시" → 일정, 나머지 줄은 결정사항
+export function minutes(input, ctx = {}) {
+  const ls = String(input || '').split(/\n+/).map(x => x.trim()).filter(Boolean); if (ls.length < 3) return null;
+  const head = ls[0]; if (head.length > 40 || !/(회의록|회의\s*(내용|정리|메모|결과|요약)|미팅\s*(내용|정리|메모|결과|요약|노트))/.test(head)) return null;
+  const base = ctx.base || new Date(); const people = ctx.people || []; const mine = [].concat(ctx.me || []).filter(Boolean);
+  const title = head.replace(/[:：]\s*$/, '').replace(/^[#\[\]\s]+|[\]\s]+$/g, '').trim(); const hw = parseWhen(head, base);
+  const project = projectGuess(head, ctx.projects || [], ctx.project || '').name || ctx.project || '';
+  const B = /^(?:[-*•·▪◦✓☐□]|\d{1,2}[.)]|\(\d{1,2}\)|[①-⑳])\s*/; const MUST = /(해야|하기로|줘야|필요|부탁|까지|하기$|보내기|만들기|확인$|정리$|작성$|준비$|섭외$|발주$|예약$)/;
+  const items = [], notes = [], att = new Set();
+  for (const raw of ls.slice(1)) {
+    let l = raw.replace(B, '').trim(); if (!l) continue; let who = null;
+    const pm = l.match(/^([가-힣A-Za-z]{1,6}?)(?:님|씨)?\s*[:：]\s*(.+)$/);
+    if (pm) { const n = pm[1]; const full = people.find(p => p === n || (p.length === 3 && p.slice(1) === n)); const isMe = /^(나|저|본인)$/.test(n) || mine.some(x => x === n || (x.length === 3 && x.slice(1) === n));
+      if (isMe) { who = ''; att.add(mine[0] || '나'); l = pm[2]; } else if (full) { who = n; att.add(full); l = pm[2]; }
+      else if (/^(참석자?|참여자?|참석\s*인원)$/.test(n)) { pm[2].split(/[,\s·]+/).filter(x => x.length >= 2).forEach(x => att.add(x)); continue; }
+      else if (/^(결정|결론|결정\s*사항|메모|비고|공유|안건|논의|이슈)$/.test(n)) { notes.push(pm[2]); continue; } }
+    let rs = interpret(who ? `${who} ${l}` : l, { ...ctx, project }).filter(r => r.kind !== 'talk' && r.kind !== 'query' && r.kind !== 'nav');
+    if (who !== null && !rs.some(r => r.kind === 'task' || r.kind === 'event')) { const w = parseWhen(l, base); rs = [{ kind: 'task', label: '할 일', confidence: 0.75, data: { title: cleanTask(w.hits.reduce((x, hh) => x.replace(hh, ' '), l), who || '') || l, due: w.date || '', time: '', who, priority: 'normal', project, tags: [] } }]; }
+    const keep = rs.filter(r => who !== null ? (r.kind === 'task' || r.kind === 'event') : ((r.kind === 'event' && r.data.date) || (r.kind === 'task' && (r.data.who || r.data.due || MUST.test(l)))));
+    if (!keep.length) { notes.push(l); continue; }
+    for (const r of keep) { const d = r.data; if (r.kind === 'task' && who !== null) d.who = who; if (!d.project && project) d.project = project;
+      if (r.kind === 'event' && /^다음\s*(회의|미팅)$/.test(d.title || '')) d.title = `${project ? project + ' ' : ''}${d.title.replace(/^다음\s*/, '')}`;
+      items.push({ ...r, src: raw }); }
+  }
+  if (!items.length && notes.length < 2) return null;
+  return { title, project, date: hw.date && hw.hits.length ? hw.date : '', attendees: [...att], items, notes, body: ls.slice(1).join('\n') };
 }
 // "[공지] 11/27(금) 워크숍 / 시간: 10시 집합 / 장소: … / 회비: …" → 일정 하나
 function noticeBlock(input, base, ctx) {
@@ -523,6 +554,7 @@ export function vendorParts(t, known = []) {
   const hit = known.filter(Boolean).sort((a, b) => b.length - a.length).find(n => t.replace(/\s/g, '').includes(n.replace(/\s/g, '')));
   const toks = rest.split(/[\s,·/]+/).filter(Boolean);
   let name = hit || toks.find(x => !VSKIP.test(x) && !/^\d/.test(x) && !VCAT.some(([c, re]) => x === c || (re.test(x) && x.length <= 3))) || '';
+  { const after = rest.match(/^\s*([가-힣A-Za-z·]{2,8})\s*(?:업체|거래처)(?:는|은)?\s+([가-힣A-Za-z0-9]{2,})/); if (!hit && after && !VSKIP.test(after[2]) && !/^(견적|가격|단가|연락|전화|번호)/.test(after[2])) name = after[2]; }
   name = name.replace(/(은|는|이|가|에서|에|한테|의)$/, m => (name.length - m.length >= 2 ? '' : m));
   const explicit = (rest.match(/([가-힣·]+)\s*(?:업체|거래처)/) || [])[1] || '';
   const cat = (VCAT.find(([c, re]) => re.test(explicit)) || (hit ? [''] : null) || VCAT.find(([c, re]) => re.test(name)) || VCAT.find(([c, re]) => re.test(rest)) || ['기타'])[0];
@@ -565,7 +597,8 @@ function interpretOne(s, base, ctx) {
     if (HELPQ.test(t)) return false;
     if (/\?\s*$/.test(t)) return true;
     if (/(얼마나?\s*(썼|나갔|들었|남았|받았|벌었)|누가\s*(제일|가장)|뭐가\s*(제일|가장)|어디가\s*(제일|가장))/.test(t)) return true;
-    if (/(얼마|몇\s*(개|명|건|번|시|층|일|분))/.test(t) && /(썼|남았|들었|나갔|야|지|죠|예요|에요|였지|였죠|더라|인지|돼|됐)(어|어요|나|니)?\s*$/.test(t)) return true;
+    if (/(얼마|몇\s*(개|명|건|번|시|층|일|분))/.test(t) && /(썼|남았|남아|남지|남나|남는지|들었|나갔|야|지|죠|예요|에요|였지|였죠|더라|인지|돼|됐)(어|어요|나|니)?\s*$/.test(t)) return true;
+    if (/프로젝트\s*별|(어디까지|얼마나)\s*(됐|했|진행|왔|남)/.test(t) && money == null && !/(해야|하기|까지\s*$)/.test(t)) return true;
     if (money != null) return false;
     const QW = /(언제|어디|누구|누가|뭐|뭘|무슨|몇|얼마|어느|어떻게|어땠|어때)/;
     if (QW.test(t) && !/(뭐\s*좀|뭔가|어떻게든|어디든|언제든|누구든|뭐든|아무)/.test(t)) {
@@ -581,8 +614,8 @@ function interpretOne(s, base, ctx) {
       if (/^(주간|이번\s*주|금주|지난\s*주)\s*(점검|보고|리포트|결산|회고)(\s*(해\s*줘|보여\s*줘|뽑아\s*줘))?$/.test(t)) return true;
       const m = t.match(/^(.*?)\s*(할\s*일|할일|마감|일정|스케줄|지출|지출\s*내역|진행\s*상황|진행상황|진행\s*현황|현황|회의\s*내용|휴가자?|빈\s*시간|작업\s*시간|대기함|확인할\s*것)\s*(은|는|좀)?$/);
       if (m) { const rest = m[1].trim().split(/\s+/).filter(Boolean); const bare = x => x.replace(/(이|의|님)$/, '');
-        const okW = x => /^(오늘|내일|모레|어제|이번|다음|지난|주|달|이번주|다음주|지난주|이번달|금주|담주|팀|팀원|개인|내|우리|전체|남은|밀린|끝난|나|저)$/.test(x) || known(bare(x), ctx) || isName(bare(x));
-        if (rest.length <= 4 && (rest.every(okW) || (rest.length && !!projectMatch(m[1], ctx.projects || []) && !w.date))) return true; }
+        const okW = x => /^(오늘|내일|모레|어제|이번|다음|지난|주|달|이번주|다음주|지난주|이번달|금주|담주|팀|팀원|개인|내|우리|전체|남은|밀린|끝난|나|저|프로젝트|프로젝트별)$/.test(x) || known(bare(x), ctx) || isName(bare(x));
+        if (rest.length <= 4 && (rest.every(okW) || (rest.length && (g => !!(g.name || g.many))(projectGuess(m[1], ctx.projects || [])) && !w.date))) return true; }
     }
     return false;
   })();
@@ -610,11 +643,16 @@ function interpretOne(s, base, ctx) {
     const tail = (w.hits || []).reduce((x, hh) => x.replace(hh, ' '), t).replace(/(오전|오후|아침|저녁|밤|점심)(에)?\s*$/, '').replace(/\s+/g, ' ').trim(); // 날짜·시간 말을 뺀 나머지
     const doit = ACTION.test(t) || TASKEND.test(tail);
     if (NOTELABEL.test(t) || /(저장해\s*놔|적어\s*놔|기억해\s*(둬|놔|줘)|메모해)/.test(t)) return 'note';
+    if (/^.{0,14}(피드백|회고|후기|조건|원칙|규칙|결론|결정\s*사항)\s*[:：]/.test(t)) return 'note'; // "수정 3차 피드백: …", "회고: …"
+    if (/(익월|익일\s*지급|지급\s*조건|결제\s*조건|정산\s*조건)/.test(t) && !/(해야|보내|요청)/.test(t)) return 'note'; // 거래 조건
+    if (/(으면|면)\s/.test(t) && /(하기로|청구하기로|받기로)\s*(함|했\S*)?\s*$/.test(t) && !w.date) return 'note'; // "~하면 ~하기로 함"은 약속한 규칙
+    if (/(선금|계약금|잔금|중도금|대금|시공비|인건비|외주비|대관료)\s*[\d,.]+\s*(만|천|억)?\s*원?\s*(을|를)?\s*(보냄|보냈\S*|송금\S*|이체\S*|지급함|지급했\S*|입금함|입금했\S*)\s*$/.test(t)) return 'expense';
+    if (/\d{3,}\s*[xX×*]\s*\d{3,}/.test(t) && /(발주|주문|인쇄|출력|제작)/.test(t) && OBLIG.test(t)) return 'task'; // 치수는 금액이 아님
     if (METRIC.test(t) && /\d/.test(t) && !dl && !OBLIG.test(t)) return 'note';
     const sentQuote = /(견적|제안)/.test(t) && /(보냄|보냈|보내드|발송|제출함|제출했)/.test(t);
     if (!sentQuote && (((/(업체|거래처|인쇄소|제작소|공방)/.test(t) || (/견적/.test(t) && (biz || vknown || phone || urls.length))) && (vsig || /(추가|등록|저장|정리)/.test(t)) && !/(받기|받아|요청|보내|문의하|연락하|알아보)/.test(t)) || (vknown && vsig && !/(결제|샀|구매했|썼|냈|입금)/.test(t)))) return 'vendor';
     if (urls.length && /(사야|살\s*거|살\s*것|구매\s*(목록|예정|할)|장바구니|주문해야|사자|사 ?줘)/.test(t)) return 'buy';
-    if (/(사야|살\s*거|살\s*것|구매해야|사\s*와야|사\s*놔야|사\s*둬야)/.test(t) && !w.date && !dl) return 'buy';
+    if ((/(사야|살\s*거|살\s*것|구매해야|사\s*와야|사\s*놔야|사\s*둬야)/.test(t) || /[가-힣]\s*(에서|서)\s*사기\s*$/.test(t)) && !w.date && !dl) return 'buy';
     if (phone || email) { if (money != null || RATE.test(t) || vknown) return 'vendor'; if ((dl || OBLIG.test(t)) && ACTION.test(t.replace(/담당|까지/g, ''))) return 'task'; return 'contact'; }
     if (money != null) {
       const out = /(외주비|외주|페이|인건비|알바|사례비|대관|렌탈|대여|모델료|출연료|수수료|월세|구독|광고비|원천세|급여|월급)/.test(t);
@@ -690,7 +728,11 @@ function interpretOne(s, base, ctx) {
         const ROLE = /^(.*?)(대표|이사|팀장|실장|부장|차장|과장|대리|주임|사원|주무관|매니저|PD|피디|교수|작가|감독|디자이너|개발자|기획자|마케터|에디터|사장|선생님|쌤|원장|담당자?)(님)?$/; const ws = raw.split(' ').filter(Boolean); let nm = '', role = '', org = '';
         const ti = ws.findIndex(x => ROLE.test(x) && x.match(ROLE)[1].length >= 1 && x.match(ROLE)[1].length <= 3); // "김대리", "박대표님"
         const ni = ws.findIndex(x => /^[가-힣]{2,4}$/.test(x) && !ROLE.test(x) && !PLACE_SUF.test(x) && !/(프린팅|디자인|스튜디오|컴퍼니|상사|기획|미디어|랩|웍스|코리아|주식회사|팀|부서|센터|회사|대학교|대학|학과|본부|지점|은행|병원|협회|재단)$/.test(x));
-        if (ni >= 0) { nm = ws[ni]; const others = ws.filter((_, k) => k !== ni); role = others.find(x => ROLE.test(x) && !x.match(ROLE)[1]) || ''; org = others.filter(x => x !== role).join(' '); }
+        const JOBW = /^(아트|디렉터|서기|경영|총무|회계|PM|피엠|UI|UX|디자이너|기획자?|개발자?|마케터|에디터|PD|피디|AE|카피라이터|인턴|운영|촬영|편집자?|리서처|매니저|아트디렉터)$/i;
+        const ri = ws.findIndex((x, k) => k >= 1 && ROLE.test(x) && !/^담당자?$/.test(x) && !x.match(ROLE)[1] && /^[가-힣]{2,4}$/.test(ws[k - 1]) && !ROLE.test(ws[k - 1]) && !/^(담당|소속)$/.test(ws[k - 1]));
+        if (ri >= 2 || (ri === 1 && ws.length === 2)) { nm = ws[ri - 1]; role = ws[ri].replace(/님$/, ''); org = ws.slice(0, ri - 1).filter(x => !/^(담당|소속)$/.test(x)).concat(ws.slice(ri + 1)).join(' '); }
+        else if (ni >= 0 && ws.length > 1 && ws.filter((_, k) => k !== ni).every(x => JOBW.test(x))) { nm = ws[ni]; role = ws.filter((_, k) => k !== ni).join(' '); org = ''; }
+        else if (ni >= 0) { nm = ws[ni]; const others = ws.filter((_, k) => k !== ni); role = others.find(x => ROLE.test(x) && !x.match(ROLE)[1]) || ''; org = others.filter(x => x !== role).join(' '); }
         else if (ti >= 0) { nm = ws[ti]; role = ws[ti].match(ROLE)[2]; org = ws.filter((_, k) => k !== ti).join(' '); }
         else { nm = (raw.match(/[가-힣]{2,4}|[A-Za-z]+(?:\s[A-Za-z]+)?/) || [''])[0]; org = raw.replace(nm, '').trim(); }
         return { kind, label: '연락처', confidence: 0.85, data: { name: nm, phone: ph || '', email: em || '', org, role, memo: '', tags } }; }
@@ -711,8 +753,12 @@ function interpretOne(s, base, ctx) {
   function moneyParts(body, bw) {
     const MR = new RegExp(MONEY_SRC, 'g'); let amt = parseMoney(body); let memo = ''; let ttl = body;
     const tot = body.match(new RegExp('(?:총|합계|합쳐서|다\\s*해서|토탈)\\s*(' + MONEY_SRC + ')'));
-    if (tot) amt = parseMoney(tot[1]);
-    else if (amt != null) { const first = body.match(new RegExp(MONEY_SRC)); const after = first ? body.slice(first.index + first[0].length) : ''; const mul = after.match(/^\s*(?:씩)?\s*(?:[xX×*]\s*(\d{1,3})(?:\s*(?:명|개|장|건|회|일|번|인|잔|박|권|세트|컷|편))?|씩\s*(\d{1,3})\s*(?:명|개|장|건|회|일|번|인|잔|박|권|세트|컷|편))/) || (/씩/.test(after.slice(0, 3)) ? null : null);
+    const part = body.match(new RegExp('(' + MONEY_SRC + ')\\s*중\\s*(선금|계약금|잔금|중도금|일부)?\\s*(' + MONEY_SRC + ')'));
+    const perDay = body.match(new RegExp('(?:하루|일당|1일)\\s*(' + MONEY_SRC + ')\\s*(?:씩)?\\s*(\\d{1,3})\\s*일(?:간|치|동안)?'));
+    if (part) { const whole = parseMoney(part[1]); const sub = parseMoney(body.slice(part.index + part[1].length)); if (sub != null) { amt = sub; memo = `총 ${Number(whole).toLocaleString()}원 중 ${part[2] || '일부'}`; ttl = ttl.replace(/\s중(?=\s)/, ' '); } }
+    else if (perDay) { const one = parseMoney(perDay[1]); const n = +perDay[2]; if (one != null && n > 1) { amt = one * n; memo = `${one.toLocaleString()}원 × ${n}일`; ttl = ttl.replace(perDay[0], ' '); } }
+    else if (tot) amt = parseMoney(tot[1]);
+    else if (amt != null && !part && !perDay) { const first = body.match(new RegExp(MONEY_SRC)); const after = first ? body.slice(first.index + first[0].length) : ''; const mul = after.match(/^\s*(?:씩)?\s*(?:[xX×*]\s*(\d{1,3})(?:\s*(?:명|개|장|건|회|일|번|인|잔|박|권|세트|컷|편))?|씩\s*(\d{1,3})\s*(?:명|개|장|건|회|일|번|인|잔|박|권|세트|컷|편))/) || (/씩/.test(after.slice(0, 3)) ? null : null);
       const n = mul ? +(mul[1] || mul[2]) : 0; if (n > 1 && n <= 500) { memo = `${amt.toLocaleString()}원 × ${n}`; amt = amt * n; ttl = ttl.replace(mul[0], ' '); } }
     if (amt == null) { const ba = bareAmount(body); if (ba != null) { amt = ba; ttl = ttl.replace(new RegExp('(?<![\\d,])' + String(ba).replace(/\B(?=(\d{3})+(?!\d))/g, ',?') + '(?![\\d,])'), ' '); } }
     if (/3\.3\s*%/.test(body)) memo = [memo, '3.3% 원천징수'].filter(Boolean).join(' · ');
@@ -752,7 +798,7 @@ export function eventParts(title, people = []) {
   let words = t.split(' ');
   if (!area && words.length > 1 && AREA.test(words[0].replace(/(에서|에)$/, ''))) { area = words.shift().replace(/(에서|에)$/, ''); t = words.join(' '); }
   // 이름 끝이 장소 같은 말 (○○센터, ○○시청, ○○역…): 앞에 붙은 말까지 묶음
-  if (!place) { words = t.split(' '); const k = words.findIndex(x => PLACE_SUF.test(x) && x.length >= 2); if (k >= 0 && k <= 2 && !(who && words.slice(0, k + 1).join(' ').includes(who))) { place = words.slice(0, k + 1).join(' '); const restT = words.slice(k + 1).join(' '); if (restT.length >= 2) t = restT; } }
+  if (!place) { words = t.split(' '); const k = words.findIndex(x => PLACE_SUF.test(x) && x.length >= 2); if (k >= 0 && k <= 2 && !(who && words.slice(0, k + 1).join(' ').includes(who))) { place = words.slice(0, k + 1).join(' '); const restT = words.slice(k + 1).join(' '); if (/^(에\s*)?(가야\s*\S*(\s*\S{1,2})?|가기|감|갈\s*\S*|들르\S*|다녀오\S*)$/.test(restT)) t = place; else if (restT.length >= 2) t = restT; } }
   // 보러 가는 일정이면 앞말이 장소
   const dm = t.match(DOING);
   if (!place && dm && dm.index > 0) { const head = t.slice(0, dm.index).trim().replace(/(에서|에|으로|로)$/, ''); if (head && head.split(' ').length <= 3 && !/(하|되)$/.test(head) && /(방문|관람|구경|보기|가기|견학|투어|답사|전시|공연|팝업|나들이|여행|데이트)$/.test(dm[1])) place = head; }
@@ -765,7 +811,42 @@ function placeOf(s) { const m = s.match(/([가-힣A-Za-z0-9]+(?:역|카페|센�
 const nsp = x => String(x || '').replace(/\s+/g, '');
 export function projAliases(p) { const ws = String(p || '').trim().split(/\s+/); const out = [p]; if (ws.length >= 3) out.push(ws.slice(0, 2).join(' ')); if (ws.length >= 2 && ws[0].length >= 4 && !/^(브랜드|유튜브|인스타|프로젝트|캠페인)$/.test(ws[0])) out.push(ws[0]); return out.filter(a => nsp(a).length >= 3); }
 export function projectMatch(s, projects = []) { const S = nsp(s).toLowerCase(); let best = null; for (const p of projects) if (p) for (const a of projAliases(p)) { const A = nsp(a).toLowerCase(); if (S.includes(A) && (!best || A.length > best.len)) best = { name: p, alias: a, len: A.length }; } return best; }
-function projectOf(s, ctx) { const hit = projectMatch(s, ctx.projects || []); if (hit) return hit.name; const m = s.match(/\[([^\]]+)\]/); return m ? m[1] : ''; }
+const NOPROJ = /(월세|관리비|부가세|세금\s*신고|종소세|주간\s*회의|휴가|반차|연차|병가|병원|치과|회고|급여|월급|보험|생일|개인|회식|사무실|워크숍|구독)/;
+const PGEN = /^(팝업|프로젝트|캠페인|브랜드|영상|제안|행사|촬영|디자인|기획|운영|리뉴얼|채널|유튜브|인스타|콘텐츠|제작|패키지|이벤트|론칭|런칭|홍보|마케팅|광고|\d+차?|신규|새|굿즈|릴스|회의|미팅|시안|작업)$/;
+const PADV = /^(제일|우리|이번|다음|지난|가을|겨울|봄|여름|오늘|내일|매일|하루|전체|모든|하나|새로)$/;
+export function projectGuess(s, projects = [], cur = '') {
+  const hit = projectMatch(s, projects); if (hit) return { name: hit.name };
+  const words = String(s || '').split(/[\s,·/()\[\]:：]+/).filter(Boolean); const cands = new Map();
+  for (const p of projects) for (const tk of String(p || '').split(/\s+/)) {
+    if (tk.length < 2 || PGEN.test(tk) || AREA.test(tk)) continue;
+    if (words.some(wd => wd.startsWith(tk) && (PADV.test(tk) ? wd.length >= tk.length + 2 : true))) cands.set(p, (cands.get(p) || 0) + tk.length);
+  }
+  if (!cands.size) return { name: '' };
+  const top = [...cands.entries()].sort((a, b) => b[1] - a[1]);
+  if (top.length === 1 || top[0][1] > top[1][1]) return { name: top[0][0] };
+  const many = top.filter(x => x[1] === top[0][1]).map(x => x[0]);
+  return { name: many.includes(cur) ? cur : '', many };
+}
+function projectOf(s, ctx) { const g = projectGuess(s, ctx.projects || [], ctx.project || ''); if (g.name) return g.name; const m = s.match(/\[([^\]]+)\]/); return m ? m[1] : ''; }
+// 마지막 손질: 제목에 남은 조사·요일, 프로젝트 붙이기
+const PROJ_KINDS = new Set(['event', 'task', 'expense', 'income', 'note', 'idea', 'reference', 'buy', 'sns', 'timelog']);
+export function polish(r, ctx = {}) {
+  const d = r && r.data; if (!d) return r; const src = String(r.src || '');
+  if (['event', 'income', 'expense', 'task', 'buy'].includes(r.kind) && typeof d.title === 'string' && d.title) {
+    let t = d.title.replace(/^[-*•·▪◦]\s+/, '').replace(/(?<=\S)\s+(까지|부터|에|으로|로|은|는|이랑|랑)(?=\s|$)/g, ' ');
+    if (/\d\s*일|\d{1,2}[/.]\d{1,2}/.test(src)) t = t.replace(/(^|\s)\(?[월화수목금토일]요일\)?(이랑|랑|에)?(?=\s|$)/g, ' '); // 날짜를 말했으면 요일은 제목에서 뺌
+    if (r.kind === 'event' || r.kind === 'income') t = t.replace(/^(\S{1,12}?)(은|는)(?=\s|$)/, (m0, a, j) => (new RegExp('^\\s*' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + j + '\\s+(\\d|오늘|내일|모레|다음|이번|팝업|[월화수목금토일]요일)').test(src) ? a : m0)); // "PT는 12월 9일 …" → "PT"
+    t = t.replace(/\s+/g, ' ').trim(); if (t) d.title = t;
+  }
+  if (r.kind === 'event' && d.title) { const t2 = d.title.replace(/^(나|내가|저|제가|나는|저는)\s+/, '').replace(/(^|\s)(오전|오후|아침|저녁|밤|새벽)에?(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim(); if (t2 && t2 !== d.title) { if (d.place === d.title) d.place = t2; d.title = t2; } }
+  if (r.kind === 'expense' && d.title) d.title = d.title.replace(/\s+(나감|나갔\S*|냄|냈\S*|씀|썼\S*|결제\S*|지출함?)$/, '').trim() || d.title;
+  if (r.kind === 'reference' && d.title) d.title = d.title.replace(/^(레퍼런스|참고|레퍼)\s*[:：]?\s+/, '').trim() || d.title;
+  if (r.kind === 'vendor' && /^(받음|받았\S*|옴|왔\S*)$/.test(d.memo || '')) d.memo = '';
+  if (PROJ_KINDS.has(r.kind) && !d.project) { const s0 = src || d.title || ''; const pj = projectOf(s0, ctx);
+    if (pj) d.project = pj;
+    else if (ctx.project && !NOPROJ.test(s0) && d.scope !== 'personal' && !projectGuess(s0, ctx.projects || []).many) { d.project = ctx.project; r.byCtx = true; } }
+  return r;
+}
 export function quarterOf(d = new Date()) { d = new Date(d); return `${d.getFullYear()} Q${Math.floor(d.getMonth() / 3) + 1}`; }
 
 // ── 비슷한 기록 찾기 ─────────────────────────────────────────

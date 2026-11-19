@@ -49,6 +49,12 @@ export function run() {
   results.push({ group: '회의 정리', name: '후속 일정 찾기', ok: a.dates.some(d => d.date === MEETING_EXPECT.dateOf26 && d.time === '14:00'), detail: a.dates.map(d => `${d.date} ${d.time || ''}`).join(', ') });
   results.push({ group: '회의 정리', name: '요약 길이', ok: a.summary.length >= 2 && a.summary.length <= 6, detail: `${a.summary.length}줄` });
   results.push({ group: '회의 정리', name: '키워드 품질', ok: a.keywords.every(k => !/(는데|어요|세요|했고)$/.test(k)) && a.keywords.length >= 4, detail: a.keywords.join(', ') });
+  { const P = ['제일 성수 팝업', '아모레 쿠션 팝업', '아모레 프리오픈', '루미에 팝업'];
+    const m = B.minutes('아모레 쿠션 킥오프 회의록\n- 예산 1억 2천, 기간 3주\n- 민서: 굿즈 후보 3개 다음주 금요일까지\n- 서연: 견적서 다음주 화요일까지\n- 하진: 예약 페이지 와이어프레임 11월 30일까지\n- 다음 회의 12월 1일 오후 2시', { base: BASE, people: ['최민서', '안서연'], projects: P, me: ['하진'] });
+    const it = (m?.items || []).map(x => `${x.kind}:${x.data.title}:${x.data.who ?? ''}:${x.data.due || x.data.date || ''}`);
+    results.push({ group: '회의록 붙여넣기', name: '담당·마감·프로젝트', ok: !!m && m.project === '아모레 쿠션 팝업' && it[0] === 'task:굿즈 후보 3개:민서:2026-11-27' && it[1] === 'task:견적서:서연:2026-11-24' && it[2] === 'task:예약 페이지 와이어프레임::2026-11-30' && m.items[3]?.kind === 'event' && m.notes.length === 1, detail: it.join(' / ') });
+    const g = s2 => B.projectGuess(s2, P).name;
+    results.push({ group: '프로젝트 묶기', name: '이름 일부만 말해도', ok: g('루미에 포스터') === '루미에 팝업' && g('제일기획 PT') === '제일 성수 팝업' && g('제일 급한 일') === '' && g('아모레 견적서') === '' && B.projectGuess('아모레 견적서', P, '아모레 프리오픈').name === '아모레 프리오픈', detail: [g('루미에 포스터'), g('제일기획 PT'), g('제일 급한 일') || '(없음)', g('아모레 견적서') || '(둘이라 안 정함)'].join(' / ') }); }
   const refs = B.recommendRefs('게임 UI 파스텔 미니멀 인벤토리 화면');
   results.push({ group: '레퍼런스', name: '게임 UI 추천', ok: refs.links.length >= 3 && refs.moods.includes('pastel'), detail: refs.links.map(l => l.site).join(', ') });
   const sim = B.similar('협찬 초대장', [{ id: 1, text: '이터니아 협찬사 초대장 디자인' }, { id: 2, text: '점심 메뉴' }]);
@@ -73,4 +79,12 @@ CASES.push(
   ['박예진 예진디자인 대표 01098765432', 'contact', { phone: '010-9876-5432' }],
   ['회의록', 'nav', {}],
   ['다음 달 초에 포트폴리오 업데이트', 'task', { due: '2026-12-01' }],
+  ['수요일까지 아모레 견적서 보내기', 'task', { title: '아모레 견적서 보내기', due: '2026-11-25' }],
+  ['예약 페이지 와이어프레임 11월 30일까지', 'task', { title: '예약 페이지 와이어프레임', due: '2026-11-30' }],
+  ['공간제작소 시공비 2,800만원 중 선금 1,400만원 보냄', 'expense', { amount: 14000000 }],
+  ['스태프 식대 하루 4만원 14일', 'expense', { amount: 560000 }],
+  ['이번 주 금요일 6시 제일기획 수정본 컨펌 콜', 'event', { date: '2026-11-20', start: '18:00' }],
+  ['루미에 팝업 12월 5일 토요일이랑 6일 일요일 연남동', 'event', { date: '2026-12-05', endDate: '2026-12-06' }],
+  ['더현대 담당 이수민 대리 010-5555-0202', 'contact', { name: '이수민' }],
+  ['현수막 3000x1200 유포지 2장 발주해야 해', 'task', {}],
 );

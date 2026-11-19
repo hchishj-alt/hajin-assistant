@@ -228,3 +228,18 @@ export async function handoff(task, to, note = '') {
   try { const sync = await import('./sync.js'); const r = (await db.kvGet('sync:roster', [])).find(m => m.name === to); if (r?.id && await sync.me()) await sync.dmSend(r.id, `[인수인계] “${task.title}”을 넘겨받았어요.${note ? ' 메모: ' + note : ''}${task.due ? ' (마감 ' + task.due.slice(5).replace('-', '/') + ')' : ''}`); } catch { }
   return t;
 }
+
+// 프로젝트별 한눈에: 할 일 진행, 다음 마감, 다음 일정, 받은 돈·받을 돈·쓴 돈, 담당별 남은 일
+export async function projectStats() {
+  const pad = n => String(n).padStart(2, '0'); const d0 = new Date(); const today = `${d0.getFullYear()}-${pad(d0.getMonth() + 1)}-${pad(d0.getDate())}`;
+  const [ps, tasks, events, exps, incs] = await Promise.all(['projects', 'tasks', 'events', 'expenses', 'incomes'].map(c => db.list(c)));
+  const sum = a => a.reduce((x, y) => x + (Number(y.amount) || 0), 0);
+  return ps.filter(p => p.name).map(p => {
+    const t = tasks.filter(x => x.project === p.name), left = t.filter(x => !x.done).sort((a, b) => (a.due || '9').localeCompare(b.due || '9'));
+    const ev = events.filter(x => x.project === p.name && (x.endDate || x.date || '') >= today).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const inc = incs.filter(x => x.project === p.name), ex = exps.filter(x => x.project === p.name);
+    const who = {}; for (const x of left) { const k = x.who || '나'; who[k] = (who[k] || 0) + 1; }
+    const got = sum(inc.filter(x => x.status === 'got')), due = sum(inc.filter(x => x.status !== 'got')), out = sum(ex);
+    return { ...p, all: t.length, done: t.length - left.length, left: left.length, late: left.filter(x => x.due && x.due < today).length, next: left.find(x => x.due) || null, nextEv: ev[0] || null, got, due, out, money: inc.length + ex.length, who: Object.entries(who).sort((a, b) => b[1] - a[1]) };
+  });
+}

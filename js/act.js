@@ -34,6 +34,12 @@ async function find(q, kinds, { date } = {}) {
   if (cs.length === 1 || cs[0].s - cs[1].s >= 0.2) return { one: cs[0] };
   return { many: cs.slice(0, 4) };
 }
+// 지출·받을 돈에서 말에 맞는 것 찾기 (금액을 말했으면 금액도 맞아야 함)
+async function money(q, cols) {
+  const amt = brain.parseMoney(q); const words = q.replace(new RegExp(brain.MONEY_SRC, 'g'), ' ').replace(/[\d,]+\s*원/g, ' ');
+  const out = []; for (const col of cols) for (const x of await db.list(col)) { const s = toks(words).length ? score(words, `${x.title || ''} ${x.project || ''}`) : (amt != null ? 0.7 : 0); if (s >= 0.6 && (amt == null || Number(x.amount) === amt)) out.push({ ...x, _s: s }); }
+  return out.sort((a, b) => b._s - a._s || (b.date || '').localeCompare(a.date || ''));
+}
 const label = c => (c.it._draft ? '(확인 전) ' : '') + (c.kind === 'event' ? `${c.it.title} · ${c.it.date ? fmtD(c.it.date) : ''}${c.it.start ? ' ' + c.it.start : ''}` : `${c.it.title}${c.it.due ? ' · 마감 ' + fmtD(c.it.due) : ''}${c.it.who ? ' · ' + c.it.who : ''}`);
 const ask = (cs, act, lead) => ({ text: `${lead} 어느 건가요?`, chips: [...cs.map(c => ({ label: label(c).slice(0, 34), act: { ...act, id: c.it.id } })), { label: '아니에요', skip: true }] });
 const undo = prev => ({ label: '되돌리기', act: { op: 'restore', prev } });
@@ -41,6 +47,7 @@ const undo = prev => ({ label: '되돌리기', act: { op: 'restore', prev } });
 // 실제로 바꾸는 곳. chips의 act도 여기로 옴
 export async function run(a) {
   const it = a.id ? await db.get(a.id) : null;
+  if (a.op === 'unproj') { for (const id of a.ids || []) { const x = await db.get(id); if (!x) continue; if (x.col === 'drafts') await db.patch(id, { data: { ...x.data, project: '' } }); else await db.patch(id, { project: '' }); } return { text: '프로젝트에서 뺐어요.', refresh: a.ids || [] }; }
   if (a.op === 'restore') { await db.put(a.prev.col, { ...a.prev, deleted: false }); return { text: `“${a.prev.title || a.prev.name}” 원래대로 돌려놨어요.` }; }
   if (!it || it.deleted) return { text: '그 사이에 없어졌어요.' };
   const prev = { ...it };
@@ -65,7 +72,8 @@ export async function run(a) {
     await db.patch(it.id, p); const clash = (await db.list('events')).filter(x => x.id !== it.id && x.date === p.date && x.start && (p.start || it.start) && x.start === (p.start || it.start));
     return { text: `“${it.title}”을 ${fmtD(p.date)}${p.start || it.start ? ' ' + (p.start || it.start) : ''}로 옮겼어요.${clash.length ? ` 그런데 그 시간에 “${clash[0].title}”도 있어요.` : ''}${it.who ? ` ${it.who}에게도 알려 주세요.` : ''}`, chips: [undo(prev)] };
   }
-  if (a.op === 'remove') { await db.remove(it.id); return { text: `“${it.title}” 지웠어요.`, chips: [undo(prev)] }; }
+  if (a.op === 'remove') { await db.remove(it.id); return { text: `“${it.title || it.name}” 지웠어요.`, chips: [undo(prev)] }; }
+  if (a.op === 'got') { await db.patch(it.id, { status: 'got', gotAt: today(), ...(it.date && it.date !== today() ? { date: today(), planned: it.date } : {}) }); const left = (await db.list('incomes')).filter(x => x.status !== 'got'); return { text: `“${it.title}” ${Number(it.amount || 0).toLocaleString()}원 받은 것으로 바꿨어요.${left.length ? ` 아직 받을 돈은 ${left.reduce((s, x) => s + (Number(x.amount) || 0), 0).toLocaleString()}원(${left.length}건)이에요.` : ' 이제 받을 돈이 없어요.'}`, chips: [undo(prev)] }; }
   if (a.op === 'handoff') { await handoff(it, a.to, a.note || ''); return { text: `“${it.title}”을 ${a.to} 님에게 넘겼어요.${a.note ? ` 메모: ${a.note}` : ''} 넘긴 기록은 할 일을 열면 보여요.`, chips: [undo(prev)] }; }
   if (a.op === 'assign') { await db.patch(it.id, { who: a.to }); return { text: `“${it.title}” 담당을 ${a.to} 님으로 했어요.`, chips: [undo(prev)] }; }
   if (a.op === 'prio') { await db.patch(it.id, { priority: a.v }); return { text: `“${it.title}”을 ${a.v === 'high' ? '중요' : '보통'}으로 표시했어요.`, chips: [undo(prev)] }; }
@@ -128,6 +136,7 @@ export async function tryAct(text, { people = [] } = {}) {
     if (tail.length && (nw.date || nw.time)) { const sw = brain.parseWhen(subj); const due = /마감/.test(m[1]);
       const r = await find(subj, due ? ['task'] : ['event', 'task'], { date: sw.hits.length ? sw.date : null }); const act = { op: 'move', date: nw.hits.some(x => !/^\d{1,2}시|^\d{1,2}:\d|^오전|^오후|^반$/.test(x)) || !nw.time ? nw.date : null, time: nw.time || '' };
       if (r.one && r.one.it.repeat && !r.one.it._draft && !/(앞으로|계속|매주|매번|전부|다\s)/.test(t)) { const from = sw.hits.length && sw.date ? sw.date : null; return { text: `“${r.one.it.title}”은 반복 일정이에요. 이번 한 번만 옮길까요, 앞으로 계속 옮길까요?`, chips: [{ label: '이번만', act: { ...act, op: 'moveOnce', id: r.one.it.id, from } }, { label: '앞으로 계속', act: { ...act, id: r.one.it.id } }, { label: '그냥 두기', skip: true }] }; }
+      if (r.one && act.date && /(미뤄|미루|연기|밀렸|밀려)/.test(t) && tail.every(x => /^[월화수목금토일](요일|욜)$/.test(x) || !/[월화수목금토일](요일|욜)/.test(x)) && !/(주|달|월|일$)/.test(tail.filter(x => !/(요일|욜)$/.test(x)).join('')) && tail.some(x => /(요일|욜)$/.test(x))) { const cur = r.one.it.due || r.one.it.date || ''; let d = new Date(act.date + 'T00:00'); let k = 0; const f = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; while (cur && f(d) <= cur && k++ < 8) d.setDate(d.getDate() + 7); act.date = f(d); } // 미루는 건 지금 날짜보다 뒤로
       if (r.one) return run({ ...act, id: r.one.it.id }); if (r.many) return ask(r.many, act, '옮길 게'); return { text: `“${subj}”에 맞는 일정이나 할 일을 못 찾았어요. 새로 만들까요?`, chips: [{ label: '새 일정으로', say: `일정: ${subj} ${tail.join(' ')}` }, { label: '아니에요', skip: true }] }; }
   }
   // 취소·지우기 (항상 확인)
@@ -136,9 +145,20 @@ export async function tryAct(text, { people = [] } = {}) {
     if (r.one && r.one.it.repeat && !r.one.it._draft) return { text: `“${r.one.it.title}”은 반복 일정이에요. 이번 것만 뺄까요, 전부 지울까요?`, chips: [{ label: '이번만 빼기', act: { op: 'skipOnce', id: r.one.it.id, from: sw.hits.length && sw.date ? sw.date : null } }, { label: '전부 지우기', act: { op: 'remove', id: r.one.it.id } }, { label: '그냥 두기', skip: true }] };
     if (r.one) return { text: `“${label(r.one)}” 이거 지울까요?`, chips: [{ label: '지우기', act: { op: 'remove', id: r.one.it.id } }, { label: '그냥 두기', skip: true }] };
     if (r.many) return ask(r.many, { op: 'remove' }, '지울 게');
+    // 일정·할 일이 아니면 지출·받을 돈에서 찾음: "주차 2만원 지워줘"
+    { const ms = await money(m[1], ['expenses', 'incomes']); const lab = x => `${x.title} ${Number(x.amount || 0).toLocaleString()}원${x.date ? ' · ' + fmtD(x.date) : ''}`;
+      if (ms.length === 1) return { text: `${ms[0].col === 'incomes' ? '받을 돈' : '지출'} “${lab(ms[0])}” 이거 지울까요?`, chips: [{ label: '지우기', act: { op: 'remove', id: ms[0].id } }, { label: '그냥 두기', skip: true }] };
+      if (ms.length > 1) return { text: '지울 게 어느 건가요?', chips: [...ms.slice(0, 4).map(x => ({ label: lab(x).slice(0, 34), act: { op: 'remove', id: x.id } })), { label: '아니에요', skip: true }] };
+      if (brain.parseMoney(m[1]) != null) return { text: `“${m[1].trim()}”에 맞는 지출이나 받을 돈을 못 찾았어요. 비용 화면에서 직접 지울 수 있어요.`, chips: [{ label: '비용 화면 열기', go: 'money' }] }; }
+  }
+  // 입금 확인: "루미에 잔금 들어왔어", "제일기획 계약금 입금됐어" → 받기로 한 돈을 받은 것으로
+  if ((m = t.match(/^(.+?)\s*(?:이|가|은|는|도)?\s*(?:오늘\s*)?(?:다\s*)?(?:들어왔|들어옴|입금\s*됐|입금\s*됨|입금\s*완료|입금\s*확인|받았|받음|수금했|수금함)\S*$/)) && !/(해야|까지|언제|\?|아직|(?<![가-힣\d])안\s|(?<![가-힣\d])못\s)/.test(t)) {
+    const amt = brain.parseMoney(m[1]); const ms = (await money(m[1], ['incomes'])).filter(x => x.status !== 'got');
+    if (ms.length === 1 || (ms.length > 1 && amt != null && ms.filter(x => Number(x.amount) === amt).length === 1)) { const x = amt != null ? (ms.find(y => Number(y.amount) === amt) || ms[0]) : ms[0]; return run({ op: 'got', id: x.id }); }
+    if (ms.length > 1) return { text: '어느 돈이 들어왔나요?', chips: [...ms.slice(0, 4).map(x => ({ label: `${x.title} ${Number(x.amount || 0).toLocaleString()}원`.slice(0, 34), act: { op: 'got', id: x.id } })), { label: '아니에요', skip: true }] };
   }
   // 완료: "포스터 시안 끝냈어", "견적 요청 보냈어"
-  if ((m = t.match(/^(.+?)\s*(?:은|는|을|를|도)?\s*(?:다\s*)?(?:끝냈|끝났|끝냄|끝남|끝$|끝!|완료|마쳤|마침|해결했|해결됨|다\s*했|다\s*함|다함|했어|했음|했다|했습니다|챙겼|보냈어|보냈음|보냈습니다|보냄|제출했|제출함|올렸어|올렸음|올림|처리했|처리함|넘겼어|넘겼음|전달했|전달함|공유했|공유함|컨펌\s*받았)\S*$/)) && !/(해야|까지|할\s*거|하자|할까|언제|\?|못\s|안\s)/.test(t)) {
+  if ((m = t.match(/^(.+?)\s*(?:은|는|을|를|도)?\s*(?:다\s*)?(?:끝냈|끝났|끝냄|끝남|끝$|끝!|완료|마쳤|마침|해결했|해결됨|다\s*했|다\s*함|다함|했어|했음|했다|했습니다|챙겼|보냈어|보냈음|보냈습니다|보냄|제출했|제출함|올렸어|올렸음|올림|처리했|처리함|넘겼어|넘겼음|전달했|전달함|공유했|공유함|컨펌\s*받았)\S*$/)) && !/(해야|까지|할\s*거|하자|할까|언제|\?|(?<![가-힣\d])못\s|(?<![가-힣\d])안\s)/.test(t)) {
     const r = await find(m[1], ['task']);
     if (r.one && r.one.s >= 0.75) return run({ op: 'done', id: r.one.it.id });
     if (r.one || r.many) return ask(r.many || [r.one], { op: 'done' }, '끝낸 일이');

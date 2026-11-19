@@ -19,6 +19,7 @@ export default {
     const micBtn = h('button.btn.icon.ghost', { title: '말로 입력', 'aria-label': '말로 입력', onclick: () => toggleMic() }, ic('mic', 20));
     const sendBtn = h('button.btn.pri.icon', { 'aria-label': '보내기', onclick: () => send() }, ic('right', 20));
     const recBar = h('div.row.hide', { style: { padding: '6px 4px', gap: '10px' } });
+    const projBar = h('div.chips', { style: { padding: '0 4px 6px' } });
     const sug = h('div.suggest', SUGGEST.map(s => h('button.chip', { onclick: () => { ta.value = s; send(); } }, s)));
 
     const page = h('div.chatpage');
@@ -27,7 +28,7 @@ export default {
       h('div.page-head', h('div', h('h1', '비서'), h('p.sub', '한 줄로 일정·할 일·지출·연락처·메모 무엇이든. 결과는 확정 전까지 임시예요.')),
         h('div.row', h('button.btn.sm.ghost', { onclick: clearChat }, ic('trash', 14), '대화 지우기'))),
       list,
-      h('div.composer', sug, recBar, h('div.box', ta, micBtn, sendBtn), preview));
+      h('div.composer', sug, projBar, recBar, h('div.box', ta, micBtn, sendBtn), preview));
 
     // 기존 대화
     const msgs = (await db.list('chat')).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-60);
@@ -42,6 +43,13 @@ export default {
     const pre = sessionStorage.getItem('assistant:prefill');
     if (pre) { sessionStorage.removeItem('assistant:prefill'); send(pre); }
 
+    // 지금 이야기하는 프로젝트: 프로젝트 이름을 말하면 따라 바뀌고, 이름 없이 적은 것도 여기에 묶임 (3시간 지나면 풀림)
+    async function curProj() { const c = await db.kvGet('chat:project', null); if (!c || !c.name || Date.now() - (c.at || 0) > 3 * 36e5) return ''; return (await store.projects()).includes(c.name) ? c.name : ''; }
+    async function setProj(name) { await db.kvSet('chat:project', name ? { name, at: Date.now() } : null); await drawProj(); }
+    async function drawProj() { clear(projBar); const cur = await curProj(); const all = await store.projects(); if (!all.length) return;
+      if (cur) projBar.append(h('span.chip.acc', { title: '이름 없이 적은 것도 이 프로젝트로 묶어요' }, ic('folder', 12), `지금 프로젝트: ${cur}`), h('button.chip', { 'aria-label': '프로젝트 묶기 끄기', style: { minHeight: '36px' }, onclick: () => setProj('') }, '끄기'));
+      if (all.length > 1 || !cur) { const sel = h('select.chip', { 'aria-label': '지금 프로젝트 고르기', style: { maxWidth: '180px', minHeight: '36px' }, onchange: () => setProj(sel.value) }, h('option', { value: '' }, cur ? '다른 프로젝트로' : '프로젝트 고르기'), ...all.filter(p => p !== cur).map(p => h('option', { value: p }, p))); projBar.append(sel); } }
+    await drawProj();
     function autoGrow() { ta.style.height = 'auto'; ta.style.height = Math.min(180, ta.scrollHeight) + 'px'; }
     function livePreview() {
       clear(preview);
@@ -92,7 +100,7 @@ export default {
       const w = brain.parseWhen(text); const rest = w.hits.reduce((x, hh) => x.replace(hh, ' '), text).replace(/(쯤|경|정도|일\s*듯|인\s*듯|같아요?|이요|부터|까지|으로|로|에|이야|야|예요|이에요|요|해|하자|할게|일걸|쯤이야)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
       if (k === 'date' || k === 'time') return (p.kind === 'task' || p.kind === 'event' || p.kind === 'note') && rest.length >= 5 && !/^(아직|몰라|미정|나중에|종일|하루\s*종일)/.test(rest);
       return (p.kind === 'task' || p.kind === 'event') && w.hits.length > 0 && rest.length >= 4; };
-    const missing = (data, src) => { const w = brain.parseWhen(src || ''); const need = []; if ((!w.date || w.vague) && !data._dated) need.push('date'); if (!data.start && !data._allday && !/(오전|오후|아침|저녁|밤|점심|새벽|종일|하루\s*종일)/.test(src || '')) need.push('time'); if (!data._asked && ((!data.who && !data.place && !data.area) || (!data.who && /(방문|관람|구경|저녁|점심|식사|약속|영화|여행|나들이|데이트|모임)/.test(data.title || '')))) need.push(data.place || data.area ? 'who' : 'more'); return need; };
+    const missing = (data, src) => { if (data.endDate && data.endDate > (data.date || '')) return []; const w = brain.parseWhen(src || ''); const need = []; if ((!w.date || w.vague) && !data._dated) need.push('date'); if (!data.start && !data._allday && !/(오전|오후|아침|저녁|밤|점심|새벽|종일|하루\s*종일)/.test(src || '')) need.push('time'); if (!data._asked && ((!data.who && !data.place && !data.area) || (!data.who && /(방문|관람|구경|저녁|점심|식사|약속|영화|여행|나들이|데이트|모임)/.test(data.title || '')))) need.push(data.place || data.area ? 'who' : 'more'); return need; };
     async function answerAsk(pend, text) {
       const d = await db.get(pend.id); if (!d || d.status !== 'pending') { await db.kvSet('chat:ask', null); return false; }
       const k = pend.need[0]; const w = brain.parseWhen(text); const skip = /^(없어|없음|몰라|아직|미정|모름|나중에|건너|패스|스킵|그냥|됐어|아니|혼자)/.test(text.trim()); const data = { ...d.data }; let lead = '';
@@ -115,8 +123,10 @@ export default {
       const projects = await store.projects();
       const people = await store.peopleNames();
       const vendorNames = (await db.list('vendors')).map(v => v.name).filter(Boolean);
+      // 프로젝트 이름(또는 그 안의 낱말)을 말하면 '지금 프로젝트'가 그쪽으로 바뀜
+      const project = await curProj();
       const F = await import('../js/follow.js');
-      { const pend = await db.kvGet('chat:ask', null); if (pend) { if (looksNew(text, pend.need[0], { projects, people, vendors: vendorNames })) await db.kvSet('chat:ask', null); else if (await answerAsk(pend, text)) return; } }
+      { const pend = await db.kvGet('chat:ask', null); if (pend) { if (looksNew(text, pend.need[0], { projects, people, vendors: vendorNames, project })) await db.kvSet('chat:ask', null); else if (await answerAsk(pend, text)) return; } }
       // 방금 만든 것을 말로 고치기·취소하기
       { const r = await F.tryFollow(text, { people }); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: r.chips }), new Map()); updateBadge(); return; } }
       const talk = async src => { const r = await CH.reply(src, { name: (await db.kvGet('name', '')) || '' }); await drawMsg(await db.put('chat', { role: 'bot', q: src, text: r.text, list: r.list, chips: r.chips }), new Map()); };
@@ -126,7 +136,17 @@ export default {
         if (!roster.some(r => r.name && (r.name === dm[1].trim() || r.name.slice(1) === dm[1].trim()))) { await drawMsg(await db.put('chat', { role: 'bot', q: `${dm[1].trim()}에게 ${dm[2]} 전하기`, text: `${dm[1].trim()} 님에게 바로 전하려면 팀 동기화에 로그인돼 있어야 해요. 지금은 연결이 안 돼 있어서, 잊지 않게 할 일로 적어 둘까요?`, chips: [{ label: '할 일로', make: 'task' }, { label: '괜찮아요', skip: true }] }), new Map()); return; } } }
       if (CH.isTalk(text)) return talk(text);
       // 이미 있는 걸 말로 고치기 (완료·옮기기·취소·넘기기·담당)
-      { const ACT = await import('../js/act.js'); const r = await ACT.tryAct(text, { people }); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: r.chips }), new Map()); return; } }
+      { const ACT = await import('../js/act.js'); const r = await ACT.tryAct(text, { people }); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: r.chips }), new Map()); await drawProj(); const np = (r.text.match(/^“(.+?)” 프로젝트를 만들었어요/) || [])[1]; if (np) await setProj(np); return; } }
+      // 회의록 붙여넣기: 회의록에 넣고, 줄마다 담당·마감을 읽어 임시 항목으로
+      { const mn = brain.minutes(text, { projects, people, vendors: vendorNames, project, me: await store.myNames() });
+        if (mn) { const a = brain.analyzeNotes(mn.body, { people }); a.decisions = [...new Set([...mn.notes, ...(a.decisions || [])])].slice(0, 12); a.actions = mn.items.filter(x => x.kind === 'task').map(x => ({ title: x.data.title, who: x.data.who || '', due: x.data.due || '', src: x.src }));
+          if (mn.project && mn.project !== project) await setProj(mn.project);
+          const mt = await db.put('meetings', { title: mn.title, date: mn.date || todayStr(), attendees: mn.attendees.join(', '), project: mn.project, transcript: mn.body, seconds: 0, summaryDraft: a });
+          const ids = []; for (const x of mn.items) ids.push((await store.draft(x.kind, x.data, { source: x.src, sourceRef: mt.id, confidence: x.confidence || 0.75, origin })).id);
+          await F.remember(ids);
+          const nT = mn.items.filter(x => x.kind === 'task').length, nE = mn.items.filter(x => x.kind === 'event').length;
+          await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `“${mn.title}”을 회의록에 넣었어요.${mn.project ? ` “${mn.project}” 프로젝트에 묶었어요.` : ''} 할 일 ${nT}개${nE ? `, 일정 ${nE}개` : ''}를 임시로 만들었고, 나머지 ${mn.notes.length}줄은 결정사항으로 적어 뒀어요. 맞으면 확정해 주세요.`, draftIds: ids, chips: [{ label: '회의록 보기', go: 'meetings/' + mt.id }] }), new Map((await store.drafts()).map(d => [d.id, d])));
+          updateBadge(); return; } }
       // 길게 쓰거나 말한 건 → 원문은 메모로 저장(내가 쓴 거라 확정), 요약·할 일은 임시
       const nSent = brain.sentences(text).length;
       const isMeeting = /^(회의록|회의\s*(내용|정리|메모)|미팅\s*(내용|정리|메모))\s*[:：]/.test(text);
@@ -164,21 +184,24 @@ export default {
           wait.remove(); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `${ai ? 'AI가' : '앱 안에서'} 읽고 ${a.summary.length}줄로 줄였어요. 원문은 메모에 넣어 뒀어요.${ai ? '' : ' 설정에서 무료 AI 키를 넣으면 요약이 더 자연스러워져요.'}`, draftIds: [d.id] }), new Map((await store.drafts()).map(x => [x.id, x]))); updateBadge();
         } catch (e) { wait.remove(); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `이 링크는 읽지 못했어요. 로그인이 필요하거나 막아 둔 사이트일 수 있어요. 내용을 붙여 넣어 주시면 정리해 드릴게요.` }), new Map()); }
         return; } }
-      let parsed = brain.interpret(text, { projects, people, vendors: vendorNames });
+      let parsed = brain.interpret(text, { projects, people, vendors: vendorNames, project });
       // 키가 연결돼 있으면 Gemini가 먼저 읽음(규칙 초안을 힌트로). 못 읽거나 연결이 없으면 규칙 결과 그대로
       let byAI = false, aiLate = false;
       if (!parsed.some(p => p.kind === 'query' || p.kind === 'nav') && text.trim().length >= 4) { const AI = await import('../js/ai.js');
         if (await AI.enabled()) { const wait = h('div.bubble.bot.faint', h('span.spin'), ' AI가 읽고 있어요'); list.append(wait); wait.scrollIntoView({ block: 'end' });
           const got = await AI.refine(text, parsed, { today: todayStr(), people, projects, vendors: (await db.list('vendors')).map(v => v.name) }); wait.remove();
-          if (got && got.length) { parsed = got; byAI = true; } else if (got === null) { aiLate = true; } else if (got && !got.length && parsed.every(p => p.kind === 'talk')) { /* AI도 만들 게 없다고 봄 → 대화로 */ } } }
+          if (got && got.length) { parsed = got.map(g => brain.polish({ src: text, ...g }, { projects, project })); byAI = true; } else if (got === null) { aiLate = true; } else if (got && !got.length && parsed.every(p => p.kind === 'talk')) { /* AI도 만들 게 없다고 봄 → 대화로 */ } } }
       const ids = []; const replies = [];
+      // 프로젝트 이름을 말한 항목이 있으면 '지금 프로젝트'가 그쪽으로 바뀜 (연락처·질문은 안 바꿈)
+      { const named = parsed.find(p => p.data && p.data.project && !p.byCtx && projects.includes(p.data.project)); if (named && named.data.project !== project) await setProj(named.data.project); }
+      const ctxIds = [];
       for (const p of parsed) {
         if (p.kind === 'nav') { const map = { 캘린더: 'calendar', 일정: 'calendar', '할 일': 'tasks', 할일: 'tasks', 회의: 'meetings', 기획: 'plan', 인맥: 'people', 연락처: 'people', 비용: 'money', 지출: 'money', 스타트업: 'startup', SNS: 'studio', 스튜디오: 'studio', 피그마: 'figma', 설정: 'settings', 대기함: 'inbox', '확인 대기함': 'inbox' }; go(map[p.data.to.replace(/\s+/g, ' ')] || 'today'); return; }
         if (p.kind === 'talk') { await talk(p.src || text); continue; }
         if (p.kind === 'query') { const a = await answer(text); replies.push(a); continue; }
         // 일정에 장소가 있으면 실제 주소를 찾아 붙임 (못 찾아도 그대로 진행)
         if (p.kind === 'event' && (p.data.place || p.data.area)) { try { const PL = await import('../js/place.js'); const hit = await PL.lookup(p.data.place || p.data.area, p.data.place ? p.data.area : ''); if (hit) { p.data.addr = hit.addr; p.data.mapUrl = hit.url || ''; p.data.placeBy = hit.by; } } catch { } }
-        ids.push((await store.draft(p.kind, p.data, { source: p.src || text, confidence: p.confidence, origin })).id);
+        ids.push((await store.draft(p.kind, p.data, { source: p.src || text, confidence: p.confidence, origin })).id); if (p.byCtx) ctxIds.push(ids.at(-1));
       }
       await F.remember(ids);
       for (const a of replies) {
@@ -191,7 +214,7 @@ export default {
       }
       if (ids.length) {
         const labels = parsed.filter(p => p.kind !== 'query').map(p => p.label);
-        const msg = await db.put('chat', { role: 'bot', q: text, text: `${[...new Set(labels)].join(' · ')} ${ids.length}개를 임시로 만들었어요. 맞으면 확정해 주세요.${byAI ? ' (AI가 읽음)' : aiLate ? ' (AI가 늦어서 앱 규칙으로 읽었어요)' : ''}`, draftIds: ids });
+        const msg = await db.put('chat', { role: 'bot', q: text, text: `${[...new Set(labels)].join(' · ')} ${ids.length}개를 임시로 만들었어요. 맞으면 확정해 주세요.${byAI ? ' (AI가 읽음)' : aiLate ? ' (AI가 늦어서 앱 규칙으로 읽었어요)' : ''}${ctxIds.length ? ` 프로젝트 이름이 없어서 지금 프로젝트 “${project}”에 묶었어요.` : ''}`, draftIds: ids, ...(ctxIds.length ? { chips: [{ label: '프로젝트에서 빼기', act: { op: 'unproj', ids: ctxIds } }] } : {}) });
         await drawMsg(msg, new Map((await store.drafts()).map(d => [d.id, d])));
         updateBadge();
       }
@@ -212,6 +235,8 @@ export default {
         row.append(...m.chips.map(c => h('button.chip' + (c.make === 'task' ? '.acc' : ''), { onclick: async () => {
           if (c.say) return send(c.say);
           if (c.skip) return done('넘겼어요');
+          if (c.go) return go(c.go);
+          if (c.proj !== undefined) { await setProj(c.proj); return done(c.proj ? `지금 프로젝트: ${c.proj}` : '프로젝트 없이'); }
           if (c.act) { const ACT = await import('../js/act.js'); const r = await ACT.run(c.act); await done(c.label); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', text: r.text, chips: r.chips }), new Map()); } updateBadge(); return; }
           if (c.follow) { const F = await import('../js/follow.js'); const r = await F.run(c.follow); await done(c.label); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', text: r.text }), new Map()); } updateBadge(); return; }
           if (c.undoAlias) { const CH = await import('../js/chat.js'); const a = await CH.aliases(); delete a[c.undoAlias]; await db.kvSet('chat:alias', a); return done('기억을 지웠어요'); }

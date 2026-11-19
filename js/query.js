@@ -17,6 +17,9 @@ export function rangeOf(q, base = new Date()) {
   if (/이번\s*달|이달|이번달/.test(q)) return [ymd(new Date(b.getFullYear(), b.getMonth(), 1)), ymd(new Date(b.getFullYear(), b.getMonth() + 1, 0)), '이번 달'];
   if (/지난\s*달|저번\s*달/.test(q)) return [ymd(new Date(b.getFullYear(), b.getMonth() - 1, 1)), ymd(new Date(b.getFullYear(), b.getMonth(), 0)), '지난 달'];
   if (/올해|이번\s*년/.test(q)) return [`${b.getFullYear()}-01-01`, `${b.getFullYear()}-12-31`, '올해'];
+  if (/다음\s*달|담달|내달/.test(q)) return [ymd(new Date(b.getFullYear(), b.getMonth() + 1, 1)), ymd(new Date(b.getFullYear(), b.getMonth() + 2, 0)), '다음 달'];
+  { const mm = q.match(/(?:(내년|작년|올해)\s*)?(\d{1,2})\s*월(?!\s*\d{1,2}\s*일)(?!\s*(?:초|중순|말|첫|둘|셋|넷|마지막))/); // "12월 일정" → 그 달 전체
+    if (mm && +mm[2] >= 1 && +mm[2] <= 12) { let y = b.getFullYear() + (mm[1] === '내년' ? 1 : mm[1] === '작년' ? -1 : 0); const mo = +mm[2] - 1; if (!mm[1] && mo < b.getMonth() - 5) y += 1; return [ymd(new Date(y, mo, 1)), ymd(new Date(y, mo + 1, 0)), `${mm[2]}월`]; } }
   const w = brain.parseWhen(q, base);
   if (w.date) return [w.date, w.date, w.hits[0] || w.date];
   return null;
@@ -67,9 +70,10 @@ export async function answer(q, base = new Date()) {
     const want = /개인|내\s*개인|사적/.test(q) ? 'personal' : /팀|업무|회사/.test(q) ? 'work' : ''; const label = label0 + (want ? ' ' + SC.LABEL[want] + ' 쪽' : '');
     const all = [...(await db.list('events')), ...(await store.drafts()).filter(d => d.kind === 'event' && d.data?.date).map(d => ({ ...d.data, title: '(확인 전) ' + d.data.title }))].filter(e => !want || SC.of(e) === want);
     const out = [];
-    for (let d = new Date(a); ymd(d) <= b; d = addD(d, 1)) for (const e of all) if (store.occursOn(e, ymd(d))) out.push({ ...e, _d: ymd(d) });
+    const seen = new Set();
+    for (let d = new Date(a); ymd(d) <= b; d = addD(d, 1)) for (const e of all) if (store.occursOn(e, ymd(d))) { const span = e.endDate && e.endDate > e.date && !e.repeat; if (span) { const k = e.id || e.title + e.date; if (seen.has(k)) continue; seen.add(k); } out.push({ ...e, _d: ymd(d), _span: span ? `${e.date.slice(5).replace('-', '/')}~${e.endDate.slice(5).replace('-', '/')}` : '' }); }
     out.sort((x, y) => (x._d + (x.start || '')).localeCompare(y._d + (y.start || '')));
-    return { text: out.length ? `${label} 일정 ${out.length}개예요.` : `${label}에는 일정이 없어요.`, items: out.map(e => ({ icon: 'calendar', title: e.title, sub: `${e._d.slice(5).replace('-', '/')} ${e.start || '종일'}${e.place ? ' · ' + e.place : ''}${e.who ? ' · ' + e.who : ''} · ${SC.LABEL[SC.of(e)]}`, route: 'calendar/' + e._d })) };
+    return { text: out.length ? `${label} 일정 ${out.length}개예요.` : `${label}에는 일정이 없어요.`, items: out.map(e => ({ icon: 'calendar', title: e.title, sub: `${e._span || e._d.slice(5).replace('-', '/')} ${e._span ? '' : e.start || '종일'}${e.place ? ' · ' + e.place : ''}${e.who ? ' · ' + e.who : ''}${e.project ? ' · ' + e.project : ''} · ${SC.LABEL[SC.of(e)]}`, route: 'calendar/' + e._d })) };
   }
   if (/(할\s*일|할일|투두|todo|해야\s*할|마감)/i.test(q)) {
     let ts = [...(await store.openTasks()), ...(await store.drafts()).filter(d => d.kind === 'task' && d.data?.title).map(d => ({ ...d.data, title: '(확인 전) ' + d.data.title }))];
@@ -80,12 +84,12 @@ export async function answer(q, base = new Date()) {
   }
   if (/(지출|비용|돈|얼마|썼|정산|영수증)/.test(q)) {
     const [a, b, label] = r || [ymd(new Date(base.getFullYear(), base.getMonth(), 1)), ymd(new Date(base.getFullYear(), base.getMonth() + 1, 0)), '이번 달'];
-    let xs = (await db.list('expenses')).filter(e => e.date >= a && e.date <= b);
+    const allX = await db.list('expenses'); let xs = allX.filter(e => e.date >= a && e.date <= b);
     if (/정산\s*(안|전)|미정산/.test(q)) xs = xs.filter(e => e.status !== 'done');
     // "메타 광고비 얼마 썼지", "식비 얼마" → 그 말이 든 것만
-    const ws = brain.parseWhen(q, base).hits.reduce((x, hh) => x.replace(hh, ' '), q).replace(/(이번\s*(주|달)|지난\s*(주|달)|다음\s*주|올해|지출|비용|돈|얼마나?|썼(지|어|나|더라|는지)?|나갔(지|어|나)?|들었(지|어|나)?|정산|영수증|내역|알려\s*줘|보여\s*줘|총|전부|다\s|에|은|는|이|가|\?)/g, ' ').split(/\s+/).filter(x => x.length >= 2);
-    if (ws.length) { const hit = xs.filter(e => ws.every(k => `${e.title} ${e.category || ''} ${e.project || ''} ${e.pay || ''} ${e.memo || ''}`.includes(k))); const any = hit.length ? hit : xs.filter(e => ws.some(k => `${e.title} ${e.category || ''} ${e.project || ''} ${e.pay || ''}`.includes(k)));
-      if (any.length) { const s2 = any.reduce((s, e) => s + (Number(e.amount) || 0), 0); return { text: `${label} ‘${ws.join(' ')}’ 지출은 ${s2.toLocaleString()}원 (${any.length}건)이에요.`, items: any.sort((x, y) => (y.date || '').localeCompare(x.date || '')).slice(0, 12).map(e => ({ icon: 'receipt', title: e.title, sub: `${(Number(e.amount) || 0).toLocaleString()}원 · ${e.date.slice(5).replace('-', '/')} · ${e.category || ''}`, route: 'money' })) }; }
+    const ws = brain.parseWhen(q, base).hits.reduce((x, hh) => x.replace(hh, ' '), q).replace(/(이번\s*(주|달)|지난\s*(주|달)|다음\s*주|올해|지출|비용|돈|얼마(나|였지|였더라|였어|였나|야|지|예요|에요|임)?|썼(지|어|나|더라|는지)?|나갔(지|어|나)?|들었(지|어|나)?|정산|영수증|내역|알려\s*줘|보여\s*줘|총|전부|다\s|에|은|는|이|가|\?)/g, ' ').split(/\s+/).filter(x => x.length >= 2);
+    if (ws.length) { if (!r) xs = allX; const hit = xs.filter(e => ws.every(k => `${e.title} ${e.category || ''} ${e.project || ''} ${e.pay || ''} ${e.memo || ''}`.includes(k))); const any = hit.length ? hit : xs.filter(e => ws.some(k => `${e.title} ${e.category || ''} ${e.project || ''} ${e.pay || ''}`.includes(k)));
+      if (any.length) { const s2 = any.reduce((s, e) => s + (Number(e.amount) || 0), 0); return { text: `${r ? label + ' ' : ''}‘${ws.join(' ')}’ 지출은 ${s2.toLocaleString()}원 (${any.length}건)이에요.`, items: any.sort((x, y) => (y.date || '').localeCompare(x.date || '')).slice(0, 12).map(e => ({ icon: 'receipt', title: e.title, sub: `${(Number(e.amount) || 0).toLocaleString()}원 · ${e.date.slice(5).replace('-', '/')} · ${e.category || ''}`, route: 'money' })) }; }
       if (ws.some(k => k.length >= 2) && !/^(이번|지난|전체)$/.test(ws.join(''))) return { text: `${label}에는 ‘${ws.join(' ')}’(으)로 적힌 지출이 없어요. 전체 지출은 ${xs.reduce((s, e) => s + (Number(e.amount) || 0), 0).toLocaleString()}원이에요.`, items: [] }; }
     const sum = xs.reduce((s, e) => s + (Number(e.amount) || 0), 0);
     const byCat = {}; xs.forEach(e => (byCat[e.category || '기타'] = (byCat[e.category || '기타'] || 0) + (Number(e.amount) || 0)));

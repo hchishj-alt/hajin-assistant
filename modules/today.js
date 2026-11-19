@@ -92,10 +92,10 @@ export default {
       quick: () => h('div.home-full', h('div.quick', ic('zap'), qi, h('button.btn.icon.ghost', { type: 'button', 'aria-label': '적기', onclick: addQuick }, ic('send')), h('a.btn.icon.ghost', { href: '#/assistant', 'aria-label': '말로 입력' }, ic('mic'))), qp, qres),
       tiles: () => h('div.home-full', tiles),
       flow: () => h('div.card', h('div.card-h', h('h3', ic('clock'), '오늘 흐름'), h('a.btn.sm.ghost', { href: '#/calendar' }, '캘린더')), tl),
-      tasks: () => tcard, people: () => pc, meetings: () => mc, sns: () => snsCard(), team: () => teamCard(allTasks, name), activity: () => activityCard(),
+      tasks: () => tcard, people: () => pc, meetings: () => mc, sns: () => snsCard(), team: () => teamCard(allTasks, name), projects: () => projectCard(), activity: () => activityCard(),
     };
     const grid = h('div.home-grid');
-    for (const id of homeOrder(L)) if (!L.homeOff?.includes(id) && blocks[id]) grid.append(await blocks[id]());
+    for (const id of homeOrder(L)) if (!L.homeOff?.includes(id) && blocks[id]) { const el = await blocks[id](); if (el) grid.append(el); }
     root.append(hdr);
     if (askName && !name) {
       const ni = h('input.in', { placeholder: '이름 (예: 민서)', 'aria-label': '내 이름', style: { maxWidth: '200px' } });
@@ -107,7 +107,7 @@ export default {
     if (!grid.children.length) grid.append(h('div.card.home-full', h('div.empty', '메인 화면 카드를 모두 껐어요. 꾸미기 › 메인 화면에서 다시 켤 수 있어요.', h('a.btn.sm', { href: '#/look', style: { marginTop: '10px' } }, '꾸미기 열기'))));
   },
 };
-export const HOME = { quick: '빠른 입력', tiles: '숫자 요약', team: '팀 할 일 (담당자별)', flow: '오늘 흐름(일정)', tasks: '내 할 일', activity: '팀 최근 활동', meetings: '최근 회의', sns: 'SNS 예정', people: '챙길 사람' };
+export const HOME = { quick: '빠른 입력', tiles: '숫자 요약', team: '팀 할 일 (담당자별)', projects: '프로젝트 (진행·마감·받을 돈)', flow: '오늘 흐름(일정)', tasks: '내 할 일', activity: '팀 최근 활동', meetings: '최근 회의', sns: 'SNS 예정', people: '챙길 사람' };
 export const homeOrder = L => [...(L.home || []).filter(k => HOME[k]), ...Object.keys(HOME).filter(k => !(L.home || []).includes(k))];
 const shortWon = n => n >= 10000 ? (Math.round(n / 1000) / 10).toLocaleString() + '만' : n.toLocaleString();
 async function snsCard() {
@@ -120,6 +120,19 @@ async function snsCard() {
 }
 
 // 팀 할 일: 담당자별로 남은 일·밀린 일 (팀 앱의 첫 화면)
+// 프로젝트가 둘 이상 굴러갈 때만 보임: 진행, 다음 마감, 받을 돈
+async function projectCard() {
+  const ps = (await store.projectStats()).filter(p => (p.status || '진행') !== '완료' && (p.left || p.nextEv || p.due)); if (ps.length < 2) return null;
+  const md2 = s => s ? `${+s.slice(5, 7)}/${+s.slice(8, 10)}` : '';
+  const c = h('div.card', h('div.card-h', h('h3', ic('folder'), '프로젝트'), h('a.btn.sm.ghost', { href: '#/plan/projects' }, '전체')));
+  for (const p of ps.sort((a, b) => (b.late - a.late) || ((a.next?.due || a.nextEv?.date || '9').localeCompare(b.next?.due || b.nextEv?.date || '9'))).slice(0, 6)) {
+    const sub = p.next ? `다음 마감 ${md2(p.next.due)} · ${p.next.title}${p.next.who ? ' (' + p.next.who + ')' : ''}` : p.nextEv ? `다음 일정 ${md2(p.nextEv.date)} · ${p.nextEv.title}` : '마감이 정해진 일이 없어요';
+    c.append(h('div.li.click', { onclick: () => go('plan/projects') }, h('span.dot', { style: { background: p.color || colorFor(p.name), width: '10px', height: '10px', flex: 'none' } }),
+      h('div.grow', { style: { minWidth: 0 } }, h('div.t.small', p.name), h('div.faint.tiny', sub + (p.due ? ` · 받을 돈 ${shortWon(p.due)}` : ''))),
+      p.late ? h('span.chip.bad', `밀림 ${p.late}`) : null, h('span.chip', { title: '끝낸 일 / 전체 할 일' }, `${p.done}/${p.all}`)));
+  }
+  return c;
+}
 async function teamCard(allTasks, me) {
   const today = todayStr();
   const mine = w => !w || w === '나' || (me && store.sameName(w, me));
