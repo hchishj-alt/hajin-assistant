@@ -4,7 +4,7 @@ export const EXP_CAT_LIST = [...Object.keys(EXP_CATS), '기타'];
 export const FIELDS = {
   event: [
     { k: 'title', label: '제목', full: true },
-    { k: 'date', label: '날짜', type: 'date' },
+    { k: 'date', label: '날짜', type: 'date', req: true },
     { k: 'endDate', label: '끝나는 날 (여러 날일 때)', type: 'date' },
     { k: 'place', label: '장소' },
     { k: 'who', label: '누구랑' },
@@ -22,7 +22,6 @@ export const FIELDS = {
     { k: 'due', label: '마감일', type: 'date' },
     { k: 'time', label: '시간', type: 'time' },
     { k: 'priority', label: '중요도', type: 'select', options: [['high', '높음'], ['normal', '보통'], ['low', '낮음']], default: 'normal' },
-    { k: 'est', label: '예상 시간(분)', type: 'number', default: 30 },
     { k: 'project', label: '프로젝트' },
     { k: 'who', label: '담당' },
     { k: 'scope', label: '구분', type: 'select', options: [['', '알아서 (내용 보고 정함)'], ['work', '팀 업무 (팀 전체 일정)'], ['personal', '개인 (나만 보기)']], default: '' },
@@ -77,7 +76,7 @@ export const FIELDS = {
     { k: 'memo', label: '메모', type: 'textarea', rows: 3 },
   ],
   note: [
-    { k: 'title', label: '제목', full: true },
+    { k: 'title', label: '제목', full: true, req: false },
     { k: 'body', label: '내용', type: 'textarea', rows: 8 },
     { k: 'project', label: '프로젝트' },
   ],

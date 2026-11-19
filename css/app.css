@@ -819,3 +819,38 @@ button.vd-n:hover b{color:var(--acc)}
 .qr-cam{position:relative;width:min(320px,78vw);aspect-ratio:1;border-radius:16px;overflow:hidden;background:#000}
 .qr-cam video{width:100%;height:100%;object-fit:cover}
 .qr-cam i{position:absolute;inset:14%;border:2px solid rgba(255,255,255,.85);border-radius:12px;pointer-events:none}
+
+/* ── 시뮬레이션 점검 반영 ── */
+body{overflow-x:clip}
+html{scroll-padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+.chip{max-width:100%;white-space:normal;overflow-wrap:anywhere;flex-shrink:0}
+.faint{color:color-mix(in srgb,var(--ink) 63%,transparent)}
+::placeholder{color:color-mix(in srgb,var(--ink) 54%,transparent)}
+.chip.acc{color:color-mix(in srgb,var(--acc) 78%,var(--ink))}
+.chip.ok{color:color-mix(in srgb,var(--ok) 68%,var(--ink))}
+.chip.warn{color:color-mix(in srgb,var(--warn) 64%,var(--ink))}
+.chip.bad{color:color-mix(in srgb,var(--bad) 74%,var(--ink))}
+.quick:focus-within,.composer .box:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+[data-kb]:focus-visible,.click:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:8px}
+.rdw-fab{color:var(--acc-ink)}
+/* 창: 제목과 저장 버튼은 스크롤해도 보이게 */
+.modal>.modal-h{position:sticky;top:0;z-index:3;background:var(--card);padding:6px 0;margin-top:-6px}
+.modal .modal-f{position:sticky;bottom:0;z-index:2;background:var(--card);padding:10px 0 4px}
+.modal:focus{outline:0}
+#toast button{min-height:32px;padding:4px 12px;font-weight:650}
+@media (max-width:900px){
+  #toast{bottom:calc(84px + env(safe-area-inset-bottom));width:max-content}
+  .modal{padding-bottom:calc(22px + env(safe-area-inset-bottom))}
+  .modal .modal-f{padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+}
+@media (pointer:coarse),(max-width:900px){
+  .btn.sm{min-height:40px}.btn.icon,.btn.sm.icon{min-width:42px;min-height:42px}
+  .seg button{min-height:38px}
+  button.chip,a.chip{min-height:34px}
+  .labels .lab{min-height:38px}
+  select.in{min-height:38px}
+  input[type=checkbox]{width:22px;height:22px;position:relative}
+  input[type=checkbox]::after{content:'';position:absolute;inset:-11px}
+  #toast button{min-height:38px}
+}
+.card-h{flex-wrap:wrap}.card-h h3{min-width:0;overflow-wrap:anywhere}.card-h>.row{flex-wrap:wrap}

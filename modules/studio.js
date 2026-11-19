@@ -8,7 +8,7 @@ import { go } from '../js/app.js';
 let tab = 'feed';
 export default {
   async render(root, params) {
-    if (params[0] === 'edit') return editor(root, params[1]);
+    if (params[0] === 'edit') { if (!params[1]) return go('studio'); return editor(root, params[1]); }
     const body = h('div');
     root.append(head('SNS 스튜디오', '찍은 걸 넣으면 내 콘셉트로 통일해서 편집·자막·썸네일까지.',
       h('button.btn.sm', { onclick: () => { tab = 'concept'; draw(); } }, ic('palette', 14), '콘셉트'),

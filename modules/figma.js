@@ -133,7 +133,7 @@ async function detail(root, id) {
         h('div.modal-f', h('button.btn', { onclick: close }, '취소'), h('button.btn.pri', { onclick: async e => {
           if (!title.value.trim()) { toast('할 일을 적어 주세요'); return; }
           const btn = e.currentTarget; busy(btn, true);
-          const task = { title: title.value.trim(), who: who.value.trim(), due: due.value, project: f.name, est: 30, figma: { key: f.key, node: n.id }, memo: `피그마 ${f.name} › ${n.name}` };
+          const task = { title: title.value.trim(), who: who.value.trim(), due: due.value, project: f.name, figma: { key: f.key, node: n.id }, memo: `피그마 ${f.name} › ${n.name}` };
           if (token) { try { task.figma.comment = await F.postTask(f, n, task); } catch (err) { toast('피그마 댓글은 못 남겼어요: ' + err.message); } }
           await store.commit('task', task);
           toast(task.figma.comment ? '할 일 저장 + 피그마에 댓글 핀' : '할 일로 저장했어요'); close(); draw();
@@ -145,7 +145,7 @@ async function detail(root, id) {
     if (!s.todo.length) card.append(h('div.empty', '정리할 게 없어요. 깔끔해요!'));
     s.todo.forEach((t, i) => card.append(h('div.li', { style: { alignItems: 'flex-start' } }, h('span.dot', { style: { background: TONE[t.level] || 'var(--acc)', marginTop: '7px' } }),
       h('div.grow', h('div.t.small', t.text), h('div.faint.tiny', '방법: ' + t.how)),
-      h('button.btn.sm', { title: '할 일로', onclick: async () => { await store.commit('task', { title: `[피그마] ${t.text}`, project: f.name, est: 30, memo: t.how, figma: { key: f.key } }); toast('할 일에 넣었어요'); } }, ic('plus', 12), '할 일'))));
+      h('button.btn.sm', { title: '할 일로', onclick: async () => { await store.commit('task', { title: `[피그마] ${t.text}`, project: f.name, memo: t.how, figma: { key: f.key } }); toast('할 일에 넣었어요'); } }, ic('plus', 12), '할 일'))));
     return h('div.stack', card, h('div.card.flat', h('p.small.muted', '플러그인 버튼 이름 그대로 적었어요. 피그마에서 "하진 정리" 플러그인을 열고 해당 버튼을 누르면 돼요. 끝나면 1분 안에 점수가 다시 계산돼요.')));
   }
   function activity() {

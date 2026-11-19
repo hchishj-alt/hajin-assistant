@@ -14,20 +14,24 @@ export default {
   async render(root, params) {
     if (params[0]) cursor = new Date(params[0]);
     const body = h('div');
-    const quick = h('input', { placeholder: '일정 바로 추가: "다음 주 수요일 2시~4시 홍대 촬영"', 'aria-label': '일정 추가' });
-    quick.addEventListener('keydown', async e => {
-      if (e.key !== 'Enter' || e.isComposing || !quick.value.trim()) return;
-      const v = quick.value.trim(); const p = brain.interpret('일정: ' + v)[0];
-      const ev = await db.put('events', p.data);
-      quick.value = ''; cursor = new Date(ev.date); toast(`${fmtDate(ev.date)} ${ev.start || '종일'} 추가`); draw();
+    const quick = h('input', { placeholder: '일정 바로 추가: "다음 주 수요일 2시~4시 홍대 촬영"', 'aria-label': '일정 추가', enterkeyhint: 'done' });
+    const ctx = { people: await store.peopleNames().catch(() => []), projects: await store.projects().catch(() => []) };
+    const addQuick = async () => {
+      const v = quick.value.trim(); if (!v) return;
+      quick.value = ''; /* 두 번 눌러도 한 번만 */
+      const p = brain.interpret('일정: ' + v, ctx)[0];
+      const noDate = !p.data.date;
+      const ev = await db.put('events', { ...p.data, date: p.data.date || todayStr() });
+      cursor = new Date(ev.date); toast(`${fmtDate(ev.date)} ${ev.start || '종일'} · ${ev.title}${noDate ? ' (날짜가 없어서 오늘로 넣었어요)' : ''}`, { label: '되돌리기', fn: async () => { await db.remove(ev.id); draw(); } }); draw();
       // 바로 넣어 두고, AI가 읽은 뒤 날짜·시간·사람이 다르면 조용히 고침
       import('../js/ai.js').then(AI => AI.polishSaved('event', v, p, ev, { patch: (id, a) => db.patch(id, a), add: d => db.put('events', d) })).then(async ch => { if (!ch) return; const now = await db.get(ev.id); toast(`AI가 다시 읽고 다듬었어요: ${fmtDate(now.date)} ${now.start || '종일'}`); if (location.hash.startsWith('#/calendar')) { cursor = new Date(now.date); draw(); } }).catch(() => { });
-    });
+    };
+    quick.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addQuick(); } });
     root.append(head('캘린더', null,
       h('button.btn.sm.ghost', { onclick: importIcs, title: '구글·애플 캘린더에서 내보낸 .ics 파일 가져오기' }, ic('upload', 14), '.ics 가져오기'),
       h('button.btn.sm.ghost', { onclick: gcalModal, title: '구글 캘린더에서 알림 받기' }, ic('calendar', 14), '구글 캘린더'),
       h('button.btn.sm.pri', { onclick: () => edit({ date: ymd(cursor) }) }, ic('plus', 14), '일정')),
-      h('div.quick', { style: { marginBottom: '14px' } }, ic('zap'), quick), body);
+      h('div.quick', { style: { marginBottom: '14px' } }, ic('zap'), quick, h('button.btn.icon.ghost', { type: 'button', 'aria-label': '추가', onclick: addQuick }, ic('send'))), body);
     await draw();
 
     async function draw() {
@@ -127,29 +131,29 @@ export default {
         const evs = on(ds), tk = tasks.filter(t => t.due === ds);
         if (!evs.length && !tk.length && ds !== todayStr()) continue;
         any = true;
-        wrap.append(h('div.card', h('div.card-h', h('h3', ds === todayStr() ? h('span.chip.acc', '오늘') : null, fmtDate(ds)), h('button.btn.sm.ghost', { onclick: () => edit({ date: ds }) }, ic('plus', 14))),
+        wrap.append(h('div.card', h('div.card-h', h('h3', ds === todayStr() ? h('span.chip.acc', '오늘') : null, fmtDate(ds)), h('button.btn.sm.ghost', { 'aria-label': `${fmtDate(ds)} 일정 추가`, onclick: () => edit({ date: ds }) }, ic('plus', 14))),
           evs.length || tk.length ? h('div.list', evs.map(e => evRow(e)), tk.map(t => h('div.li', ic('check2', 16), h('div.grow', h('div.small', t.title), h('div.faint.tiny', '마감'))))) : h('div.faint.small', '일정 없음')));
       }
       if (!any) wrap.append(h('div.card', h('div.empty', '앞으로 3주간 일정이 없어요')));
       return wrap;
     }
-    function evRow(e) {
-      return h('div.li.click', { onclick: () => edit(e) }, h('span.dot', { style: { background: evColor(e) } }),
+    function evRow(e, before) {
+      return h('div.li.click', { onclick: () => { before && before(); edit(e); } }, h('span.dot', { style: { background: evColor(e) } }),
         h('div.mono.small', { style: { width: '92px' } }, e.start ? `${e.start}${e.end ? '–' + e.end : ''}` : '종일'),
         h('div.grow', h('div.t.small', e.title), e.place || e.who ? h('div.faint.tiny', [e.place, e.who && (w => w + (((w.charCodeAt(w.length - 1) - 0xAC00) % 28) > 0 && /[가-힣]$/.test(w) ? '과' : '와') + ' 함께')(e.who)].filter(Boolean).join(' · ')) : null), h('span.chip.tiny' + (e._sc === 'personal' ? '' : '.acc'), SC.LABEL[e._sc || 'work']), e.repeat ? ic('refresh', 14) : null);
     }
     async function dayModal(ds, on) {
       const slots = await store.freeSlots(ds);
       modal(fmtDate(ds), close => h('div',
-        on(ds).length ? h('div.list', on(ds).map(e => { const r = evRow(e); r.onclick = () => { close(); edit(e); }; return r; })) : h('p.faint', '일정이 없어요'),
+        on(ds).length ? h('div.list', on(ds).map(e => evRow(e, close))) : h('p.faint', '일정이 없어요'),
         slots.length ? h('div', { style: { marginTop: '12px' } }, h('div.small', { style: { fontWeight: 650 } }, '비는 시간'), h('div.chips', { style: { marginTop: '6px' } }, slots.map(s => h('button.chip', { onclick: () => { close(); edit({ date: ds, start: s.start, end: store.addMins(s.start, 60) }); } }, `${s.start}–${s.end}`)))) : null,
         h('div.modal-f', h('button.btn.pri', { onclick: () => { close(); edit({ date: ds }); } }, ic('plus', 14), '일정 추가'))));
     }
     function edit(e = {}) {
       modal(e.id ? '일정 고치기' : '새 일정', close => {
-        const f = form(FIELDS.event, e, async v => { const ch = await store.changedSince(e); if (ch && !await confirmBox(`창을 연 사이에 ${ch.cur.by && ch.cur.by !== e.by ? ch.cur.by + ' 님이' : '다른 곳에서'} 이 일정을 고쳤어요. 내 내용으로 저장할까요?`, '내 내용으로 저장')) return; await db.put('events', { ...(ch ? ch.cur : e), ...v }); close(); draw(); });
+        const f = form(FIELDS.event, e, async v => { const ch = await store.changedSince(e); if (ch && !await confirmBox(`창을 연 사이에 ${ch.cur.by && ch.cur.by !== e.by ? ch.cur.by + ' 님이' : '다른 곳에서'} 이 일정을 고쳤어요. 내 내용으로 저장할까요?`, '내 내용으로 저장')) return; const saved = await db.put('events', { ...(ch ? ch.cur : e), ...v }); close(); if (saved.date) cursor = new Date(saved.date); draw(); toast(`${e.id ? '고쳤어요' : '넣었어요'} · ${fmtDate(saved.date)} ${saved.start || '종일'} ${saved.title}`); });
         if (e.id && e.date) f.querySelector('.modal-f').prepend(h('a.btn.ghost', { href: G.addUrl(e), target: '_blank', rel: 'noopener', title: '구글 캘린더에 이 일정을 넣어요 (구글 알림이 울려요)' }, ic('calendar', 14), '구글에 추가'));
-        if (e.id) f.querySelector('.modal-f').prepend(h('button.btn.danger', { type: 'button', onclick: async () => { if (await confirmBox('이 일정을 지울까요?', '지우기')) { await db.remove(e.id); close(); draw(); } } }, ic('trash', 14), '지우기'));
+        if (e.id) f.querySelector('.modal-f').prepend(h('button.btn.danger', { type: 'button', onclick: async () => { if (e.repeat && !await confirmBox('반복 일정이에요. 앞으로의 반복까지 모두 지울까요?', '모두 지우기')) return; await db.remove(e.id); close(); draw(); toast(`지웠어요 · ${e.title}`, { label: '되돌리기', fn: async () => { await db.put('events', { ...e, deleted: false }); draw(); } }); } }, ic('trash', 14), '지우기'));
         return f;
       });
     }

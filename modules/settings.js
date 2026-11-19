@@ -107,6 +107,11 @@ async function learnedSection() {
 }
 
 // ── 폰·PC 동기화 (Supabase) ──
+let syncOff = null;
+async function copySql(done) {
+  try { const sql = await (await fetch('supabase/setup.sql')).text(); await navigator.clipboard.writeText(sql); toast(done); }
+  catch { toast('복사하지 못했어요. 파일을 새 창으로 열게요'); try { window.open('supabase/setup.sql', '_blank', 'noopener'); } catch { } }
+}
 async function syncSection(focus) {
   const sync = await import('../js/sync.js');
   const box = h('div.card', { style: { marginBottom: '14px', outline: focus ? '2px solid var(--acc)' : '' }, id: 'sec-sync' });
@@ -125,14 +130,14 @@ async function syncSection(focus) {
       box.append(h('div.grid.g2', { style: { marginTop: '10px' } }, h('label.f', 'Project URL', u), h('label.f', 'Publishable 키', k)),
         h('p.faint.tiny', { style: { marginTop: '6px' } }, 'secret 키는 절대 넣지 마세요. 공개 키만으로 충분해요.'),
         h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm.pri', { onclick: async () => { if (!/^https:\/\/.+/.test(u.value.trim()) || !k.value.trim()) { toast('주소와 키를 확인해 주세요'); return; } if (/secret|service_role/i.test(k.value)) { toast('secret 키는 넣으면 안 돼요. publishable 키를 넣어 주세요'); return; } focus = false; await sync.setConfig(u.value, k.value); draw(); } }, '연결'),
-          h('button.btn.sm', { onclick: async () => { const sql = await (await fetch('supabase/setup.sql')).text(); await navigator.clipboard.writeText(sql); toast('서버 설정 SQL을 복사했어요. Supabase SQL Editor에 붙여넣고 Run 하세요'); } }, ic('copy', 14), '서버 설정 SQL 복사')));
+          h('button.btn.sm', { onclick: () => copySql('서버 설정 SQL을 복사했어요. Supabase SQL Editor에 붙여넣고 Run 하세요') }, ic('copy', 14), '서버 설정 SQL 복사')));
       return;
     }
     const me = sync.user();
     if (!me) {
       const codeIn = h('input.in', { placeholder: '멤버 코드 (예: AB3CD)', maxlength: 5, autocapitalize: 'characters', autocomplete: 'one-time-code', style: { textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, maxWidth: '220px' } });
       const go1 = async btn => { busy(btn, true, '들어가는 중'); try { const m = await sync.loginWithCode(codeIn.value); toast(`${m.name} 님, 반가워요. 맞추는 중이에요`); } catch (e) { toast(e.message); } busy(btn, false); draw(); };
-      codeIn.addEventListener('keydown', e => e.key === 'Enter' && go1(e.target.nextSibling));
+      codeIn.addEventListener('keydown', e => e.key === 'Enter' && !e.isComposing && go1(e.target.nextSibling));
       box.append(h('div.row', { style: { marginTop: '10px' } }, codeIn, h('button.btn.sm.pri', { onclick: e => go1(e.currentTarget) }, '로그인'), h('button.btn.sm.ghost', { onclick: () => { focus = 'cfg'; draw(); } }, '서버 바꾸기')),
         h('p.faint.tiny', { style: { marginTop: '6px' } }, '관리자(하진)가 준 5자리 코드로 들어와요. 폰과 PC에서 같은 코드를 쓰면 기록이 맞춰져요.'));
       return;
@@ -145,10 +150,11 @@ async function syncSection(focus) {
       h('div.tile', h('div.tn', String(st.pulled || 0)), h('div.tl', '방금 받은 것'))),
       st.error ? h('p.small', { style: { color: 'var(--bad)' } }, st.error) : null,
       h('div.row', h('button.btn.sm.pri', { onclick: async e => { const btn = e.currentTarget; busy(btn, true, '맞추는 중'); await sync.syncNow(); busy(btn, false); draw(); } }, ic('refresh', 14), '지금 맞추기'),
-        h('button.btn.sm', { onclick: async () => { const sql = await (await fetch('supabase/setup.sql')).text(); await navigator.clipboard.writeText(sql); toast('서버 설정 SQL을 복사했어요'); } }, ic('copy', 14), '서버 설정 SQL'),
+        h('button.btn.sm', { onclick: () => copySql('서버 설정 SQL을 복사했어요') }, ic('copy', 14), '서버 설정 SQL'),
         h('button.btn.sm.ghost', { onclick: async () => { if (await confirmBox('이 기기에서 로그아웃할까요? 기록은 기기에 그대로 남아요.', '로그아웃')) { await sync.signOut(); draw(); } } }, '로그아웃')));
   }
-  off = sync.onState(() => { if (!document.body.contains(box)) { off?.(); return; } draw(); });
+  syncOff?.(); /* 예전 화면의 구독은 끊음 */
+  off = syncOff = sync.onState(() => { if (!document.body.contains(box)) { off?.(); return; } draw(); });
   await draw();
   return box;
 }

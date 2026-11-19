@@ -9,8 +9,10 @@ export default {
   async render(root) {
     const body = h('div');
     const quick = h('input', { placeholder: '“택시 12,300원 법인카드”, “오로라 계약금 300만원 25일 입금 예정”처럼 적고 Enter', 'aria-label': '지출이나 받을 돈 추가', enterkeyhint: 'done' });
+    let adding = false;
     const addQuick = async () => {
-      const v = quick.value.trim(); if (!v) return;
+      const v = quick.value.trim(); if (!v || adding) return;
+      adding = true; setTimeout(() => (adding = false), 800); /* 두 번 눌러도 한 번만 */
       const ctx = { projects: (await db.list('projects')).map(x => x.name).filter(Boolean), vendors: (await db.list('vendors')).map(x => x.name).filter(Boolean) };
       let p = brain.interpret(v, ctx)[0]; if (!p || (p.kind !== 'expense' && p.kind !== 'income')) p = brain.interpret('지출: ' + v, ctx)[0];
       const tags = brain.parseTags(v);

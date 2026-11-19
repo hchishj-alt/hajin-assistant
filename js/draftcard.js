@@ -46,7 +46,7 @@ export function draftCard(d, onDone) {
     }, { submitLabel: '고쳐서 확정' }));
   }
   function kindMenu() {
-    const sel = h('select.in', { style: { width: 'auto', padding: '4px 8px', fontSize: '13px' }, onchange: async () => { const cur = await fresh(); if (!cur) return; const nd = await store.changeKind(cur, sel.value); toast(`${store.KINDS[sel.value].label}(으)로 바꿨어요. 다음부터 비슷한 말은 이렇게 알아들을게요.`); const repl = draftCard(nd, onDone); el.replaceWith(repl); } },
+    const sel = h('select.in', { 'aria-label': '종류 바꾸기', style: { width: 'auto', padding: '4px 8px', fontSize: '13px' }, onchange: async () => { const cur = await fresh(); if (!cur) return; const nd = await store.changeKind(cur, sel.value); toast(`${store.KINDS[sel.value].label}(으)로 바꿨어요. 다음부터 비슷한 말은 이렇게 알아들을게요.`); const repl = draftCard(nd, onDone); el.replaceWith(repl); } },
       Object.entries(store.KINDS).filter(([key, v]) => v.col && key !== 'meeting').map(([key, v]) => h('option', { value: key, selected: key === d.kind }, v.label)));
     return sel;
   }

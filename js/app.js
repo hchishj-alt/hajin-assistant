@@ -136,24 +136,25 @@ export async function openPalette() {
   const close = modal('검색·명령', h('div', inp, res), { onClose: () => (paletteOpen = false) });
   const draw = () => {
     const q = inp.value.trim();
-    items = [];
+    items = []; let made = null;
     if (q) {
       const parsed = brain.interpretCapture(q).filter(x => !['query', 'nav'].includes(x.kind));
-      if (parsed.length) items.push({ icon: 'zap', title: `${parsed.map(p => p.label).join(' + ')}로 만들기`, sub: parsed.map(p => p.data.title || p.data.name).join(' / '), run: async () => { for (const p of parsed) await store.draft(p.kind, p.data, { source: p.src || q, confidence: p.confidence, origin: 'palette' }); updateBadge(); toast('확인 대기함에 넣었어요', { label: '보기', fn: () => go('inbox') }); } });
+      if (parsed.length) made = { icon: 'zap', title: `적어 두기: ${parsed.map(p => p.label).join(', ')}`, sub: parsed.map(p => p.data.title || p.data.name).join(' / '), run: async () => { for (const p of parsed) await store.draft(p.kind, p.data, { source: p.src || q, confidence: p.confidence, origin: 'palette' }); updateBadge(); toast('확인 대기함에 넣었어요', { label: '보기', fn: () => go('inbox') }); } };
     }
     const ql = q.toLowerCase();
-    for (const m of MODULES.filter(m => !m.hidden && (!q || m.title.includes(q) || m.id.includes(ql)))) items.push({ icon: m.icon, title: m.title, sub: '메뉴로 이동', run: () => go(m.id) });
+    for (const m of MODULES.filter(m => !m.hidden && (!m.adminOnly || !document.body.classList.contains('not-admin')) && (!q || m.title.includes(q) || m.title.replace(/\s/g, '').includes(q.replace(/\s/g, '')) || m.id.includes(ql)))) items.push({ icon: m.icon, title: m.title, sub: '메뉴로 이동', run: () => go(m.id) });
+    if (made) { if (items.length && q.length <= 6) items.push(made); else items.unshift(made); } /* 메뉴 이름을 친 거면 이동이 먼저 */
     if (q) for (const d of brain.similar(q, docs, 8)) items.push({ icon: store.KINDS[Object.keys(store.KINDS).find(k => store.KINDS[k].col === d.col)]?.icon || 'file', title: d.title || '(제목 없음)', sub: d.text.slice(0, 70), run: () => go(d.route + '/' + d.id) });
     sel = Math.min(sel, Math.max(0, items.length - 1));
     clear(res);
     items.slice(0, 14).forEach((it, i) => res.append(h('div.li.click' + (i === sel ? '.sel' : ''), { onclick: () => { close(); it.run(); } }, ic(it.icon), h('div.grow', h('div.t', it.title), h('div.faint.tiny', it.sub)))));
     if (!items.length) res.append(h('div.empty', '결과가 없어요'));
   };
-  inp.addEventListener('input', () => { sel = 0; draw(); });
+  let palT; inp.addEventListener('input', () => { sel = 0; clearTimeout(palT); palT = setTimeout(draw, 140); });
   inp.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') { sel = Math.min(items.length - 1, sel + 1); draw(); e.preventDefault(); }
     if (e.key === 'ArrowUp') { sel = Math.max(0, sel - 1); draw(); e.preventDefault(); }
-    if (e.key === 'Enter' && items[sel]) { e.preventDefault(); close(); items[sel].run(); }
+    if (e.key === 'Enter' && !e.isComposing && items[sel]) { e.preventDefault(); clearTimeout(palT); draw(); if (items[sel]) { close(); items[sel].run(); } }
   });
   draw();
 }
@@ -198,12 +199,24 @@ async function tickReminders() {
   }
 }
 
+// 글꼴은 화면을 막지 않게 나중에 붙임 (CDN이 느려도 첫 화면이 바로 뜸)
+function lateFont() { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css'; document.head.append(l); }
+// 눌러서 여는 줄·칸은 키보드로도 닿게 (Tab으로 가서 Enter)
+function kbAccess() {
+  const NATIVE = /^(A|BUTTON|INPUT|SELECT|TEXTAREA|LABEL)$/;
+  const mark = () => document.querySelectorAll('.click:not([tabindex]),[data-kb]:not([tabindex]),.cal .d:not([tabindex])').forEach(el => { if (NATIVE.test(el.tagName)) return; el.tabIndex = 0; el.setAttribute('role', 'button'); });
+  let t; new MutationObserver(() => { clearTimeout(t); t = setTimeout(mark, 150); }).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('keydown', e => { const el = e.target; if ((e.key === 'Enter' || e.key === ' ') && !e.isComposing && el?.matches?.('[role=button][tabindex]') && !NATIVE.test(el.tagName)) { e.preventDefault(); el.click(); } });
+}
+
 async function boot() {
+  lateFont(); kbAccess();
   window.addEventListener('error', e => store.logError(e.error || e.message, 'window'));
   window.addEventListener('unhandledrejection', e => { if (/관리자만|올린 사람과 관리자/.test(e.reason?.message || '')) { toast(e.reason.message); e.preventDefault(); return; } store.logError(e.reason, 'promise'); if (/QuotaExceeded|InvalidState|저장소/.test(String(e.reason?.name || '') + String(e.reason?.message || ''))) toast('저장하지 못했어요. 기기 저장 공간이나 브라우저 설정을 확인해 주세요.'); });
   (await import('./admin.js')).install();
   await (await import('./labels.js')).load();
   await applyTheme();
+  if (!(await db.kvGet('onboarded', false)) && (await db.kvGet('name', null)) == null) await db.kvSet('askName', true); /* 새 기기에서는 이름부터 물어봄 */
   if (!location.hash || location.hash === '#/') { const st = (await db.kvGet('look', null))?.start; if (st && st !== 'today' && MODULES.some(m => m.id === st)) history.replaceState(null, '', '#/' + st); }
   if (/^#k=/.test(location.hash) || sessionStorage.getItem('hajin:pk')) await (await import('./keyshare.js')).takeFromHash();
   await store.loadLearned();

@@ -5,6 +5,8 @@ import * as store from '../js/store.js';
 import * as brain from '../js/brain.js';
 import { taskRow, sortTasks } from './tasks.js';
 import { go, updateBadge } from '../js/app.js';
+import { draftCard } from '../js/draftcard.js';
+import * as F from '../js/follow.js';
 
 export default {
   async render(root) {
@@ -12,39 +14,43 @@ export default {
     const today = todayStr();
     const hour = now.getHours();
     const hi = hour < 6 ? '늦은 밤이에요' : hour < 12 ? '좋은 아침이에요' : hour < 18 ? '좋은 오후예요' : '오늘도 수고했어요';
-    const name = await db.kvGet('name', '하진');
+    const askName = await db.kvGet('askName', false);
+    const name = (await db.kvGet('name', '')) || (askName ? '' : '하진');
 
-    const [events, allTasks, drafts, reach, bdays, expenses, logs, meetings] = await Promise.all([
-      store.eventsOn(today), db.list('tasks'), store.drafts(), store.peopleToReach(), store.upcomingBirthdays(7), db.list('expenses'), db.list('timelogs'), db.list('meetings')]);
+    const [events, allTasks, drafts, reach, bdays, expenses, meetings] = await Promise.all([
+      store.eventsOn(today), db.list('tasks'), store.drafts(), store.peopleToReach(), store.upcomingBirthdays(7), db.list('expenses'), db.list('meetings')]);
     const open = allTasks.filter(t => !t.done);
     const todays = open.filter(t => !t.due || t.due <= today).sort(sortTasks);
     const doneToday = allTasks.filter(t => t.done && (t.doneAt || '').slice(0, 10) === today).length;
     const monthKey = today.slice(0, 7);
     const monthSpend = expenses.filter(e => (e.date || '').startsWith(monthKey)).reduce((s, e) => s + (Number(e.amount) || 0), 0);
     const budget = await db.kvGet('budget', 0);
-    const mins = logs.filter(l => l.date === today).reduce((s, l) => s + (l.minutes || 0), 0);
     const overdue = open.filter(t => t.due && t.due < today).length;
 
     // 빠른 입력
-    const qi = h('input', { placeholder: '생각나는 대로 적기 — 일정·할 일·지출 무엇이든', 'aria-label': '빠른 입력' });
+    const qi = h('input', { placeholder: '생각나는 대로 적어 주세요', 'aria-label': '빠른 입력', enterkeyhint: 'send' });
     const qp = h('div.chips', { style: { padding: '4px 6px 0', minHeight: '20px' } });
+    const qres = h('div.stack', { style: { marginTop: '6px' } });
     qi.addEventListener('input', () => { clear(qp); const v = qi.value.trim(); if (!v) return; for (const p of brain.interpretCapture(v).slice(0, 3)) qp.append(h('span.chip.acc', ic(store.KINDS[p.kind]?.icon || 'search', 12), p.kind === 'query' ? '찾아보기' : store.KINDS[p.kind]?.label || '')); });
-    qi.addEventListener('keydown', async e => {
-      if (e.key !== 'Enter' || e.isComposing || !qi.value.trim()) return;
-      const v = qi.value.trim();
-      const projects = await store.projects(), people = [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean);
+    const addQuick = async () => {
+      const v = qi.value.trim(); if (!v) return;
+      qi.value = ''; clear(qp); /* 두 번 눌러도 한 번만 */
+      const projects = await store.projects(), people = await store.peopleNames();
       let ps = brain.interpretCapture(v, { projects, people });
       if (ps.some(p => p.kind === 'query' || p.kind === 'nav')) { sessionStorage.setItem('assistant:prefill', v); go('assistant'); return; }
-      qi.value = ''; clear(qp);
       { const AI = await import('../js/ai.js'); if (await AI.enabled()) { toast('AI가 읽고 있어요'); const d = new Date(); const got = await AI.refine(v, ps, { today: new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10), people, projects, vendors: (await db.list('vendors')).map(x => x.name) }); if (got && got.length) ps = got; } }
-      for (const p of ps) await store.draft(p.kind, p.data, { source: p.src || v, confidence: p.confidence, origin: 'quick' });
-      qi.value = ''; clear(qp); updateBadge();
-      toast(`${ps.map(p => p.label).join(', ')} → 확인 대기함`, { label: '보기', fn: () => go('inbox') });
-    });
+      /* 적은 자리에서 바로 확인: 카드가 여기 뜨고, 그냥 두면 확인 대기함에 남음 */
+      clear(qres); qres.dataset.live = '1';
+      const ids = [];
+      for (const p of ps) { const d = await store.draft(p.kind, p.data, { source: p.src || v, confidence: p.confidence, origin: 'quick' }); ids.push(d.id); qres.append(draftCard(d, () => updateBadge())); }
+      qres.append(h('div.row.between', h('span.faint.tiny', '확정을 누르면 기록돼요. 그냥 두면 확인 대기함에 남아요.'), h('button.btn.sm.ghost', { type: 'button', onclick: () => { delete qres.dataset.live; this.render(clear(root)); } }, '닫기')));
+      await F.remember(ids); updateBadge();
+    };
+    qi.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addQuick(); } });
 
     const hdr = h('div.page-head', h('div',
       h('p.faint.small', fmtDate(now, { year: true })),
-      h('h1', `${hi}, ${name}님`),
+      h('h1', name ? `${hi}, ${name}님` : hi),
       h('p.sub', brain.briefing({ events, tasks: open, drafts: drafts.length, people: reach }))),
       h('div.row', h('a.btn.sm', { href: '#/assistant' }, ic('sparkles', 14), '비서'), h('a.btn.sm', { href: '#/meetings/new' }, ic('mic', 14), '회의 녹음')));
 
@@ -61,7 +67,7 @@ export default {
     const rows = [...events.map(e => ({ t: e.start || '00:00', e })), ...slots.map(s => ({ t: s.start, s }))].sort((a, b) => a.t.localeCompare(b.t));
     if (!rows.length) tl.append(h('div.faint.small', '오늘은 일정이 없어요'));
     for (const r of rows) {
-      if (r.e) { const past = r.e.end ? r.e.end < nowHM : (r.e.start && r.e.start < nowHM); tl.append(h('div.tl-i', { style: { opacity: past ? .5 : 1 } }, h('div.mono.tiny.faint', r.e.start ? `${r.e.start}${r.e.end ? '–' + r.e.end : ''}` : '종일'), h('div.t.small', h('span.dot', { style: { background: colorFor(r.e.title), display: 'inline-block', marginRight: '6px' } }), r.e.title, r.e.place ? h('span.faint', ' · ' + r.e.place) : null, r.e.who ? h('span.faint', ' · ' + r.e.who) : null, ' ', h('span.chip.tiny' + (SC.of(r.e) === 'personal' ? '' : '.acc'), SC.LABEL[SC.of(r.e)])))); }
+      if (r.e) { const past = r.e.end ? r.e.end < nowHM : (r.e.start && r.e.start < nowHM); tl.append(h('div.tl-i', { style: { opacity: past ? .72 : 1 } }, h('div.mono.tiny.faint', r.e.start ? `${r.e.start}${r.e.end ? '–' + r.e.end : ''}` : '종일'), h('div.t.small', h('span.dot', { style: { background: colorFor(r.e.title), display: 'inline-block', marginRight: '6px' } }), r.e.title, r.e.place ? h('span.faint', ' · ' + r.e.place) : null, r.e.who ? h('span.faint', ' · ' + r.e.who) : null, ' ', h('span.chip.tiny' + (SC.of(r.e) === 'personal' ? '' : '.acc'), SC.LABEL[SC.of(r.e)])))); }
       else if (r.s.mins >= 30) tl.append(h('div.tl-i', { style: { opacity: .75 } }, h('div.mono.tiny.faint', `${r.s.start}–${r.s.end}`), h('div.small.faint', `빈 시간 ${Math.floor(r.s.mins / 60) ? Math.floor(r.s.mins / 60) + '시간 ' : ''}${r.s.mins % 60 ? (r.s.mins % 60) + '분' : ''}`)));
     }
 
@@ -72,8 +78,8 @@ export default {
     // 사람
     const pc = h('div.card', h('div.card-h', h('h3', ic('users'), '챙길 사람'), h('a.btn.sm.ghost', { href: '#/people' }, '인맥')));
     if (!reach.length && !bdays.length) pc.append(h('div.empty', '연락 주기를 정해 두면 때 맞춰 알려 드려요'));
-    bdays.forEach(c => pc.append(h('div.li', ic('cake'), h('div.grow', h('div.t.small', c.name), h('div.faint.tiny', c.inDays ? `${c.inDays}일 후 생일` : '오늘 생일!')), c.phone ? h('a.btn.sm', { href: 'sms:' + c.phone }, ic('msg', 14)) : null)));
-    reach.slice(0, 4).forEach(c => pc.append(h('div.li', h('div.avatar', { style: { background: colorFor(c.name), width: '30px', height: '30px', fontSize: '12px' } }, c.name?.[0] || '?'), h('div.grow', h('div.t.small', c.name), h('div.faint.tiny', `${c.overdue + c.cadence}일째 연락 없음`)), c.phone ? h('a.btn.sm', { href: 'tel:' + c.phone }, ic('phone', 14)) : null)));
+    bdays.forEach(c => pc.append(h('div.li', ic('cake'), h('div.grow', h('div.t.small', c.name), h('div.faint.tiny', c.inDays ? `${c.inDays}일 후 생일` : '오늘 생일!')), c.phone ? h('a.btn.sm', { href: 'sms:' + c.phone, 'aria-label': `${c.name}에게 문자` }, ic('msg', 14)) : null)));
+    reach.slice(0, 4).forEach(c => pc.append(h('div.li', h('div.avatar', { style: { background: colorFor(c.name), width: '30px', height: '30px', fontSize: '12px' } }, c.name?.[0] || '?'), h('div.grow', h('div.t.small', c.name), h('div.faint.tiny', `${c.overdue + c.cadence}일째 연락 없음`)), c.phone ? h('a.btn.sm', { href: 'tel:' + c.phone, 'aria-label': `${c.name}에게 전화` }, ic('phone', 14)) : null)));
 
     // 최근 회의
     const mc = h('div.card', h('div.card-h', h('h3', ic('mic'), '최근 회의'), h('a.btn.sm.ghost', { href: '#/meetings' }, '전체')));
@@ -81,21 +87,23 @@ export default {
     if (!ms.length) mc.append(h('div.empty', '회의를 녹음하면 요약이 여기 보여요'));
     ms.forEach(m => mc.append(h('div.li.click', { onclick: () => go('meetings/' + m.id) }, ic(m.summaryConfirmed ? 'check' : 'sparkles', 16), h('div.grow', h('div.t.small', m.title), h('div.faint.tiny', fmtDate(m.date || m.createdAt) + (m.summaryConfirmed ? ' · 요약 확정' : ' · 요약 확인 전'))))));
 
-    const focus = h('div.card', h('div.card-h', h('h3', ic('timer'), '오늘 집중'), h('a.btn.sm.ghost', { href: '#/tasks' }, '타이머')),
-      h('div.row', h('div.stat', `${Math.floor(mins / 60)}`, h('span.small.muted', '시간 '), `${mins % 60}`, h('span.small.muted', '분'))),
-      h('div.bar', { style: { marginTop: '8px' } }, h('i', { style: { width: Math.min(100, mins / ((await db.kvGet('focusGoal', 240)) || 240) * 100) + '%' } })),
-      h('p.faint.tiny', { style: { marginTop: '4px' } }, `목표 ${Math.round((await db.kvGet('focusGoal', 240)) / 60)}시간`));
-
     const L = await (await import('../js/look.js')).get();
     const blocks = {
-      quick: () => h('div.home-full', h('div.quick', ic('zap'), qi, h('a.btn.icon.ghost', { href: '#/assistant', 'aria-label': '말로 입력' }, ic('mic'))), qp),
+      quick: () => h('div.home-full', h('div.quick', ic('zap'), qi, h('button.btn.icon.ghost', { type: 'button', 'aria-label': '적기', onclick: addQuick }, ic('send')), h('a.btn.icon.ghost', { href: '#/assistant', 'aria-label': '말로 입력' }, ic('mic'))), qp, qres),
       tiles: () => h('div.home-full', tiles),
       flow: () => h('div.card', h('div.card-h', h('h3', ic('clock'), '오늘 흐름'), h('a.btn.sm.ghost', { href: '#/calendar' }, '캘린더')), tl),
       tasks: () => tcard, people: () => pc, meetings: () => mc, sns: () => snsCard(), team: () => teamCard(allTasks, name), activity: () => activityCard(),
     };
     const grid = h('div.home-grid');
     for (const id of homeOrder(L)) if (!L.homeOff?.includes(id) && blocks[id]) grid.append(await blocks[id]());
-    root.append(hdr, grid);
+    root.append(hdr);
+    if (askName && !name) {
+      const ni = h('input.in', { placeholder: '이름 (예: 민서)', 'aria-label': '내 이름', style: { maxWidth: '200px' } });
+      const saveName = async () => { const v = ni.value.trim(); if (!v) return toast('이름을 적어 주세요'); await db.kvSet('name', v); await db.kvSet('askName', false); this.render(clear(root)); };
+      ni.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) saveName(); });
+      root.append(h('div.card', { style: { marginBottom: '14px' } }, h('h3', '처음 오셨네요. 뭐라고 부를까요?'), h('p.faint.small', { style: { margin: '4px 0 10px' } }, '팀에서 받은 멤버 코드가 있으면 ', h('a', { href: '#/settings' }, '설정'), '에서 로그인해 주세요. 이름과 팀 할 일이 자동으로 맞춰져요.'), h('div.row', ni, h('button.btn.pri', { type: 'button', onclick: saveName }, '저장'))));
+    }
+    root.append(grid);
     if (!grid.children.length) grid.append(h('div.card.home-full', h('div.empty', '메인 화면 카드를 모두 껐어요. 꾸미기 › 메인 화면에서 다시 켤 수 있어요.', h('a.btn.sm', { href: '#/look', style: { marginTop: '10px' } }, '꾸미기 열기'))));
   },
 };
@@ -114,13 +122,14 @@ async function snsCard() {
 // 팀 할 일: 담당자별로 남은 일·밀린 일 (팀 앱의 첫 화면)
 async function teamCard(allTasks, me) {
   const today = todayStr();
-  const shared = allTasks.filter(t => t.team && !t.done);
-  const c = h('div.card', h('div.card-h', h('h3', ic('users'), '팀 할 일'), h('a.btn.sm.ghost', { href: '#/tasks' }, '전체')));
-  if (!shared.length) { c.append(h('div.empty', '팀에 공유된 할 일이 없어요. “민서 금요일까지 썸네일 시안”처럼 적으면 담당자에게 보여요.')); return c; }
-  const by = {}; for (const t of shared) (by[t.who || '담당 미정'] = by[t.who || '담당 미정'] || []).push(t);
+  const mine = w => !w || w === '나' || (me && store.sameName(w, me));
+  const shared = allTasks.filter(t => !t.done && (t.team || (t.who && !mine(t.who))));
+  const c = h('div.card', h('div.card-h', h('h3', ic('users'), '팀 할 일'), h('a.btn.sm.ghost', { href: '#/tasks/team' }, '담당자별')));
+  if (!shared.length) { c.append(h('div.empty', '담당이 정해진 할 일이 없어요. “민서 금요일까지 썸네일 시안”처럼 적으면 담당자별로 모여요.')); return c; }
+  const by = {}; for (const t of shared) { const k = t.who ? (mine(t.who) ? (me || '나') : t.who) : '담당 미정'; (by[k] = by[k] || []).push(t); }
   for (const [who, ts] of Object.entries(by).sort((a, b) => b[1].length - a[1].length)) {
     const late = ts.filter(t => t.due && t.due < today).length, soon = ts.filter(t => t.due && t.due >= today).sort((a, b) => a.due.localeCompare(b.due))[0];
-    c.append(h('div.li.click', { onclick: () => go('tasks') }, h('div.avatar', { style: { background: colorFor(who), width: '30px', height: '30px', fontSize: '12px' } }, who.slice(-2, -1) || who[0]),
+    c.append(h('div.li.click', { onclick: () => go('tasks/team') }, h('div.avatar', { style: { background: colorFor(who), width: '30px', height: '30px', fontSize: '12px' } }, who === '담당 미정' ? '?' : who.slice(-2, -1) || who[0]),
       h('div.grow', h('div.t.small', who), h('div.faint.tiny', soon ? `다음 마감 ${fmtDate(soon.due)} · ${soon.title}` : ts[0].title)),
       late ? h('span.chip.bad', `밀림 ${late}`) : null, h('span.chip', `${ts.length}개`)));
   }

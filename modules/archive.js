@@ -99,7 +99,7 @@ export default {
         return h('div',
           media,
           h('div.row', { style: { margin: '12px 0 6px', gap: '8px', flexWrap: 'wrap' } },
-            r.colors?.length ? h('div.pal.lg', r.colors.map(c => h('button', { title: c + ' 복사', style: { background: c }, onclick: async () => { await navigator.clipboard.writeText(c); toast(c + ' 복사했어요'); } }))) : null,
+            r.colors?.length ? h('div.pal.lg', r.colors.map(c => h('button', { title: c + ' 복사', style: { background: c }, onclick: async () => { try { await navigator.clipboard.writeText(c); } catch { toast('복사 권한이 없어요. 색 값: ' + c); return; } toast(c + ' 복사했어요'); } }))) : null,
             ...(r.mood || []).map(m => h('span.chip', m)), ...(r.hues || []).map(x => h('span.chip', x))),
           h('p.faint.small', [r.by && `${r.by} 올림`, r.provider, r.project && `폴더 ${r.project}${r.sub ? ' › ' + r.sub : ''}`].filter(Boolean).join(' · ')),
           r.memo ? h('p.small', r.memo) : null,
@@ -185,7 +185,7 @@ export default {
       const ff = await folderFields({ project: F.folder && F.folder !== '_none' ? F.folder : '' });
       const urls = files.map(f => URL.createObjectURL(f));
       modal(files.length > 1 ? `이미지 ${files.length}장 담기` : '이미지 담기', close => {
-        const f = form([{ k: 'title', label: '제목 (비우면 파일 이름)', full: true }, { k: 'url', label: '원본 링크 (선택)', type: 'url', full: true, default: link }, ...ff, { k: 'memo', label: '메모 (선택)', full: true }],
+        const f = form([{ k: 'title', label: '제목 (비우면 파일 이름)', full: true, req: false }, { k: 'url', label: '원본 링크 (선택)', type: 'url', full: true, default: link }, ...ff, { k: 'memo', label: '메모 (선택)', full: true }],
           { project: F.folder && F.folder !== '_none' ? F.folder : '', sub: F.sub, url: link }, async v => {
             const by = await meName(), team = await teamOf();
             const sync = await import('../js/sync.js'); const Q = await import('../js/queue.js');

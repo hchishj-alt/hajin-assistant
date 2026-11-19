@@ -134,7 +134,7 @@ export async function enhance(a, text, { today = '', people = [], meeting = fals
 // ── Gemini가 먼저 읽기 ──
 // 규칙이 읽은 초안(parsed)을 같이 주고, AI가 뜻을 보고 고쳐 쓰게 함. 전화·금액·링크처럼 글자 그대로인 건 규칙 값을 믿고,
 // 날짜·종류·제목·누구랑·장소처럼 뜻을 읽어야 하는 건 AI 값을 씀. 실패하면 null → 규칙 결과 그대로
-const KO = { event: '일정', task: '할 일', expense: '지출', contact: '연락처', idea: '아이디어', note: '메모', vendor: '업체', buy: '살 것', reference: '레퍼런스', sns: 'SNS 아이디어', grant: '지원사업' };
+const KO = { event: '일정', task: '할 일', expense: '지출', income: '받을 돈', contact: '연락처', idea: '아이디어', note: '메모', vendor: '업체', buy: '살 것', reference: '레퍼런스', sns: 'SNS 아이디어', grant: '지원사업' };
 // AI가 말에 없는 사람을 지어내지 못하게: 말에 실제로 나온 이름만 남긴다(목록 사람은 성 뺀 이름도 인정).
 function whoIn(w, text, people, fallback) {
   const t = String(text).replace(/\s/g, ''); const ok = [];
@@ -164,7 +164,7 @@ ${calendarTable(today)}
 프로젝트: ${projects.slice(0, 20).join(', ') || '없음'}
 업체: ${vendors.slice(0, 30).join(', ') || '없음'}
 
-항목 모양: {"kind":"event|task|expense|contact|idea|note|vendor|buy|reference|sns|grant","title":"짧은 명사형 제목(날짜·사람·장소·조사는 뺌)","date":"YYYY-MM-DD","endDate":"여러 날이면 끝 날짜","start":"HH:MM","end":"HH:MM","allDay":false,"who":"같이 하는/맡은 사람","place":"가게·건물·전시 이름","area":"동네·도시","scope":"work|personal","priority":"high|normal","project":"","amount":0,"category":"","memo":"제목에 못 담은 조건","repeat":"daily|weekly|monthly|weekdays 또는 빈칸","phone":"","email":"","org":"","role":"직함","url":"","cat":"업체 분야","prices":[{"item":"품목","price":0,"note":""}]}
+항목 모양: {"kind":"event|task|expense|income|contact|idea|note|vendor|buy|reference|sns|grant","title":"짧은 명사형 제목(날짜·사람·장소·조사는 뺌)","date":"YYYY-MM-DD","endDate":"여러 날이면 끝 날짜","start":"HH:MM","end":"HH:MM","allDay":false,"who":"같이 하는/맡은 사람","place":"가게·건물·전시 이름","area":"동네·도시","scope":"work|personal","priority":"high|normal","project":"","amount":0,"category":"","memo":"제목에 못 담은 조건","repeat":"daily|weekly|monthly|weekdays 또는 빈칸","phone":"","email":"","org":"","role":"직함","url":"","cat":"업체 분야","prices":[{"item":"품목","price":0,"note":""}]}
 없는 칸은 빼거나 빈칸으로 둬.
 
 읽는 법:
@@ -172,6 +172,7 @@ ${calendarTable(today)}
 - 한 문장에 약속과 그걸 위한 할 일이 같이 있으면 반드시 event와 task를 따로 만들어. 예: \"28일 오후에 최종 발표, 그 전날까지 PPT 완성\" → event \"최종 발표\"(28일, memo \"오후\") + task \"PPT 완성\"(27일). 서로 다른 할 일이 여러 개여도 하나씩 나눠.
 - 한 문장에 단계가 이어지고(\"~해서\", \"~하고\", \"~한 뒤\") 날짜가 따로 있으면 단계마다 task를 따로 만들어. \"까지\"가 붙은 날짜는 바로 그 뒤에 나오는 일의 마감이야. 예: \"오늘 사진 컨셉 기획해서 다음주 월요일까지 촬영해야 해\" → task \"사진 컨셉 기획\"(오늘) + task \"사진 촬영\"(다음 주 월요일). 뒤 단계 제목만 봐도 무엇을 하는지 알 수 있게 대상을 넣어(\"촬영\"이 아니라 \"사진 촬영\"). 반대로 \"다음주 중 작업 목요일까지 제출\"처럼 한 가지 일의 기간과 마감을 말한 것이면 나누지 말고 task 하나로(마감은 \"까지\" 날짜). 날짜를 말하지 않은 단계에 날짜를 지어내지 마.
 - 해야 하는 일(\"~해야 해\", \"~까지\")은 컨셉·아이디어 같은 낱말이 있어도 task야.
+- expense는 내가 쓴 돈. income은 받을 돈·들어온 돈(입금 예정, 계약금·잔금·협찬비·정산받기). 누가 주는지는 who에, 받기로 한 날은 date에.
 - 인스타·릴스·유튜브·블로그에 올릴 거리는 sns. 그냥 떠오른 생각은 idea.
 - "다음주 중 작업, 목요일까지 제출"처럼 주 표현과 요일이 떨어져 있어도 그 주의 요일로 읽어. 주를 말하지 않은 요일은 오늘 이후 가장 가까운 그 요일(오늘과 같은 요일이면 다음 주).
 - 날짜는 반드시 위 달력에서 골라. 계산하지 말고 찾아.
@@ -192,12 +193,14 @@ ${calendarTable(today)}
   const out = []; const seen = {};
   for (const g of arr.slice(0, 8)) {
     if (!g || !KO[g.kind] || !String(g.title || '').trim()) continue;
+    if (g.kind === 'expense' && (parsed || []).some(p => p.kind === 'income') && !(parsed || []).some(p => p.kind === 'expense')) g.kind = 'income'; /* 규칙이 받을 돈으로 읽은 건 지출로 뒤집지 않음 */
     if (g.kind === 'idea' && /인스타|릴스|유튜브|쇼츠|틱톡|블로그|스레드|트위터|피드/.test(text) && /올리|올려|업로드|게시|포스팅|찍어|콘텐츠/.test(text)) g.kind = 'sns';
     const same = (parsed || []).filter(p => p.kind === g.kind); const nth = seen[g.kind] = (seen[g.kind] ?? -1) + 1; const base = (same[nth] || same[0])?.data || {}; /* 같은 종류가 여럿이면 순서대로 짝지음 */ const title = String(g.title).trim().slice(0, 80); const S = v => (typeof v === 'string' ? v.trim() : ''); let data;
     const date = isD(g.date) ? g.date : '';
     if (g.kind === 'event') data = { ...base, title, date: date || base.date || today, endDate: isD(g.endDate) && g.endDate > (date || '') ? g.endDate : '', start: isT(g.start) ? g.start : g.allDay ? '' : base.start || '', end: isT(g.end) ? g.end : '', who: whoIn(g.who, text, people, base.who), place: S(g.place), area: S(g.area), scope: g.scope === 'personal' ? 'personal' : 'work', repeat: /^(daily|weekly|monthly|weekdays)$/.test(g.repeat || '') ? g.repeat : '', memo: S(g.memo) || base.memo || '', _dated: !!(date || base.date), _allday: !!g.allDay };
     else if (g.kind === 'task') data = { ...base, title, due: date || base.due || '', time: isT(g.start) ? g.start : '', who: whoIn(g.who, text, people, base.who), priority: g.priority === 'high' || base.priority === 'high' ? 'high' : 'normal', project: S(g.project) || base.project || '', scope: g.scope === 'personal' ? 'personal' : 'work', memo: S(g.memo) || base.memo || '' };
     else if (g.kind === 'expense') data = { ...base, title, amount: Number(base.amount) || Number(g.amount) || 0, date: date || base.date || today, category: base.category || S(g.category) || '기타', project: S(g.project) || base.project || '', pay: base.pay || '개인카드' };
+    else if (g.kind === 'income') data = { ...base, title, amount: Number(base.amount) || Number(g.amount) || 0, date: date || base.date || '', from: base.from || S(g.who), project: S(g.project) || base.project || '', status: base.status || 'due', memo: base.memo || S(g.memo) };
     else if (g.kind === 'contact') data = { ...base, name: base.name && base.phone ? (S(g.title) || base.name) : title, phone: base.phone || S(g.phone), email: base.email || S(g.email), org: S(g.org) || base.org || '', role: base.role || S(g.role), memo: S(g.memo) };
     else if (g.kind === 'vendor') data = { ...base, name: title, cat: S(g.cat) || base.cat || '기타', phone: base.phone || S(g.phone), link: base.link || S(g.url), kakao: base.kakao || '', memo: S(g.memo), prices: (base.prices && base.prices.length ? base.prices : (g.prices || []).filter(x => x && x.item).map(x => ({ item: String(x.item).slice(0, 40), price: String(Number(x.price) || ''), note: S(x.note), at: today }))) };
     else if (g.kind === 'buy') data = { ...base, title, url: base.url || S(g.url), price: Number(base.price) || Number(g.amount) || 0, qty: 1, need: 'must' };
@@ -205,7 +208,7 @@ ${calendarTable(today)}
     else if (g.kind === 'grant') data = { ...base, title, deadline: date || base.deadline || '', status: base.status || '검토', amount: base.amount ?? (Number(g.amount) || null), url: base.url || S(g.url) };
     else if (g.kind === 'sns') data = { ...base, title, platform: base.platform || (/유튜브|쇼츠/.test(text) ? '유튜브' : /틱톡/.test(text) ? '틱톡' : /블로그/.test(text) ? '블로그' : /트위터|\bX\b/.test(text) ? 'X' : '인스타그램'), status: base.status || '아이디어', date: date || base.date || '' };
     else data = { ...base, title, url: base.url || S(g.url) };
-    out.push({ kind: g.kind, label: KO[g.kind], confidence: 0.85, data, src: text, ai: true });
+    out.push({ kind: g.kind, label: g.kind === 'income' && data.status === 'got' ? '받은 돈' : KO[g.kind], confidence: 0.85, data, src: text, ai: true });
   }
   return out.length ? out : (arr.length === 0 ? [] : null);
 }

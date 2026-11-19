@@ -42,18 +42,64 @@ export function toast(msg, action) {
 }
 
 // 모달. content: Node | (close)=>Node. 반환: close 함수
+// 맨 위 창만 Esc·뒤로 가기에 반응하고, 적던 내용이 있으면 바깥을 눌러도 바로 닫지 않음
+const stack = [];
+let mseq = 0, noteState = () => { };
+const hstate = () => { try { return history.state || {}; } catch { return {}; } };
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+if (typeof window !== 'undefined') {
+  let cur = hstate(), curHash = location.hash;
+  noteState = () => { cur = hstate(); curHash = location.hash; };
+  window.addEventListener('popstate', () => {
+    const st = hstate(), was = cur, wasHash = curHash; let closed = 0;
+    while (stack.length && stack[stack.length - 1].id !== st.modal) { stack[stack.length - 1].close(true); closed++; }
+    cur = st; curHash = location.hash;
+    /* 이미 닫힌 창이 남긴 빈 칸에서 뒤로 가면 같은 화면이 한 번 더 나오므로 건너뜀 */
+    if (!closed && !stack.length && (was.modalDone || was.modal) && wasHash === location.hash) history.back();
+  });
+  window.addEventListener('hashchange', () => { for (const m of [...stack].reverse()) if (m.hash !== location.hash) m.close(true); noteState(); });
+  document.addEventListener('keydown', e => {
+    const top = stack[stack.length - 1]; if (!top) return;
+    if (e.key === 'Escape' && !e.isComposing) { e.stopPropagation(); top.tryClose(); return; }
+    if (e.key !== 'Tab') return;
+    const els = [...top.el.querySelectorAll(FOCUSABLE)].filter(x => x.offsetParent !== null);
+    if (!els.length) { e.preventDefault(); return; }
+    const first = els[0], last = els[els.length - 1], cur = document.activeElement;
+    if (!top.el.contains(cur)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && cur === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && cur === last) { e.preventDefault(); first.focus(); }
+  }, true);
+}
 export function modal(title, content, { wide = false, onClose } = {}) {
   const root = document.getElementById('modal-root');
-  const close = () => { bg.remove(); document.removeEventListener('keydown', esc); onClose && onClose(); };
-  const esc = e => e.key === 'Escape' && close();
+  const id = Date.now() * 100 + (mseq++ % 100);
+  const prev = document.activeElement;
+  let dirty = false, sure = 0, gone = false;
+  const me = { id, hash: location.hash, el: null, close: null, tryClose: null };
+  const close = fromPop => {
+    if (gone) return; gone = true;
+    bg.remove();
+    const i = stack.indexOf(me); if (i >= 0) stack.splice(i, 1);
+    try { if (fromPop !== true && hstate().modal === id) history.replaceState({ modalDone: true }, ''); noteState(); } catch { }
+    const app = document.getElementById('app'); if (app && !stack.length) app.inert = false;
+    if (prev && document.contains(prev) && !/^(INPUT|TEXTAREA|SELECT|BODY)$/.test(prev.tagName)) { try { prev.focus({ preventScroll: true }); } catch { } }
+    onClose && onClose();
+  };
+  const tryClose = () => {
+    if (dirty && bg.querySelector('form,textarea') && Date.now() - sure > 4000) { sure = Date.now(); toast('적던 내용이 있어요. 닫으려면 한 번 더 눌러 주세요'); return; }
+    close();
+  };
   const body = typeof content === 'function' ? content(close) : content;
-  const bg = h('div.modal-bg', { onclick: e => e.target === bg && close() },
-    h('div.modal' + (wide ? '.wide' : ''), { role: 'dialog', 'aria-label': title },
-      h('div.modal-h', h('h2', title), h('button.btn.ghost.icon', { onclick: close, 'aria-label': '닫기' }, ic('x'))),
-      body));
-  root.append(bg);
-  document.addEventListener('keydown', esc);
-  setTimeout(() => bg.querySelector('input,textarea,select')?.focus(), 30);
+  const dlg = h('div.modal' + (wide ? '.wide' : ''), { role: 'dialog', 'aria-modal': 'true', 'aria-label': title, tabindex: '-1' },
+    h('div.modal-h', h('h2', title), h('button.btn.ghost.icon', { type: 'button', onclick: () => close(), 'aria-label': '닫기' }, ic('x'))),
+    body);
+  const bg = h('div.modal-bg', { onclick: e => e.target === bg && tryClose() }, dlg);
+  bg.addEventListener('input', () => { dirty = true; });
+  me.el = dlg; me.close = close; me.tryClose = tryClose;
+  root.append(bg); stack.push(me);
+  try { const st = hstate(); if (st.modalDone || (st.modal && stack.length === 1)) history.replaceState({ modal: id }, ''); else history.pushState({ modal: id }, ''); noteState(); } catch { }
+  const app = document.getElementById('app'); if (app) app.inert = true;
+  setTimeout(() => { if (gone) return; const f = dlg.querySelector('input:not([type=hidden]):not([type=checkbox]),textarea,select'); try { (f || dlg).focus({ preventScroll: !f }); } catch { } }, 30);
   return close;
 }
 export function confirmBox(msg, okLabel = '확인') {
@@ -68,7 +114,17 @@ export function confirmBox(msg, okLabel = '확인') {
 import { all as labelList } from './labels.js';
 export function form(fields, values = {}, onSubmit, { submitLabel = '저장', extra } = {}) {
   const inputs = {};
-  const f = h('form.stack', { onsubmit: e => { e.preventDefault(); onSubmit(read()); } });
+  let busy = false;
+  const need = (fd, i) => fd.req ?? (i === 0 && (fd.k === 'title' || fd.k === 'name') && (!fd.type || fd.type === 'text'));
+  const f = h('form.stack', { novalidate: '', onsubmit: async e => {
+    e.preventDefault(); if (busy) return;
+    const v = read();
+    const miss = fields.find((fd, i) => need(fd, i) && !String(v[fd.k] ?? '').trim());
+    if (miss) { toast(`‘${miss.label}’ 칸을 적어 주세요`); try { inputs[miss.k].focus(); } catch { } return; }
+    const btn = f.querySelector('.modal-f button[type=submit]');
+    busy = true; if (btn) btn.disabled = true;
+    try { await onSubmit(v); } finally { busy = false; if (btn) btn.disabled = false; }
+  } });
   const grid = h('div.grid.g2');
   for (const fd of fields) {
     let inp;

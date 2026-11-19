@@ -63,7 +63,7 @@ export default {
         h('p.small.muted', '팀원은 이 앱에서 동기화에 로그인한 뒤 아래 코드나 링크로 들어오면 돼요.'),
         h('div', { style: { fontSize: '34px', fontWeight: 800, letterSpacing: '.18em', textAlign: 'center', margin: '14px 0' } }, code),
         h('div.row', { style: { justifyContent: 'center' } },
-          h('button.btn.sm.pri', { onclick: async () => { await navigator.clipboard.writeText(`[하진 비서] "${t.name}" 팀 참여 코드: ${code}\n${link}`); toast('초대 문구를 복사했어요'); } }, ic('copy', 14), '초대 문구 복사'),
+          h('button.btn.sm.pri', { onclick: async () => { try { await navigator.clipboard.writeText(`[하진 비서] "${t.name}" 팀 참여 코드: ${code}\n${link}`); toast('초대 문구를 복사했어요'); } catch { toast('복사 권한이 없어요. 코드를 직접 알려 주세요'); } } }, ic('copy', 14), '초대 문구 복사'),
           navigator.share ? h('button.btn.sm', { onclick: () => navigator.share({ title: t.name + ' 팀 참여', text: `참여 코드 ${code}`, url: link }).catch(() => { }) }, '공유') : null,
           h('button.btn.sm.ghost', { onclick: close }, '닫기'))));
     }
@@ -191,7 +191,7 @@ async function membersCard() {
       h('div.grow', h('div.t.small', m.name, m.is_admin ? h('span.chip.acc', { style: { marginLeft: '6px' } }, '관리자') : null, m.active ? null : h('span.chip', { style: { marginLeft: '6px' } }, '비활성')),
         h('div.faint.tiny', [m.role, m.gmail, m.joined ? '로그인함' : '로그인 전'].filter(Boolean).join(' · '))),
       admin && m.code ? h('span.mono', { style: { fontWeight: 750, letterSpacing: '.12em' } }, m.code) : null,
-      admin ? h('button.btn.sm.ghost', { title: '초대 문구 복사', onclick: async () => { await navigator.clipboard.writeText(invite(m)); toast(`${m.name} 님 초대 문구를 복사했어요`); } }, ic('copy', 14)) : null,
+      admin ? h('button.btn.sm.ghost', { title: '초대 문구 복사', onclick: async () => { try { await navigator.clipboard.writeText(invite(m)); toast(`${m.name} 님 초대 문구를 복사했어요`); } catch { toast('복사 권한이 없어요'); } } }, ic('copy', 14)) : null,
       admin ? h('button.btn.sm.ghost', { title: '고치기', onclick: () => edit(m) }, ic('edit', 14)) : null))),
     admin ? h('p.faint.tiny', { style: { marginTop: '6px' } }, '코드는 관리자에게만 보여요. 멤버는 코드 하나로 폰·PC 어디서든 로그인하고, 모든 기능을 자기 기록으로 써요. 팀에 공유한 것만 서로 보여요.') : null);
   function edit(m = { code: sync.newCode(), active: true }) {
