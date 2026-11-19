@@ -491,3 +491,50 @@ h1{font-weight:800}h2{font-weight:740}h3{font-weight:700}
 .chip{font-weight:640}
 ::placeholder{color:color-mix(in srgb,var(--ink) 40%,transparent);font-weight:430}
 .look-row .seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(62px,1fr))}.look-row .seg button{padding-left:4px;padding-right:4px}
+
+/* 메인 화면: 개인이 정한 순서대로 */
+.home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;align-items:start}
+.home-grid>.home-full{grid-column:1/-1}
+.btn.icon:disabled{opacity:.3}
+
+/* 중요도 색 라벨 */
+.labels{display:flex;flex-wrap:wrap;gap:6px}
+.lab{display:inline-flex;align-items:center;gap:6px;padding:5px 11px 5px 8px;border-radius:99px;border:calc(var(--bw,1px)*1) solid var(--line);background:var(--card-bg,var(--card));font:inherit;font-size:calc(12.5px*var(--fs,1));font-weight:620;color:var(--ink2);cursor:pointer;transition:transform .35s var(--spring)}
+.lab i{width:10px;height:10px;border-radius:50%;background:var(--lc)}
+.lab.on{border-color:var(--lc);background:color-mix(in srgb,var(--lc) 16%,var(--card));color:var(--ink)}
+.lab:active{transform:scale(.94)}
+
+.arch-detail{display:flex;flex-direction:column;gap:10px;padding-top:10px;border-top:1px dashed var(--line);animation:popin .3s var(--out)}
+.masonry>.card{column-span:all}
+@media (pointer:coarse){.swatches .sw{width:30px;height:30px}}
+@media (min-width:600px) and (max-width:900px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.lab i{display:block;flex:none}
+
+/* 구매 목록 */
+.buys{padding:6px 14px}
+.buy{display:grid;grid-template-columns:auto 64px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-bottom:calc(var(--bw,1px)*1) solid var(--line);background:var(--card-bg,var(--card));transition:background .2s}
+.buy:last-child{border-bottom:0}
+.buy.on{background:color-mix(in srgb,var(--acc) 6%,transparent)}
+.buy.drag{opacity:.9;box-shadow:var(--sh);border-radius:calc(12px*var(--rd,1));position:relative;z-index:2;outline:2px solid var(--acc)}
+.buy-chk{width:22px;height:22px;accent-color:var(--acc)}
+.buy-ok{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--ok-soft);color:var(--ok)}
+.buy-img{width:64px;height:64px;border-radius:calc(12px*var(--rd,1));overflow:hidden;background:var(--bg2);cursor:pointer}
+.buy-img img{width:100%;height:100%;object-fit:cover;display:block}
+.buy-ph{width:100%;height:100%;display:grid;place-items:center;color:var(--ink3)}
+.buy-t{font-weight:660;color:var(--ink);text-decoration:none;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;letter-spacing:-.015em}
+a.buy-t:hover{text-decoration:underline}
+.buy-p{font-weight:780;font-variant-numeric:tabular-nums}
+.buy-act{display:flex;flex-direction:column;align-items:center;gap:6px}
+.grip{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;color:var(--ink3);cursor:grab;touch-action:none}
+.grip:active{cursor:grabbing;background:var(--bg2)}
+.stepper{display:inline-flex;align-items:center;border:calc(var(--bw,1px)*1) solid var(--line2);border-radius:99px;overflow:hidden}
+.stepper button{width:30px;height:28px;border:0;background:transparent;font:inherit;font-weight:700;cursor:pointer;color:var(--ink2)}
+.stepper b{min-width:22px;text-align:center;font-size:calc(13px*var(--fs,1));font-variant-numeric:tabular-nums}
+.buy-pv{width:100%;max-height:160px;object-fit:contain;border-radius:12px;background:var(--bg2)}
+.cartbar{position:sticky;bottom:16px;margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-radius:calc(18px*var(--rd,1));background:var(--ink);color:var(--bg);box-shadow:0 10px 30px rgba(0,0,0,.25);animation:popin .35s var(--spring);z-index:5}
+.cartbar b{font-size:calc(12.5px*var(--fs,1));opacity:.75;font-weight:600}
+.cart-sum{font-size:calc(21px*var(--fs,1));font-weight:820;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+@media (max-width:900px){.cartbar{bottom:calc(84px + env(safe-area-inset-bottom))}.buy{grid-template-columns:auto 54px minmax(0,1fr) auto;gap:10px}.buy-img{width:54px;height:54px}}
+
+/* 폰: 숫자 타일을 낮게 (아이콘 옆에 숫자) */
+@media (max-width:600px){.tile{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;align-items:center;padding:11px 12px}.tile .ti{grid-row:1/3;margin:0;width:34px;height:34px}.tile .tn{font-size:calc(20px*var(--fs,1))}.tile .tl{font-size:calc(11.5px*var(--fs,1))}}

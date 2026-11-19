@@ -4,7 +4,12 @@ export function ytId(u) {
   const m = String(u).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/))([\w-]{11})/);
   return m ? m[1] : '';
 }
-const isImg = u => /\.(png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i.test(u);
+const isImg = u => /\.(png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i.test(u) || /[?&](format|fm)=(jpe?g|png|webp|avif)/i.test(u) || /^https?:\/\/(i\.pinimg\.com|pbs\.twimg\.com\/media|images\.unsplash\.com|[\w-]+\.googleusercontent\.com|i\.ytimg\.com|img\.youtube\.com|cdn\.dribbble\.com\/userupload|mir-s3-cdn-cf\.behance\.net|i\.imgur\.com|[\w.-]*cdninstagram\.com|postfiles\.pstatic\.net|blogfiles\.pstatic\.net)\//i.test(u);
+// 확장자가 없어도 실제로 그림이 뜨는 주소인지 직접 불러 봄 (우클릭 › 이미지 주소 복사로 가져온 링크용)
+export const probeImage = (url, ms = 5000) => new Promise(res => { const im = new Image(); im.referrerPolicy = 'no-referrer'; const t = setTimeout(() => { im.src = ''; res(false); }, ms); im.onload = () => { clearTimeout(t); res(im.naturalWidth > 1); }; im.onerror = () => { clearTimeout(t); res(false); }; im.src = url; });
+// 아트팀 작업 분야 자동 분류
+export const USES = [['캐릭터', /캐릭터|character|인물|chara|oc\b|마스코트/i], ['배경', /배경|background|풍경|landscape|environment|공간|건물|인테리어/i], ['UI', /\bui\b|ux|인터페이스|hud|대시보드|dashboard|앱\s*디자인|웹\s*디자인|화면\s*설계|아이콘/i], ['모션', /모션|motion|애니메이션|animation|트랜지션|after\s*effects|애펙|에펙|mv\b|뮤직비디오/i], ['타이포', /타이포|typo|폰트|font|레터링|lettering|글자/i], ['컬러', /컬러|color|palette|팔레트|배색|색감/i], ['일러스트', /일러스트|illust|드로잉|drawing|그림|원화|concept\s*art|컨셉\s*아트/i], ['3D', /3d|blender|블렌더|c4d|모델링|렌더|voxel/i], ['포즈·인체', /포즈|pose|인체|해부|anatomy|손\s*그리|동세/i], ['조명', /조명|lighting|라이팅|빛|그림자/i], ['레이아웃', /레이아웃|layout|구도|composition|그리드|포스터|편집\s*디자인/i], ['브랜딩', /브랜딩|branding|로고|logo|패키지|굿즈|md\b/i], ['영상편집', /편집|컷|릴스|reels|shorts|쇼츠|브이로그|vlog|자막/i], ['의상·소품', /의상|패션|fashion|코스튬|소품|prop|무기|액세서리/i]];
+export const usesOf = text => USES.filter(([, re]) => re.test(text || '')).map(([n]) => n).slice(0, 3);
 const isVid = u => /\.(mp4|webm|mov)(\?|#|$)/i.test(u);
 const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const VIDEO_HOSTS = /youtube|youtu\.be|vimeo|tiktok|instagram\.com\/(reel|tv)|twitch|dailymotion|naver\.tv|tv\.kakao/i;
@@ -18,11 +23,14 @@ export async function preview(url) {
   url = String(url || '').trim();
   if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
   const out = { url, title: '', thumb: '', kind: 'web', provider: host(url), embed: '' };
+  const ytThumb = url.match(/(?:i\.ytimg\.com|img\.youtube\.com)\/vi(?:_webp)?\/([\w-]{11})\//);
+  if (ytThumb) url = out.url = `https://youtu.be/${ytThumb[1]}`; // 유튜브 썸네일 주소를 붙여도 영상으로
   const yt = ytId(url);
   if (yt) { out.kind = 'video'; out.thumb = `https://i.ytimg.com/vi/${yt}/hqdefault.jpg`; out.embed = `https://www.youtube-nocookie.com/embed/${yt}`; out.provider = 'YouTube'; }
   else if (isImg(url)) { out.kind = 'image'; out.thumb = url; out.title = decodeURIComponent(url.split('/').pop().split('?')[0]).replace(/\.\w+$/, ''); return out; }
   else if (isVid(url)) { out.kind = 'video'; out.embed = url; out.title = decodeURIComponent(url.split('/').pop().split('?')[0]); }
   else if (VIDEO_HOSTS.test(url)) out.kind = 'video';
+  else if (await probeImage(url)) { out.kind = 'image'; out.thumb = url; out.title = host(url); return out; }
   try {
     const j = await getJSON('https://noembed.com/embed?url=' + encodeURIComponent(url));
     if (!j.error) {

@@ -6,7 +6,7 @@
 import * as db from './db.js';
 import { SUPABASE } from './config.js';
 
-const SHARE_COLS = new Set(['teams', 'events', 'polls', 'pollvotes', 'tasks', 'meetings', 'expenses', 'docs', 'notes', 'figmafiles', 'refs', 'reffolders', 'projects', 'leads', 'leadmarks', 'grants', 'contacts', 'audit']);
+const SHARE_COLS = new Set(['teams', 'events', 'polls', 'pollvotes', 'tasks', 'meetings', 'expenses', 'docs', 'notes', 'figmafiles', 'refs', 'reffolders', 'projects', 'leads', 'leadmarks', 'grants', 'contacts', 'audit', 'labelsets', 'buys', 'boards', 'dms', 'feedback']);
 const CHUNK = 200;
 let client = null, session = null, channel = null;
 let pushT = null, pullT = null, busy = null, started = false, pendingAgain = false, wired = false;

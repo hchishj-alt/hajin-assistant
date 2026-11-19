@@ -5,7 +5,9 @@ import * as brain from '../js/brain.js';
 import * as LP from '../js/linkpreview.js';
 import { go } from '../js/app.js';
 
-const F = { folder: '', sub: '', kind: '', hues: new Set(), moods: new Set(), by: '', q: '' };
+const F = { folder: '', sub: '', kind: '', hues: new Set(), moods: new Set(), uses: new Set(), by: '', q: '', sort: 'new', open: null };
+const SORTS = { new: ['최신순', (a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')], old: ['오래된순', (a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')], name: ['이름순', (a, b) => (a.title || '').localeCompare(b.title || '', 'ko')], color: ['색상순', (a, b) => hueOf(a) - hueOf(b)], who: ['올린 사람순', (a, b) => (a.by || '').localeCompare(b.by || '', 'ko') || (b.createdAt || '').localeCompare(a.createdAt || '')] };
+const hueOf = r => { const c = r.colors?.[0]; if (!c) return 999; const [R, G, B] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255); const mx = Math.max(R, G, B), mn = Math.min(R, G, B), d = mx - mn; if (d < .08) return 400 + (1 - mx) * 100; const hh = mx === R ? ((G - B) / d) % 6 : mx === G ? (B - R) / d + 2 : (R - G) / d + 4; return (hh * 60 + 360) % 360; };
 const KIND = { video: ['영상', 'film'], image: ['이미지', 'image'], web: ['웹', 'globe'] };
 const teamOf = async () => ((await db.get('team-main')) ? 'team-main' : '');
 const meName = () => db.kvGet('name', '하진');
@@ -36,7 +38,7 @@ export default {
       const [all, projects, subs] = await Promise.all([db.list('refs'), db.list('projects'), db.list('reffolders')]);
       const people = [...new Set(all.map(r => r.by).filter(Boolean))];
       const inFolder = all.filter(r => (!F.folder || (F.folder === '_none' ? !r.project : r.project === F.folder)) && (!F.sub || r.sub === F.sub));
-      const shown = inFolder.filter(r => (!F.kind || (r.kind || 'image') === F.kind) && (!F.by || r.by === F.by) && [...F.hues].every(x => (r.hues || []).includes(x)) && [...F.moods].every(x => (r.mood || []).includes(x)) && (!F.q || `${r.title} ${r.memo || ''} ${(r.tags || []).join(' ')} ${r.provider || ''}`.toLowerCase().includes(F.q.toLowerCase())));
+      const shown = inFolder.filter(r => (!F.kind || (r.kind || 'image') === F.kind) && (!F.by || r.by === F.by) && [...F.hues].every(x => (r.hues || []).includes(x)) && [...F.moods].every(x => (r.mood || []).includes(x)) && [...F.uses].every(x => (r.uses || []).includes(x)) && (!F.q || `${r.title} ${r.memo || ''} ${(r.tags || []).join(' ')} ${r.provider || ''}`.toLowerCase().includes(F.q.toLowerCase())));
       box.append(h('div.tiles', { style: { marginBottom: '14px' } }, tile('layers', all.length, '전체 레퍼런스'), tile('film', all.filter(r => r.kind === 'video').length, '영상'), tile('image', all.filter(r => (r.kind || 'image') === 'image').length, '이미지'), tile('users', people.length, '올린 사람')));
       const layout = h('div.arch');
       // 폴더 (대분류 = 프로젝트)
@@ -54,14 +56,21 @@ export default {
       const sw = h('div.swatches', LP.HUES.map(([n, c]) => h('button.sw' + (F.hues.has(n) ? '.on' : ''), { title: n, 'aria-label': n, style: { background: c }, onclick: () => { F.hues.has(n) ? F.hues.delete(n) : F.hues.add(n); draw(); } })));
       const moods = h('div.chips', LP.MOODS.filter(m => all.some(r => (r.mood || []).includes(m))).map(m => h('button.chip' + (F.moods.has(m) ? '.acc' : ''), { onclick: () => { F.moods.has(m) ? F.moods.delete(m) : F.moods.add(m); draw(); } }, m)));
       const who = h('div.chips', people.map(p => h('button.chip' + (F.by === p ? '.acc' : ''), { onclick: () => { F.by = F.by === p ? '' : p; draw(); } }, h('span.av', { style: { background: colorFor(p) } }, p.slice(-2, -1) || p[0]), p)));
-      const active = F.hues.size + F.moods.size + (F.by ? 1 : 0) + (F.kind ? 1 : 0) + (F.q ? 1 : 0);
+      const useList = LP.USES.map(u => u[0]).filter(u => all.some(r => (r.uses || []).includes(u)));
+      const uses = h('div.chips', useList.map(m => h('button.chip' + (F.uses.has(m) ? '.acc' : ''), { onclick: () => { F.uses.has(m) ? F.uses.delete(m) : F.uses.add(m); draw(); } }, m)));
+      const detailN = F.hues.size + F.moods.size + F.uses.size + (F.by ? 1 : 0);
+      if (F.open == null) F.open = innerWidth > 900;
+      const active = detailN + (F.kind ? 1 : 0) + (F.q ? 1 : 0);
       const filters = h('div.card.arch-filter',
-        h('div.row', { style: { gap: '10px', flexWrap: 'wrap' } }, h('div.arch-q.grow', { style: { minWidth: '180px' } }, q), seg([['', '전체'], ['video', '영상'], ['image', '이미지'], ['web', '웹']], F.kind, v => { F.kind = v; draw(); }), active ? h('button.btn.sm.ghost', { onclick: () => { F.hues.clear(); F.moods.clear(); F.by = ''; F.kind = ''; F.q = ''; draw(); } }, '필터 지우기') : null),
-        h('div.arch-frow', h('span.lbl', '색'), sw), all.some(r => r.mood?.length) ? h('div.arch-frow', h('span.lbl', '느낌'), moods) : null, people.length ? h('div.arch-frow', h('span.lbl', '올린 사람'), who) : null);
+        h('div.row', { style: { gap: '10px', flexWrap: 'wrap' } }, h('div.arch-q.grow', { style: { minWidth: '180px' } }, q), seg([['', '전체'], ['video', '영상'], ['image', '이미지'], ['web', '웹']], F.kind, v => { F.kind = v; draw(); }), active ? h('button.btn.sm.ghost', { onclick: () => { F.hues.clear(); F.moods.clear(); F.uses.clear(); F.by = ''; F.kind = ''; F.q = ''; draw(); } }, '필터 지우기') : null),
+        h('div.row', { style: { gap: '8px', flexWrap: 'wrap' } },
+          h('button.btn.sm' + (detailN ? '.pri' : ''), { 'aria-expanded': !!F.open, onclick: () => { F.open = !F.open; draw(); } }, ic(F.open ? 'up' : 'down', 14), `세부 필터${detailN ? ' ' + detailN : ''}`),
+          h('select.in', { 'aria-label': '정렬', style: { width: 'auto', padding: '6px 10px' }, onchange: e => { F.sort = e.target.value; draw(); } }, Object.entries(SORTS).map(([k, v]) => h('option', { value: k, selected: F.sort === k }, v[0])))),
+        F.open ? h('div.arch-detail', h('div.arch-frow', h('span.lbl', '색'), sw), all.some(r => r.mood?.length) ? h('div.arch-frow', h('span.lbl', '느낌'), moods) : null, useList.length ? h('div.arch-frow', h('span.lbl', '작업 분야'), uses) : null, people.length ? h('div.arch-frow', h('span.lbl', '올린 사람'), who) : null) : null);
       // 그리드
       const grid = h('div.masonry');
       if (!shown.length) grid.append(h('div.card', h('div.empty', all.length ? '조건에 맞는 레퍼런스가 없어요' : '링크를 붙여넣기(Ctrl+V) 하거나 “링크 추가”를 눌러 보세요. 유튜브·비메오·핀터레스트·비핸스·인스타·이미지 주소 다 돼요.')));
-      for (const r of shown.sort((a, b) => b.createdAt.localeCompare(a.createdAt))) grid.append(await cardOf(r));
+      for (const r of shown.sort((SORTS[F.sort] || SORTS.new)[1])) grid.append(await cardOf(r));
       const dz = h('div.drop.arch-drop', { onclick: () => addLinks() }, ic('link', 16), ' 링크·이미지 붙여넣기(Ctrl+V) · 끌어놓기 · 눌러서 링크 추가');
       dz.ondragover = e => { e.preventDefault(); dz.classList.add('over'); }; dz.ondragleave = () => dz.classList.remove('over');
       dz.ondrop = async e => { e.preventDefault(); dz.classList.remove('over'); const t = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text'); const fs = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/')); if (fs.length) return addImages(fs, t && /^https?:/.test(t) ? t : ''); if (t) return addLinks(t); };
@@ -109,10 +118,10 @@ export default {
     }
     async function edit(r) {
       const ff = await folderFields(r);
-      modal('레퍼런스 고치기', close => form([{ k: 'title', label: '제목', full: true }, ...ff, { k: 'tagsS', label: '태그 (쉼표로)', full: true }, { k: 'moodS', label: '느낌 (쉼표로)', full: true }, { k: 'memo', label: '메모', type: 'textarea', rows: 3 }],
-        { ...r, tagsS: (r.tags || []).join(', '), moodS: (r.mood || []).join(', ') }, async v => {
-          const { tagsS, moodS, ...rest } = v; const sp = s => s.split(/[,，]/).map(x => x.trim()).filter(Boolean);
-          await db.put('refs', { ...r, ...rest, tags: sp(tagsS), mood: sp(moodS) }); close(); draw();
+      modal('레퍼런스 고치기', close => form([{ k: 'title', label: '제목', full: true }, ...ff, { k: 'tagsS', label: '태그 (쉼표로)', full: true }, { k: 'usesS', label: '작업 분야 (쉼표로: 캐릭터, 배경, UI, 모션…)', full: true }, { k: 'moodS', label: '느낌 (쉼표로)', full: true }, { k: 'memo', label: '메모', type: 'textarea', rows: 3 }],
+        { ...r, tagsS: (r.tags || []).join(', '), usesS: (r.uses || []).join(', '), moodS: (r.mood || []).join(', ') }, async v => {
+          const { tagsS, moodS, usesS, ...rest } = v; const sp = s => s.split(/[,，]/).map(x => x.trim()).filter(Boolean);
+          await db.put('refs', { ...r, ...rest, tags: sp(tagsS), mood: sp(moodS), uses: sp(usesS) }); close(); draw();
         }));
     }
 
@@ -131,7 +140,7 @@ export default {
             const ex = (await db.list('refs')).find(x => x.url === u);
             if (ex) { n++; continue; }
             let p; try { p = await LP.preview(u); } catch { p = { url: u, title: u, kind: 'web' }; }
-            const item = await db.put('refs', { ...p, project: v.project, sub: v.sub, memo: v.memo, by, team, tags: brain.keywords(`${p.title} ${p.desc || ''} ${v.memo || ''}`, 4) });
+            const item = await db.put('refs', { ...p, project: v.project, sub: v.sub, memo: v.memo, by, team, tags: brain.keywords(`${p.title} ${p.desc || ''} ${v.memo || ''}`, 4), uses: LP.usesOf(`${p.title} ${p.desc || ''} ${v.memo || ''}`) });
             if (p.thumb) LP.analyzeColors(p.thumb).then(c => db.patch(item.id, c)).then(() => draw()).catch(() => { });
             btn.textContent = `불러오는 중 ${++n}/${urls.length}`;
           }

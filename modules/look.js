@@ -7,6 +7,7 @@ import { go, applyTheme, MODULES, buildNav } from '../js/app.js';
 export default {
   async render(root) {
     const cur = await L.get();
+    const T = await import('./today.js'); const order = T.homeOrder(cur);
     const set = async (patch, redraw = true) => { await L.save(patch); await applyTheme(); if (redraw) go('look'); };
     const row = (label, ctl) => h('div.look-row', h('span', label), ctl);
     const pick = (k, opts) => seg(opts, cur[k], v => set({ [k]: v }));
@@ -22,7 +23,7 @@ export default {
 
     root.append(
       h('div.card', { style: { marginBottom: '14px' } }, h('div.card-h', h('h3', ic('sparkles'), '분위기 한 번에')),
-        h('div.presets', Object.entries(L.PRESETS).map(([id, p]) => h('button.preset', { onclick: async () => { await db.kvSet('look', { ...L.DEFAULT, ...p.look, bg: { ...L.DEFAULT.bg, ...(p.look.bg || {}) }, start: cur.start, hidden: cur.hidden }); await applyTheme(); toast(`"${p.name}" 분위기로 바꿨어요`); go('look'); } },
+        h('div.presets', Object.entries(L.PRESETS).map(([id, p]) => h('button.preset', { onclick: async () => { await db.kvSet('look', { ...L.DEFAULT, ...p.look, bg: { ...L.DEFAULT.bg, ...(p.look.bg || {}) }, start: cur.start, hidden: cur.hidden, home: cur.home, homeOff: cur.homeOff }); await applyTheme(); toast(`"${p.name}" 분위기로 바꿨어요`); go('look'); } },
           h('div.pv', { style: { fontFamily: L.FONTS[p.look.font || 'pretendard'].css, borderRadius: 10 * (p.look.rd || 1) + 'px', background: p.look.bg ? L.GRADS[p.look.bg.grad] : 'var(--bg2)', borderWidth: (p.look.bw ?? 1) + 'px' } }, '가나 Aa'), h('b', p.name), h('span', p.note))))),
       h('div.look-grid',
         sec('글씨', 'edit',
@@ -51,6 +52,12 @@ export default {
         sec('움직임 · 여백', 'zap',
           row('움직임', pick('motion', [['bouncy', '쫀득'], ['calm', '잔잔'], ['off', '끄기']])),
           row('여백', pick('density', [['tight', '촘촘'], ['normal', '보통'], ['loose', '넉넉']]))),
+        sec('메인 화면', 'home',
+          h('p.small.muted', { style: { marginBottom: '6px' } }, '오늘 화면에 보일 카드를 켜고 끄고, 중요한 순서대로 위로 올려요.'),
+          order.map((id, i) => { const off = (cur.homeOff || []).includes(id); const mv = d => async () => { const o = [...order]; const j = i + d; if (j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; await set({ home: o }); };
+            return h('div.li', { style: { opacity: off ? .5 : 1 } }, h('span.faint.tiny.mono', { style: { width: '14px' } }, i + 1), h('div.grow.small', { style: { fontWeight: 620 } }, T.HOME[id]),
+              h('button.btn.sm.icon', { 'aria-label': '위로', disabled: i === 0, onclick: mv(-1) }, ic('up', 14)), h('button.btn.sm.icon', { 'aria-label': '아래로', disabled: i === order.length - 1, onclick: mv(1) }, ic('down', 14)),
+              h('button.btn.sm' + (off ? '' : '.pri'), { 'aria-pressed': !off, onclick: () => set({ homeOff: off ? cur.homeOff.filter(x => x !== id) : [...(cur.homeOff || []), id] }) }, off ? '꺼짐' : '켜짐')); })),
         sec('메뉴', 'menu',
           row('처음 화면', h('select.in', { onchange: e => set({ start: e.target.value }, false) }, MODULES.filter(m => !m.hidden && !m.adminOnly).map(m => h('option', { value: m.id, selected: cur.start === m.id }, m.title)))),
           h('p.small.muted', { style: { margin: '8px 0 4px' } }, '안 쓰는 메뉴 숨기기'),

@@ -24,6 +24,7 @@ export default {
       sec('화면 · 색 조합', 'palette',
         h('div.row', { style: { marginBottom: '12px' } }, seg([['auto', '시스템 따라'], ['light', '밝게'], ['dark', '어둡게']], theme, async v => { await db.kvSet('theme', v); await applyTheme(v); go('settings'); })),
         await palettePicker()),
+      await labelSection(),
       sec('알림', 'bell', h('p.small.muted', '일정 10분 전(일정마다 바꿀 수 있어요)과 집중 타이머 끝을 알려요. 폰에서는 홈 화면에 설치한 뒤 켜 주세요.'),
         h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm', { onclick: async () => { const r = await Notification?.requestPermission?.(); toast(r === 'granted' ? '알림을 켰어요' : '알림이 꺼져 있어요. 브라우저 설정에서 허용해 주세요.'); } }, '알림 켜기'), h('span.chip', 'Notification' in window ? (Notification.permission === 'granted' ? '켜짐' : '꺼짐') : '지원 안 함'))),
       await syncSection(params[0] === 'sync'),
@@ -151,4 +152,24 @@ async function palettePicker() {
   return h('div',
     h('div.pals', Object.entries(T.PALETTES).map(([id, p]) => sw(id, p)), sw('custom', T.customPalette(cur.tint, cur.cacc))),
     h('div.row', { style: { marginTop: '12px', gap: '14px', flexWrap: 'wrap' } }, h('span.small', { style: { fontWeight: 650 } }, '내 조합 만들기'), h('label.row.small', '배경 톤', tint), h('label.row.small', '포인트', acc), h('span.faint.tiny', '고르면 밝게·어둡게 둘 다 자동으로 맞춰요. 글자가 안 보일 조합은 알아서 보정해요.')));
+}
+
+// 중요도·분류 색: 일정·회의에 붙이는 라벨 (팀 공유, 관리자가 관리)
+async function labelSection() {
+  const LB = await import('../js/labels.js');
+  const admin = await (await import('../js/admin.js')).isAdmin();
+  let list = (await LB.load()).map(l => ({ ...l }));
+  const box = h('div.card', { style: { marginBottom: '14px' }, id: 'sec-labels' });
+  const save = async () => { try { await LB.save(list.filter(l => l.name.trim())); } catch (e) { toast(e.message); } };
+  const draw = () => {
+    clear(box);
+    box.append(h('div.card-h', h('h3', ic('palette'), '중요도 · 분류 색'), admin ? h('div.row', h('button.btn.sm', { onclick: async () => { list.push({ id: 'l' + Date.now().toString(36), name: '새 라벨', color: '#14a3c7' }); await save(); draw(); } }, ic('plus', 14), '추가')) : null),
+      h('p.small.muted', { style: { marginBottom: '8px' } }, admin ? '일정과 회의에 붙이는 색이에요. 이름과 색을 바꾸면 팀 전체에 같은 뜻으로 적용돼요.' : '일정과 회의에 붙이는 색이에요. 바꾸는 건 관리자만 할 수 있어요.'),
+      ...list.map((l, i) => h('div.li', h('input', { type: 'color', value: l.color, disabled: !admin, onchange: async e => { l.color = e.target.value; await save(); } }),
+        h('input.in.grow', { value: l.name, disabled: !admin, 'aria-label': '라벨 이름', onchange: async e => { l.name = e.target.value.trim(); await save(); } }),
+        admin ? h('button.btn.sm.icon', { 'aria-label': '위로', disabled: i === 0, onclick: async () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; await save(); draw(); } }, ic('up', 14)) : null,
+        admin ? h('button.btn.sm.icon', { 'aria-label': '지우기', onclick: async () => { list.splice(i, 1); await save(); draw(); } }, ic('trash', 14)) : null)));
+  };
+  draw();
+  return box;
 }

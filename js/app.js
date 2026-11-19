@@ -18,6 +18,7 @@ export const MODULES = [
   { id: 'people', title: '인맥 · 연락처', icon: 'users', group: '사람', short: '인맥' },
   { id: 'team', title: '팀 · 일정 조율', icon: 'grid', group: '사람', short: '팀' },
   { id: 'money', title: '비용 처리', icon: 'wallet', group: '회사', short: '비용' },
+  { id: 'shop', title: '구매 목록', icon: 'cart', group: '회사', short: '구매' },
   { id: 'radar', title: '지원사업 · 정보 랭킹', icon: 'trend', group: '회사', short: '랭킹' },
   { id: 'startup', title: '스타트업 PM', icon: 'rocket', group: '회사', short: '스타트업' },
   { id: 'look', title: '꾸미기', icon: 'palette', group: '시스템' },
@@ -183,6 +184,7 @@ async function boot() {
   window.addEventListener('error', e => store.logError(e.error || e.message, 'window'));
   window.addEventListener('unhandledrejection', e => { if (/관리자만|올린 사람과 관리자/.test(e.reason?.message || '')) { toast(e.reason.message); e.preventDefault(); return; } store.logError(e.reason, 'promise'); });
   (await import('./admin.js')).install();
+  await (await import('./labels.js')).load();
   await applyTheme();
   if (!location.hash || location.hash === '#/') { const st = (await db.kvGet('look', null))?.start; if (st && st !== 'today' && MODULES.some(m => m.id === st)) history.replaceState(null, '', '#/' + st); }
   await store.loadLearned();

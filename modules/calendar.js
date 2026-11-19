@@ -3,6 +3,9 @@ import * as db from '../js/db.js';
 import * as store from '../js/store.js';
 import * as brain from '../js/brain.js';
 import { FIELDS } from '../js/fields.js';
+import * as LB from '../js/labels.js';
+const evColor = e => LB.colorOf(e.label) || e.color || colorFor((e.title || '').replace(/^◆ /, ''));
+let labF = '';
 
 let mode = matchMedia('(max-width:900px)').matches ? 'agenda' : 'month', cursor = new Date();
 export default {
@@ -30,8 +33,8 @@ export default {
       const nav = h('div.row.between', { style: { marginBottom: '12px' } },
         h('div.row', h('button.btn.icon.ghost', { 'aria-label': '이전', onclick: () => move(-1) }, ic('left')), h('h2', { style: { minWidth: '150px', textAlign: 'center' } }, title()), h('button.btn.icon.ghost', { 'aria-label': '다음', onclick: () => move(1) }, ic('right')), h('button.btn.sm', { onclick: () => { cursor = new Date(); draw(); } }, '오늘')),
         seg([['month', '월'], ['week', '주'], ['agenda', '목록']], mode, v => { mode = v; draw(); }));
-      body.append(nav);
-      const on = d => events.filter(e => e.date === d || store.repeatsOn(e, d)).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+      body.append(nav, h('div.labels', { style: { marginBottom: '10px' } }, [{ id: '', name: '전체', color: 'var(--line2)' }, ...LB.all()].map(l => h('button.lab' + (labF === l.id ? '.on' : ''), { style: { '--lc': l.color }, onclick: () => { labF = l.id; draw(); } }, h('i'), l.name))));
+      const on = d => events.filter(e => (!labF || e.label === labF) && (e.date === d || store.repeatsOn(e, d))).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
       if (mode === 'month') body.append(month(on, tasks));
       else if (mode === 'week') body.append(week(on));
       else body.append(agenda(on, tasks));
@@ -57,7 +60,7 @@ export default {
         const evs = on(ds), tk = tasks.filter(t => t.due === ds);
         const cell = h('div.d' + (d.getMonth() !== cursor.getMonth() ? '.out' : '') + (ds === todayStr() ? '.today' : ''), { onclick: () => dayModal(ds, on) },
           h('div.row.between', h('span.n', d.getDate()), tk.length ? h('span.tiny.faint', `✓${tk.length}`) : null),
-          evs.slice(0, 3).map(e => h('div.ev', { style: { background: e.color || colorFor(e.title.replace(/^◆ /, '')) } }, (e.start ? e.start + ' ' : '') + e.title)),
+          evs.slice(0, 3).map(e => h('div.ev', { style: { background: evColor(e) } }, (e.start ? e.start + ' ' : '') + e.title)),
           evs.length > 3 ? h('div.tiny.faint', `+${evs.length - 3}`) : null);
         g.append(cell);
       }
@@ -76,9 +79,9 @@ export default {
         const col = h('div.col', { onclick: e => { if (e.target !== col) return; const y = e.offsetY; const hh = Math.floor(y / PX) + H0; edit({ date: ds, start: `${String(hh).padStart(2, '0')}:00`, end: `${String(Math.min(23, hh + 1)).padStart(2, '0')}:00` }); } });
         for (let hh = H0; hh < H1; hh++) col.append(h('div.hr', { style: { pointerEvents: 'none' } }));
         for (const e of on(ds)) {
-          if (!e.start) { col.prepend(h('div.blk', { style: { top: '0', height: '18px', background: e.color || colorFor(e.title), opacity: .8 }, onclick: () => edit(e) }, e.title)); continue; }
+          if (!e.start) { col.prepend(h('div.blk', { style: { top: '0', height: '18px', background: evColor(e), opacity: .8 }, onclick: () => edit(e) }, e.title)); continue; }
           const [a, b] = [e.start, e.end || store.addMins(e.start, 60)].map(t => { const [x, y] = t.split(':').map(Number); return x + y / 60; });
-          col.append(h('div.blk', { style: { top: ((a - H0) * PX) + 'px', height: Math.max(20, (b - a) * PX - 2) + 'px', background: e.kind === 'focus' ? 'var(--ink2)' : (e.color || colorFor(e.title)) }, onclick: () => edit(e) }, h('b', e.start), ' ', e.title));
+          col.append(h('div.blk', { style: { top: ((a - H0) * PX) + 'px', height: Math.max(20, (b - a) * PX - 2) + 'px', background: e.kind === 'focus' ? 'var(--ink2)' : evColor(e) }, onclick: () => edit(e) }, h('b', e.start), ' ', e.title));
         }
         if (ds === todayStr()) { const n = new Date(); const y = (n.getHours() + n.getMinutes() / 60 - H0) * PX; if (y > 0) col.append(h('div.nowline', { style: { top: y + 'px' } })); }
         g.append(col);
@@ -100,7 +103,7 @@ export default {
       return wrap;
     }
     function evRow(e) {
-      return h('div.li.click', { onclick: () => edit(e) }, h('span.dot', { style: { background: e.color || colorFor(e.title) } }),
+      return h('div.li.click', { onclick: () => edit(e) }, h('span.dot', { style: { background: evColor(e) } }),
         h('div.mono.small', { style: { width: '92px' } }, e.start ? `${e.start}${e.end ? '–' + e.end : ''}` : '종일'),
         h('div.grow', h('div.t.small', e.title), e.place ? h('div.faint.tiny', e.place) : null), e.repeat ? ic('refresh', 14) : null);
     }

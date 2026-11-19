@@ -62,6 +62,7 @@ export function confirmBox(msg, okLabel = '확인') {
 }
 
 // 폼 빌더: fields = [{k, label, type, options, placeholder, full}]
+import { all as labelList } from './labels.js';
 export function form(fields, values = {}, onSubmit, { submitLabel = '저장', extra } = {}) {
   const inputs = {};
   const f = h('form.stack', { onsubmit: e => { e.preventDefault(); onSubmit(read()); } });
@@ -71,10 +72,12 @@ export function form(fields, values = {}, onSubmit, { submitLabel = '저장', ex
     const v = values[fd.k] ?? fd.default ?? '';
     if (fd.type === 'textarea') inp = h('textarea.in', { name: fd.k, placeholder: fd.placeholder || '', rows: fd.rows || 4 }, v);
     else if (fd.type === 'select') { const opts = fd.options.map(o => (Array.isArray(o) ? o : [o, o])); if (v != null && v !== '' && !opts.some(([val]) => String(val) === String(v))) opts.push([v, fd.k === 'team' ? '다른 팀' : String(v)]); inp = h('select.in', { name: fd.k }, opts.map(([val, lab]) => h('option', { value: val, selected: String(val) === String(v) }, lab))); }
+    else if (fd.type === 'label') { inp = h('input', { type: 'hidden', name: fd.k, value: v }); }
     else if (fd.type === 'checkbox') inp = h('input', { type: 'checkbox', name: fd.k, checked: !!v });
     else inp = h('input.in', { name: fd.k, type: fd.type || 'text', value: v, placeholder: fd.placeholder || '', step: fd.step, inputmode: fd.inputmode, list: fd.datalist ? fd.k + '-dl' : null });
     inputs[fd.k] = inp;
     const wrap = fd.type === 'checkbox' ? h('label.chk', inp, fd.label) : h('label.f', fd.label, inp);
+    if (fd.type === 'label') { const row = h('div.labels'); const paint = () => { clear(row); for (const l of [{ id: '', name: '없음', color: 'var(--line2)' }, ...labelList()]) row.append(h('button.lab' + (inp.value === l.id ? '.on' : ''), { type: 'button', style: { '--lc': l.color }, onclick: () => { inp.value = l.id; paint(); } }, h('i'), l.name)); }; paint(); wrap.append(row); }
     if (fd.datalist) wrap.append(h('datalist#' + fd.k + '-dl', fd.datalist.map(o => h('option', { value: o }))));
     if (fd.full || fd.type === 'textarea') wrap.style.gridColumn = '1/-1';
     grid.append(wrap);

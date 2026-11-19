@@ -3,7 +3,7 @@
 import * as db from './db.js';
 
 export const DEFAULT = { fs: 1, font: 'pretendard', ls: 'normal', lh: 'normal', ink: '', rd: 1, bw: 1, line: 'soft', cardA: 100, shadow: 'soft', density: 'normal', motion: 'bouncy', iw: 1.9,
-  bg: { kind: 'none', grad: 'aurora', url: '', blur: 24, dim: 60, mask: 'bottom' }, start: 'today', hidden: [] };
+  bg: { kind: 'none', grad: 'aurora', url: '', blur: 24, dim: 60, mask: 'bottom' }, start: 'today', hidden: [], home: [], homeOff: [] };
 
 const SYS = '-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif';
 export const FONTS = {

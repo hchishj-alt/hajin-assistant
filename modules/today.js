@@ -82,14 +82,21 @@ export default {
       h('div.bar', { style: { marginTop: '8px' } }, h('i', { style: { width: Math.min(100, mins / ((await db.kvGet('focusGoal', 240)) || 240) * 100) + '%' } })),
       h('p.faint.tiny', { style: { marginTop: '4px' } }, `목표 ${Math.round((await db.kvGet('focusGoal', 240)) / 60)}시간`));
 
-    root.append(hdr,
-      h('div.quick', ic('zap'), qi, h('a.btn.icon.ghost', { href: '#/assistant', 'aria-label': '말로 입력' }, ic('mic'))), qp,
-      h('div', { style: { height: '12px' } }), tiles, h('div', { style: { height: '14px' } }),
-      h('div.grid.g3', h('div.card', h('div.card-h', h('h3', ic('clock'), '오늘 흐름'), h('a.btn.sm.ghost', { href: '#/calendar' }, '캘린더')), tl), tcard, h('div.stack', focus, pc)),
-      h('div', { style: { height: '14px' } }),
-      h('div.grid.g2', mc, await snsCard()));
+    const L = await (await import('../js/look.js')).get();
+    const blocks = {
+      quick: () => h('div.home-full', h('div.quick', ic('zap'), qi, h('a.btn.icon.ghost', { href: '#/assistant', 'aria-label': '말로 입력' }, ic('mic'))), qp),
+      tiles: () => h('div.home-full', tiles),
+      flow: () => h('div.card', h('div.card-h', h('h3', ic('clock'), '오늘 흐름'), h('a.btn.sm.ghost', { href: '#/calendar' }, '캘린더')), tl),
+      tasks: () => tcard, focus: () => focus, people: () => pc, meetings: () => mc, sns: () => snsCard(),
+    };
+    const grid = h('div.home-grid');
+    for (const id of homeOrder(L)) if (!L.homeOff?.includes(id) && blocks[id]) grid.append(await blocks[id]());
+    root.append(hdr, grid);
+    if (!grid.children.length) grid.append(h('div.card.home-full', h('div.empty', '메인 화면 카드를 모두 껐어요. 꾸미기 › 메인 화면에서 다시 켤 수 있어요.', h('a.btn.sm', { href: '#/look', style: { marginTop: '10px' } }, '꾸미기 열기'))));
   },
 };
+export const HOME = { quick: '빠른 입력', tiles: '숫자 요약', flow: '오늘 흐름(일정)', tasks: '오늘 할 일', focus: '오늘 집중', people: '챙길 사람', meetings: '최근 회의', sns: 'SNS 예정' };
+export const homeOrder = L => [...(L.home || []).filter(k => HOME[k]), ...Object.keys(HOME).filter(k => !(L.home || []).includes(k))];
 const shortWon = n => n >= 10000 ? (Math.round(n / 1000) / 10).toLocaleString() + '만' : n.toLocaleString();
 async function snsCard() {
   const xs = (await db.list('sns')).filter(s => s.status !== '게시').sort((a, b) => (a.date || '9').localeCompare(b.date || '9'));

@@ -6,6 +6,8 @@ import { createRecorder, hasSpeech, waveEl, fmtSec } from '../js/voice.js';
 import { draftCard, summaryView } from '../js/draftcard.js';
 import { go, updateBadge } from '../js/app.js';
 
+import * as LB from '../js/labels.js';
+let labF = '';
 export default {
   async render(root, params) {
     if (params[0] === 'new') return newMeeting(root);
@@ -19,9 +21,10 @@ export default {
       h('div.tiles', { style: { marginBottom: '14px' } }, tile('mic', ms.length, '회의'), tile('sparkles', unconfirmed, '요약 확인 전', unconfirmed ? 'warn' : 'ok'), tile('clock', totalMin + '분', '녹음 시간'), tile('check2', (await db.list('tasks')).filter(t => t.sourceRef && ms.some(m => m.id === t.sourceRef)).length, '회의에서 나온 할 일')));
     const c = h('div.card');
     if (!ms.length) c.append(h('div.empty', '아직 회의록이 없어요. 새 회의를 눌러 녹음해 보세요.'));
-    for (const m of ms) c.append(h('div.li.click', { onclick: () => go('meetings/' + m.id) },
+    c.append(h('div.labels', { style: { marginBottom: '6px' } }, [{ id: '', name: '전체', color: 'var(--line2)' }, ...LB.all()].map(l => h('button.lab' + (labF === l.id ? '.on' : ''), { style: { '--lc': l.color }, onclick: () => { labF = l.id; go('meetings'); } }, h('i'), l.name))));
+    for (const m of ms.filter(m => !labF || m.label === labF)) c.append(h('div.li.click', { onclick: () => go('meetings/' + m.id) },
       h('div.ti', { style: { width: '34px', height: '34px', borderRadius: '10px', display: 'grid', placeItems: 'center', background: m.summaryConfirmed ? 'var(--ok-soft)' : 'var(--warn-soft)', color: m.summaryConfirmed ? 'var(--ok)' : 'var(--warn)' } }, ic(m.summaryConfirmed ? 'check' : 'sparkles', 16)),
-      h('div.grow', h('div.t', m.title), h('div.faint.tiny', [fmtDate(m.date || m.createdAt), m.attendees, m.seconds ? fmtSec(m.seconds) : '', m.project].filter(Boolean).join(' · '))),
+      h('div.grow', h('div.t', LB.find(m.label) ? h('span.dot', { title: LB.find(m.label).name, style: { background: LB.colorOf(m.label), display: 'inline-block', marginRight: '6px' } }) : null, m.title), h('div.faint.tiny', [fmtDate(m.date || m.createdAt), LB.find(m.label)?.name, m.attendees, m.seconds ? fmtSec(m.seconds) : '', m.project].filter(Boolean).join(' · '))),
       h('div.chips', (m.keywords || []).slice(0, 3).map(k => h('span.chip', '#' + k)))));
     root.append(c);
 
@@ -124,6 +127,7 @@ async function detail(root, id) {
   const dCard = drafts.filter(d => d.kind !== 'summary').length ? h('div.card', h('div.card-h', h('h3', ic('inbox'), '이 회의에서 나온 임시 항목'), h('span.chip.warn', drafts.filter(d => d.kind !== 'summary').length)), drafts.filter(d => d.kind !== 'summary').map(d => draftCard(d, () => updateBadge()))) : null;
 
   root.append(head(m.title, [fmtDate(m.date || m.createdAt), m.attendees, m.project, m.seconds ? fmtSec(m.seconds) : ''].filter(Boolean).join(' · '),
+    h('button.btn.sm.ghost', { onclick: () => modal('중요도 색', close => form([{ k: 'title', label: '회의 이름', full: true }, { k: 'label', label: '중요도 색', type: 'label', full: true }], m, async v => { await db.patch(id, v); close(); go('meetings/' + id); })) }, h('span.dot', { style: { background: LB.colorOf(m.label) || 'var(--line2)' } }), LB.find(m.label)?.name || '중요도'),
     h('button.btn.sm.ghost', { onclick: exportMd }, ic('download', 14), '내보내기'),
     h('button.btn.sm.ghost', { onclick: copyShare }, ic('copy', 14), '공유용 복사'),
     (await db.get('team-main')) ? h('button.btn.sm' + (m.team ? '.pri' : '.ghost'), { title: '팀원도 이 회의록을 봐요 (녹음 원본은 기기에만)', onclick: async () => { if (m.team) await (await import('../js/sync.js')).unshare(m).catch(() => { }); await db.patch(id, { team: m.team ? '' : 'team-main', by: m.by || (await db.kvGet('name', '')) }); toast(m.team ? '나만 보기로 바꿨어요' : '팀에 공유했어요'); go('meetings/' + id); } }, ic('users', 14), m.team ? '팀 공유 중' : '팀에 공유') : null,
