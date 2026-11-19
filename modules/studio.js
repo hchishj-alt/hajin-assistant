@@ -5,7 +5,7 @@ import * as V from '../js/video.js';
 import { FIELDS } from '../js/fields.js';
 import { go } from '../js/app.js';
 
-let tab = 'board';
+let tab = 'feed';
 export default {
   async render(root, params) {
     if (params[0] === 'edit') return editor(root, params[1]);
@@ -19,7 +19,8 @@ export default {
       const [items, projs, concepts] = await Promise.all([db.list('sns'), db.list('studio'), db.list('concepts')]);
       const stages = ['아이디어', '촬영', '편집', '예약', '게시'];
       body.append(h('div.tiles', { style: { marginBottom: '12px' } }, tile('bulb', items.filter(i => i.status === '아이디어').length, '아이디어'), tile('film', projs.length, '편집 중인 영상'), tile('check', items.filter(i => i.status === '게시').length, '게시함', 'ok'), tile('palette', concepts.length, '내 콘셉트')));
-      body.append(h('div', { style: { marginBottom: '12px' } }, seg([['board', '콘텐츠 보드'], ['edits', '편집실'], ['concept', '콘셉트']], tab, v => { tab = v; draw(); })));
+      body.append(h('div', { style: { marginBottom: '12px' } }, seg([['feed', '피드·게시글'], ['board', '콘텐츠 보드'], ['edits', '편집실'], ['concept', '콘셉트']], tab, v => { tab = v; draw(); })));
+      if (tab === 'feed') body.append(await (await import('./feed.js')).feedView(draw));
       if (tab === 'board') {
         const kan = h('div.kan');
         for (const s of stages) {
