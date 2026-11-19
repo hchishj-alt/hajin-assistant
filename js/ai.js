@@ -170,6 +170,8 @@ ${calendarTable(today)}
 읽는 법:
 - event: 시간이 정해진 약속·회의·방문·행사·발표·휴가·불참. task: 해야 할 일(date는 마감).
 - 한 문장에 약속과 그걸 위한 할 일이 같이 있으면 반드시 event와 task를 따로 만들어. 예: \"28일 오후에 최종 발표, 그 전날까지 PPT 완성\" → event \"최종 발표\"(28일, memo \"오후\") + task \"PPT 완성\"(27일). 서로 다른 할 일이 여러 개여도 하나씩 나눠.
+- 한 문장에 단계가 이어지고(\"~해서\", \"~하고\", \"~한 뒤\") 날짜가 따로 있으면 단계마다 task를 따로 만들어. \"까지\"가 붙은 날짜는 바로 그 뒤에 나오는 일의 마감이야. 예: \"오늘 사진 컨셉 기획해서 다음주 월요일까지 촬영해야 해\" → task \"사진 컨셉 기획\"(오늘) + task \"사진 촬영\"(다음 주 월요일). 뒤 단계 제목만 봐도 무엇을 하는지 알 수 있게 대상을 넣어.
+- 해야 하는 일(\"~해야 해\", \"~까지\")은 컨셉·아이디어 같은 낱말이 있어도 task야.
 - 인스타·릴스·유튜브·블로그에 올릴 거리는 sns. 그냥 떠오른 생각은 idea.
 - "다음주 중 작업, 목요일까지 제출"처럼 주 표현과 요일이 떨어져 있어도 그 주의 요일로 읽어. 주를 말하지 않은 요일은 오늘 이후 가장 가까운 그 요일(오늘과 같은 요일이면 다음 주).
 - 날짜는 반드시 위 달력에서 골라. 계산하지 말고 찾아.
@@ -187,11 +189,11 @@ ${calendarTable(today)}
 사용자 말: ${text}`;
   let arr; try { const j = await ask(prompt, { json: true, ms, temp: 0, fast: true }); arr = Array.isArray(j) ? j : j.items; } catch (e) { console.warn('ai', e); return null; }
   if (!Array.isArray(arr)) return null;
-  const out = [];
+  const out = []; const seen = {};
   for (const g of arr.slice(0, 8)) {
     if (!g || !KO[g.kind] || !String(g.title || '').trim()) continue;
     if (g.kind === 'idea' && /인스타|릴스|유튜브|쇼츠|틱톡|블로그|스레드|트위터|피드/.test(text) && /올리|올려|업로드|게시|포스팅|찍어|콘텐츠/.test(text)) g.kind = 'sns';
-    const base = (parsed || []).find(p => p.kind === g.kind)?.data || {}; const title = String(g.title).trim().slice(0, 80); const S = v => (typeof v === 'string' ? v.trim() : ''); let data;
+    const same = (parsed || []).filter(p => p.kind === g.kind); const nth = seen[g.kind] = (seen[g.kind] ?? -1) + 1; const base = (same[nth] || same[0])?.data || {}; /* 같은 종류가 여럿이면 순서대로 짝지음 */ const title = String(g.title).trim().slice(0, 80); const S = v => (typeof v === 'string' ? v.trim() : ''); let data;
     const date = isD(g.date) ? g.date : '';
     if (g.kind === 'event') data = { ...base, title, date: date || base.date || today, endDate: isD(g.endDate) && g.endDate > (date || '') ? g.endDate : '', start: isT(g.start) ? g.start : g.allDay ? '' : base.start || '', end: isT(g.end) ? g.end : '', who: whoIn(g.who, text, people, base.who), place: S(g.place), area: S(g.area), scope: g.scope === 'personal' ? 'personal' : 'work', repeat: /^(daily|weekly|monthly|weekdays)$/.test(g.repeat || '') ? g.repeat : '', memo: S(g.memo) || base.memo || '', _dated: !!(date || base.date), _allday: !!g.allDay };
     else if (g.kind === 'task') data = { ...base, title, due: date || '', time: isT(g.start) ? g.start : '', who: whoIn(g.who, text, people, base.who), priority: g.priority === 'high' || base.priority === 'high' ? 'high' : 'normal', project: S(g.project) || base.project || '', scope: g.scope === 'personal' ? 'personal' : 'work', memo: S(g.memo) || base.memo || '' };

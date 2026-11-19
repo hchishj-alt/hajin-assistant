@@ -74,9 +74,10 @@ export function refresh() { render(); }
 
 function markNav(id) {
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === id || (id !== 'today' && a.dataset.nav === 'menu' && !MODULES.find(m => m.id === id)?.tab)));
-  { const box = document.querySelector(`#nav .navlink[data-nav="${id}"]`)?.closest('.navg'); if (box && !box.classList.contains('open')) { box.classList.add('open'); box.previousElementSibling?.setAttribute('aria-expanded', 'true'); } }
+  { const box = document.querySelector(`#nav .navlink[data-nav="${id}"]`)?.closest('.navg'); if (box && !box.classList.contains('open') && navFold[box.dataset.g] !== true) { /* 직접 접어 둔 묶음은 다시 열지 않음 */ box.classList.add('open'); box.previousElementSibling?.setAttribute('aria-expanded', 'true'); } }
 }
 
+let navFold = {};
 export async function buildNav() {
   const adm = await (await import('./admin.js')).isAdmin();
   const nav = document.getElementById('nav');
@@ -86,14 +87,14 @@ export async function buildNav() {
   let g = '', box = null;
   const hid = (await db.kvGet('look', null))?.hidden || [];
   // 카테고리별로 접기: 하루는 늘 펼침, 나머지는 접어 두고 지금 보는 화면의 묶음만 열림 (누르면 기억)
-  const fold = await db.kvGet('nav:fold', {}); const cur = (location.hash.replace(/^#\//, '').split('/')[0]) || 'today';
+  const fold = await db.kvGet('nav:fold', {}); navFold = fold; const cur = (location.hash.replace(/^#\//, '').split('/')[0]) || 'today';
   const curGroup = MODULES.find(m => m.id === cur)?.group;
   for (const m of MODULES.filter(m => !m.hidden && !hid.includes(m.id) && (!m.adminOnly || adm))) {
     if (m.group !== g) {
-      g = m.group; const name = g; const open = name === '하루' || name === curGroup || fold[name] === false;
-      box = h('div.navg' + (open ? '.open' : ''), { 'data-g': name });
-      const head = h('button.grp', { 'aria-expanded': String(open), onclick: async () => { const b2 = head.nextElementSibling; const now = !b2.classList.contains('open'); b2.classList.toggle('open', now); head.setAttribute('aria-expanded', String(now)); const f = await db.kvGet('nav:fold', {}); f[name] = !now; await db.kvSet('nav:fold', f); } }, h('span', name), ic('down', 12));
-      nav.append(head, box);
+      g = m.group; const name = g; const open = fold[name] === false || (fold[name] !== true && (name === '하루' || name === curGroup)); /* 직접 접거나 편 건 그대로 기억 */
+      const outer = h('div.navg' + (open ? '.open' : ''), { 'data-g': name }); box = h('div.navg-in'); outer.append(box); /* 안쪽 한 겹이 있어야 접었을 때 높이가 0이 됨 */
+      const head = h('button.grp', { 'aria-expanded': String(open), onclick: async () => { const b2 = head.nextElementSibling; const now = !b2.classList.contains('open'); b2.classList.toggle('open', now); head.setAttribute('aria-expanded', String(now)); const f = await db.kvGet('nav:fold', {}); f[name] = !now; navFold = f; await db.kvSet('nav:fold', f); } }, h('span', name), ic('down', 12));
+      nav.append(head, outer);
     }
     const a = h('a.navlink', { href: '#/' + m.id, 'data-nav': m.id }, ic(m.icon), h('span.grow', m.title));
     if (m.id === 'inbox') a.append(h('span.badge#inbox-badge.hide'));

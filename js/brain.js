@@ -320,8 +320,52 @@ export function interpret(input, ctx = {}) {
   const base = ctx.base || new Date();
   const parts = splitCommands(input);
   const out = [];
-  for (const p of parts) out.push(...interpretOne(p, base, ctx).map(r => ({ ...r, src: p.trim() })));
+  for (const p of parts) {
+    const pre = (p.match(/^\s*(할\s*일|할일|투두|todo)\s*[:：]\s*/i) || [''])[0];
+    const steps = splitSteps(p.slice(pre.length), base, ctx);
+    if (steps.length < 2) { out.push(...interpretOne(p, base, ctx).map(r => ({ ...r, src: p.trim() }))); continue; }
+    // 단계마다 날짜가 다른 한 문장 → 단계별 항목. 약속(시간 있음)은 일정, 나머지는 할 일
+    let prev = null;
+    for (const st of steps) {
+      let r = pre ? null : interpretOne(st, base, ctx)[0];
+      if (!r || (r.kind !== 'task' && r.kind !== 'event')) r = interpretOne('할일: ' + st, base, ctx)[0];
+      if (r.kind === 'event') r.data.title = String(r.data.title || '').replace(/\s*하기$/, '').trim() || r.data.title;
+      if (r.kind === 'task' && prev) r.data.memo = [r.data.memo, `앞 단계: ${prev.data.title}`].filter(Boolean).join(' · ');
+      out.push({ ...r, src: p.trim() }); prev = r;
+    }
+  }
   return out;
+}
+// "오늘 컨셉 기획해서 다음주 월요일까지 촬영해야 해" → ["오늘 컨셉 기획하기", "다음주 월요일까지 촬영해야 해"]
+// 이어 주는 말(해서·하고·한 뒤…) 앞뒤에 서로 다른 날짜가 있을 때만 나눈다.
+const STEP_END = /^(.*?)(하고서?|해서|끝내고|마치고|만들고|보내고|받고|뽑고|짜고|잡고|찍고|쓰고|올리고|고르고|모으고|정리하고)$/;
+export function splitSteps(text, base = new Date(), ctx = {}) {
+  const toks = String(text).trim().split(/\s+/); if (toks.length < 4 || text.length > 160) return [text];
+  for (let i = 0; i < toks.length - 2; i++) {
+    let m = STEP_END.exec(toks[i]), skip = 0, stem = '', tail = '';
+    if (m) { stem = m[1]; tail = m[2]; if (/^(나서|난)$/.test(toks[i + 1])) { skip = 1; if (/^(뒤|후|다음)에?$/.test(toks[i + 2] || '')) skip = 2; } }
+    else if (/한$/.test(toks[i]) && /^(뒤|후|다음)에?$/.test(toks[i + 1])) { stem = toks[i].slice(0, -1); tail = '한'; skip = 1; }
+    else if (/^[가-힣]{2,}고$/.test(toks[i]) && !/^(광고|보고|창고|재고|경고|참고|사고|원고|공고|그리고|최고|예고|권고|신고|충고|보고서|출고|입고|퇴고|숙고|중고|여고|남고)$/.test(toks[i])) { stem = toks[i].slice(0, -1); tail = '고'; }
+    else continue;
+    if ((ctx.people || []).some(n => n && (n === stem || n.slice(1) === stem || n === stem.replace(/이$/, '') || n.slice(1) === stem.replace(/이$/, '')))) continue; // "민서하고 회의"의 하고는 '와'
+    const noun = /^(하고서?|해서|한|정리하고)$/.test(tail) ? (tail === '정리하고' ? stem + '정리하기' : stem.length >= 2 ? stem + '하기' : stem + '하기') : stem + tail.replace(/고$/, '기');
+    if (!stem && !/^(끝내고|마치고|만들고|보내고|받고|뽑고|짜고|잡고|찍고|쓰고|올리고|고르고|모으고|정리하고)$/.test(tail)) continue; // 그냥 "하고"만 있으면 앞말이 없음
+    const left = [...toks.slice(0, i), noun].join(' '), right = toks.slice(i + 1 + skip).join(' ');
+    const wl = parseWhen(left, base), wr = parseWhen(right, base);
+    if (wl.date && wr.date && wl.hits.length && wr.hits.length && left.replace(/\s/g, '').length >= 5) return [left, ...splitSteps(right, base, ctx)];
+  }
+  return [text];
+}
+// "오늘 회의에서 다음주 월요일까지 내기로 함"처럼 날짜가 둘이면 '까지'가 붙은 쪽이 마감
+export function deadlineDate(text, base = new Date()) {
+  const toks = String(text).trim().split(/\s+/); let found = '';
+  toks.forEach((tk, i) => {
+    const m = tk.match(/^(.+?)까지/); if (!m) { if (tk !== '까지') return; }
+    const a = m ? m[1] : toks[i - 1] || '', off = m ? 0 : 1, b = toks[i - 1 - off] || '', c = toks[i - 2 - off] || '';
+    const seg = /^(다음|이번|다다음|지난)$/.test(c) && /^(주|달)$/.test(b) ? `${c} ${b} ${a}` : /^(다음\s*주|이번\s*주|다다음\s*주|담주|금주|다음\s*달|이번\s*달|\d{1,2}월|다음|이번)$/.test(b) ? `${b} ${a}` : a;
+    const d = parseWhen(seg, base).date; if (d) found = d;
+  });
+  return found;
 }
 // 빠른 입력 칸처럼 '적어 두려고' 쓴 말은 신호가 없어도 할 일로 받음
 export function interpretCapture(input, ctx = {}) { return interpret(input, ctx).flatMap(p => p.kind === 'talk' ? interpret('할일: ' + (p.src || input), ctx).map(r => ({ ...r, src: p.src })) : [p]); }
@@ -417,7 +461,8 @@ function interpretOne(s, base, ctx) {
     if ((/\d+(\.\d+)?\s*(시간|분)/.test(t) && /(했음|했다|했어|했고|함$|완료|끝냄|작업|공부|집중)/.test(t) && !w.time) || /작업\s*(했|함|기록)/.test(t)) return 'timelog';
     if ((w.time || w.date) && /(회의|미팅|약속|만나|만남|수업|면접|발표|전시|촬영|병원|저녁|점심|콜|통화|줌|zoom|meet|일정|스케줄|행사|세미나|오픈|마감식|파티|회식|생일|여행|공연|콘서트|(?<!업)데이트|식사|모임|스터디|레슨|강의|워크숍|휴가|설명회|간담회|관람|방문|상담|진료|치과|인터뷰|구경|팝업|나들이|답사|견학|투어|페어|박람회)/i.test(t) && !(isDeadline(t) && ACTION.test(t))) return 'event';
     if (w.time && !ACTION.test(t)) return 'event';
-    if (/(회의|미팅|약속|만나|수업|면접|발표|행사|세미나|전시)/.test(t) && w.date) return 'event';
+    if (/(회의|미팅|약속|만나|수업|면접|발표|행사|세미나|전시)/.test(t) && w.date && !(isDeadline(t) && /(기로|해야|야\s*(함|해|돼|됨|한다|겠)|제출|보내|넘기|넘겨|내야|내기)/.test(t))) return 'event';
+    if (isDeadline(t) && /(해야|야\s*(함|해|돼|됨|한다|겠)|하기로|제출|끝내|완료|마쳐|넘겨|보내)/.test(t)) return 'task';
     if (IDEA.test(t) || /(떠올|생각났|영감|후보(는|가|로)?\s|후보\s*[:：])/.test(t)) return 'idea';
     if (/(달라고\s*(함|했어|했음|하심|하셨어|한다|하네|해)|달래|달라심|해\s*달라는|떨어짐|떨어졌|다\s*씀|다\s*썼|고장|망가졌|안\s*됨$|안\s*나옴$)/.test(t)) return 'task';
     if (ACTION.test(t) || w.date || /(하기|할것|사기|보내기|챙기기|만들기)$/.test(t)) return 'task';
@@ -432,13 +477,13 @@ function interpretOne(s, base, ctx) {
       case 'event': { const rep = /매일|날마다/.test(body) ? 'daily' : /평일마다|매\s*평일|평일\s*매일/.test(body) ? 'weekdays' : /매주|주마다/.test(body) ? 'weekly' : /매달|매월|달마다/.test(body) ? 'monthly' : ''; const r0 = { kind, label: rep ? '반복 일정' : '일정', confidence: bw.time ? 0.9 : 0.7, data: { repeat: rep, title: cleanTitle.replace(/(매일|날마다|평일마다|매\s*평일|매주|주마다|매달|매월|달마다)\s*/g, '').trim() || '일정', date: bw.date || ymd(base), start: bw.time || '', end: bw.end || '', place: '', tags } }; const ev = r0.data; if (bw.endDate) ev.endDate = bw.endDate; ev.title = ev.title.replace(/^(이틀|사흘|나흘|\d+박\s*\d+일|\d+일간)\s*/, '').trim() || ev.title;
         { const ab = body.match(/(\S{2,4}?)(?:이가|이|가|는|은)?\s+.*?(못\s*(?:온|와|옴|간|감|나온|나와)\S*|불참|빠진대|빠질\S*|안\s*온대)/); if (ab) { const nm = (ctx.people || []).find(n => n === ab[1] || n.slice(1) === ab[1] || n.slice(1) === ab[1].replace(/이$/, '')) || ab[1].replace(/이$/, ''); ev.title = `${nm.length > 2 ? nm.slice(1) : nm} 불참`; ev.who = nm; ev._allday = true; } }
         if (/(휴무|반차|연차|월차|휴가|출장|외근|재택|휴일)/.test(ev.title) && !ev.start) ev._allday = true;
-        const pp = ev.who && /불참$/.test(ev.title) ? null : eventParts(ev.title, ctx.people || []); if (pp) { ev.title = pp.title; if (pp.who) ev.who = pp.who; if (pp.place) ev.place = pp.place; if (pp.area) ev.area = pp.area; } if (!ev.place && !ev.area) ev.place = placeOf(body); ev.scope = guessScope(body, { who: ev.who || '', team: ctx.people || [] }); return r0; }
+        const pp = ev.who && /불참$/.test(ev.title) ? null : eventParts(ev.title, ctx.people || []); if (pp) { ev.title = String(pp.title || '').replace(/^(에서|에|이랑|랑|하고|와|과)\s+/, '').trim() || pp.title; if (pp.who) ev.who = pp.who; if (pp.place) ev.place = pp.place; if (pp.area) ev.area = pp.area; } if (!ev.place && !ev.area) ev.place = placeOf(body); ev.scope = guessScope(body, { who: ev.who || '', team: ctx.people || [] }); return r0; }
       case 'task': { let who0 = findAssignee(body, ctx.people || []); let ct = cleanTitle.replace(/(^|\s)(급함|급해|급한\s*건데|asap|ASAP)[,:：!\s]*/g, ' ').replace(/\s*마감(임|이야|입니다)?\s*$/, '').trim(); let memo = '';
         // "서연이한테 영상 편집 맡기기" → 담당 서연, 할 일 영상 편집
         { const hm = ct.match(/^(\S{1,6}?)(?:이)?(?:한테|에게|께)\s+(.+?)\s*(?:맡기기|맡기|맡김|맡겨|시키기|시키)\S*$/); if (hm) { const nm = (ctx.people || []).find(n => n === hm[1] || n.slice(1) === hm[1]); if (nm || /^[가-힣]{2,3}$/.test(hm[1])) { who0 = nm || hm[1]; ct = hm[2]; } } }
         // "클라이언트가 로고 색 바꿔달라고 함" → 로고 색 바꿔 주기 (클라이언트 요청)
         { const rm = ct.match(/^(?:(\S{1,8}?)(?:이|가|께서|님이)\s+)?(.+?)\s*(?:달라고\s*(?:함|했어|했음|하심|하셨어|한다|하네|해)|달래|달라심)$/); if (rm) { ct = rm[2].replace(/\s*(해|줘)$/, m0 => m0) + ' 주기'; ct = ct.replace(/해\s*주기$/, '해 주기').replace(/\s+/g, ' '); if (rm[1] && !(ctx.people || []).some(n => n === rm[1] || n.slice(1) === rm[1])) memo = rm[1] + ' 요청'; if (rm[1] && who0 === rm[1]) who0 = ''; } }
-        const who = who0 === '나' ? '' : who0; return { kind, label: '할 일', confidence: 0.75, data: { who, ...(memo ? { memo } : {}), title: (/주기$/.test(ct) && memo ? ct : cleanTask(ct, who)) || ct || body, due: bw.date || '', time: isDeadline(body) ? '' : (bw.time || ''), priority: /(급|급함|asap|ASAP|중요|빨리|꼭|반드시|!!)/.test(body) ? 'high' : 'normal', project: projectOf(body, ctx), tags } }; }
+        const who = who0 === '나' ? '' : who0; return { kind, label: '할 일', confidence: 0.75, data: { who, ...(memo ? { memo } : {}), title: (/주기$/.test(ct) && memo ? ct : cleanTask(ct, who)) || ct || body, due: (() => { const dl = isDeadline(body) ? deadlineDate(body, base) : ''; return dl && !(bw.date && new Date(dl).getDay() === new Date(bw.date).getDay()) ? dl : (bw.date || dl || ''); })(), time: isDeadline(body) ? '' : (bw.time || ''), priority: /(급|급함|asap|ASAP|중요|빨리|꼭|반드시|!!)/.test(body) ? 'high' : 'normal', project: projectOf(body, ctx), tags } }; }
       case 'expense': { const amt = parseMoney(body) || 0; return { kind, label: '지출', confidence: 0.85, data: { title: strip(body.replace(/(\d+(?:\.\d+)?\s*만\s*(\d+\s*천)?\s*원?|\d[\d,]*\s*원|₩\s*[\d,]+)/g, ''), bw.hits).replace(/(법인\s*카드|회사\s*카드|개인\s*카드|카드|현금|계좌\s*이체)/g, '').replace(/\s*(내가|제가|우리가)?\s*(결제|샀다|샀어|샀음|삼|썼다|썼어|썼음|씀|지출|냈다|냈어|냈음|냄|했다|입금함|입금했어|입금|결제함|결제했어|긁음|긁었어)\s*$/, '').replace(/\s+/g, ' ').trim() || '지출', amount: amt, date: bw.date || ymd(base), category: guessCategory(body), project: projectOf(body, ctx), pay: /(법인|회사|팀)\s*카드/.test(body) ? '법인카드' : /(현금)/.test(body) ? '현금' : '개인카드' } }; }
       case 'contact': { const ph = parsePhone(body), em = parseEmail(body); const raw = body.replace(ph ? /(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/ : /$^/, ' ').replace(em || /$^/, ' ').replace(/(명함\s*(받음|받았어|받았음|교환)?|번호|전화|연락처|이메일|메일|저장|추가|해줘|해 줘|받음|받았어|알게\s*됨|소개\s*받음)/g, ' ').replace(/#[\p{L}\p{N}_]+/gu, ' ').replace(/\s+/g, ' ').trim();
         const ROLE = /^(.*?)(대표|이사|팀장|실장|부장|차장|과장|대리|주임|사원|주무관|매니저|PD|피디|교수|작가|감독|디자이너|개발자|기획자|마케터|에디터|사장|선생님|쌤|원장|담당자?)(님)?$/; const ws = raw.split(' ').filter(Boolean); let nm = '', role = '', org = '';
@@ -464,7 +509,7 @@ function interpretOne(s, base, ctx) {
   function strip(x, hits) {
     let r = x;
     for (const hh of hits || []) r = r.replace(hh, ' ');
-    return r.replace(/#[\p{L}\p{N}_]+/gu, '').replace(/^(일정|할일|메모)\s*[:：]/, '').replace(/(에|에서|부터|까지)\s*$/, '').replace(/\s*(으로|로)?\s*(잡자|잡아\s*줘|잡아줘|잡을게|정하자|추가해\s*줘|등록해\s*줘|넣어\s*줘|기록해\s*줘|저장해\s*줘|해줘|있음|있어|있다)\s*$/, '').replace(/\s+/g, ' ').trim().replace(/^(까지|부터|에서|으로|로|에|은|는|쯤|경)\s+/, '').trim();
+    return r.replace(/#[\p{L}\p{N}_]+/gu, '').replace(/^\s*(일정|약속|할\s*일|투두|메모|아이디어)\s*[:：]\s*/, '').replace(/(에|에서|부터|까지)\s*$/, '').replace(/\s*(으로|로)?\s*(잡자|잡아\s*줘|잡아줘|잡을게|정하자|추가해\s*줘|등록해\s*줘|넣어\s*줘|기록해\s*줘|저장해\s*줘|해줘|있음|있어|있다)\s*$/, '').replace(/\s+/g, ' ').trim().replace(/^(까지|부터|에서|으로|로|에|은|는|쯤|경)\s+/, '').trim();
   }
 }
 // "서충주 수집오빠랑 충주본색 전시 방문" → 누구랑 수집오빠 · 지역 서충주 · 장소 충주본색 · 제목 충주본색 전시 방문

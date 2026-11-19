@@ -24,6 +24,8 @@ export async function showQR() {
     cv,
     h('p.small', '받을 기기에서 비서 앱을 열고 ', h('b', '설정 → 외부 AI 연결 → QR로 키 받기'), '를 눌러 이 QR을 비춰 주세요.'),
     h('p.faint.tiny', '앱을 설치하지 않았다면 기본 카메라로 찍어도 돼요. 이 QR은 키 그 자체라서 다른 사람에게 보이거나 캡처해 두지 마세요. 키는 이 화면에서만 그려지고 어디로도 전송되지 않아요.'),
+    h('div.row', { style: { gap: '8px', justifyContent: 'center', flexWrap: 'wrap' } },
+      h('button.btn.sm', { onclick: async e => { try { await navigator.clipboard.writeText(link(key)); e.currentTarget.textContent = '복사했어요. 다른 브라우저 주소창에 붙여 넣으세요'; } catch { toast('복사하지 못했어요'); } } }, '같은 컴퓨터의 다른 브라우저로 옮기기 (링크 복사)')),
     cnt), { onClose: () => clearInterval(timer) });
   timer = setInterval(() => { left -= 1; cnt.textContent = `${left}초 뒤 닫혀요`; if (left <= 0) close(); }, 1000);
 }

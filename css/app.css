@@ -742,9 +742,12 @@ button.rank-t{min-height:30px}
 #nav button.grp[aria-expanded=true] svg{transform:rotate(0)}
 #nav .navg{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s var(--spring)}
 #nav .navg.open{grid-template-rows:1fr}
-#nav .navg>*{min-height:0}
+#nav .navg>.navg-in{min-height:0;overflow:hidden;opacity:0;transition:opacity .25s ease}
+#nav .navg.open>.navg-in{opacity:1}
 #nav .navg{overflow:hidden}
-#nav .navg:not(.open) .navlink{visibility:hidden}
+#nav .navg:not(.open) .navlink{visibility:hidden;transition:visibility 0s .35s}
+#nav .navg.open .navlink{visibility:visible}
+#nav button.grp{padding-bottom:6px}
 
 /* 캘린더 사람별 */
 .cal-people{margin-bottom:10px;align-items:center}.cal-people .chip{cursor:pointer;border:0;gap:6px}

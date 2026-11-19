@@ -63,6 +63,7 @@ export async function reject(d) { await db.patch(d.id, { status: 'rejected' }); 
 export async function changeKind(d, kind) {
   brain.learnKind(d.source || d.data.title || '', kind); await saveLearned();
   const re = brain.interpret(`${KINDS[kind]?.label || kind}: ${d.source || d.data.title}`)[0];
+  if (re?.data?.title) re.data.title = String(re.data.title).replace(/^\s*(일정|약속|할\s*일|투두|메모|아이디어|지출|연락처)\s*[:：]\s*/, '');
   return db.patch(d.id, { kind, data: re?.data || d.data });
 }
 export async function saveLearned() { await db.kvSet('brain:learned', brain.getLearned()); }
