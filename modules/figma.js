@@ -52,9 +52,9 @@ function tokenCard() {
 
 async function addFile() {
   if (!(await F.getToken())) { toast('먼저 피그마 토큰을 넣어 주세요'); return; }
-  modal('피그마 파일 연결', close => form([{ k: 'url', label: '파일 링크 (figma.com/design/…)', full: true }], {}, async v => {
+  modal('피그마 파일 연결', close => form([{ k: 'url', label: '파일 링크 (figma.com/design/…)', full: true }, { k: 'share', label: '공유', type: 'select', options: [['', '나만 보기 (개인 파일)'], ['1', '팀에 공유']] }], {}, async v => {
     const btn = document.querySelector('.modal button[type=submit]'); busy(btn, true, '분석 중');
-    try { const f = await F.addFile(v.url); toast(`"${f.name}" 연결 · 정리 점수 ${f.snap.score}`); close(); go('figma/' + f.id); }
+    try { const f = await F.addFile(v.url, !!v.share); toast(`"${f.name}" 연결 · 정리 점수 ${f.snap.score}`); close(); go('figma/' + f.id); }
     catch (e) { toast(e.message === 'Failed to fetch' ? '인터넷 연결을 확인해 주세요' : e.message); busy(btn, false); }
   }, { submitLabel: '연결' }));
 }
@@ -80,6 +80,7 @@ async function detail(root, id) {
     head(f.name || f.key, `점수 ${s.score ?? '–'} · ${s.checkedAt ? '확인 ' + new Date(s.checkedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}${token ? ' · 1분마다 자동 확인' : ' · 토큰 없음 (팀 공유본)'}`,
       h('button.btn.sm.ghost', { onclick: guide }, ic('book', 14), '?'),
       h('a.btn.sm', { href: F.fileLink(f.key), target: '_blank', rel: 'noopener' }, '피그마에서 열기'),
+      (await db.get('team-main')) ? h('button.btn.sm' + (f.team ? '.pri' : ''), { title: '팀원도 이 파일의 정리 화면을 봐요', onclick: async () => { await db.patch(id, { team: f.team ? '' : 'team-main' }); toast(f.team ? '나만 보기로 바꿨어요' : '팀에 공유했어요'); go('figma/' + id); } }, ic('users', 14), f.team ? '팀 공유 중' : '나만 보기') : null,
       token ? h('button.btn.sm', { onclick: async e => { const btn = e.currentTarget; busy(btn, true, '읽는 중'); try { await F.refresh(f, { force: true }); go('figma/' + id); } catch (err) { toast(err.message); busy(btn, false); } } }, ic('refresh', 14), '지금') : null,
       h('button.btn.sm.ghost.danger', { onclick: async () => { if (await confirmBox('이 파일 연결을 뺄까요? 피그마 파일은 그대로예요.', '빼기')) { await db.remove(id); go('figma'); } } }, ic('trash', 14))),
     h('div.tiles', { style: { marginBottom: '12px' } }, tile('target', s.score ?? '–', '정리 점수', s.score >= 80 ? 'ok' : s.score >= 50 ? 'warn' : 'bad'), tile('grid', (s.totals.sections || 0), '섹션'), tile('layers', s.totals.frames || 0, '맨 위 프레임'), tile('flag', s.todo.length, '할 일', s.todo.length ? 'warn' : 'ok'), tile('msg', (f.comments || []).filter(c => !c.resolved && !c.parent).length, '열린 댓글')),

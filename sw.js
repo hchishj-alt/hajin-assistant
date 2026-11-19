@@ -2,8 +2,8 @@
 const VERSION = '1.0.0';
 const CACHE = 'hajin-' + VERSION;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png',
-  'js/app.js', 'js/ui.js', 'js/db.js', 'js/icons.js', 'js/brain.js', 'js/store.js', 'js/fields.js', 'js/draftcard.js', 'js/query.js', 'js/voice.js', 'js/video.js', 'js/ext.js', 'js/seed.js', 'js/selftest.js', 'js/version.js', 'js/sync.js', 'js/config.js', 'js/figma-api.js', 'js/linkpreview.js', 'js/theme.js', 'js/vendor-supabase.js',
-  ...['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'studio', 'figma', 'archive', 'radar', 'people', 'team', 'money', 'startup', 'settings', 'health', 'menu'].map(m => `modules/${m}.js`)];
+  'js/app.js', 'js/ui.js', 'js/db.js', 'js/icons.js', 'js/brain.js', 'js/store.js', 'js/fields.js', 'js/draftcard.js', 'js/query.js', 'js/voice.js', 'js/video.js', 'js/ext.js', 'js/seed.js', 'js/selftest.js', 'js/version.js', 'js/sync.js', 'js/config.js', 'js/figma-api.js', 'js/linkpreview.js', 'js/theme.js', 'js/admin.js', 'js/vendor-supabase.js',
+  ...['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'studio', 'figma', 'archive', 'radar', 'admin', 'people', 'team', 'money', 'startup', 'settings', 'health', 'menu'].map(m => `modules/${m}.js`)];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => { })))));
 });

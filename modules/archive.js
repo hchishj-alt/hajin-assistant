@@ -16,7 +16,7 @@ export default {
     if (params[0] === 'p' && params[1]) { F.folder = params[1]; F.sub = params[2] || ''; }
     const box = h('div');
     root.append(head('레퍼런스 아카이브', '링크만 붙이면 미리보기가 떠요. 색·느낌은 자동으로 골라 둬요.',
-      h('button.btn.sm', { onclick: newFolder }, ic('plus', 14), '폴더'),
+      h('button.btn.sm.admin-only', { onclick: newFolder }, ic('plus', 14), '폴더'),
       h('button.btn.sm', { onclick: async () => { const f = await pickFile('image/*', true); const fs = [].concat(f || []).filter(Boolean); if (fs.length) addImages(fs); } }, ic('upload', 14), '이미지 올리기'),
       h('button.btn.sm.pri', { onclick: () => addLinks() }, ic('link', 14), '링크 추가')), box);
     // 어디서든 링크·이미지 붙여넣기

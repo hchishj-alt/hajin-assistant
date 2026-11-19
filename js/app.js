@@ -20,6 +20,7 @@ export const MODULES = [
   { id: 'money', title: '비용 처리', icon: 'wallet', group: '회사', short: '비용' },
   { id: 'radar', title: '지원사업 · 정보 랭킹', icon: 'trend', group: '회사', short: '랭킹' },
   { id: 'startup', title: '스타트업 PM', icon: 'rocket', group: '회사', short: '스타트업' },
+  { id: 'admin', title: '관리자', icon: 'shield', group: '시스템', adminOnly: true },
   { id: 'settings', title: '설정', icon: 'sliders', group: '시스템' },
   { id: 'health', title: '자가 점검', icon: 'shield', group: '시스템' },
   { id: 'menu', title: '메뉴', icon: 'menu', hidden: true, tab: 5 },
@@ -69,13 +70,14 @@ function markNav(id) {
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === id || (id !== 'today' && a.dataset.nav === 'menu' && !MODULES.find(m => m.id === id)?.tab)));
 }
 
-async function buildNav() {
+export async function buildNav() {
+  const adm = await (await import('./admin.js')).isAdmin();
   const nav = document.getElementById('nav');
   clear(nav);
   nav.append(h('div.brand', h('img', { src: 'icons/icon.svg', alt: '' }), '하진 비서'));
   nav.append(h('button.searchbtn', { onclick: openPalette }, ic('search', 16), h('span.lbl', '검색·명령'), h('kbd', navigator.platform.includes('Mac') ? '⌘K' : 'Ctrl K')));
   let g = '';
-  for (const m of MODULES.filter(m => !m.hidden)) {
+  for (const m of MODULES.filter(m => !m.hidden && (!m.adminOnly || adm))) {
     if (m.group !== g) { g = m.group; nav.append(h('div.grp', g)); }
     const a = h('a.navlink', { href: '#/' + m.id, 'data-nav': m.id }, ic(m.icon), h('span.grow', m.title));
     if (m.id === 'inbox') a.append(h('span.badge#inbox-badge.hide'));
@@ -177,7 +179,8 @@ async function tickReminders() {
 
 async function boot() {
   window.addEventListener('error', e => store.logError(e.error || e.message, 'window'));
-  window.addEventListener('unhandledrejection', e => store.logError(e.reason, 'promise'));
+  window.addEventListener('unhandledrejection', e => { if (/관리자만|올린 사람과 관리자/.test(e.reason?.message || '')) { toast(e.reason.message); e.preventDefault(); return; } store.logError(e.reason, 'promise'); });
+  (await import('./admin.js')).install();
   await applyTheme();
   await store.loadLearned();
   await buildNav();
@@ -190,7 +193,7 @@ async function boot() {
   setupSW();
   setInterval(tickReminders, 60 * 1000); tickReminders();
   // 동기화 (설정에서 로그인했을 때만). 다른 기기·팀원이 바꾼 게 오면 입력 중이 아닐 때 화면 새로 그림
-  import('./sync.js').then(s => s.start()).catch(e => store.logError(e, 'sync'));
+  import('./sync.js').then(s => { let was = ''; s.onState(async st => { if (st.status === was) return; was = st.status; (await import('./admin.js')).clearCache(); await buildNav(); document.body.classList.toggle('not-admin', !(await (await import('./admin.js')).isAdmin())); }); return s.start(); }).catch(e => store.logError(e, 'sync'));
   // 피그마 실시간 감시 (토큰 있을 때만, 바뀐 파일만 다시 읽음)
   import('./figma-api.js').then(async F => { if (await F.getToken()) F.watch(f => { toast(`피그마 "${f.name}"이 바뀌어서 다시 정리했어요`, { label: '보기', fn: () => go('figma/' + f.id) }); updateBadge(); }); }).catch(e => store.logError(e, 'figma'));
   window.addEventListener('hajin:remote', () => {

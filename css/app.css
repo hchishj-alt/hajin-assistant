@@ -417,3 +417,22 @@ p.muted,p.small,.sub{max-width:68ch}
 .palb .pv i:last-child{flex:none;width:16px;border-radius:50%}
 .palb b{font-size:12.5px;font-weight:680;display:block;letter-spacing:-.01em}
 .palb span{font-size:11px;color:var(--ink3)}
+
+/* 관리자 화면 */
+body.not-admin .admin-only{display:none!important}
+.audit{cursor:pointer;align-items:flex-start}
+.audit .av{width:26px;height:26px;font-size:12px;margin-top:2px}
+.audit-d{margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--bg2);display:grid;gap:5px}
+.audit-c{font-size:12.5px;display:flex;gap:6px;flex-wrap:wrap;align-items:baseline}
+.audit-c b{min-width:52px;color:var(--ink2)}
+.audit-c .from{color:var(--ink3);text-decoration:line-through}
+.audit-c .to{color:var(--ink);font-weight:620}
+.statbar{display:grid;grid-template-columns:96px 1fr 64px;gap:10px;align-items:center;padding:6px 2px;font-size:13px}
+.statbar .sb{position:relative;height:10px;border-radius:6px;background:var(--bg2);overflow:hidden}
+.statbar .sb i{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--acc-soft)}
+.statbar .sb i.s{background:var(--acc)}
+.statbar .sn{text-align:right;color:var(--ink3);font-variant-numeric:tabular-nums}
+.daybars{display:flex;gap:6px;align-items:flex-end;height:120px}
+.daybars .db{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px}
+.daybars .db i{width:100%;max-width:26px;border-radius:6px 6px 3px 3px;background:var(--acc);opacity:.85}
+.daybars .db span{font-size:10.5px;color:var(--ink3)}

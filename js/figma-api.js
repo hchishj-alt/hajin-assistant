@@ -113,12 +113,11 @@ export async function refresh(item, { force = false } = {}) {
   return out;
 }
 
-export async function addFile(url) {
+export async function addFile(url, share = false) {
   const key = parseKey(url);
   if (!key) throw new Error('피그마 파일 링크가 아니에요');
   const ex = (await db.list('figmafiles')).find(f => f.key === key);
-  const team = (await db.get('team-main')) ? 'team-main' : '';
-  const item = ex || await db.put('figmafiles', { key, url, team, name: '불러오는 중…' });
+  const item = ex || await db.put('figmafiles', { key, url, team: share && (await db.get('team-main')) ? 'team-main' : '', by: await db.kvGet('name', '하진'), name: '불러오는 중…' });
   return refresh(item, { force: true });
 }
 

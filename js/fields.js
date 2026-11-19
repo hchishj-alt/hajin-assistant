@@ -44,6 +44,7 @@ export const FIELDS = {
     { k: 'group', label: '그룹', type: 'select', options: ['팀', '학교', '협력사', '클라이언트', '투자·지원', '친구', '가족', '기타'], default: '기타' },
     { k: 'birthday', label: '생일', type: 'date' },
     { k: 'cadence', label: '연락 주기(일, 0=없음)', type: 'number', default: 0 },
+    { k: 'team', label: '공유', type: 'select', options: [['', '나만 보기'], ['team-main', '팀에 공유']] },
     { k: 'sns', label: 'SNS·포트폴리오', full: true },
     { k: 'memo', label: '메모', type: 'textarea', rows: 3 },
   ],

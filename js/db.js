@@ -51,9 +51,13 @@ export async function list(col, { includeDeleted = false } = {}) {
 }
 export async function get(id) { return tx('items', 'readonly', s => req(s.get(id))); }
 
+// 저장 전 검사·기록 (권한, 수정 기록). js/admin.js 가 등록함
+let guard = null;
+export function setGuard(fn) { guard = fn; }
 export async function put(col, data) {
   const prev = data.id ? await get(data.id) : null;
   const item = { ...(prev || {}), ...data, id: data.id || uid(), col, updatedAt: now(), dirty: true };
+  if (guard) await guard(prev, item);
   if (!item.createdAt) item.createdAt = item.updatedAt;
   if (item.deleted === undefined) item.deleted = false;
   await tx('items', 'readwrite', s => req(s.put(item)));
