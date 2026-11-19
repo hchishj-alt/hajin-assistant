@@ -1,4 +1,5 @@
 import { h, ic, clear, toast, todayStr, fmtDate, tile, ring, colorFor, won, countUp } from '../js/ui.js';
+import * as SC from '../js/scope.js';
 import * as db from '../js/db.js';
 import * as store from '../js/store.js';
 import * as brain from '../js/brain.js';
@@ -57,7 +58,7 @@ export default {
     const rows = [...events.map(e => ({ t: e.start || '00:00', e })), ...slots.map(s => ({ t: s.start, s }))].sort((a, b) => a.t.localeCompare(b.t));
     if (!rows.length) tl.append(h('div.faint.small', '오늘은 일정이 없어요'));
     for (const r of rows) {
-      if (r.e) { const past = r.e.end ? r.e.end < nowHM : (r.e.start && r.e.start < nowHM); tl.append(h('div.tl-i', { style: { opacity: past ? .5 : 1 } }, h('div.mono.tiny.faint', r.e.start ? `${r.e.start}${r.e.end ? '–' + r.e.end : ''}` : '종일'), h('div.t.small', h('span.dot', { style: { background: colorFor(r.e.title), display: 'inline-block', marginRight: '6px' } }), r.e.title, r.e.place ? h('span.faint', ' · ' + r.e.place) : null))); }
+      if (r.e) { const past = r.e.end ? r.e.end < nowHM : (r.e.start && r.e.start < nowHM); tl.append(h('div.tl-i', { style: { opacity: past ? .5 : 1 } }, h('div.mono.tiny.faint', r.e.start ? `${r.e.start}${r.e.end ? '–' + r.e.end : ''}` : '종일'), h('div.t.small', h('span.dot', { style: { background: colorFor(r.e.title), display: 'inline-block', marginRight: '6px' } }), r.e.title, r.e.place ? h('span.faint', ' · ' + r.e.place) : null, r.e.who ? h('span.faint', ' · ' + r.e.who) : null, ' ', h('span.chip.tiny' + (SC.of(r.e) === 'personal' ? '' : '.acc'), SC.LABEL[SC.of(r.e)])))); }
       else if (r.s.mins >= 30) tl.append(h('div.tl-i', { style: { opacity: .75 } }, h('div.mono.tiny.faint', `${r.s.start}–${r.s.end}`), h('div.small.faint', `빈 시간 ${Math.floor(r.s.mins / 60) ? Math.floor(r.s.mins / 60) + '시간 ' : ''}${r.s.mins % 60 ? (r.s.mins % 60) + '분' : ''}`)));
     }
 

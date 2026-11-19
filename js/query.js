@@ -1,5 +1,6 @@
 // 비서에게 물어보는 말 → 기기 안 데이터에서 답 찾기
 import * as db from './db.js';
+import * as SC from './scope.js';
 import * as store from './store.js';
 import * as brain from './brain.js';
 
@@ -55,12 +56,14 @@ export async function answer(q, base = new Date()) {
     }
   }
   if (/(일정|스케줄|약속|회의\s*언제|미팅)/.test(q)) {
-    const [a, b, label] = r || [today, ymd(addD(base, 6)), '앞으로 7일'];
-    const all = await db.list('events');
+    const [a, b, label0] = r || [today, ymd(addD(base, 6)), '앞으로 7일'];
+    // "개인 일정", "팀 일정"처럼 물으면 그쪽만
+    const want = /개인|내\s*개인|사적/.test(q) ? 'personal' : /팀|업무|회사/.test(q) ? 'work' : ''; const label = label0 + (want ? ' ' + SC.LABEL[want] + ' 쪽' : '');
+    const all = (await db.list('events')).filter(e => !want || SC.of(e) === want);
     const out = [];
     for (let d = new Date(a); ymd(d) <= b; d = addD(d, 1)) for (const e of all) if (e.date === ymd(d) || store.repeatsOn(e, ymd(d))) out.push({ ...e, _d: ymd(d) });
     out.sort((x, y) => (x._d + (x.start || '')).localeCompare(y._d + (y.start || '')));
-    return { text: out.length ? `${label} 일정 ${out.length}개예요.` : `${label}에는 일정이 없어요.`, items: out.map(e => ({ icon: 'calendar', title: e.title, sub: `${e._d.slice(5).replace('-', '/')} ${e.start || '종일'}${e.place ? ' · ' + e.place : ''}`, route: 'calendar/' + e._d })) };
+    return { text: out.length ? `${label} 일정 ${out.length}개예요.` : `${label}에는 일정이 없어요.`, items: out.map(e => ({ icon: 'calendar', title: e.title, sub: `${e._d.slice(5).replace('-', '/')} ${e.start || '종일'}${e.place ? ' · ' + e.place : ''}${e.who ? ' · ' + e.who : ''} · ${SC.LABEL[SC.of(e)]}`, route: 'calendar/' + e._d })) };
   }
   if (/(할\s*일|할일|투두|todo|해야\s*할|마감)/i.test(q)) {
     let ts = await store.openTasks();
