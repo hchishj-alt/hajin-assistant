@@ -20,12 +20,12 @@ export default {
     const sec = (title, iconName, ...kids) => h('div.card', { style: { marginBottom: '14px' }, id: 'sec-' + iconName }, h('div.card-h', h('h3', ic(iconName), title)), ...kids);
 
     root.append(
-      sec('나', 'user', h('div.grid.g2', h('label.f', '부를 이름', nameIn), h('label.f', '하루 집중 목표(시간)', goalIn))),
+      sec('나', 'user', h('div.grid.g2', h('label.f', '부를 이름', nameIn))),
       sec('화면 · 색 조합', 'palette',
         h('div.row', { style: { marginBottom: '12px' } }, seg([['auto', '시스템 따라'], ['light', '밝게'], ['dark', '어둡게']], theme, async v => { await db.kvSet('theme', v); await applyTheme(v); go('settings'); })),
         await palettePicker()),
       await labelSection(),
-      sec('알림', 'bell', h('p.small.muted', '일정 10분 전(일정마다 바꿀 수 있어요)과 집중 타이머 끝을 알려요. 폰에서는 홈 화면에 설치한 뒤 켜 주세요.'),
+      sec('알림', 'bell', h('p.small.muted', '일정 10분 전(일정마다 바꿀 수 있어요)을 알려요. 폰에서는 홈 화면에 설치한 뒤 켜 주세요.'),
         h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm', { onclick: async () => { const r = await Notification?.requestPermission?.(); toast(r === 'granted' ? '알림을 켰어요' : '알림이 꺼져 있어요. 브라우저 설정에서 허용해 주세요.'); } }, '알림 켜기'), h('span.chip', 'Notification' in window ? (Notification.permission === 'granted' ? '켜짐' : '꺼짐') : '지원 안 함'))),
       await syncSection(params[0] === 'sync'),
       await extSection(params[0] === 'ext'),

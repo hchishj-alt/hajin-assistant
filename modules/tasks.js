@@ -19,7 +19,7 @@ export default {
       await store.commit('task', { ...p.data, title: p.data.title.replace(/[!！]?중요/g, '').trim(), project: p.data.project || tags[0] || proj || '', est: 30 });
       quick.value = ''; clear(hint); toast('추가했어요'); draw();
     });
-    root.append(head('할 일 · 집중', '직접 적은 할 일은 바로 확정돼요. 비서가 뽑은 건 확인 대기함으로 가요.',
+    root.append(head('할 일', '직접 적은 할 일은 바로 확정돼요. 비서가 뽑은 건 확인 대기함으로 가요.',
       h('button.btn.sm', { onclick: autoPlan }, ic('sparkles', 14), '오늘 빈 시간에 배치'),
       h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '할 일')),
       h('div.quick', { style: { marginBottom: '6px' } }, ic('plus'), quick), hint, body);
@@ -42,7 +42,7 @@ export default {
         tile('check2', open.length, '남은 할 일'), tile('flag', dueToday, '오늘 마감', dueToday ? 'warn' : ''), tile('clock', overdue, '밀린 일', overdue ? 'bad' : 'ok'), tile('timer', `${Math.floor(mins / 60)}h ${mins % 60}m`, '오늘 작업 시간', 'ok')));
       const projects = [...new Set(all.map(t => t.project).filter(Boolean))];
       body.append(h('div.row.between', { style: { marginBottom: '10px' } },
-        seg([['today', '오늘'], ['upcoming', '예정'], ['all', '전체'], ['done', '완료'], ...(hasTeam ? [['team', '팀']] : []), ['focus', '집중'], ['log', '시간 기록']], view, v => { view = v; draw(); }),
+        seg([['today', '오늘'], ['upcoming', '예정'], ['all', '전체'], ['done', '완료'], ...(hasTeam ? [['team', '팀']] : []), ['log', '시간 기록']], view, v => { view = v; draw(); }),
         projects.length && !['focus', 'log'].includes(view) ? h('select.in', { style: { width: 'auto' }, onchange: e => { proj = e.target.value; draw(); } }, h('option', { value: '' }, '모든 프로젝트'), projects.map(p => h('option', { value: p, selected: p === proj }, p))) : null));
       if (view === 'focus') return body.append(await focusView());
       if (view === 'log') return body.append(await logView(logs));
