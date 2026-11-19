@@ -209,15 +209,28 @@ ${calendarTable(today)}
 }
 
 // 캘린더·할 일 화면의 한 줄 입력처럼 종류가 정해진 곳에서 쓴다.
-// AI가 같은 종류로 읽은 항목이 있으면 그걸, 없거나 늦으면 규칙이 읽은 값을 그대로 돌려준다.
-export async function readOne(kind, text, rule) {
+// AI가 같은 종류로 읽은 항목들을 돌려준다. 못 읽었거나 늦으면 null.
+export async function readOne(kind, text, rule, ms = 12000) {
   const clean = d => Object.fromEntries(Object.entries(d).filter(([k]) => !k.startsWith('_')));
-  if (!(await enabled())) return [clean(rule.data)];
+  if (!(await enabled())) return null;
   try {
     const store = await import('./store.js'); const d = new Date();
     const people = [...new Set([...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean))];
-    const got = await refine(text, [rule], { today: new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10), people, projects: (await db.list('projects')).map(x => x.name), ms: 6000 });
+    const got = await refine(text, [rule], { today: new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10), people, projects: (await db.list('projects')).map(x => x.name), ms });
     const hit = (got || []).filter(x => x.kind === kind);
-    return hit.length ? hit.map(x => clean(x.data)) : [clean(rule.data)];
-  } catch { return [clean(rule.data)]; }
+    return hit.length ? hit.map(x => clean(x.data)) : null;
+  } catch { return null; }
+}
+// 한 줄 입력은 규칙이 읽은 값으로 바로 저장해 기다리지 않게 하고, AI가 읽은 뒤 조용히 고쳐 준다.
+// 그 사이 사용자가 손댔으면(updatedAt이 바뀜) 건드리지 않는다. 바뀐 게 있으면 true.
+export async function polishSaved(kind, text, rule, saved, { patch, add, fix = d => d }) {
+  const list = await readOne(kind, text, rule); if (!list) return false;
+  const cur = await db.get(saved.id); if (!cur || cur.deleted || cur.updatedAt !== saved.updatedAt) return false;
+  const KEYS = kind === 'task' ? ['title', 'due', 'time', 'who', 'priority', 'scope', 'memo'] : ['title', 'date', 'endDate', 'start', 'end', 'who', 'place', 'area', 'scope', 'repeat', 'memo'];
+  const a = fix(Object.fromEntries(KEYS.filter(k => list[0][k] !== undefined).map(k => [k, list[0][k]])));
+  const differ = ks => ks.some(k => a[k] !== undefined && (a[k] || '') !== (cur[k] || ''));
+  if (differ(Object.keys(a))) await patch(cur.id, a);
+  let changed = differ(['title', 'due', 'date', 'endDate', 'time', 'start', 'end', 'who', 'place']); // 눈에 보이는 게 바뀌었을 때만 알림
+  for (const d of list.slice(1)) { await add(fix(d)); changed = true; }
+  return changed;
 }

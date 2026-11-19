@@ -16,9 +16,14 @@ export default {
       const v = quick.value.trim();
       const p = brain.interpret('할일: ' + v)[0];
       const tags = brain.parseTags(v);
-      quick.value = ''; clear(hint); quick.disabled = true; const AI = await import('../js/ai.js'); if (await AI.enabled()) toast('AI가 읽고 있어요');
-      let n = 0; try { for (const d of await AI.readOne('task', v, p)) { await store.commit('task', { ...d, title: d.title.replace(/#\S+/g, '').replace(/[!！]?중요/g, '').trim() || p.data.title, project: d.project || tags[0] || proj || '', est: 30 }); n++; } } finally { quick.disabled = false; quick.focus(); }
-      toast(n > 1 ? `${n}개 추가했어요` : '추가했어요'); draw();
+      const tidy = t => String(t || '').replace(/#\S+/g, '').replace(/[!！]?중요/g, '').trim();
+      const first = await store.commit('task', { ...p.data, title: tidy(p.data.title) || p.data.title, project: p.data.project || tags[0] || proj || '', est: 30 });
+      // 오늘 탭에서 넣었는데 마감이 뒤면 목록에서 안 보이니, 어디로 갔는지 알려 줌
+      const say = (t, lead) => { const far = t.due && t.due > todayStr() && view === 'today'; toast(`${far ? (lead ? lead + ' · 예정 탭' : '예정 탭에 넣었어요') : (lead || '추가했어요')}${t.due ? ` · 마감 ${fmtDate(t.due)}` : ''}`, far ? { label: '보기', fn: () => { view = 'upcoming'; draw(); } } : undefined); };
+      quick.value = ''; clear(hint); say(first); draw();
+      // 바로 넣어 두고, AI가 읽은 뒤 마감·제목이 다르면 조용히 고침. 여러 가지를 한 줄에 썼으면 나눠 줌
+      const fix = d => ({ ...d, ...(d.title !== undefined ? { title: tidy(d.title) || first.title } : {}) });
+      import('../js/ai.js').then(AI => AI.polishSaved('task', v, p, first, { fix, patch: (id, a) => store.commit('task', { id, ...a }), add: d => store.commit('task', { ...d, project: d.project || first.project || '', est: 30 }) })).then(async ch => { if (!ch) return; say((await db.get(first.id)) || first, 'AI가 다시 읽고 다듬었어요'); if (location.hash.startsWith('#/tasks')) draw(); }).catch(() => { });
     });
     root.append(head('할 일', '직접 적은 할 일은 바로 확정돼요. 비서가 뽑은 건 확인 대기함으로 가요.',
       h('button.btn.sm', { onclick: autoPlan }, ic('sparkles', 14), '오늘 빈 시간에 배치'),
@@ -45,7 +50,6 @@ export default {
       body.append(h('div.row.between', { style: { marginBottom: '10px' } },
         seg([['today', '오늘'], ['upcoming', '예정'], ['all', '전체'], ['done', '완료'], ...(hasTeam ? [['team', '팀']] : []), ['log', '시간 기록']], view, v => { view = v; draw(); }),
         projects.length && !['focus', 'log'].includes(view) ? h('select.in', { style: { width: 'auto' }, onchange: e => { proj = e.target.value; draw(); } }, h('option', { value: '' }, '모든 프로젝트'), projects.map(p => h('option', { value: p, selected: p === proj }, p))) : null));
-      if (view === 'focus') return body.append(await focusView());
       if (view === 'log') return body.append(await logView(logs));
       if (view === 'team') return body.append(teamView(every.filter(t => t.team && (!proj || t.project === proj))));
       let xs = all.filter(t => !proj || t.project === proj);

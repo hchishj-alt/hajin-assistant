@@ -18,9 +18,10 @@ export default {
     quick.addEventListener('keydown', async e => {
       if (e.key !== 'Enter' || e.isComposing || !quick.value.trim()) return;
       const v = quick.value.trim(); const p = brain.interpret('일정: ' + v)[0];
-      quick.value = ''; quick.disabled = true; const AI = await import('../js/ai.js'); if (await AI.enabled()) toast('AI가 읽고 있어요');
-      let ev; try { for (const d of await AI.readOne('event', v, p)) ev = await db.put('events', d); } finally { quick.disabled = false; quick.focus(); }
-      cursor = new Date(ev.date); toast(`${fmtDate(ev.date)} ${ev.start || '종일'} 추가`); draw();
+      const ev = await db.put('events', p.data);
+      quick.value = ''; cursor = new Date(ev.date); toast(`${fmtDate(ev.date)} ${ev.start || '종일'} 추가`); draw();
+      // 바로 넣어 두고, AI가 읽은 뒤 날짜·시간·사람이 다르면 조용히 고침
+      import('../js/ai.js').then(AI => AI.polishSaved('event', v, p, ev, { patch: (id, a) => db.patch(id, a), add: d => db.put('events', d) })).then(async ch => { if (!ch) return; const now = await db.get(ev.id); toast(`AI가 다시 읽고 다듬었어요: ${fmtDate(now.date)} ${now.start || '종일'}`); if (location.hash.startsWith('#/calendar')) { cursor = new Date(now.date); draw(); } }).catch(() => { });
     });
     root.append(head('캘린더', null,
       h('button.btn.sm.ghost', { onclick: importIcs, title: '구글·애플 캘린더에서 내보낸 .ics 파일 가져오기' }, ic('upload', 14), '.ics 가져오기'),
