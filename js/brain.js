@@ -65,11 +65,15 @@ export function parseWhen(text, base = new Date()) {
       const mon = addD(b, -((b.getDay() + 6) % 7));
       let off = 0;
       const w = (m[1] || '').replace(/\s/g, '');
-      if (/다음주|담주/.test(w)) off = 7; else if (/다다음주|다담주/.test(w)) off = 14; else if (/저번주|지난주/.test(w)) off = -7;
+      if (/다다음주|다담주/.test(w)) off = 14; else if (/다음주|담주/.test(w)) off = 7; else if (/저번주|지난주/.test(w)) off = -7;
+      // "다음주 중 작업 목요일까지"처럼 주 표현이 요일과 떨어져 있어도 같이 읽음
+      let far = null; if (!w && (far = t.match(/(이번\s*주|이번주|금주|다음\s*주|다음주|담주|다담주|다다음\s*주|다다음주)\s*(중에|중으로|중|안에|안으로|내로|내에)?(?=\s|$)/))) { const fw = far[1].replace(/\s/g, ''); off = /다다음주|다담주/.test(fw) ? 14 : /다음주|담주/.test(fw) ? 7 : 0; hits.push(far[0].trim()); }
       date = addD(mon, off + ((target + 6) % 7));
-      if (!w && date < b) date = addD(date, 7);
+      // 주를 말하지 않은 요일이 오늘이거나 지났으면 다음 주 그 요일 (오늘이면 보통 "오늘"이라고 하니까)
+      if (!w && !far && date <= b) date = addD(date, 7);
     }
-    else if ((m = hit(t.match(/(다음\s*주|담주|다음주)/)))) date = addD(addD(b, -((b.getDay() + 6) % 7)), 7);
+    else if ((m = hit(t.match(/(다다음\s*주|다담주)\s*(중에|중으로|중|안에|내로)?(?=\s|$)/)))) date = addD(addD(b, -((b.getDay() + 6) % 7)), 14);
+    else if ((m = hit(t.match(/(다음\s*주|담주|다음주)\s*(중에|중으로|중|안에|내로)?(?=\s|$)/)))) date = addD(addD(b, -((b.getDay() + 6) % 7)), 7);
     else if ((m = hit(t.match(/(이번\s*주말|주말)/)))) date = addD(b, (6 - b.getDay() + 7) % 7);
     else if ((m = hit(t.match(/(이번\s*달|이달)\s*(말|안)/)))) date = new Date(b.getFullYear(), b.getMonth() + 1, 0);
     else if ((m = hit(t.match(/(다음\s*달|담달)\s*(초)?/)))) date = new Date(b.getFullYear(), b.getMonth() + 1, m[2] ? 1 : b.getDate());
@@ -460,7 +464,7 @@ function interpretOne(s, base, ctx) {
   function strip(x, hits) {
     let r = x;
     for (const hh of hits || []) r = r.replace(hh, ' ');
-    return r.replace(/#[\p{L}\p{N}_]+/gu, '').replace(/^(일정|할일|메모)\s*[:：]/, '').replace(/(에|에서|부터|까지)\s*$/, '').replace(/\s*(잡아\s*줘|추가해\s*줘|등록해\s*줘|넣어\s*줘|기록해\s*줘|저장해\s*줘|해줘|있음|있어|있다)\s*$/, '').replace(/\s+/g, ' ').trim().replace(/^(까지|부터|에서|으로|로|에|은|는|쯤|경)\s+/, '').trim();
+    return r.replace(/#[\p{L}\p{N}_]+/gu, '').replace(/^(일정|할일|메모)\s*[:：]/, '').replace(/(에|에서|부터|까지)\s*$/, '').replace(/\s*(으로|로)?\s*(잡자|잡아\s*줘|잡아줘|잡을게|정하자|추가해\s*줘|등록해\s*줘|넣어\s*줘|기록해\s*줘|저장해\s*줘|해줘|있음|있어|있다)\s*$/, '').replace(/\s+/g, ' ').trim().replace(/^(까지|부터|에서|으로|로|에|은|는|쯤|경)\s+/, '').trim();
   }
 }
 // "서충주 수집오빠랑 충주본색 전시 방문" → 누구랑 수집오빠 · 지역 서충주 · 장소 충주본색 · 제목 충주본색 전시 방문

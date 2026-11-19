@@ -103,3 +103,63 @@ export async function enhance(a, text, { today = '', people = [], meeting = fals
     return true;
   } catch (e) { console.warn('ai', e); return false; }
 }
+
+// ── Gemini가 먼저 읽기 ──
+// 규칙이 읽은 초안(parsed)을 같이 주고, AI가 뜻을 보고 고쳐 쓰게 함. 전화·금액·링크처럼 글자 그대로인 건 규칙 값을 믿고,
+// 날짜·종류·제목·누구랑·장소처럼 뜻을 읽어야 하는 건 AI 값을 씀. 실패하면 null → 규칙 결과 그대로
+const KO = { event: '일정', task: '할 일', expense: '지출', contact: '연락처', idea: '아이디어', note: '메모', vendor: '업체', buy: '살 것', reference: '레퍼런스', sns: 'SNS 아이디어', grant: '지원사업' };
+const isD = v => /^\d{4}-\d{2}-\d{2}$/.test(v || ''), isT = v => /^([01]\d|2[0-3]):[0-5]\d$/.test(v || '');
+function calendarTable(today) {
+  const b = new Date(today + 'T00:00'); const rows = [];
+  for (let i = -7; i <= 27; i++) { const d = new Date(b); d.setDate(b.getDate() + i); const y = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; const wk = Math.floor((i + ((b.getDay() + 6) % 7)) / 7); rows.push(`${y} ${'일월화수목금토'[d.getDay()]}${i === 0 ? ' (오늘)' : ''} [${wk === 0 ? '이번 주' : wk === 1 ? '다음 주' : wk === 2 ? '다다음 주' : wk === -1 ? '지난 주' : wk + '주 뒤'}]`); }
+  return rows.join('\n');
+}
+export async function refine(text, parsed, { today, people = [], projects = [], vendors = [] } = {}) {
+  if (!(await enabled()) || !text || text.trim().length < 4 || text.length > 1500) return null;
+  if ((parsed || []).some(p => p.kind === 'query' || p.kind === 'nav')) return null;
+  const hint = (parsed || []).filter(p => p.kind !== 'talk').map(p => ({ kind: p.kind, ...p.data }));
+  const prompt = `너는 작은 콘텐츠 기획 팀이 쓰는 한국어 업무 비서의 "말 이해" 담당이야. 사용자가 편하게 쓴 말을 읽고 항목으로 정리해 JSON 배열로만 답해.
+
+달력(주는 월요일 시작):
+${calendarTable(today)}
+
+아는 사람: ${people.slice(0, 40).join(', ') || '없음'}
+프로젝트: ${projects.slice(0, 20).join(', ') || '없음'}
+업체: ${vendors.slice(0, 30).join(', ') || '없음'}
+
+항목 모양: {"kind":"event|task|expense|contact|idea|note|vendor|buy|reference|sns|grant","title":"짧은 명사형 제목(날짜·사람·장소·조사는 뺌)","date":"YYYY-MM-DD","endDate":"여러 날이면 끝 날짜","start":"HH:MM","end":"HH:MM","allDay":false,"who":"같이 하는/맡은 사람","place":"가게·건물·전시 이름","area":"동네·도시","scope":"work|personal","priority":"high|normal","project":"","amount":0,"category":"","memo":"제목에 못 담은 조건","repeat":"daily|weekly|monthly|weekdays 또는 빈칸","phone":"","email":"","org":"","url":"","cat":"업체 분야","prices":[{"item":"품목","price":0,"note":""}]}
+없는 칸은 빼거나 빈칸으로 둬.
+
+읽는 법:
+- event: 시간이 정해진 약속·회의·방문·행사·휴가·불참. task: 해야 할 일(date는 마감). 둘 다 있으면 항목을 나눠.
+- "다음주 중 작업, 목요일까지 제출"처럼 주 표현과 요일이 떨어져 있어도 그 주의 요일로 읽어. 주를 말하지 않은 요일은 오늘 이후 가장 가까운 그 요일(오늘과 같은 요일이면 다음 주).
+- 날짜는 반드시 위 달력에서 골라. 계산하지 말고 찾아.
+- "3시"처럼 오전·오후가 없으면 1~7시는 오후로.
+- 사람 이름은 아는 사람 목록의 전체 이름으로 바꿔 써. 목록에 없으면 말한 그대로.
+- scope: 가족·친구·개인 볼일은 personal, 나머지는 work.
+- 말에 없는 내용은 지어내지 마. 뭘 만들 말이 아니면(인사, 감탄, 질문) 빈 배열 [].
+
+규칙이 먼저 읽은 초안(틀렸으면 고쳐 써): ${JSON.stringify(hint).slice(0, 1500)}
+
+사용자 말: ${text}`;
+  let arr; try { const j = await ask(prompt, { json: true, ms: 12000 }); arr = Array.isArray(j) ? j : j.items; } catch (e) { console.warn('ai', e); return null; }
+  if (!Array.isArray(arr)) return null;
+  const out = [];
+  for (const g of arr.slice(0, 8)) {
+    if (!g || !KO[g.kind] || !String(g.title || '').trim()) continue;
+    const base = (parsed || []).find(p => p.kind === g.kind)?.data || {}; const title = String(g.title).trim().slice(0, 80); const S = v => (typeof v === 'string' ? v.trim() : ''); let data;
+    const date = isD(g.date) ? g.date : '';
+    if (g.kind === 'event') data = { ...base, title, date: date || base.date || today, endDate: isD(g.endDate) && g.endDate > (date || '') ? g.endDate : '', start: isT(g.start) ? g.start : g.allDay ? '' : base.start || '', end: isT(g.end) ? g.end : '', who: S(g.who), place: S(g.place), area: S(g.area), scope: g.scope === 'personal' ? 'personal' : 'work', repeat: /^(daily|weekly|monthly|weekdays)$/.test(g.repeat || '') ? g.repeat : '', memo: S(g.memo) || base.memo || '', _dated: !!(date || base.date), _allday: !!g.allDay };
+    else if (g.kind === 'task') data = { ...base, title, due: date || '', time: isT(g.start) ? g.start : '', who: S(g.who), priority: g.priority === 'high' || base.priority === 'high' ? 'high' : 'normal', project: S(g.project) || base.project || '', scope: g.scope === 'personal' ? 'personal' : 'work', memo: S(g.memo) || base.memo || '' };
+    else if (g.kind === 'expense') data = { ...base, title, amount: Number(base.amount) || Number(g.amount) || 0, date: date || base.date || today, category: base.category || S(g.category) || '기타', project: S(g.project) || base.project || '', pay: base.pay || '개인카드' };
+    else if (g.kind === 'contact') data = { ...base, name: base.name && base.phone ? (S(g.title) || base.name) : title, phone: base.phone || S(g.phone), email: base.email || S(g.email), org: S(g.org) || base.org || '', role: base.role || '', memo: S(g.memo) };
+    else if (g.kind === 'vendor') data = { ...base, name: title, cat: S(g.cat) || base.cat || '기타', phone: base.phone || S(g.phone), link: base.link || S(g.url), kakao: base.kakao || '', memo: S(g.memo) || base.memo || '', prices: (base.prices && base.prices.length ? base.prices : (g.prices || []).filter(x => x && x.item).map(x => ({ item: String(x.item).slice(0, 40), price: String(Number(x.price) || ''), note: S(x.note), at: today }))) };
+    else if (g.kind === 'buy') data = { ...base, title, url: base.url || S(g.url), price: Number(base.price) || Number(g.amount) || 0, qty: 1, need: 'must' };
+    else if (g.kind === 'idea' || g.kind === 'note') data = { ...base, title, body: base.body || text, tags: base.tags || [] };
+    else if (g.kind === 'grant') data = { ...base, title, deadline: date || base.deadline || '', status: base.status || '검토', amount: base.amount ?? (Number(g.amount) || null), url: base.url || S(g.url) };
+    else if (g.kind === 'sns') data = { ...base, title, platform: base.platform || '인스타그램', status: base.status || '아이디어', date: date || base.date || '' };
+    else data = { ...base, title, url: base.url || S(g.url) };
+    out.push({ kind: g.kind, label: KO[g.kind], confidence: 0.85, data, src: text, ai: true });
+  }
+  return out.length ? out : (arr.length === 0 ? [] : null);
+}

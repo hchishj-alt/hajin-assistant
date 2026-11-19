@@ -142,13 +142,12 @@ export default {
         } catch (e) { wait.remove(); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `이 링크는 읽지 못했어요. 로그인이 필요하거나 막아 둔 사이트일 수 있어요. 내용을 붙여 넣어 주시면 정리해 드릴게요.` }), new Map()); }
         return; } }
       let parsed = brain.interpret(text, { projects, people, vendors: (await db.list('vendors')).map(v => v.name) });
-      // 규칙으로 잘 모르겠는 말(대화·메모로만 읽힌 것)은 연결해 둔 무료 AI에 한 번 더 물어봄. 결과는 그대로 임시 카드
-      if (parsed.length === 1 && (parsed[0].kind === 'talk' || (parsed[0].kind === 'note' && parsed[0].confidence <= 0.6)) && text.length >= 8) {
-        const AI = await import('../js/ai.js'); const got = await AI.understand(text, { today: todayStr(), people });
-        if (got && !(got.length === 1 && got[0].kind === 'note')) parsed = got.map(g => { const L = { event: '일정', task: '할 일', idea: '아이디어', note: '메모', expense: '지출', contact: '연락처' }[g.kind];
-          const data = g.kind === 'event' ? { title: g.title, date: g.date || '', start: g.start || '', end: g.end || '', who: g.who || '', place: g.place || '', _dated: !!g.date } : g.kind === 'task' ? { title: g.title, due: g.date || '', who: g.who || '', priority: 'normal', project: '' } : g.kind === 'expense' ? { title: g.title, amount: Number(g.amount) || 0, date: g.date || todayStr() } : g.kind === 'contact' ? { name: g.title, memo: '' } : { title: g.title, body: text, tags: brain.keywords(text, 4) };
-          return { kind: g.kind, label: L + ' (AI)', confidence: 0.65, data, src: text }; });
-      }
+      // 키가 연결돼 있으면 Gemini가 먼저 읽음(규칙 초안을 힌트로). 못 읽거나 연결이 없으면 규칙 결과 그대로
+      let byAI = false;
+      if (!parsed.some(p => p.kind === 'query' || p.kind === 'nav') && text.trim().length >= 4) { const AI = await import('../js/ai.js');
+        if (await AI.enabled()) { const wait = h('div.bubble.bot.faint', h('span.spin'), ' AI가 읽고 있어요'); list.append(wait); wait.scrollIntoView({ block: 'end' });
+          const got = await AI.refine(text, parsed, { today: todayStr(), people, projects, vendors: (await db.list('vendors')).map(v => v.name) }); wait.remove();
+          if (got && got.length) { parsed = got; byAI = true; } else if (got && !got.length && parsed.every(p => p.kind === 'talk')) { /* AI도 만들 게 없다고 봄 → 대화로 */ } } }
       const ids = []; const replies = [];
       for (const p of parsed) {
         if (p.kind === 'nav') { const map = { 캘린더: 'calendar', 일정: 'calendar', '할 일': 'tasks', 할일: 'tasks', 회의: 'meetings', 기획: 'plan', 인맥: 'people', 연락처: 'people', 비용: 'money', 지출: 'money', 스타트업: 'startup', SNS: 'studio', 스튜디오: 'studio', 피그마: 'figma', 설정: 'settings', 대기함: 'inbox', '확인 대기함': 'inbox' }; go(map[p.data.to.replace(/\s+/g, ' ')] || 'today'); return; }
@@ -168,7 +167,7 @@ export default {
       }
       if (ids.length) {
         const labels = parsed.filter(p => p.kind !== 'query').map(p => p.label);
-        const msg = await db.put('chat', { role: 'bot', q: text, text: `${[...new Set(labels)].join(' · ')} ${ids.length}개를 임시로 만들었어요. 맞으면 확정해 주세요.`, draftIds: ids });
+        const msg = await db.put('chat', { role: 'bot', q: text, text: `${[...new Set(labels)].join(' · ')} ${ids.length}개를 임시로 만들었어요. 맞으면 확정해 주세요.${byAI ? ' (AI가 읽음)' : ''}`, draftIds: ids });
         await drawMsg(msg, new Map((await store.drafts()).map(d => [d.id, d])));
         updateBadge();
       }

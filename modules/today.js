@@ -32,8 +32,11 @@ export default {
     qi.addEventListener('keydown', async e => {
       if (e.key !== 'Enter' || e.isComposing || !qi.value.trim()) return;
       const v = qi.value.trim();
-      const ps = brain.interpretCapture(v, { projects: await store.projects(), people: [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean) });
+      const projects = await store.projects(), people = [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean);
+      let ps = brain.interpretCapture(v, { projects, people });
       if (ps.some(p => p.kind === 'query' || p.kind === 'nav')) { sessionStorage.setItem('assistant:prefill', v); go('assistant'); return; }
+      qi.value = ''; clear(qp);
+      { const AI = await import('../js/ai.js'); if (await AI.enabled()) { toast('AI가 읽고 있어요'); const d = new Date(); const got = await AI.refine(v, ps, { today: new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10), people, projects, vendors: (await db.list('vendors')).map(x => x.name) }); if (got && got.length) ps = got; } }
       for (const p of ps) await store.draft(p.kind, p.data, { source: p.src || v, confidence: p.confidence, origin: 'quick' });
       qi.value = ''; clear(qp); updateBadge();
       toast(`${ps.map(p => p.label).join(', ')} → 확인 대기함`, { label: '보기', fn: () => go('inbox') });
