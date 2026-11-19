@@ -43,6 +43,8 @@ export async function applyTheme(t) {
   root.setAttribute('data-pal', '1');
   const set = (k, v) => root.style.setProperty(k, v);
   set('--bg', bg); set('--card', card); set('--ink', ink); set('--acc', acc);
+  const L = await (await import('./look.js')).apply({ bg, card, ink, acc, dark }, set, root);
+  if (L.ink) ink = getComputedStyle(root).getPropertyValue('--ink').trim() || ink;
   set('--acc-ink', contrast(acc, '#ffffff') >= contrast(acc, '#111111') ? '#ffffff' : '#111111');
   document.querySelectorAll('meta[name=theme-color]').forEach(m => m.setAttribute('content', bg));
   if (!mqBound) { mqBound = true; matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme()); }

@@ -20,6 +20,7 @@ export const MODULES = [
   { id: 'money', title: '비용 처리', icon: 'wallet', group: '회사', short: '비용' },
   { id: 'radar', title: '지원사업 · 정보 랭킹', icon: 'trend', group: '회사', short: '랭킹' },
   { id: 'startup', title: '스타트업 PM', icon: 'rocket', group: '회사', short: '스타트업' },
+  { id: 'look', title: '꾸미기', icon: 'palette', group: '시스템' },
   { id: 'admin', title: '관리자', icon: 'shield', group: '시스템', adminOnly: true },
   { id: 'settings', title: '설정', icon: 'sliders', group: '시스템' },
   { id: 'health', title: '자가 점검', icon: 'shield', group: '시스템' },
@@ -77,7 +78,8 @@ export async function buildNav() {
   nav.append(h('div.brand', h('img', { src: 'icons/icon.svg', alt: '' }), '하진 비서'));
   nav.append(h('button.searchbtn', { onclick: openPalette }, ic('search', 16), h('span.lbl', '검색·명령'), h('kbd', navigator.platform.includes('Mac') ? '⌘K' : 'Ctrl K')));
   let g = '';
-  for (const m of MODULES.filter(m => !m.hidden && (!m.adminOnly || adm))) {
+  const hid = (await db.kvGet('look', null))?.hidden || [];
+  for (const m of MODULES.filter(m => !m.hidden && !hid.includes(m.id) && (!m.adminOnly || adm))) {
     if (m.group !== g) { g = m.group; nav.append(h('div.grp', g)); }
     const a = h('a.navlink', { href: '#/' + m.id, 'data-nav': m.id }, ic(m.icon), h('span.grow', m.title));
     if (m.id === 'inbox') a.append(h('span.badge#inbox-badge.hide'));
@@ -182,6 +184,7 @@ async function boot() {
   window.addEventListener('unhandledrejection', e => { if (/관리자만|올린 사람과 관리자/.test(e.reason?.message || '')) { toast(e.reason.message); e.preventDefault(); return; } store.logError(e.reason, 'promise'); });
   (await import('./admin.js')).install();
   await applyTheme();
+  if (!location.hash || location.hash === '#/') { const st = (await db.kvGet('look', null))?.start; if (st && st !== 'today' && MODULES.some(m => m.id === st)) history.replaceState(null, '', '#/' + st); }
   await store.loadLearned();
   await buildNav();
   window.addEventListener('hashchange', render);
@@ -197,7 +200,7 @@ async function boot() {
   // 피그마 실시간 감시 (토큰 있을 때만, 바뀐 파일만 다시 읽음)
   import('./figma-api.js').then(async F => { if (await F.getToken()) F.watch(f => { toast(`피그마 "${f.name}"이 바뀌어서 다시 정리했어요`, { label: '보기', fn: () => go('figma/' + f.id) }); updateBadge(); }); }).catch(e => store.logError(e, 'figma'));
   window.addEventListener('hajin:remote', () => {
-    updateBadge();
+    updateBadge(); applyTheme();
     const a = document.activeElement;
     if (document.querySelector('.modal-bg') || (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || document.querySelector('.avail.painting')) return;
     render();

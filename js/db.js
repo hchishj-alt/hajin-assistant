@@ -93,7 +93,7 @@ export async function delBlob(key) { return tx('blobs', 'readwrite', s => req(s.
 // 설정 등 키-값
 export async function kvGet(k, d = null) { const v = await tx('kv', 'readonly', s => req(s.get(k))); return v === undefined ? d : v; }
 // 기기 사이에 같이 맞출 설정 (동기화 켜면 items의 _kv 로 오감)
-export const SYNC_KV = ['name', 'focusGoal', 'brain:learned', 'accent', 'theme', 'palette', 'palTint', 'palAcc'];
+export const SYNC_KV = ['name', 'focusGoal', 'brain:learned', 'accent', 'theme', 'palette', 'palTint', 'palAcc', 'look'];
 export async function kvSet(k, v) {
   await tx('kv', 'readwrite', s => req(s.put(v, k)));
   if (SYNC_KV.includes(k)) await put('_kv', { id: 'kv:' + k, key: k, value: v ?? null });

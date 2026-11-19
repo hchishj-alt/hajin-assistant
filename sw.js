@@ -1,9 +1,9 @@
 // 오프라인 실행 + 자동 업데이트. 배포 때 VERSION을 js/version.js와 같이 올리면 새 버전이 설치돼요.
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const CACHE = 'hajin-' + VERSION;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png',
-  'js/app.js', 'js/ui.js', 'js/db.js', 'js/icons.js', 'js/brain.js', 'js/store.js', 'js/fields.js', 'js/draftcard.js', 'js/query.js', 'js/voice.js', 'js/video.js', 'js/ext.js', 'js/seed.js', 'js/selftest.js', 'js/version.js', 'js/sync.js', 'js/config.js', 'js/figma-api.js', 'js/linkpreview.js', 'js/theme.js', 'js/admin.js', 'js/vendor-supabase.js',
-  ...['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'studio', 'figma', 'archive', 'radar', 'admin', 'people', 'team', 'money', 'startup', 'settings', 'health', 'menu'].map(m => `modules/${m}.js`)];
+  'js/app.js', 'js/ui.js', 'js/db.js', 'js/icons.js', 'js/brain.js', 'js/store.js', 'js/fields.js', 'js/draftcard.js', 'js/query.js', 'js/voice.js', 'js/video.js', 'js/ext.js', 'js/seed.js', 'js/selftest.js', 'js/version.js', 'js/sync.js', 'js/config.js', 'js/figma-api.js', 'js/linkpreview.js', 'js/theme.js', 'js/admin.js', 'js/look.js', 'js/vendor-supabase.js',
+  ...['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'studio', 'figma', 'archive', 'radar', 'admin', 'look', 'people', 'team', 'money', 'startup', 'settings', 'health', 'menu'].map(m => `modules/${m}.js`)];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => { })))));
 });
@@ -31,7 +31,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   // 글꼴 CDN: 받아 두고 재사용
-  if (/cdn\.jsdelivr\.net\/gh\/orioncactus/.test(url.href)) {
+  if (/cdn\.jsdelivr\.net\/gh\/orioncactus|fonts\.(googleapis|gstatic)\.com/.test(url.href)) {
     e.respondWith((async () => { const c = await caches.open('hajin-fonts'); const hit = await c.match(e.request); if (hit) return hit; const r = await fetch(e.request); if (r.ok) c.put(e.request, r.clone()); return r; })());
   }
 });
