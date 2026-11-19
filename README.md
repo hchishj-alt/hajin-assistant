@@ -8,6 +8,7 @@
 - `js/ext.js` — 확장 두뇌 (기기 내 Whisper 음성인식, 소형 언어모델; 선택 다운로드)
 - `js/store.js` — 확인 대기함 흐름: 비서가 만든 건 전부 임시 → 하진이 확정해야 저장
 - `js/selftest.js` + `tests/run.mjs` — 자가 점검 시나리오 (`node tests/run.mjs`)
+- `tests/order.cjs` — 화면 코드에서 값을 만들기 전에 쓰는 순서 문제 찾기 (`node tests/order.cjs`, 푸시 전에 같이 돌림)
 - `figma-plugin/` — 피그마 정리 자체 플러그인 (manifest.json으로 가져오기)
 - `sw.js` — 오프라인 실행·자동 업데이트
 

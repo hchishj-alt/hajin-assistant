@@ -78,13 +78,13 @@ async function conceptView(concepts, redraw) {
     const cv = h('canvas', { style: { width: '100%', maxWidth: '260px', borderRadius: '12px', display: 'block', margin: '0 auto' } });
     const st = structuredClone(c); st.edit = { ...V.EDIT_DEFAULT, ...(st.edit || {}) }; st.sub = st.sub || {}; st.edit.progress = st.edit.progress ? '1' : '';
     let anim = 0; const stopAnim = () => { cancelAnimationFrame(anim); anim = 0; };
+    let logoImg = st.logoKey ? await blobImg(await db.getBlob(st.logoKey)) : null;
+    const upd = () => { if (!anim) previewConcept(cv, st, logoImg); };
     // 움직임·전환·화면 틀이 실제로 어떻게 보이는지 4컷짜리로 돌려 봄
     const playDemo = async () => { stopAnim(); await V.ensureFont(st.font); const [W, H] = V.RATIOS[st.ratio] || V.RATIOS['9:16']; const g = cv.getContext('2d'); const len = Math.min(2.2, Math.max(.9, st.edit.cut || 1.6)), n = 4, t0 = performance.now(); let last = -1;
       const tick = () => { if (!cv.isConnected) return stopAnim(); const T = (performance.now() - t0) / 1000; if (T >= len * n) { anim = 0; upd(); return; } const idx = Math.floor(T / len), local = T - idx * len; if (idx !== last) { last = idx; if (idx && st.edit.sfxCut) V.playSfx(st.edit.sfxCut, .4); }
         g.setTransform(1 / 3, 0, 0, 1 / 3, 0, 0); V.drawFrame(g, sample(idx), W, H, st, { ...V.motionAt(st, { type: 'image' }, local, len, idx), t: Math.floor(T * 24) }); V.transitionAt(g, W, H, st, local, idx); V.drawOverlay(g, W, H, st, { T, total: len * n, idx, n }); V.drawSubtitle(g, ['오늘 하루 시작', '자막은 이렇게 나와요', '컷이 바뀔 때마다', '끝!'][idx], W, H, st, 1, local); anim = requestAnimationFrame(tick); };
       anim = requestAnimationFrame(tick); };
-    let logoImg = st.logoKey ? await blobImg(await db.getBlob(st.logoKey)) : null;
-    const upd = () => { if (!anim) previewConcept(cv, st, logoImg); };
     const rng = (label, key, min, max, step) => { const i = h('input', { type: 'range', min, max, step, value: st.look[key] ?? 0, style: { width: '100%' }, oninput: () => { st.look[key] = +i.value; upd(); } }); return h('label.f', label, i); };
     const looks = h('div.chips', Object.keys(V.LOOKS).map(n => h('button.chip', { onclick: () => { st.look = { ...V.LOOKS[n] }; close(); edit({ ...st, look: st.look }); } }, n)));
     const inp = (label, key, type = 'text', obj = st) => { const i = h('input.in', { type, value: obj[key] ?? '', oninput: () => { obj[key] = type === 'number' ? +i.value : i.value; upd(); } }); return h('label.f', label, i); };

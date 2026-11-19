@@ -59,11 +59,11 @@ async function loadFeed() {
 
 export default {
   async render(root) {
-    const body = h('div');
+    const body = h('div'); let feed = { items: [] }, curRank = []; /* 글을 불러오는 동안 버튼을 눌러도 되게 먼저 만들어 둠 */
     root.append(head('지원사업 · 정보 랭킹', '매일 아침 새 글을 모아서, 우리 회사 기준으로 시급성·유익성·우선순위 점수를 매겨요.',
       h('button.btn.sm.ghost', { onclick: howto }, ic('book', 14), '?'),
       h('button.btn.sm.pri', { onclick: () => add() }, ic('plus', 14), '링크 넣기')), body);
-    const feed = await loadFeed(); let curRank = [];
+    feed = await loadFeed();
     await draw();
     widget();
 

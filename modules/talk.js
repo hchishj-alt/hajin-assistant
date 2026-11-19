@@ -34,6 +34,8 @@ export default {
       if (!other) { pane.append(h('div.empty', ic('msg', 26), h('p', '왼쪽에서 대화할 사람을 골라요.'))); return; }
       wrap.classList.add('open');
       const ms = all.filter(d => d.other === other.id);
+      const ta = h('textarea', { rows: 1, placeholder: `${other.name} 님에게 전할 말`, 'aria-label': '메시지' });
+      const send = async (text = ta.value) => { text = text.trim(); if (!text) return; ta.value = ''; try { await sync.dmSend(other.id, text); await draw(true); } catch (e) { toast(e.message); ta.value = text; } };
       const log = h('div.talk-log');
       let day = '';
       for (const d of ms) {
@@ -43,8 +45,6 @@ export default {
         if (!d.mine && !d.handled) log.append(await assist(d, other));
       }
       if (!ms.length) log.append(h('div.empty', `${other.name} 님에게 전할 말을 아래에 적어 보세요.`));
-      const ta = h('textarea', { rows: 1, placeholder: `${other.name} 님에게 전할 말`, 'aria-label': '메시지' });
-      const send = async (text = ta.value) => { text = text.trim(); if (!text) return; ta.value = ''; try { await sync.dmSend(other.id, text); await draw(true); } catch (e) { toast(e.message); ta.value = text; } };
       ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
       ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; });
       pane.append(h('div.talk-h', h('button.btn.sm.icon.ghost.talk-back', { 'aria-label': '목록', onclick: () => { open = ''; wrap.classList.remove('open'); go('talk'); } }, ic('left', 16)), h('span.avatar', { style: { background: colorFor(other.name), width: '30px', height: '30px', fontSize: '12px' } }, other.name.slice(-2, -1) || other.name[0]), h('b', other.name), h('span.faint.tiny', other.role || '')),

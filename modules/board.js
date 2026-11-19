@@ -65,6 +65,7 @@ async function canvas(root, id) {
   tools.addEventListener('pointerdown', e => { if (document.activeElement?.isContentEditable) e.preventDefault(); }); // 글 고치는 중에 도구를 눌러도 편집이 안 끊기게
   const chatList = h('div.mm-chat-list'); const chatIn = h('input', { placeholder: '말하거나 적어요', 'aria-label': '대화 입력' });
   const live = h('div.mm-live.hide');
+  let room = null; function hi() { room?.send({ t: 'hi', name: myName, sel }); } /* 화면이 다 뜨기 전에 눌러도 되게 먼저 만들어 둠 */
   const peersEl = h('div.mm-peers');
   const micBtn = h('button.mm-mic', { 'aria-label': '음성 대화', title: '음성 대화 (말한 내용이 대화에 쌓여요)', onclick: toggleVoice }, ic('mic', 18));
   const autoBtn = h('button.mm-switch' + (auto ? '.on' : ''), { role: 'switch', 'aria-checked': auto, title: '켜면 말하거나 적은 내용이 알맞은 자리에 노드로 그려져요. 이상하게 그려지면 꺼 두세요.', onclick: async () => { auto = !auto; autoBtn.classList.toggle('on', auto); autoBtn.setAttribute('aria-checked', auto); await db.patch(id, { voiceAuto: auto }); toast(auto ? '이제 대화가 노드로 그려져요' : '대화는 기록만 하고 노드는 직접 그려요'); } }, h('i'), h('span', '대화 → 노드'));
@@ -82,8 +83,7 @@ async function canvas(root, id) {
   await load(); fit();
   // 실시간: 즉시 전달(방) + 저장 동기화(변경 알림) 둘 다
   const sync = await import('../js/sync.js');
-  const room = board.team ? sync.room('board-' + id, onRoom) : null;
-  const hi = () => room?.send({ t: 'hi', name: myName, sel });
+  room = board.team ? sync.room('board-' + id, onRoom) : null;
   hi(); const hiT = setInterval(() => { hi(); const now = Date.now(); for (const [k, v] of peers) if (now - v.at > 45000) peers.delete(k); drawPeers(); }, 15000);
   const offDb = db.onChange((col, item) => { if (col !== 'bnodes' || item.board !== id) return; applyRemote(item); });
   const onKey = e => {

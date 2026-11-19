@@ -30,6 +30,25 @@ export default {
       list,
       h('div.composer', sug, projBar, recBar, h('div.box', ta, micBtn, sendBtn), preview));
 
+    // 아래 값들은 지난 대화를 그리는 동안에도 쓰이므로, 기다리는 일(await)보다 먼저 만들어 둠
+    // 일정에 빠진 필수 정보(날짜·시간)와 누구랑·어디서를 되물어 채움
+    const ASK = {
+      day: ['무슨 요일이에요?', ['월요일', '화요일', '수요일', '목요일', '금요일', '아직 몰라']],
+      date: ['언제예요?', ['오늘', '내일', '이번 주 토요일', '아직 몰라']],
+      time: ['몇 시예요?', ['오전 10시', '오후 2시', '저녁 7시', '종일']],
+      more: ['누구랑, 어디서 하는지도 알려 주면 채워 둘게요.', ['없어']],
+      who: ['누구랑 가요?', ['혼자', '팀이랑']],
+    };
+    const staticCard = d => h('div.draft' + (d.status === 'approved' ? '.done' : '.gone'), { 'data-did': d.id }, h('div.k', ic(store.KINDS[d.kind]?.icon || 'file')), h('div.grow', h('div.small', { style: { fontWeight: 650 } }, d.data.title || d.data.name), h('div.faint.tiny', d.status === 'approved' ? '확정됨' : '버림')));
+    // 되묻는 중에 온 말이 답이 아니라 새로 적는 말인지 (예: "몇 시예요?"에 "점심 9000원")
+    const looksNew = (text, k, ctx) => { const ps = brain.interpret(text, ctx); if (!ps.length) return false; if (ps.length > 1) return true; const p = ps[0];
+      if (['expense', 'income', 'contact', 'vendor', 'query', 'reference', 'buy', 'nav', 'timelog'].includes(p.kind)) return true;
+      const w = brain.parseWhen(text); const rest = w.hits.reduce((x, hh) => x.replace(hh, ' '), text).replace(/(쯤|경|정도|일\s*듯|인\s*듯|같아요?|이요|부터|까지|으로|로|에|이야|야|예요|이에요|요|해|하자|할게|일걸|쯤이야)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+      if (k === 'date' || k === 'time') return (p.kind === 'task' || p.kind === 'event' || p.kind === 'note') && rest.length >= 5 && !/^(아직|몰라|미정|나중에|종일|하루\s*종일)/.test(rest);
+      return (p.kind === 'task' || p.kind === 'event') && w.hits.length > 0 && rest.length >= 4; };
+    const missing = (data, src) => { if (data.endDate && data.endDate > (data.date || '')) return []; const w = brain.parseWhen(src || ''); const need = []; if ((!w.date || w.vague) && !data._dated) need.push('date'); if (!data.start && !data._allday && !/(오전|오후|아침|저녁|밤|점심|새벽|종일|하루\s*종일)/.test(src || '')) need.push('time'); if (!data._asked && ((!data.who && !data.place && !data.area) || (!data.who && /(방문|관람|구경|저녁|점심|식사|약속|영화|여행|나들이|데이트|모임)/.test(data.title || '')))) need.push(data.place || data.area ? 'who' : 'more'); return need; };
+    let recorder = null, timer = 0;
+
     // 기존 대화
     const msgs = (await db.list('chat')).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-60);
     if (!msgs.length) list.append(botBubble(h('div', h('p', '안녕하세요 하진님. 이렇게 말해 보세요.'), h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, ['"다음 주 화요일 2시 홍대 촬영"', '"어도비 구독 3만7천원 결제"', '"홍길동 010-1234-5678 디자이너"', '"오늘 일정 보여줘"', '회의나 생각을 길게 말하면 요약·키워드·할 일로 정리해요'].map(x => h('li.small', x))))));
@@ -75,14 +94,6 @@ export default {
       scrollDown();
     }
 
-    // 일정에 빠진 필수 정보(날짜·시간)와 누구랑·어디서를 되물어 채움
-    const ASK = {
-      day: ['무슨 요일이에요?', ['월요일', '화요일', '수요일', '목요일', '금요일', '아직 몰라']],
-      date: ['언제예요?', ['오늘', '내일', '이번 주 토요일', '아직 몰라']],
-      time: ['몇 시예요?', ['오전 10시', '오후 2시', '저녁 7시', '종일']],
-      more: ['누구랑, 어디서 하는지도 알려 주면 채워 둘게요.', ['없어']],
-      who: ['누구랑 가요?', ['혼자', '팀이랑']],
-    };
     // 되묻는 동안에도 임시 카드를 같이 보여 줌(첫 물음에 한 번). 답이 올 때마다 그 카드를 새로 그림
     async function askNext(d, need, lead = '', carded = false) {
       const k = need[0]; await refreshCards([d.id]);
@@ -93,14 +104,6 @@ export default {
       await drawMsg(await db.put('chat', { role: 'bot', text: `${lead}${lead ? ' ' : ''}“${d.data.title}” ${week ? week + ' ' : ''}${A[0]}`, chips: A[1].map(x => ({ label: x, say: x })), draftIds: carded ? [] : [d.id] }), new Map([[d.id, await db.get(d.id)]]));
     }
     async function refreshCards(ids) { for (const id of ids || []) { const els = list.querySelectorAll(`.draft[data-did="${id}"]`); if (!els.length) continue; const d = await db.get(id); if (!d) continue; els.forEach(el => el.replaceWith(d.status === 'pending' ? draftCard(d, () => updateBadge()) : staticCard(d))); } }
-    const staticCard = d => h('div.draft' + (d.status === 'approved' ? '.done' : '.gone'), { 'data-did': d.id }, h('div.k', ic(store.KINDS[d.kind]?.icon || 'file')), h('div.grow', h('div.small', { style: { fontWeight: 650 } }, d.data.title || d.data.name), h('div.faint.tiny', d.status === 'approved' ? '확정됨' : '버림')));
-    // 되묻는 중에 온 말이 답이 아니라 새로 적는 말인지 (예: "몇 시예요?"에 "점심 9000원")
-    const looksNew = (text, k, ctx) => { const ps = brain.interpret(text, ctx); if (!ps.length) return false; if (ps.length > 1) return true; const p = ps[0];
-      if (['expense', 'income', 'contact', 'vendor', 'query', 'reference', 'buy', 'nav', 'timelog'].includes(p.kind)) return true;
-      const w = brain.parseWhen(text); const rest = w.hits.reduce((x, hh) => x.replace(hh, ' '), text).replace(/(쯤|경|정도|일\s*듯|인\s*듯|같아요?|이요|부터|까지|으로|로|에|이야|야|예요|이에요|요|해|하자|할게|일걸|쯤이야)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
-      if (k === 'date' || k === 'time') return (p.kind === 'task' || p.kind === 'event' || p.kind === 'note') && rest.length >= 5 && !/^(아직|몰라|미정|나중에|종일|하루\s*종일)/.test(rest);
-      return (p.kind === 'task' || p.kind === 'event') && w.hits.length > 0 && rest.length >= 4; };
-    const missing = (data, src) => { if (data.endDate && data.endDate > (data.date || '')) return []; const w = brain.parseWhen(src || ''); const need = []; if ((!w.date || w.vague) && !data._dated) need.push('date'); if (!data.start && !data._allday && !/(오전|오후|아침|저녁|밤|점심|새벽|종일|하루\s*종일)/.test(src || '')) need.push('time'); if (!data._asked && ((!data.who && !data.place && !data.area) || (!data.who && /(방문|관람|구경|저녁|점심|식사|약속|영화|여행|나들이|데이트|모임)/.test(data.title || '')))) need.push(data.place || data.area ? 'who' : 'more'); return need; };
     async function answerAsk(pend, text) {
       const d = await db.get(pend.id); if (!d || d.status !== 'pending') { await db.kvSet('chat:ask', null); return false; }
       const k = pend.need[0]; const w = brain.parseWhen(text); const skip = /^(없어|없음|몰라|아직|미정|모름|나중에|건너|패스|스킵|그냥|됐어|아니|혼자)/.test(text.trim()); const data = { ...d.data }; let lead = '';
@@ -259,7 +262,6 @@ export default {
       toast('대화를 지웠어요.', { label: '되돌리기', fn: async () => { for (const m of all) await db.put('chat', { ...m, deleted: false }); clear(list); const pend = new Map((await store.drafts()).map(d => [d.id, d])); for (const m of all.sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-60)) await drawMsg(m, pend, false); scrollDown(); } }); }
 
     // 음성
-    let recorder = null, timer = 0;
     async function toggleMic() {
       if (recorder?.running) { const r = await recorder.stop(); clearInterval(timer); recBar.classList.add('hide'); micBtn.classList.remove('rec'); if (r.text.trim()) send(r.text.trim(), 'voice'); else toast('알아들은 말이 없어요'); return; }
       if (!hasSpeech()) { toast('이 브라우저는 실시간 받아쓰기를 지원하지 않아요. 회의록 메뉴에서 녹음 후 받아쓰기를 써 주세요.'); return; }
