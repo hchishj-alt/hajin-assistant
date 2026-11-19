@@ -34,7 +34,8 @@ export async function approve(d, edited) {
   const k = KINDS[d.kind];
   let saved = null;
   if (k && k.col) {
-    const payload = { ...data };
+    const payload = Object.fromEntries(Object.entries(data).filter(([key]) => !key.startsWith('_'))); // 되묻기용 임시 표시는 저장하지 않음
+    if (data._allday) payload.allDay = true;
     if (d.kind === 'idea') payload.type = 'idea';
     if (d.kind === 'note') payload.type = payload.type || 'note';
     if (d.kind === 'task') payload.done = false;

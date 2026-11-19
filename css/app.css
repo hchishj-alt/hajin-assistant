@@ -795,3 +795,18 @@ button.vd-n:hover b{color:var(--acc)}
 .pk[aria-pressed=false] .pk-c{transform:scale(0);opacity:0}
 .pk:active img{transform:scale(.95)}
 @media (prefers-reduced-motion:reduce){.pk.in{animation:none;opacity:1;transform:none}}
+
+/* 폰: 숫자 타일은 한 줄로 얇게, 설명은 한 줄만 → 실제 목록이 첫 화면에 보이게 */
+@media (max-width:600px){
+  .tiles{display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px}
+  .tile{display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px;padding:9px 4px;border-radius:calc(14px*var(--rd,1))}
+  .tile .ti{display:none}
+  .tile .tn{font-size:calc(18px*var(--fs,1));white-space:nowrap}
+  .tile .tl{font-size:calc(10.5px*var(--fs,1));line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .tiles:has(.tile:nth-child(5)){grid-auto-flow:row;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .page-head{margin-bottom:12px}
+  .page-head .sub{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;font-size:calc(12.5px*var(--fs,1));margin-top:2px}
+}
+.chips:empty{min-height:0!important;padding:0!important;margin:0!important}
+@media (pointer:coarse){.btn.icon{min-width:36px;min-height:36px}}
+@media (max-width:1200px){.rk .btn.icon,.radar .btn.icon{min-width:36px;min-height:36px}}
