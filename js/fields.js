@@ -10,6 +10,7 @@ export const FIELDS = {
     { k: 'end', label: '끝', type: 'time' },
     { k: 'repeat', label: '반복', type: 'select', options: [['', '안 함'], ['daily', '매일'], ['weekdays', '평일'], ['weekly', '매주'], ['monthly', '매월']] },
     { k: 'remind', label: '알림(분 전)', type: 'number', default: 10 },
+    { k: 'team', label: '공유', type: 'select', options: [['', '나만 보기'], ['team-main', '팀에 공유']] },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
   ],
   task: [
@@ -20,6 +21,7 @@ export const FIELDS = {
     { k: 'est', label: '예상 시간(분)', type: 'number', default: 30 },
     { k: 'project', label: '프로젝트' },
     { k: 'who', label: '담당' },
+    { k: 'team', label: '공유', type: 'select', options: [['', '나만 보기'], ['team-main', '팀에 공유']] },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
   ],
   expense: [
@@ -29,7 +31,8 @@ export const FIELDS = {
     { k: 'category', label: '분류', type: 'select', options: EXP_CAT_LIST },
     { k: 'pay', label: '결제 수단', type: 'select', options: ['개인카드', '법인카드', '현금', '계좌이체'] },
     { k: 'project', label: '프로젝트' },
-    { k: 'status', label: '처리 상태', type: 'select', options: [['todo', '정산 전'], ['submitted', '제출함'], ['done', '정산 완료']], default: 'todo' },
+    { k: 'status', label: '처리 상태', type: 'select', options: [['todo', '정산 전'], ['submitted', '결재 요청'], ['approved', '승인됨'], ['done', '정산 완료']], default: 'todo' },
+    { k: 'team', label: '공유', type: 'select', options: [['', '나만 보기'], ['team-main', '팀에 공유']] },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
   ],
   contact: [

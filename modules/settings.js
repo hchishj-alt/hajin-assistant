@@ -24,16 +24,17 @@ export default {
       sec('화면', 'palette', h('div.row', seg([['auto', '시스템'], ['light', '밝게'], ['dark', '어둡게']], theme, async v => { await db.kvSet('theme', v); applyTheme(v); go('settings'); }), h('label.row.small', '포인트 색', accIn), h('button.btn.sm.ghost', { onclick: async () => { await db.kvSet('accent', null); document.documentElement.style.removeProperty('--acc'); go('settings'); } }, '기본 색'))),
       sec('알림', 'bell', h('p.small.muted', '일정 10분 전(일정마다 바꿀 수 있어요)과 집중 타이머 끝을 알려요. 폰에서는 홈 화면에 설치한 뒤 켜 주세요.'),
         h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm', { onclick: async () => { const r = await Notification?.requestPermission?.(); toast(r === 'granted' ? '알림을 켰어요' : '알림이 꺼져 있어요. 브라우저 설정에서 허용해 주세요.'); } }, '알림 켜기'), h('span.chip', 'Notification' in window ? (Notification.permission === 'granted' ? '켜짐' : '꺼짐') : '지원 안 함'))),
+      await syncSection(params[0] === 'sync'),
       await extSection(params[0] === 'ext'),
       await learnedSection(),
       sec('데이터', 'shield',
         h('p.small.muted', `모든 기록은 이 기기 안에만 있어요. ${est ? `사용 ${(est.usage / 1e6).toFixed(1)}MB` : ''}${persisted ? ' · 자동 삭제 방지 켜짐' : ''}`),
         h('div.row', { style: { marginTop: '8px' } },
           h('button.btn.sm', { onclick: async () => download(`hajin-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(await db.exportAll()), 'application/json') }, ic('download', 14), '백업 (기록만)'),
-          h('button.btn.sm', { onclick: async e => { busy(e.currentTarget, true, '묶는 중'); download(`hajin-backup-full-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(await db.exportAll({ withBlobs: true })), 'application/json'); busy(e.currentTarget, false); } }, ic('download', 14), '백업 (사진·녹음 포함)'),
+          h('button.btn.sm', { onclick: async e => { const btn = e.currentTarget; busy(btn, true, '묶는 중'); download(`hajin-backup-full-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(await db.exportAll({ withBlobs: true })), 'application/json'); busy(btn, false); } }, ic('download', 14), '백업 (사진·녹음 포함)'),
           h('button.btn.sm', { onclick: async () => { const f = await pickFile('.json,application/json'); if (!f) return; try { await db.importAll(JSON.parse(await f.text())); toast('복원했어요'); setTimeout(() => location.reload(), 600); } catch (e) { toast(e.message); } } }, ic('upload', 14), '복원'),
           h('button.btn.sm.ghost.danger', { onclick: async () => { if (!(await confirmBox('모든 기록을 지울까요? 되돌릴 수 없어요. 먼저 백업을 권해요.', '모두 지우기'))) return; indexedDB.deleteDatabase('hajin-assistant'); toast('지웠어요'); setTimeout(() => location.reload(), 600); } }, '모두 지우기')),
-        h('p.faint.tiny', { style: { marginTop: '8px' } }, '폰과 PC를 바꿀 때는 백업 파일로 옮길 수 있어요. 자동 동기화는 다음 단계에서 켜져요.')),
+        h('p.faint.tiny', { style: { marginTop: '8px' } }, '동기화를 켜면 폰과 PC가 자동으로 맞춰져요. 백업 파일은 만약을 위한 사본이에요.')),
       sec('업데이트', 'refresh', h('p.small.muted', '새 버전이 올라오면 앱이 스스로 받아 두고 "업데이트" 알림을 띄워요. 기록은 그대로 남아요.'),
         h('div.row', { style: { marginTop: '8px' } }, h('span.chip', `현재 v${VERSION}`), h('button.btn.sm', { onclick: async () => { const r = await navigator.serviceWorker?.getRegistration(); if (!r) { toast('오프라인 모드가 아직 준비 안 됐어요'); return; } await r.update(); toast(r.waiting || r.installing ? '새 버전을 받는 중이에요' : '최신 버전이에요'); } }, '지금 확인'))),
       sec('폰에 설치', 'phone', h('div.list',
@@ -41,6 +42,7 @@ export default {
         h('div.li', h('b.small', { style: { width: '70px' } }, '안드로이드'), h('span.small', 'Chrome으로 열기 → 메뉴 ⋮ → "앱 설치" 또는 "홈 화면에 추가"')),
         h('div.li', h('b.small', { style: { width: '70px' } }, 'PC'), h('span.small', 'Chrome·Edge 주소창 오른쪽 설치 아이콘')))),
     );
+    if (params[0] === 'sync') setTimeout(() => document.getElementById('sec-sync')?.scrollIntoView({ behavior: 'smooth' }), 100);
     if (params[0] === 'ext') setTimeout(() => document.getElementById('sec-cloud')?.scrollIntoView({ behavior: 'smooth' }), 100);
   },
 };
@@ -85,5 +87,52 @@ async function learnedSection() {
     h('p.small.muted', '확인 대기함에서 고치거나 종류를 바꾸면 여기에 규칙으로 쌓여서 다음부터 반영돼요. 틀린 규칙은 지우면 돼요.'),
     rows.length ? h('div.list', { style: { marginTop: '6px' } }, rows.map(r => h('div.li', h('div.small.grow', r.t), h('button.btn.sm.ghost', { 'aria-label': '지우기', onclick: async e => { r.del(); brain.setLearned(L); await store.saveLearned(); e.target.closest('.li').remove(); } }, ic('x', 13))))) : h('p.faint.small', { style: { marginTop: '6px' } }, '아직 배운 게 없어요'),
     h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm', { onclick: () => modal('규칙 직접 추가', close => form([{ k: 'word', label: '이 말이 들어가면' }, { k: 'kind', label: '이걸로', type: 'select', options: Object.entries(store.KINDS).filter(([, v]) => v.col).map(([k, v]) => [k, v.label]) }], {}, async v => { if (!v.word) return; L.kind[v.word] = v.kind; brain.setLearned(L); await store.saveLearned(); close(); go('settings'); })) }, ic('plus', 14), '규칙 추가')));
+  return box;
+}
+
+// ── 폰·PC 동기화 (Supabase) ──
+async function syncSection(focus) {
+  const sync = await import('../js/sync.js');
+  const box = h('div.card', { style: { marginBottom: '14px', outline: focus ? '2px solid var(--acc)' : '' }, id: 'sec-sync' });
+  const LABEL = { off: ['꺼짐', ''], signedout: ['로그인 필요', 'warn'], idle: ['켜짐', 'ok'], syncing: ['맞추는 중', 'acc'], error: ['문제 있음', 'bad'], offline: ['오프라인', 'warn'] };
+  let off = null;
+  async function draw() {
+    clear(box);
+    const st = sync.getState();
+    const cfg = await sync.config();
+    const [lab, tone] = LABEL[st.status] || ['', ''];
+    box.append(h('div.card-h', h('h3', ic('refresh'), '폰·PC 동기화'), h('span.chip' + (tone ? '.' + tone : ''), lab)),
+      h('p.small.muted', '내 기록은 나만 볼 수 있게 내 Supabase에 사본으로 올라가고, 폰과 PC가 자동으로 맞춰져요. 인터넷이 없어도 기기에서 그대로 쓰고, 연결되면 알아서 맞춰요. 사진·녹음·영상 원본은 기기에만 남아요.'));
+    if (!cfg.url || !cfg.key || focus === 'cfg') {
+      const u = h('input.in', { placeholder: 'https://xxxx.supabase.co', value: cfg.url });
+      const k = h('input.in', { placeholder: 'sb_publishable_… (공개 키)', value: cfg.key });
+      box.append(h('div.grid.g2', { style: { marginTop: '10px' } }, h('label.f', 'Project URL', u), h('label.f', 'Publishable 키', k)),
+        h('p.faint.tiny', { style: { marginTop: '6px' } }, 'secret 키는 절대 넣지 마세요. 공개 키만으로 충분해요.'),
+        h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm.pri', { onclick: async () => { if (!/^https:\/\/.+/.test(u.value.trim()) || !k.value.trim()) { toast('주소와 키를 확인해 주세요'); return; } if (/secret|service_role/i.test(k.value)) { toast('secret 키는 넣으면 안 돼요. publishable 키를 넣어 주세요'); return; } focus = false; await sync.setConfig(u.value, k.value); draw(); } }, '연결'),
+          h('button.btn.sm', { onclick: async () => { const sql = await (await fetch('supabase/setup.sql')).text(); await navigator.clipboard.writeText(sql); toast('서버 설정 SQL을 복사했어요. Supabase SQL Editor에 붙여넣고 Run 하세요'); } }, ic('copy', 14), '서버 설정 SQL 복사')));
+      return;
+    }
+    const me = sync.user();
+    if (!me) {
+      const codeIn = h('input.in', { placeholder: '멤버 코드 (예: AB3CD)', maxlength: 5, autocapitalize: 'characters', autocomplete: 'one-time-code', style: { textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, maxWidth: '220px' } });
+      const go1 = async btn => { busy(btn, true, '들어가는 중'); try { const m = await sync.loginWithCode(codeIn.value); toast(`${m.name} 님, 반가워요. 맞추는 중이에요`); } catch (e) { toast(e.message); } busy(btn, false); draw(); };
+      codeIn.addEventListener('keydown', e => e.key === 'Enter' && go1(e.target.nextSibling));
+      box.append(h('div.row', { style: { marginTop: '10px' } }, codeIn, h('button.btn.sm.pri', { onclick: e => go1(e.currentTarget) }, '로그인'), h('button.btn.sm.ghost', { onclick: () => { focus = 'cfg'; draw(); } }, '서버 바꾸기')),
+        h('p.faint.tiny', { style: { marginTop: '6px' } }, '관리자(하진)가 준 5자리 코드로 들어와요. 폰과 PC에서 같은 코드를 쓰면 기록이 맞춰져요.'));
+      return;
+    }
+    const mm = await sync.me();
+    box.append(h('div.tiles', { style: { margin: '10px 0' } },
+      h('div.tile', h('div.tn', { style: { fontSize: '16px' } }, mm ? `${mm.name}${mm.is_admin ? ' · 관리자' : ''}` : '로그인됨'), h('div.tl', '멤버')),
+      h('div.tile', h('div.tn', st.last ? new Date(st.last).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '–'), h('div.tl', '마지막으로 맞춘 시각')),
+      h('div.tile', h('div.tn', String(st.pushed || 0)), h('div.tl', '방금 올린 것')),
+      h('div.tile', h('div.tn', String(st.pulled || 0)), h('div.tl', '방금 받은 것'))),
+      st.error ? h('p.small', { style: { color: 'var(--bad)' } }, st.error) : null,
+      h('div.row', h('button.btn.sm.pri', { onclick: async e => { const btn = e.currentTarget; busy(btn, true, '맞추는 중'); await sync.syncNow(); busy(btn, false); draw(); } }, ic('refresh', 14), '지금 맞추기'),
+        h('button.btn.sm', { onclick: async () => { const sql = await (await fetch('supabase/setup.sql')).text(); await navigator.clipboard.writeText(sql); toast('서버 설정 SQL을 복사했어요'); } }, ic('copy', 14), '서버 설정 SQL'),
+        h('button.btn.sm.ghost', { onclick: async () => { if (await confirmBox('이 기기에서 로그아웃할까요? 기록은 기기에 그대로 남아요.', '로그아웃')) { await sync.signOut(); draw(); } } }, '로그아웃')));
+  }
+  off = sync.onState(() => { if (!document.body.contains(box)) { off?.(); return; } draw(); });
+  await draw();
   return box;
 }

@@ -2,7 +2,7 @@
 // 설치: Figma 데스크톱 → Plugins → Development → Import plugin from manifest… → 이 폴더의 manifest.json
 figma.showUI(__html__, { width: 360, height: 620, themeColors: true });
 
-const DEFAULT_RE = /^(Frame|Rectangle|Ellipse|Group|Vector|Line|Polygon|Star|Text|Image|Component|Instance|Union|Subtract|Intersect|Exclude|Section|Slice)( \d+)?$/;
+const DEFAULT_RE = /^(Frame|Rectangle|Ellipse|Group|Vector|Line|Polygon|Star|Text|Image|image|Component|Instance|Union|Subtract|Intersect|Exclude|Section|Slice|Mask group|Slide 16:9 -|A4 -)( ?\d+)?$/;
 
 function scope(useSel) {
   if (useSel && figma.currentPage.selection.length) return figma.currentPage.selection;
@@ -99,6 +99,35 @@ const ACTIONS = {
       made++;
     }
     return made ? `이름 앞부분 기준으로 섹션 ${made}개를 만들었어요` : '묶을 만한 프레임이 없어요 (이름 앞부분이 같은 2개 이상)';
+  },
+  // 흩어진 것 모으기: 섹션·프레임 밖 요소를 겹치는 섹션 안으로, 없으면 「정리 대기」 섹션으로 (위치 그대로)
+  gather() {
+    const page = figma.currentPage;
+    const secs = page.children.filter(n => n.type === 'SECTION');
+    const loose = page.children.filter(n => !['SECTION', 'FRAME', 'COMPONENT', 'COMPONENT_SET'].includes(n.type) && 'x' in n);
+    if (!loose.length) return '흩어진 요소가 없어요. 깔끔해요!';
+    let into = 0, wait = 0;
+    const inside = (n, s) => { const cx = n.x + n.width / 2, cy = n.y + n.height / 2; return cx >= s.x && cx <= s.x + s.width && cy >= s.y && cy <= s.y + s.height; };
+    const rest = [];
+    for (const n of loose) {
+      const s = secs.find(s => inside(n, s));
+      if (s) { const ax = n.x, ay = n.y; s.appendChild(n); n.x = ax - s.x; n.y = ay - s.y; into++; } else rest.push(n);
+    }
+    if (rest.length) {
+      let box = page.children.find(n => n.type === 'SECTION' && n.name === '📥 정리 대기');
+      const minX = Math.min(...rest.map(n => n.x)) - 200, minY = Math.min(...rest.map(n => n.y)) - 200;
+      const maxX = Math.max(...rest.map(n => n.x + n.width)) + 200, maxY = Math.max(...rest.map(n => n.y + n.height)) + 200;
+      if (!box) { box = figma.createSection(); box.name = '📥 정리 대기'; box.x = minX; box.y = minY; box.resizeWithoutConstraints(maxX - minX, maxY - minY); }
+      for (const n of rest) { const ax = n.x, ay = n.y; box.appendChild(n); n.x = ax - box.x; n.y = ay - box.y; wait++; }
+    }
+    return `섹션 안으로 ${into}개, 「📥 정리 대기」로 ${wait}개 모았어요`;
+  },
+  // 섹션 이름으로 이름 붙이기: 섹션 바로 아래 기본 이름 레이어 → 섹션이름_번호
+  nameBySection({ useSel }) {
+    const secs = (useSel && figma.currentPage.selection.length ? figma.currentPage.selection : figma.currentPage.children).filter(n => n.type === 'SECTION');
+    let c = 0;
+    for (const s of secs) { const base = s.name.replace(/^(✅|🛠|👀|⏸|📥)\s*/, '').replace(/\s+/g, ''); let i = 1; for (const n of s.children) if (DEFAULT_RE.test(n.name)) { n.name = `${base}_${String(i++).padStart(2, '0')}`; c++; } }
+    return c ? `섹션 이름으로 ${c}개 이름을 붙였어요` : '바꿀 기본 이름이 없어요';
   },
   audit() {
     const fills = {}, fonts = {}; let noStyleText = 0, noStyleFill = 0, total = 0;

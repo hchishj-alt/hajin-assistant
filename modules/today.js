@@ -31,7 +31,7 @@ export default {
     qi.addEventListener('keydown', async e => {
       if (e.key !== 'Enter' || e.isComposing || !qi.value.trim()) return;
       const v = qi.value.trim();
-      const ps = brain.interpret(v, { projects: await store.projects() });
+      const ps = brain.interpret(v, { projects: await store.projects(), people: [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean) });
       if (ps.some(p => p.kind === 'query' || p.kind === 'nav')) { sessionStorage.setItem('assistant:prefill', v); go('assistant'); return; }
       for (const p of ps) await store.draft(p.kind, p.data, { source: p.src || v, confidence: p.confidence, origin: 'quick' });
       qi.value = ''; clear(qp); updateBadge();

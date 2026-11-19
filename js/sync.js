@@ -1,3 +1,310 @@
-// 동기화 자리 (마지막 단계에서 Supabase 연결). 지금은 기기 저장만.
-export const enabled = false;
-export async function syncNow() { return { ok: false, reason: '아직 동기화가 꺼져 있어요' }; }
+// 동기화: 기기 저장(IndexedDB)이 기본, Supabase는 사본.
+// · 내 기록 → items (나만 보임)
+// · 공유한 팀의 팀·팀 일정·시간 조율·응답 → space_items (참여 코드로 들어온 사람끼리)
+// · 바뀐 것만(dirty) 올리고, 서버 시각(server_at) 이후 것만 내려받음. 같은 항목이 양쪽에서 바뀌면 더 나중에 고친 쪽이 이김.
+// · 사진·녹음·영상 원본은 용량 때문에 기기에만 남음.
+import * as db from './db.js';
+import { SUPABASE } from './config.js';
+
+const SHARE_COLS = new Set(['teams', 'events', 'polls', 'pollvotes', 'tasks', 'meetings', 'expenses', 'docs', 'notes', 'figmafiles']);
+const CHUNK = 200;
+let client = null, session = null, channel = null;
+let pushT = null, pullT = null, busy = null, started = false, pendingAgain = false, wired = false;
+const state = { status: 'off', last: null, error: '', pushed: 0, pulled: 0 };
+const subs = new Set();
+const set = p => { Object.assign(state, p); subs.forEach(f => { try { f({ ...state }); } catch { } }); };
+export const onState = f => (subs.add(f), () => subs.delete(f));
+export const getState = () => ({ ...state });
+export const user = () => session?.user || null;
+export const userId = () => session?.user?.id || null;
+
+export async function config() {
+  return { url: (await db.kvGet('sync:url', '')) || SUPABASE.url, key: (await db.kvGet('sync:key', '')) || SUPABASE.key };
+}
+export async function setConfig(url, key) {
+  await db.kvSetRaw('sync:url', (url || '').trim().replace(/\/+$/, ''));
+  await db.kvSetRaw('sync:key', (key || '').trim());
+  if (channel) { try { await client.removeChannel(channel); } catch { } }
+  client = null; session = null; channel = null; started = false;
+  return start();
+}
+
+async function getClient() {
+  if (client) return client;
+  const { url, key } = await config();
+  if (!url || !key) return null;
+  const { createClient } = await import('./vendor-supabase.js');
+  client = createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'hajin-sync-auth', detectSessionInUrl: true } });
+  client.auth.onAuthStateChange((ev, s) => {
+    const was = session?.user?.id;
+    session = s;
+    if (s && s.user.id !== was) { listen(); syncNow(); }
+    if (!s) { set({ status: 'signedout' }); if (channel) { client.removeChannel(channel); channel = null; } }
+  });
+  return client;
+}
+
+// 앱 시작 때 한 번
+export async function start() {
+  if (started) return state;
+  started = true;
+  const c = await getClient().catch(e => { set({ status: 'error', error: e.message }); return null; });
+  if (!c) { set({ status: 'off' }); return state; }
+  const { data } = await c.auth.getSession();
+  session = data.session;
+  if (!session) { set({ status: 'signedout' }); return state; }
+  set({ status: 'idle' });
+  listen();
+  if (!wired) {
+    wired = true;
+    db.onChange((col, item) => { if (item?.dirty && session) schedulePush(); });
+    window.addEventListener('online', () => syncNow());
+    document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && syncNow());
+    setInterval(() => syncNow(), 5 * 60 * 1000);
+  }
+  syncNow();
+  return state;
+}
+
+function listen() {
+  if (!client || !session || channel) return;
+  channel = client.channel('hajin-' + session.user.id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter: `owner=eq.${session.user.id}` }, () => schedulePull())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'space_items' }, () => schedulePull())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'space_members' }, () => schedulePull())
+    .subscribe();
+}
+function schedulePush() { clearTimeout(pushT); pushT = setTimeout(() => syncNow(), 1500); }
+function schedulePull() { clearTimeout(pullT); pullT = setTimeout(() => syncNow(), 700); }
+
+// ── 멤버 코드 로그인 ──
+// 코드 → 서버가 멤버 id 알려줌 → 그 id로 만든 계정에 로그인 (처음이면 계정 자동 생성) → 멤버에 연결 + 팀 공간 자동 참여
+const loginEmail = id => `m-${id}@members.hajin.example.com`;
+const loginPw = (code, id) => `hj-${code}-${id.slice(0, 8)}`;
+export async function loginWithCode(code) {
+  code = String(code || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{3,5}$/.test(code)) throw new Error('멤버 코드는 영문·숫자 5자리 이내예요');
+  const c = await getClient(); if (!c) throw new Error('서버 연결 설정이 아직 없어요');
+  const { data: m, error: e1 } = await c.rpc('check_code', { p_code: code });
+  if (e1) throw new Error(koErr(e1.message));
+  const mem = Array.isArray(m) ? m[0] : m;
+  if (!mem?.id) throw new Error('멤버 코드가 맞지 않아요');
+  const email = loginEmail(mem.id), password = loginPw(code, mem.id);
+  let { error } = await c.auth.signInWithPassword({ email, password });
+  if (error && /Invalid login/i.test(error.message)) {
+    const r = await c.auth.signUp({ email, password });
+    if (r.error) throw new Error(koErr(r.error.message));
+    if (!r.data.session) throw new Error('Supabase에서 이메일 확인(Confirm email)을 꺼 주세요');
+  } else if (error) throw new Error(koErr(error.message));
+  const { data: me, error: e2 } = await c.rpc('claim_member', { p_code: code });
+  if (e2) { await c.auth.signOut(); throw new Error(koErr(e2.message)); }
+  const info = Array.isArray(me) ? me[0] : me;
+  await db.kvSetRaw('me:member', info);
+  const curName = await db.kvGet('name', '하진');
+  if (!curName || curName === '하진') await db.kvSet('name', info.name.length === 3 ? info.name.slice(1) : info.name);
+  await afterLogin();
+  return info;
+}
+export async function me() { return session ? await db.kvGet('me:member', null) : null; }
+export async function isAdmin() { return !!(await me())?.is_admin; }
+export async function listMembers() {
+  const { data, error } = await client.rpc('list_members');
+  if (error) throw new Error(koErr(error.message));
+  return (data || []).map(x => (typeof x === 'string' ? JSON.parse(x) : x));
+}
+export async function saveMember(m) {
+  const { data, error } = await client.rpc('admin_save_member', { p_id: m.id || null, p_code: m.code, p_name: m.name, p_role: m.role || '', p_gmail: m.gmail || '', p_is_admin: !!m.is_admin, p_active: m.active !== false });
+  if (error) throw new Error(/duplicate|unique/i.test(error.message) ? '이미 쓰는 코드예요' : koErr(error.message));
+  return data;
+}
+export function newCode() {
+  const A = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  const r = crypto.getRandomValues(new Uint8Array(5));
+  return [...r].map(x => A[x % A.length]).join('');
+}
+// 팀원 이름 (공유 팀 공간의 멤버)
+export async function teammates() {
+  const sp = await db.kvGet('sync:spaces', []);
+  const out = new Map();
+  sp.forEach(s => s.members.forEach(m => out.set(m.user, m.name)));
+  return [...out].map(([user, name]) => ({ user, name }));
+}
+
+// ── 로그인 (이메일, 예비) ──
+export async function signUp(email, password) {
+  const c = await getClient(); if (!c) throw new Error('먼저 Supabase 주소와 키를 넣어 주세요');
+  const { data, error } = await c.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } });
+  if (error) throw new Error(koErr(error.message));
+  if (!data.session) return { confirm: true };
+  await afterLogin(); return { confirm: false };
+}
+export async function signIn(email, password) {
+  const c = await getClient(); if (!c) throw new Error('먼저 Supabase 주소와 키를 넣어 주세요');
+  const { error } = await c.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(koErr(error.message));
+  await afterLogin();
+}
+async function afterLogin() {
+  const { data } = await client.auth.getSession(); session = data.session;
+  started = false; await start();
+}
+export async function signOut() {
+  if (!client) return;
+  await client.auth.signOut(); session = null; await db.kvSetRaw('me:member', null); set({ status: 'signedout' });
+}
+function koErr(m = '') {
+  if (/Invalid login/i.test(m)) return '이메일이나 비밀번호가 맞지 않아요';
+  if (/not confirmed/i.test(m)) return '메일함에서 가입 확인 링크를 먼저 눌러 주세요';
+  if (/already registered|already exists/i.test(m)) return '이미 가입된 이메일이에요. 로그인해 주세요';
+  if (/at least 6/i.test(m)) return '비밀번호는 6자 이상이어야 해요';
+  if (/Failed to fetch|NetworkError/i.test(m)) return '인터넷 연결을 확인해 주세요';
+  if (/Could not find the function|function .* does not exist/i.test(m)) return '서버 설정이 아직 안 됐어요 (SQL 실행 필요)';
+  if (/row-level security|violates/i.test(m)) return '등록된 멤버만 쓸 수 있어요. 관리자에게 코드를 받아 주세요';
+  if (/relation .* does not exist|schema cache/i.test(m)) return '서버 테이블이 아직 없어요. 설정의 SQL을 Supabase에서 한 번 실행해 주세요';
+  return m;
+}
+
+// ── 한 번 맞추기: 내려받기 → 올리기 ──
+export async function syncNow() {
+  if (!session || !client) return state;
+  if (busy) { pendingAgain = true; return busy; }
+  if (!navigator.onLine) { set({ status: 'offline' }); return state; }
+  busy = (async () => {
+    set({ status: 'syncing', error: '' });
+    try {
+      const pulled = await pull();
+      const pushed = await push();
+      set({ status: 'idle', last: new Date().toISOString(), pulled, pushed });
+      if (pulled) window.dispatchEvent(new CustomEvent('hajin:remote', { detail: { pulled } }));
+    } catch (e) {
+      set({ status: 'error', error: koErr(e.message || String(e)) });
+    } finally {
+      busy = null;
+      if (pendingAgain) { pendingAgain = false; schedulePull(); }
+    }
+    return state;
+  })();
+  return busy;
+}
+
+async function teamSpaces() {
+  const teams = await db.list('teams', { includeDeleted: true });
+  const m = {}; teams.forEach(t => t.space && (m[t.id] = t.space));
+  return m;
+}
+// 이 항목이 어느 팀 공간으로 가야 하는지 (없으면 개인)
+export function spaceFor(it, tmap) {
+  if (!SHARE_COLS.has(it.col)) return null;
+  if (it.col === 'teams') return it.space || null;
+  return (it.team && tmap[it.team]) || null;
+}
+const row = it => { const { dirty, ...data } = it; return { id: it.id, col: it.col, data, deleted: !!it.deleted, updated_at: it.updatedAt || new Date().toISOString() }; };
+
+async function push() {
+  const dirty = await db.dirtyItems();
+  if (!dirty.length) return 0;
+  const tmap = await teamSpaces();
+  const mine = [], shared = [];
+  for (const it of dirty) {
+    const sp = spaceFor(it, tmap);
+    if (sp) shared.push({ ...row(it), space: sp }); else mine.push({ ...row(it), owner: session.user.id });
+  }
+  for (let i = 0; i < mine.length; i += CHUNK) {
+    const { error } = await client.from('items').upsert(mine.slice(i, i + CHUNK), { onConflict: 'owner,id' });
+    if (error) throw error;
+  }
+  for (let i = 0; i < shared.length; i += CHUNK) {
+    const { error } = await client.from('space_items').upsert(shared.slice(i, i + CHUNK), { onConflict: 'space,id' });
+    if (error) throw error;
+  }
+  // 올리는 동안 또 고친 건 dirty 유지
+  for (const it of dirty) {
+    const cur = await db.get(it.id);
+    if (cur && cur.updatedAt === it.updatedAt && cur.dirty) await db.putRaw({ ...cur, dirty: false });
+  }
+  return dirty.length;
+}
+
+async function apply(r, space) {
+  r = { ...r, updated_at: new Date(r.updated_at).toISOString() }; // 서버 형식(+00:00) → 앱 형식(Z)
+  const cur = await db.get(r.id);
+  if (cur && (cur.updatedAt || '') > r.updated_at) return false; // 내 쪽이 더 최근 (나중에 고친 쪽이 이김)
+  if (cur && !cur.dirty && cur.updatedAt === r.updated_at && !!cur.deleted === r.deleted) return false;
+  const item = { ...r.data, id: r.id, col: r.col, deleted: r.deleted, updatedAt: r.updated_at, dirty: false };
+  if (space && r.col === 'teams') { item.space = space; if (cur?.sharedMembers) item.sharedMembers = cur.sharedMembers; }
+  await db.putRaw(item);
+  if (r.col === '_kv' && item.key) await db.kvSetRaw(item.key, item.deleted ? null : item.value);
+  return true;
+}
+
+async function pullTable(table, filterCol, filterVal, curKey, space) {
+  let cursor = await db.kvGet(curKey, '1970-01-01T00:00:00Z'), n = 0;
+  for (; ;) {
+    let q = client.from(table).select('id,col,data,deleted,updated_at,server_at').gt('server_at', cursor).order('server_at', { ascending: true }).limit(500);
+    if (filterCol) q = q.eq(filterCol, filterVal);
+    const { data, error } = await q;
+    if (error) throw error;
+    for (const r of data) if (await apply(r, space)) n++;
+    if (data.length) { cursor = data[data.length - 1].server_at; await db.kvSetRaw(curKey, cursor); }
+    if (data.length < 500) break;
+  }
+  return n;
+}
+
+async function pull() {
+  let n = await pullTable('items', 'owner', session.user.id, 'sync:cur:' + session.user.id, null);
+  // 내가 속한 팀 공간
+  const { data: mem, error } = await client.from('space_members').select('space,user_id,name,spaces(id,name,code)').order('joined_at');
+  if (error) throw error;
+  const spaces = {};
+  for (const m of mem) { const s = spaces[m.space] ||= { id: m.space, name: m.spaces?.name, code: m.spaces?.code, members: [] }; s.members.push({ user: m.user_id, name: m.name || '팀원' }); }
+  await db.kvSetRaw('sync:spaces', Object.values(spaces));
+  try { const { data: ros } = await client.rpc('list_members'); if (ros) await db.kvSetRaw('sync:roster', ros.map(x => (typeof x === 'string' ? JSON.parse(x) : x)).filter(x => x.active).map(x => ({ name: x.name, role: x.role, gmail: x.gmail, user: x.user_id }))); } catch { }
+  for (const s of Object.values(spaces)) {
+    if (!s.members.some(m => m.user === session.user.id)) continue;
+    n += await pullTable('space_items', 'space', s.id, 'sync:cur:space:' + s.id, s.id);
+    // 팀 기록에 공간 멤버·코드 붙이기 (기기 표시용, 올리지 않음)
+    for (const t of (await db.list('teams')).filter(t => t.space === s.id)) {
+      const same = JSON.stringify(t.sharedMembers || []) === JSON.stringify(s.members) && t.code === s.code;
+      if (!same) { await db.putRaw({ ...t, sharedMembers: s.members, code: s.code }); n++; }
+    }
+  }
+  return n;
+}
+
+// ── 팀 공유 ──
+export async function shareTeam(team) {
+  if (!session) throw new Error('먼저 설정에서 동기화 로그인을 해 주세요');
+  const me = await db.kvGet('name', '하진');
+  const { data, error } = await client.rpc('create_space', { p_name: team.name, p_my_name: me });
+  if (error) throw new Error(koErr(error.message));
+  const s = Array.isArray(data) ? data[0] : data;
+  await db.put('teams', { ...team, space: s.id, code: s.code });
+  // 이미 있던 팀 일정·조율·할 일도 공간으로 올림
+  for (const col of ['events', 'polls', 'pollvotes', 'tasks']) for (const x of await db.list(col)) if (x.team === team.id) await db.put(col, x);
+  await syncNow();
+  return s.code;
+}
+export async function joinTeam(code) {
+  if (!session) throw new Error('먼저 설정에서 동기화 로그인을 해 주세요');
+  const me = await db.kvGet('name', '하진');
+  const { data, error } = await client.rpc('join_space', { p_code: code, p_my_name: me });
+  if (error) throw new Error(koErr(error.message));
+  const s = Array.isArray(data) ? data[0] : data;
+  await syncNow();
+  return s;
+}
+export async function leaveTeam(team) {
+  if (!session || !team.space) return;
+  await client.from('space_members').delete().eq('space', team.space).eq('user_id', session.user.id);
+  for (const col of ['teams', 'events', 'polls', 'pollvotes', 'tasks']) for (const x of await db.list(col)) if (x.id === team.id || x.team === team.id) await db.putRaw({ ...x, deleted: true, dirty: false });
+}
+
+export const enabled = () => !!session;
+// 공유를 끈 항목: 팀 공간에서는 지운 것으로 표시 (내 쪽 기록은 그대로)
+export async function unshare(it) {
+  if (!session || !it?.team) return;
+  const sp = spaceFor(it, await teamSpaces());
+  if (!sp) return;
+  await client.from('space_items').upsert([{ ...row({ ...it, deleted: true }), space: sp }], { onConflict: 'space,id' });
+}

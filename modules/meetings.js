@@ -85,7 +85,7 @@ async function newMeeting(root) {
 
 // 회의 분석 → 요약은 임시(확인 대기), 할 일·일정도 임시
 export async function analyze(m) {
-  const people = [...(m.attendees || '').split(/[,，\s]+/).filter(Boolean), ...(await db.list('contacts')).map(c => c.name)];
+  const people = [...(m.attendees || '').split(/[,，\s]+/).filter(Boolean), ...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())];
   const a = brain.analyzeNotes(m.transcript || '', { people, base: new Date(m.date || Date.now()) });
   const stars = [...(m.transcript || '').matchAll(/★\[([\d:]+) 중요\]\s*([^★]{0,120})/g)].map(x => `${x[1]} ${x[2].trim()}`);
   if (stars.length) a.summary = [...stars.map(s => '★ ' + s), ...a.summary];
@@ -126,6 +126,7 @@ async function detail(root, id) {
   root.append(head(m.title, [fmtDate(m.date || m.createdAt), m.attendees, m.project, m.seconds ? fmtSec(m.seconds) : ''].filter(Boolean).join(' · '),
     h('button.btn.sm.ghost', { onclick: exportMd }, ic('download', 14), '내보내기'),
     h('button.btn.sm.ghost', { onclick: copyShare }, ic('copy', 14), '공유용 복사'),
+    (await db.get('team-main')) ? h('button.btn.sm' + (m.team ? '.pri' : '.ghost'), { title: '팀원도 이 회의록을 봐요 (녹음 원본은 기기에만)', onclick: async () => { if (m.team) await (await import('../js/sync.js')).unshare(m).catch(() => { }); await db.patch(id, { team: m.team ? '' : 'team-main', by: m.by || (await db.kvGet('name', '')) }); toast(m.team ? '나만 보기로 바꿨어요' : '팀에 공유했어요'); go('meetings/' + id); } }, ic('users', 14), m.team ? '팀 공유 중' : '팀에 공유') : null,
     h('button.btn.sm.ghost.danger', { onclick: async () => { if (await confirmBox('회의록을 지울까요?', '지우기')) { await db.remove(id); go('meetings'); } } }, ic('trash', 14))),
     h('div.grid.g2', h('div.stack', sumCard, dCard), h('div.card', h('div.card-h', h('h3', ic('file'), '받아쓴 내용'), h('div.row', sttBtn, reBtn, saveBtn)), audio ? h('audio', { controls: true, src: URL.createObjectURL(audio), style: { width: '100%', marginBottom: '10px' } }) : null, ta)));
 

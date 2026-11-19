@@ -28,28 +28,38 @@ async function load(id) {
   return cache[id];
 }
 
-let current = null, cleanup = null;
+let current = null, cleanup = null, lastHash = '';
 export function go(route) { const h = '#/' + route; if (location.hash === h) render(); else location.hash = h; }
 function parse() {
   const [id, ...rest] = (location.hash.replace(/^#\/?/, '') || 'today').split('/');
   return { id: MODULES.some(m => m.id === id) ? id : 'today', params: rest.map(decodeURIComponent) };
 }
 
+let seq = 0;
 async function render() {
+  const my = ++seq;
   const { id, params } = parse();
   const view = document.getElementById('view');
   markNav(id);
   try { cleanup && cleanup(); } catch { }
   cleanup = null;
   const mod = await load(id).catch(e => { store.logError(e, 'load:' + id); return null; });
+  if (my !== seq) return; // 더 새 화면 요청이 왔으면 이건 버림
+  const sameView = current === id && location.hash === lastHash;
+  const keepY = sameView ? window.scrollY : 0;
+  lastHash = location.hash;
   clear(view);
-  view.classList.remove('enter'); void view.offsetWidth; view.classList.add('enter');
-  if (!mod) { view.append(h('div.empty', '화면을 불러오지 못했어요. 새로고침해 주세요.')); return; }
+  // 화면마다 새 상자: 늦게 끝난 이전 화면이 새 화면에 섞이지 않게
+  const page = h('div.page');
+  view.append(page);
+  if (!sameView) { view.classList.remove('enter'); void view.offsetWidth; view.classList.add('enter'); }
+  if (!mod) { page.append(h('div.empty', '화면을 불러오지 못했어요. 새로고침해 주세요.')); return; }
   current = id;
-  try { cleanup = (await mod.render(view, params)) || null; }
-  catch (e) { console.error(e); store.logError(e, 'render:' + id); view.append(h('div.card', h('h3', '이 화면에서 문제가 생겼어요'), h('p.muted.small', String(e.message)), h('p.faint.tiny', '자가 점검 메뉴에 기록해 뒀어요.'))); }
+  try { const c = (await mod.render(page, params)) || null; if (my === seq) cleanup = c; else { try { c && c(); } catch { } } }
+  catch (e) { console.error(e); store.logError(e, 'render:' + id); page.append(h('div.card', h('h3', '이 화면에서 문제가 생겼어요'), h('p.muted.small', String(e.message)), h('p.faint.tiny', '자가 점검 메뉴에 기록해 뒀어요.'))); }
+  if (my !== seq) return;
   view.focus({ preventScroll: true });
-  window.scrollTo(0, 0);
+  window.scrollTo(0, keepY);
 }
 export function refresh() { render(); }
 
@@ -182,6 +192,16 @@ async function boot() {
   db.persist();
   setupSW();
   setInterval(tickReminders, 60 * 1000); tickReminders();
+  // 동기화 (설정에서 로그인했을 때만). 다른 기기·팀원이 바꾼 게 오면 입력 중이 아닐 때 화면 새로 그림
+  import('./sync.js').then(s => s.start()).catch(e => store.logError(e, 'sync'));
+  // 피그마 실시간 감시 (토큰 있을 때만, 바뀐 파일만 다시 읽음)
+  import('./figma-api.js').then(async F => { if (await F.getToken()) F.watch(f => { toast(`피그마 "${f.name}"이 바뀌어서 다시 정리했어요`, { label: '보기', fn: () => go('figma/' + f.id) }); updateBadge(); }); }).catch(e => store.logError(e, 'figma'));
+  window.addEventListener('hajin:remote', () => {
+    updateBadge();
+    const a = document.activeElement;
+    if (document.querySelector('.modal-bg') || (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || document.querySelector('.avail.painting')) return;
+    render();
+  });
   if (!(await db.kvGet('onboarded', false))) { await db.kvSet('onboarded', true); (await import('./seed.js')).welcome(); }
 }
 boot();

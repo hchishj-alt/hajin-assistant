@@ -32,7 +32,7 @@ export const MEETING_EXPECT = { decisions: 1, actionsMin: 3, who: ['창훈', '�
 export function run() {
   const results = [];
   for (const [input, kind, fields] of CASES) {
-    const r = B.interpret(input, { base: BASE })[0];
+    const r = B.interpret(input, { base: BASE, people: ['최민서', '안서연'] })[0];
     const fails = [];
     if (!r) fails.push('해석 없음');
     else {
@@ -63,6 +63,8 @@ export const EXTRA = [
 ];
 CASES.push(...EXTRA);
 CASES.push(
+  ['민서 금요일까지 전투 밸런스 수정', 'task', { who: '민서', title: '전투 밸런스 수정', due: '2026-11-20' }],
+  ['서연님한테 포스터 시안 부탁', 'task', { who: '서연', title: '포스터 시안 부탁' }],
   ['매주 화요일 7시 스터디', 'event', { repeat: 'weekly', start: '19:00', title: '스터디' }],
   ['12/24 크리스마스 파티', 'event', { date: '2026-12-24' }],
   ['30분 동안 이메일 정리했음', 'timelog', { minutes: 30 }],

@@ -230,7 +230,7 @@ export function findAssignee(s, people = []) {
   const names = [...(people || []), ...(learned.people || [])].filter(Boolean);
   for (const n of names) if (s.includes(n)) return n;
   // 성 빼고 이름만 불러도 알아듣기 (김민서 → 민서)
-  for (const n of names) if (/^[가-힣]{3}$/.test(n) && new RegExp(n.slice(1) + '(님|씨|이|가|이가|한테|에게)?[\\s,]').test(s + ' ')) return n.slice(1);
+  for (const n of names) if (/^[가-힣]{3}$/.test(n) && new RegExp(n.slice(1) + '(님한테|님께|님에게|님이|님|씨|이|가|이가|한테|에게|께)?[\\s,]').test(s + ' ')) return n.slice(1);
   const m = s.match(/([가-힣]{2,4})(?:님|씨|이가|가|이)\s*(?:이|가)?\s*(?:맡|담당|하기로|해\s*주|준비|정리|만들|보내|작성|해오)/);
   if (m && !STOP.has(m[1]) && !/^(우리|저희|제가|내가|그게|이게|이거|그거|다음|이번)$/.test(m[1])) return m[1];
   if (/(제가|내가|저는|나는)\s*/.test(s) && ACTION.test(s)) return '나';
@@ -239,12 +239,13 @@ export function findAssignee(s, people = []) {
 
 export function cleanTask(s, who = '') {
   let r = tidy(s);
-  if (who && who !== '나') r = r.replace(new RegExp(who + '(님|씨)?(이가|이|가|은|는|께서)?\\s*'), '');
+  if (who && who !== '나') r = r.replace(new RegExp(who + '(님|씨)?(이가|이|가|은|는|께서|한테|에게|께)?\\s*'), '');
   r = r.replace(/(다음\s*주|이번\s*주|담주|다다음\s*주)?\s*[월화수목금토일]요일/g, ' ')
     .replace(/(오늘|내일|모레|글피|다음\s*주|이번\s*주|\d+월\s*\d+일|\d{1,2}\/\d{1,2}|오전|오후|저녁|아침|\d+시(\s*반|\s*\d+분)?)(까지|에|부터)?/g, ' ')
     .replace(/\s(까지|에)\s/g, ' ')
     .replace(/(제가|내가|저는|나는|우리가|저희가)\s*/g, '')
-    .replace(/[.!~]+$/, '').replace(/\s+/g, ' ').trim();
+    .replace(/[.!~]+$/, '').replace(/\s+/g, ' ').trim()
+    .replace(/^(까지|부터|에)\s+/, '');
   // 끝말을 "~하기" 꼴로
   r = r.replace(/(\S+?)하?(해\s*주세요|해\s*줘|해\s*주라|하기로\s*\S*|해야\s*\S*|할\s*것|합시다|하자|할게요?|해요|했어요|합니다)$/, (m, a) => a + (/하$/.test(a) ? '기' : '하기'))
     .replace(/(\S+?)[어아]?\s*(주세요|줘|주라|드리기|드려요|드릴게요)$/, '$1기')
@@ -365,7 +366,7 @@ function interpretOne(s, base, ctx) {
     const cleanTitle = strip(body, bw.hits);
     switch (kind) {
       case 'event': { const rep = /매일|날마다/.test(body) ? 'daily' : /평일마다|매\s*평일|평일\s*매일/.test(body) ? 'weekdays' : /매주|주마다/.test(body) ? 'weekly' : /매달|매월|달마다/.test(body) ? 'monthly' : ''; return { kind, label: rep ? '반복 일정' : '일정', confidence: bw.time ? 0.9 : 0.7, data: { repeat: rep, title: cleanTitle.replace(/(매일|날마다|평일마다|매\s*평일|매주|주마다|매달|매월|달마다)\s*/g, '').trim() || '일정', date: bw.date || ymd(base), start: bw.time || '', end: bw.end || '', place: placeOf(body), tags } }; }
-      case 'task': return { kind, label: '할 일', confidence: 0.75, data: { title: cleanTask(cleanTitle) || cleanTitle || body, due: bw.date || '', time: isDeadline(body) ? '' : (bw.time || ''), priority: /(급|급함|asap|ASAP|중요|빨리|꼭|반드시|!!)/.test(body) ? 'high' : 'normal', project: projectOf(body, ctx), tags } };
+      case 'task': { const who0 = findAssignee(body, ctx.people || []); const who = who0 === '나' ? '' : who0; return { kind, label: '할 일', confidence: 0.75, data: { who, title: cleanTask(cleanTitle, who) || cleanTitle || body, due: bw.date || '', time: isDeadline(body) ? '' : (bw.time || ''), priority: /(급|급함|asap|ASAP|중요|빨리|꼭|반드시|!!)/.test(body) ? 'high' : 'normal', project: projectOf(body, ctx), tags } }; }
       case 'expense': { const amt = parseMoney(body) || 0; return { kind, label: '지출', confidence: 0.85, data: { title: strip(body.replace(/(\d+(?:\.\d+)?\s*만\s*(\d+\s*천)?\s*원?|\d[\d,]*\s*원|₩\s*[\d,]+)/g, ''), bw.hits).replace(/(법인\s*카드|회사\s*카드|개인\s*카드|카드|현금|계좌\s*이체)/g, '').replace(/(결제|샀다|샀어|썼다|썼어|지출|냈다|냈어|했다)\s*$/, '').replace(/\s+/g, ' ').trim() || '지출', amount: amt, date: bw.date || ymd(base), category: guessCategory(body), project: projectOf(body, ctx), pay: /(법인|회사|팀)\s*카드/.test(body) ? '법인카드' : /(현금)/.test(body) ? '현금' : '개인카드' } }; }
       case 'contact': { const ph = parsePhone(body), em = parseEmail(body); let name = body.replace(ph ? /(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/ : /$^/, '').replace(em || /$^/, '').replace(/(번호|전화|연락처|이메일|메일|저장|추가|해줘|해 줘)/g, ' ').trim(); const nm = (name.match(/[가-힣]{2,4}|[A-Za-z]+(?:\s[A-Za-z]+)?/) || [''])[0]; const rest = name.replace(nm, '').replace(/\s+/g, ' ').trim(); return { kind, label: '연락처', confidence: 0.85, data: { name: nm, phone: ph || '', email: em || '', org: (rest.match(/([가-힣A-Za-z0-9]+)\s*(회사|대표|팀장|매니저|PD|디자이너|교수|님)?/) || [''])[0], memo: rest, tags } }; }
       case 'reference': return { kind, label: '레퍼런스', confidence: 0.8, data: { title: strip(body.replace(/https?:\/\/\S+/g, ''), []) || (parseUrls(body)[0] || '레퍼런스'), url: parseUrls(body)[0] || '', tags: tags.length ? tags : keywords(body.replace(/레퍼런스|참고/g, ''), 4) } };

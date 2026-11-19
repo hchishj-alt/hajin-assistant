@@ -1,0 +1,30 @@
+# 무료 유지 장치: Supabase 무료 프로젝트가 7일 동안 안 쓰면 잠드는 걸 막아요.
+# 매일 한 번 서버를 살짝 깨우고, 일주일에 한 번 기록을 남겨서 GitHub 예약 작업도 꺼지지 않게 해요. (공개 저장소는 무료)
+name: keepalive
+on:
+  schedule:
+    - cron: '17 18 * * *'   # 매일 한국 시간 새벽 3:17
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Supabase 깨우기
+        run: |
+          URL=$(grep -oP "url:\s*'\K[^']+" js/config.js || true)
+          KEY=$(grep -oP "key:\s*'\K[^']+" js/config.js || true)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "아직 서버 설정 없음"; exit 0; fi
+          curl -sS -o /dev/null -w "%{http_code}\n" -X POST "$URL/rest/v1/rpc/check_code" \
+            -H "apikey: $KEY" -H "Content-Type: application/json" -d '{"p_code":"PING0"}'
+      - name: 주간 기록 (예약 작업이 꺼지지 않게)
+        if: github.event.schedule && (github.run_number % 7 == 0)
+        run: |
+          date -u +%FT%TZ > .github/heartbeat
+          git config user.name "keepalive-bot"
+          git config user.email "keepalive@users.noreply.github.com"
+          git add .github/heartbeat
+          git commit -m "keepalive" || exit 0
+          git push

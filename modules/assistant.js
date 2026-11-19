@@ -68,7 +68,7 @@ export default {
 
     async function handle(text, origin) {
       const projects = await store.projects();
-      const people = (await db.list('contacts')).map(c => c.name).filter(Boolean);
+      const people = [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean);
       // 길게 쓰거나 말한 건 → 원문은 메모로 저장(내가 쓴 거라 확정), 요약·할 일은 임시
       const nSent = brain.sentences(text).length;
       const long = text.length > 220 || (origin === 'voice' && text.length > 90) || (text.length > 100 && nSent >= 3 && !text.includes('\n')) || text.split('\n').length > 6;
@@ -85,7 +85,7 @@ export default {
         updateBadge();
         return;
       }
-      const parsed = brain.interpret(text, { projects });
+      const parsed = brain.interpret(text, { projects, people: [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean) });
       const ids = []; const replies = [];
       for (const p of parsed) {
         if (p.kind === 'nav') { const map = { 캘린더: 'calendar', 일정: 'calendar', '할 일': 'tasks', 할일: 'tasks', 회의: 'meetings', 기획: 'plan', 인맥: 'people', 연락처: 'people', 비용: 'money', 지출: 'money', 스타트업: 'startup', SNS: 'studio', 스튜디오: 'studio', 피그마: 'figma', 설정: 'settings', 대기함: 'inbox', '확인 대기함': 'inbox' }; go(map[p.data.to.replace(/\s+/g, ' ')] || 'today'); return; }

@@ -19,14 +19,16 @@ textarea{width:100%;height:90px;font-size:11px}
 <header><b>하진 정리</b><p id="info">불러오는 중…</p></header>
 <main>
   <label><input type="checkbox" id="sel"> 선택한 것만 (안 고르면 현재 페이지 전체)</label>
+  <div class="card"><h3>흩어진 것 모으기 <button class="pri" data-a="gather">실행</button></h3><p>섹션 밖 이미지·텍스트를 겹치는 섹션 안으로, 없으면 「📥 정리 대기」 섹션으로. 위치는 그대로예요.</p></div>
+  <div class="card"><h3>섹션 이름으로 이름 붙이기 <button class="pri" data-a="nameBySection">실행</button></h3><p>섹션 안 "image 6767" 같은 이름 → "전투UI_01". 앱에서 찾기 쉬워져요.</p></div>
   <div class="card"><h3>레이어 이름 정리 <button class="pri" data-a="rename">실행</button></h3><p>"Frame 12", "Rectangle 3" 같은 기본 이름을 내용 기준으로 바꿔요. (Button/확인, Card/제목, Text/…)</p></div>
   <div class="card"><h3>프레임 정렬 <button class="pri" data-a="arrange">실행</button></h3><div class="row"><label>한 줄 <input id="per" type="number" value="6" style="width:52px"></label><label>간격 <input id="gap" type="number" value="120" style="width:64px"></label><label><input id="sort" type="checkbox" checked> 이름순</label></div></div>
   <div class="card"><h3>이름별 섹션 묶기 <button class="pri" data-a="section">실행</button></h3><p>"Login/01", "Login/02"처럼 앞부분이 같은 프레임을 섹션으로.</p></div>
   <div class="card"><h3>빈 그룹 지우기 <button data-a="cleanup">실행</button></h3><label><input id="hid" type="checkbox"> 숨긴 레이어도 지우기</label></div>
-  <div class="card tag"><h3>상태 표시 (선택한 프레임)</h3><div class="row"><button data-t="✅">✅ 완료</button><button data-t="🛠">🛠 작업중</button><button data-t="👀">👀 리뷰</button><button data-t="⏸">⏸ 보류</button><button data-t="">지우기</button></div></div>
+  <div class="card tag"><h3>상태 표시 (선택한 프레임)</h3><div class="row"><button data-t="✅">✅ 확정</button><button data-t="🛠">🛠 작업 중</button><button data-t="👀">👀 검토</button><button data-t="⏸">⏸ 보류</button><button data-t="">지우기</button></div></div>
   <div class="card"><h3>페이지 구조 + 커버 <span class="row"><button data-a="pages">페이지</button><button data-a="cover">커버</button></span></h3><div class="row"><input id="ttl" placeholder="커버 제목" style="flex:1"><select id="st"><option>In progress</option><option>Review</option><option>Final</option><option>Archive</option></select></div></div>
   <div class="card"><h3>스타일 점검 <button data-a="audit">점검</button></h3><div id="audit"><p>스타일이 안 걸린 색·글꼴을 찾아요.</p></div></div>
-  <div class="card"><h3>하진 비서로 보내기 <button class="pri" data-a="summary">요약 만들기</button></h3><p>파일 구조 요약을 복사해서 비서 앱 → 피그마 정리 → 붙여넣기.</p><textarea id="out" readonly placeholder="여기에 요약이 생겨요"></textarea><button id="copy">복사</button></div>
+  <div class="card"><h3>하진 비서로 보내기 <button class="pri" data-a="summary">요약 만들기</button></h3><p>보통은 앱이 피그마 토큰으로 자동으로 읽어요. 토큰 없이 쓸 때만 이 요약을 복사해서 앱 → 피그마 → ? → 붙여넣기.</p><textarea id="out" readonly placeholder="여기에 요약이 생겨요"></textarea><button id="copy">복사</button></div>
   <div id="log"></div>
 </main>
 <script>

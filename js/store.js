@@ -37,7 +37,7 @@ export async function approve(d, edited) {
     if (d.kind === 'note') payload.type = payload.type || 'note';
     if (d.kind === 'task') payload.done = false;
     if (d.sourceRef) payload.sourceRef = d.sourceRef;
-    saved = await db.put(k.col, payload);
+    saved = await db.put(k.col, await teamify(d.kind, payload));
   } else if (d.kind === 'summary' && d.sourceRef) {
     // 회의·메모 요약 승인 → 원본에 확정 요약으로 붙임
     await db.patch(d.sourceRef, { summary: data, summaryConfirmed: true });
@@ -61,7 +61,7 @@ export async function commit(kind, data) {
   const payload = { ...data };
   if (kind === 'idea') payload.type = 'idea';
   if (kind === 'task' && payload.done === undefined) payload.done = false;
-  return db.put(k.col, payload);
+  return db.put(k.col, await teamify(kind, payload));
 }
 
 // 자주 쓰는 조회
@@ -83,7 +83,33 @@ export function repeatsOn(e, date) {
   if (e.repeat === 'weekdays') return b.getDay() > 0 && b.getDay() < 6;
   return false;
 }
-export async function openTasks() { return (await db.list('tasks')).filter(t => !t.done); }
+export async function openTasks() { const mine = await mineFilter(); return (await db.list('tasks')).filter(t => !t.done && mine(t)); }
+
+// ── 팀 ──
+// 팀 공간에서 받은 할 일 중 내 것(담당 없음·나)만 내 목록에. 나머지는 할 일 → 팀 보기에서.
+const given = n => (n || '').replace(/\s/g, '').replace(/(님|씨)$/, '');
+export const sameName = (a, b) => { a = given(a); b = given(b); if (!a || !b) return false; return a === b || (a.length === 3 && a.slice(1) === b) || (b.length === 3 && b.slice(1) === a); };
+export async function myNames() {
+  const m = await db.kvGet('me:member', null);
+  return [await db.kvGet('name', '하진'), m?.name, '나'].filter(Boolean);
+}
+export async function mineFilter() {
+  const names = await myNames();
+  return t => !t.team || !t.who || names.some(n => sameName(n, t.who));
+}
+export async function teammateNames() {
+  const sp = await db.kvGet('sync:spaces', []);
+  const mine = await myNames();
+  const roster = (await db.kvGet('sync:roster', [])).map(m => m.name);
+  return [...new Set([...sp.flatMap(s => s.members.map(m => m.name)), ...roster])].filter(n => !mine.some(x => sameName(x, n)));
+}
+// 팀원에게 맡긴 할 일은 자동으로 팀에 공유 (로그인해서 기본 팀이 있을 때)
+async function teamify(kind, payload) {
+  if (!(await db.get('team-main'))) return payload;
+  if (kind === 'task' && payload.who && !payload.team && (await teammateNames()).some(n => sameName(n, payload.who))) payload.team = 'team-main';
+  if (payload.team && !payload.by) payload.by = await db.kvGet('name', '하진');
+  return payload;
+}
 
 // 연락 주기 지난 사람
 export async function peopleToReach() {

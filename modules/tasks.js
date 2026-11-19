@@ -27,7 +27,10 @@ export default {
 
     async function draw() {
       clear(body);
-      const all = await db.list('tasks');
+      const every = await db.list('tasks');
+      const mine = await store.mineFilter();
+      const all = every.filter(mine);
+      const hasTeam = every.some(t => t.team);
       const today = todayStr();
       const open = all.filter(t => !t.done);
       const doneToday = all.filter(t => t.done && (t.doneAt || '').slice(0, 10) === today).length;
@@ -39,10 +42,11 @@ export default {
         tile('check2', open.length, '남은 할 일'), tile('flag', dueToday, '오늘 마감', dueToday ? 'warn' : ''), tile('clock', overdue, '밀린 일', overdue ? 'bad' : 'ok'), tile('timer', `${Math.floor(mins / 60)}h ${mins % 60}m`, '오늘 작업 시간', 'ok')));
       const projects = [...new Set(all.map(t => t.project).filter(Boolean))];
       body.append(h('div.row.between', { style: { marginBottom: '10px' } },
-        seg([['today', '오늘'], ['upcoming', '예정'], ['all', '전체'], ['done', '완료'], ['focus', '집중'], ['log', '시간 기록']], view, v => { view = v; draw(); }),
+        seg([['today', '오늘'], ['upcoming', '예정'], ['all', '전체'], ['done', '완료'], ...(hasTeam ? [['team', '팀']] : []), ['focus', '집중'], ['log', '시간 기록']], view, v => { view = v; draw(); }),
         projects.length && !['focus', 'log'].includes(view) ? h('select.in', { style: { width: 'auto' }, onchange: e => { proj = e.target.value; draw(); } }, h('option', { value: '' }, '모든 프로젝트'), projects.map(p => h('option', { value: p, selected: p === proj }, p))) : null));
       if (view === 'focus') return body.append(await focusView());
       if (view === 'log') return body.append(await logView(logs));
+      if (view === 'team') return body.append(teamView(every.filter(t => t.team && (!proj || t.project === proj))));
       let xs = all.filter(t => !proj || t.project === proj);
       if (view === 'today') xs = xs.filter(t => !t.done && (!t.due || t.due <= today));
       if (view === 'upcoming') xs = xs.filter(t => !t.done && t.due && t.due > today);
@@ -93,6 +97,22 @@ export default {
   },
 };
 const addDaysStr = n => ymd(addDays(new Date(), n));
+
+// 팀 보기: 담당자별 진행률과 남은 일
+function teamView(ts) {
+  const by = {};
+  ts.forEach(t => { const k = t.who || '담당 없음'; (by[k] ||= []).push(t); });
+  const today = todayStr();
+  const g = h('div.grid.g2');
+  if (!ts.length) g.append(h('div.card', h('div.empty', '팀에 공유된 할 일이 없어요. 할 일의 담당에 팀원 이름을 적으면 자동으로 공유돼요.')));
+  Object.entries(by).sort((a, b) => b[1].filter(t => !t.done).length - a[1].filter(t => !t.done).length).forEach(([who, xs]) => {
+    const open = xs.filter(t => !t.done).sort(sortTasks), done = xs.length - open.length;
+    const late = open.filter(t => t.due && t.due < today).length;
+    g.append(h('div.card', h('div.card-h', h('h3', ic('user'), who), h('div.row', late ? h('span.chip.bad', `밀림 ${late}`) : null, ring(xs.length ? done / xs.length : 0, { size: 38, label: `${done}/${xs.length}` }))),
+      open.length ? h('div.list', open.slice(0, 8).map(t => taskRow(t, () => import('../js/app.js').then(a => a.refresh())))) : h('p.faint.small', '남은 일 없음')));
+  });
+  return g;
+}
 const PRI = { high: 0, normal: 1, low: 2 };
 export const sortTasks = (a, b) => (PRI[a.priority] ?? 1) - (PRI[b.priority] ?? 1) || (a.due || '9999').localeCompare(b.due || '9999') || (a.time || '99').localeCompare(b.time || '99');
 

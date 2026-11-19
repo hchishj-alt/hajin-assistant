@@ -88,7 +88,13 @@ export async function delBlob(key) { return tx('blobs', 'readwrite', s => req(s.
 
 // 설정 등 키-값
 export async function kvGet(k, d = null) { const v = await tx('kv', 'readonly', s => req(s.get(k))); return v === undefined ? d : v; }
-export async function kvSet(k, v) { return tx('kv', 'readwrite', s => req(s.put(v, k))); }
+// 기기 사이에 같이 맞출 설정 (동기화 켜면 items의 _kv 로 오감)
+export const SYNC_KV = ['name', 'focusGoal', 'brain:learned', 'accent', 'theme'];
+export async function kvSet(k, v) {
+  await tx('kv', 'readwrite', s => req(s.put(v, k)));
+  if (SYNC_KV.includes(k)) await put('_kv', { id: 'kv:' + k, key: k, value: v ?? null });
+}
+export async function kvSetRaw(k, v) { return tx('kv', 'readwrite', s => req(s.put(v, k))); }
 
 // 전체 백업/복원 (사진·영상 원본은 용량 때문에 선택)
 export async function exportAll({ withBlobs = false } = {}) {
@@ -115,7 +121,7 @@ export async function importAll(json) {
     const cur = await get(it.id);
     if (!cur || cur.updatedAt < it.updatedAt) await putRaw({ ...it, dirty: true });
   }
-  for (const [k, v] of Object.entries(json.kv || {})) await kvSet(k, v);
+  for (const [k, v] of Object.entries(json.kv || {})) await kvSetRaw(k, v);
   for (const [k, v] of Object.entries(json.blobs || {})) await putBlob(await (await fetch(v.data)).blob(), k);
 }
 export function blobToDataURL(b) {

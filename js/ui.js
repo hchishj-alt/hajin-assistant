@@ -56,8 +56,8 @@ export function modal(title, content, { wide = false, onClose } = {}) {
 export function confirmBox(msg, okLabel = '확인') {
   return new Promise(res => {
     const close = modal('확인', c => h('div', h('p', msg), h('div.modal-f',
-      h('button.btn', { onclick: () => { c(); res(false); } }, '취소'),
-      h('button.btn.pri', { onclick: () => { c(); res(true); } }, okLabel))), { onClose: () => res(false) });
+      h('button.btn', { onclick: () => { res(false); c(); } }, '취소'),
+      h('button.btn.pri', { onclick: () => { res(true); c(); } }, okLabel))), { onClose: () => res(false) });
   });
 }
 
@@ -70,7 +70,7 @@ export function form(fields, values = {}, onSubmit, { submitLabel = '저장', ex
     let inp;
     const v = values[fd.k] ?? fd.default ?? '';
     if (fd.type === 'textarea') inp = h('textarea.in', { name: fd.k, placeholder: fd.placeholder || '', rows: fd.rows || 4 }, v);
-    else if (fd.type === 'select') inp = h('select.in', { name: fd.k }, fd.options.map(o => { const [val, lab] = Array.isArray(o) ? o : [o, o]; return h('option', { value: val, selected: String(val) === String(v) }, lab); }));
+    else if (fd.type === 'select') { const opts = fd.options.map(o => (Array.isArray(o) ? o : [o, o])); if (v != null && v !== '' && !opts.some(([val]) => String(val) === String(v))) opts.push([v, fd.k === 'team' ? '다른 팀' : String(v)]); inp = h('select.in', { name: fd.k }, opts.map(([val, lab]) => h('option', { value: val, selected: String(val) === String(v) }, lab))); }
     else if (fd.type === 'checkbox') inp = h('input', { type: 'checkbox', name: fd.k, checked: !!v });
     else inp = h('input.in', { name: fd.k, type: fd.type || 'text', value: v, placeholder: fd.placeholder || '', step: fd.step, inputmode: fd.inputmode, list: fd.datalist ? fd.k + '-dl' : null });
     inputs[fd.k] = inp;

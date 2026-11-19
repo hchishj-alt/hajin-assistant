@@ -4,7 +4,7 @@ import * as brain from '../js/brain.js';
 import { FIELDS, EXP_CAT_LIST } from '../js/fields.js';
 
 let month = todayStr().slice(0, 7), stF = '';
-const ST = { todo: ['정산 전', 'warn'], submitted: ['제출함', 'acc'], done: ['정산 완료', 'ok'] };
+const ST = { todo: ['정산 전', 'warn'], submitted: ['결재 요청', 'acc'], approved: ['승인됨', 'ok'], done: ['정산 완료', 'ok'] };
 export default {
   async render(root) {
     const body = h('div');
@@ -38,12 +38,21 @@ export default {
       const diff = prev ? Math.round((sum - prev) / prev * 100) : null;
       body.append(h('div.row.between', { style: { marginBottom: '12px' } },
         h('div.row', h('button.btn.icon.ghost', { 'aria-label': '이전 달', onclick: () => shift(-1) }, ic('left')), h('h2', `${+month.slice(0, 4)}년 ${+month.slice(5)}월`), h('button.btn.icon.ghost', { 'aria-label': '다음 달', onclick: () => shift(1) }, ic('right'))),
-        seg([['', '전체'], ['todo', '정산 전'], ['submitted', '제출함'], ['done', '완료']], stF, v => { stF = v; draw(); })));
+        seg([['', '전체'], ['todo', '정산 전'], ['submitted', '결재 요청'], ['approved', '승인'], ['done', '완료']], stF, v => { stF = v; draw(); })));
       body.append(h('div.tiles', { style: { marginBottom: '14px' } },
         tile('wallet', shortWon(sum), diff == null ? '이번 달 지출' : `지난달 대비 ${diff > 0 ? '+' : ''}${diff}%`, diff > 20 ? 'warn' : ''),
         tile('receipt', xs.length, '건수'),
         tile('clock', shortWon(pendSum), '돌려받을 돈 (개인 결제)', pendSum ? 'warn' : 'ok'),
         tile('target', budget ? Math.round(sum / budget * 100) + '%' : '–', budget ? `예산 ${shortWon(budget)}` : '예산 미설정', budget && sum > budget ? 'bad' : 'ok')));
+      // 팀 결재: 팀원이 '결재 요청'으로 올린 팀 비용 → 관리자가 승인/반려
+      const sync = await import('../js/sync.js');
+      const admin = await sync.isAdmin();
+      const waiting = all.filter(e => e.team && e.status === 'submitted');
+      if (waiting.length) body.append(h('div.card', { style: { marginBottom: '14px', borderColor: 'var(--acc)' } },
+        h('div.card-h', h('h3', ic('inbox'), `결재 ${admin ? '대기' : '요청 중'} ${waiting.length}건`), h('span.mono.small', waiting.reduce((s, e) => s + (Number(e.amount) || 0), 0).toLocaleString() + '원')),
+        h('div.list', waiting.map(e => h('div.li', h('div.grow', h('div.t.small', e.title), h('div.faint.tiny', [e.by, e.date, e.category, e.pay].filter(Boolean).join(' · '))), h('span.mono.small', (Number(e.amount) || 0).toLocaleString()),
+          admin ? h('button.btn.sm.ghost', { onclick: async () => { await db.patch(e.id, { status: 'todo', reviewed: '반려', reviewedBy: await db.kvGet('name', '') }); toast('반려했어요'); draw(); } }, '반려') : null,
+          admin ? h('button.btn.sm.pri', { onclick: async () => { await db.patch(e.id, { status: 'approved', reviewed: '승인', reviewedBy: await db.kvGet('name', '') }); toast('승인했어요'); draw(); } }, '승인') : null)))));
       // 분류별
       const byCat = {}; xs.forEach(e => (byCat[e.category || '기타'] = (byCat[e.category || '기타'] || 0) + (Number(e.amount) || 0)));
       const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
@@ -65,7 +74,7 @@ export default {
         const cb = h('input', { type: 'checkbox', 'aria-label': '선택', onchange: () => { cb.checked ? sel.add(e.id) : sel.delete(e.id); bulk.classList.toggle('hide', !sel.size); bulk.firstChild.textContent = `${sel.size}건 선택`; } });
         const [sl, st] = ST[e.status || 'todo'];
         c.append(h('div.li', cb, h('div.ti', { style: { width: '32px', height: '32px', borderRadius: '9px', display: 'grid', placeItems: 'center', background: 'var(--bg2)' } }, ic(catIcon(e.category), 16)),
-          h('div.grow', { style: { cursor: 'pointer' }, onclick: () => edit(e) }, h('div.t.small', e.title), h('div.faint.tiny', [e.category, e.pay, e.project].filter(Boolean).join(' · '))),
+          h('div.grow', { style: { cursor: 'pointer' }, onclick: () => edit(e) }, h('div.t.small', e.title), h('div.faint.tiny', [e.team ? '팀' + (e.by ? ' · ' + e.by : '') : '', e.category, e.pay, e.project, e.reviewed === '반려' ? '반려됨' : ''].filter(Boolean).join(' · '))),
           e.receiptKey ? ic('image', 14) : null, h('span.chip.' + st, sl), h('span.mono', { style: { fontWeight: 650, minWidth: '86px', textAlign: 'right' } }, (Number(e.amount) || 0).toLocaleString())));
       }
       body.append(c);
