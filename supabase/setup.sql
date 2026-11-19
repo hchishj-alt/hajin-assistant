@@ -215,3 +215,13 @@ insert into public.spaces (name, is_main)
 insert into public.space_items (space, id, col, data, updated_at)
   select s.id, 'team-main', 'teams', json_build_object('id', 'team-main', 'col', 'teams', 'name', s.name, 'color', '#4b5bff', 'members', json_build_array(), 'main', true, 'createdAt', now(), 'updatedAt', now())::jsonb, now()
   from public.spaces s where s.is_main and not exists (select 1 from public.space_items where id = 'team-main');
+
+-- ─────────────────────────────────────────────
+-- 7) 레퍼런스 이미지 저장 (무료 1GB, 이미지는 앱이 webp로 줄여서 올림 → 수천 장)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('refs', 'refs', true, 3145728, array['image/webp', 'image/jpeg', 'image/png', 'image/gif'])
+  on conflict (id) do nothing;
+drop policy if exists refs_upload on storage.objects;
+create policy refs_upload on storage.objects for insert to authenticated with check (bucket_id = 'refs' and public.is_active());
+drop policy if exists refs_delete on storage.objects;
+create policy refs_delete on storage.objects for delete to authenticated using (bucket_id = 'refs' and owner = auth.uid());

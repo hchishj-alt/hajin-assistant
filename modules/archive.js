@@ -1,5 +1,5 @@
 // 레퍼런스 아카이브: 링크만 붙이면 미리보기, 프로젝트 = 대분류 폴더, 색·느낌·올린 사람·종류로 필터
-import { h, ic, clear, toast, head, modal, form, confirmBox, tile, seg, busy, rel, debounce, colorFor } from '../js/ui.js';
+import { h, ic, clear, toast, head, modal, form, confirmBox, tile, seg, busy, rel, debounce, colorFor, pickFile } from '../js/ui.js';
 import * as db from '../js/db.js';
 import * as brain from '../js/brain.js';
 import * as LP from '../js/linkpreview.js';
@@ -17,13 +17,14 @@ export default {
     const box = h('div');
     root.append(head('레퍼런스 아카이브', '링크만 붙이면 미리보기가 떠요. 색·느낌은 자동으로 골라 둬요.',
       h('button.btn.sm', { onclick: newFolder }, ic('plus', 14), '폴더'),
+      h('button.btn.sm', { onclick: async () => { const f = await pickFile('image/*', true); const fs = [].concat(f || []).filter(Boolean); if (fs.length) addImages(fs); } }, ic('upload', 14), '이미지 올리기'),
       h('button.btn.sm.pri', { onclick: () => addLinks() }, ic('link', 14), '링크 추가')), box);
     // 어디서든 링크·이미지 붙여넣기
     const onPaste = async e => {
       if (!document.body.contains(box) || /INPUT|TEXTAREA/.test(document.activeElement?.tagName)) return;
       const t = e.clipboardData?.getData('text') || '';
       const files = [...(e.clipboardData?.files || [])].filter(x => x.type.startsWith('image/'));
-      if (files.length) { e.preventDefault(); for (const f of files) await addFile(f); draw(); }
+      if (files.length) { e.preventDefault(); addImages(files, t && /https?:\/\//.test(t) ? t.trim() : ''); }
       else if (/https?:\/\//.test(t)) { e.preventDefault(); addLinks(t); }
     };
     document.addEventListener('paste', onPaste);
@@ -61,9 +62,9 @@ export default {
       const grid = h('div.masonry');
       if (!shown.length) grid.append(h('div.card', h('div.empty', all.length ? '조건에 맞는 레퍼런스가 없어요' : '링크를 붙여넣기(Ctrl+V) 하거나 “링크 추가”를 눌러 보세요. 유튜브·비메오·핀터레스트·비핸스·인스타·이미지 주소 다 돼요.')));
       for (const r of shown.sort((a, b) => b.createdAt.localeCompare(a.createdAt))) grid.append(await cardOf(r));
-      const dz = h('div.drop.arch-drop', { onclick: () => addLinks() }, ic('link', 16), ' 링크 붙여넣기 · 이미지 끌어놓기');
+      const dz = h('div.drop.arch-drop', { onclick: () => addLinks() }, ic('link', 16), ' 링크·이미지 붙여넣기(Ctrl+V) · 끌어놓기 · 눌러서 링크 추가');
       dz.ondragover = e => { e.preventDefault(); dz.classList.add('over'); }; dz.ondragleave = () => dz.classList.remove('over');
-      dz.ondrop = async e => { e.preventDefault(); dz.classList.remove('over'); const t = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text'); if (t) return addLinks(t); for (const f of [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'))) await addFile(f); draw(); };
+      dz.ondrop = async e => { e.preventDefault(); dz.classList.remove('over'); const t = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text'); const fs = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/')); if (fs.length) return addImages(fs, t && /^https?:/.test(t) ? t : ''); if (t) return addLinks(t); };
       layout.append(tree, h('div.arch-main', filters, dz, h('div.faint.tiny', { style: { margin: '2px 2px 8px' } }, `${shown.length}개${F.folder ? ' · ' + (F.folder === '_none' ? '분류 안 됨' : F.folder) + (F.sub ? ' › ' + F.sub : '') : ''}`), grid));
       box.append(layout);
     }
@@ -141,13 +142,32 @@ export default {
         return f;
       });
     }
-    async function addFile(file) {
-      const key = await db.putBlob(file);
-      const by = await meName(), team = await teamOf();
-      const item = await db.put('refs', { title: file.name.replace(/\.\w+$/, ''), imgKey: key, kind: 'image', provider: '내 파일 (이 기기에만)', project: F.folder && F.folder !== '_none' ? F.folder : '', sub: F.sub, by, team: '' });
-      const url = URL.createObjectURL(file); blobUrls.set(key, url);
-      LP.analyzeColors(url).then(c => db.patch(item.id, c)).then(() => draw()).catch(() => { });
-      void team;
+    // 이미지 (붙여넣기·올리기·끌어놓기): 링크는 선택, 팀 저장소에 webp로 줄여 올림 (로그인 안 했으면 이 기기에만)
+    async function addImages(files, link = '') {
+      const ff = await folderFields({ project: F.folder && F.folder !== '_none' ? F.folder : '' });
+      const urls = files.map(f => URL.createObjectURL(f));
+      modal(files.length > 1 ? `이미지 ${files.length}장 담기` : '이미지 담기', close => {
+        const f = form([{ k: 'title', label: '제목 (비우면 파일 이름)', full: true }, { k: 'url', label: '원본 링크 (선택)', type: 'url', full: true, default: link }, ...ff, { k: 'memo', label: '메모 (선택)', full: true }],
+          { project: F.folder && F.folder !== '_none' ? F.folder : '', sub: F.sub, url: link }, async v => {
+            const btn = document.querySelector('.modal button[type=submit]'); busy(btn, true, '담는 중');
+            const by = await meName(), team = await teamOf();
+            const sync = await import('../js/sync.js');
+            let cloud = 0;
+            for (const [i, file] of files.entries()) {
+              const small = await shrink(file);
+              const pub = await sync.uploadImage(small).catch(() => null);
+              const base = { kind: 'image', title: (files.length > 1 && v.title ? `${v.title} ${i + 1}` : v.title) || (file.name && !/^image\.\w+$/.test(file.name) ? file.name.replace(/\.\w+$/, '') : '붙여넣은 이미지'), url: v.url || '', project: v.project, sub: v.sub, memo: v.memo, by, provider: v.url ? hostOf(v.url) : pub ? '팀 저장소' : '이 기기에만' };
+              let item;
+              if (pub) { cloud++; item = await db.put('refs', { ...base, thumb: pub, team }); }
+              else { const key = await db.putBlob(small); blobUrls.set(key, URL.createObjectURL(small)); item = await db.put('refs', { ...base, imgKey: key, team: '' }); }
+              LP.analyzeColors(urls[i]).then(c => db.patch(item.id, c)).then(() => draw()).catch(() => { });
+            }
+            toast(cloud === files.length ? `${files.length}장 담았어요 · 팀도 같이 봐요` : `${files.length}장 담았어요${cloud ? ` (팀 공유 ${cloud}장)` : ' · 동기화에 로그인하면 팀과 같이 봐요'}`);
+            close(); draw();
+          }, { submitLabel: '담기' });
+        f.prepend(h('div', { style: { display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '10px' } }, urls.map(u => h('img', { src: u, style: { height: '120px', borderRadius: '10px', flex: 'none' } }))));
+        return f;
+      });
     }
     async function newFolder() {
       const projects = (await db.list('projects')).map(p => p.name).filter(Boolean);
@@ -161,3 +181,17 @@ export default {
     }
   },
 };
+
+const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+// 긴 변 1600px, webp로 줄이기 (용량 1/5 정도)
+async function shrink(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    if (file.type === 'image/gif' && file.size < 2.5e6) return file;
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const b = await new Promise(r => c.toBlob(r, 'image/webp', 0.82));
+    return b && b.size < file.size ? b : file;
+  } catch { return file; }
+}

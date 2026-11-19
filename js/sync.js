@@ -301,6 +301,15 @@ export async function leaveTeam(team) {
 }
 
 export const enabled = () => !!session;
+// 레퍼런스 이미지 → 팀 저장소 (무료 1GB). 로그인 안 했거나 실패하면 null (그땐 기기에만 저장)
+export async function uploadImage(blob) {
+  if (!session || !client) return null;
+  const ext = (blob.type.split('/')[1] || 'webp').replace('jpeg', 'jpg');
+  const path = `${session.user.id}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await client.storage.from('refs').upload(path, blob, { contentType: blob.type, cacheControl: '31536000', upsert: false });
+  if (error) return null;
+  return client.storage.from('refs').getPublicUrl(path).data.publicUrl;
+}
 // 공유를 끈 항목: 팀 공간에서는 지운 것으로 표시 (내 쪽 기록은 그대로)
 export async function unshare(it) {
   if (!session || !it?.team) return;
