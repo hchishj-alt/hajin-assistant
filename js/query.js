@@ -27,7 +27,8 @@ const fmtK = d => { const x = new Date(d); return `${x.getMonth() + 1}월 ${x.ge
 export async function answer(q, base = new Date()) {
   const r = rangeOf(q, base);
   const today = ymd(base);
-  if (/(빈\s*시간|시간\s*(있|비)|언제\s*비|여유)/.test(q)) {
+  { const A = await import('./ask.js'); const hit = await A.smart(q, base, r); if (hit) return hit; }
+  if (/(빈\s*시간|비는\s*시간|시간\s*(있|비)|언제\s*비|여유)/.test(q)) {
     const d = r ? r[0] : today;
     const slots = await store.freeSlots(d);
     return { text: slots.length ? `${r ? r[2] : '오늘'} 비는 시간은 ${slots.length}칸이에요.` : '비는 시간이 없어요.', items: slots.map(s => ({ icon: 'clock', title: `${s.start} – ${s.end}`, sub: `${s.mins}분`, route: 'calendar' })) };
