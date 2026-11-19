@@ -51,7 +51,7 @@ export function fromHtml(html, url) {
 
 // ── Gemini (무료 키) ──
 // 모델 고르기: 가볍고 빠른 "lite" 별칭을 먼저 쓰고(무료 등급에서 가장 잘 돌아감), 막히거나 느리면 다음 후보로 넘어감. 되는 걸 기억해 둠
-const FALLBACK = ['gemini-flash-lite-latest', 'gemini-flash-latest'];
+const FALLBACK = ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
 async function candidates(key) {
   const saved = await db.kvGet('ai:model', ''); let listed = [];
   if (!saved) { try { const j = await (await timed(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(key)}`, {}, 8000)).json();
@@ -60,8 +60,35 @@ async function candidates(key) {
     listed = ms.sort((a, b) => (/lite/.test(b) ? 1 : 0) - (/lite/.test(a) ? 1 : 0) || ver(b) - ver(a)).slice(0, 3); } catch { } }
   return [...new Set([saved, ...FALLBACK, ...listed].filter(Boolean))];
 }
-export async function ask(prompt, { json = false, ms = 25000, temp = 0.2 } = {}) {
+// 무료 등급은 같은 모델도 때에 따라 1초~10초로 속도가 크게 달라진다.
+// 짧은 문장 읽기처럼 빨라야 하는 일은, 첫 모델이 hedge(ms) 안에 답이 없으면 다음 가벼운 모델에도 같이 물어 먼저 온 답을 쓴다.
+function raceCall(list, key, body, ms, hedge = 2500) {
+  const errOf = st => st === 429 ? '무료 사용량을 잠깐 넘었어요. 조금 뒤에 다시 해 주세요' : st === 400 || st === 403 ? 'AI 키를 확인해 주세요' : 'AI가 답하지 못했어요 (' + st + ')';
+  return new Promise((resolve, reject) => {
+    const acs = [], timers = []; let done = false, started = 0, pending = 0, last = '';
+    const finish = (fn, v) => { if (done) return; done = true; timers.forEach(clearTimeout); fn(v); acs.forEach(a => { try { a.abort(); } catch {} }); };
+    const start = i => {
+      if (done || i >= list.length || started > i) return; started = i + 1; pending++;
+      const m = list[i], ac = new AbortController(); acs.push(ac);
+      fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', signal: ac.signal, headers: { 'Content-Type': 'application/json' }, body })
+        .then(async r => { if (!r.ok) { last = errOf(r.status); throw 0; } const j = await r.json(); finish(resolve, { m, j }); })
+        .catch(() => { pending--; if (done) return; if (started < list.length) start(started); else if (!pending) finish(reject, new Error(last || 'AI가 답하지 못했어요')); });
+      if (i + 1 < list.length) timers.push(setTimeout(() => start(i + 1), hedge));
+    };
+    timers.push(setTimeout(() => finish(reject, new Error('응답이 너무 늦어요')), ms));
+    start(0);
+  });
+}
+export async function ask(prompt, { json = false, ms = 25000, temp = 0.2, fast = false } = {}) {
   const key = await db.kvGet(KEY, ''); if (!key) throw new Error('AI 키가 없어요');
+  if (fast) {
+    const list = (await candidates(key)).slice(0, 3);
+    const { m, j } = await raceCall(list, key, JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: temp, ...(json ? { responseMimeType: 'application/json' } : {}) } }), ms);
+    if ((await db.kvGet('ai:model', '')) !== m) await db.kvSet('ai:model', m);
+    const out = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+    if (!json) return out;
+    try { return JSON.parse(out.replace(/^```(?:json)?\s*|\s*```$/g, '')); } catch { throw new Error('AI 답을 읽지 못했어요'); }
+  }
   const call = (m, t) => timed(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: temp, ...(json ? { responseMimeType: 'application/json' } : {}) } }) }, t);
   const list = await candidates(key); let r = null, last = '';
   for (const [i, m] of list.entries()) {
@@ -158,11 +185,12 @@ ${calendarTable(today)}
 규칙이 먼저 읽은 초안(틀렸으면 고쳐 써): ${JSON.stringify(hint).slice(0, 1500)}
 
 사용자 말: ${text}`;
-  let arr; try { const j = await ask(prompt, { json: true, ms, temp: 0 }); arr = Array.isArray(j) ? j : j.items; } catch (e) { console.warn('ai', e); return null; }
+  let arr; try { const j = await ask(prompt, { json: true, ms, temp: 0, fast: true }); arr = Array.isArray(j) ? j : j.items; } catch (e) { console.warn('ai', e); return null; }
   if (!Array.isArray(arr)) return null;
   const out = [];
   for (const g of arr.slice(0, 8)) {
     if (!g || !KO[g.kind] || !String(g.title || '').trim()) continue;
+    if (g.kind === 'idea' && /인스타|릴스|유튜브|쇼츠|틱톡|블로그|스레드|트위터|피드/.test(text) && /올리|올려|업로드|게시|포스팅|찍어|콘텐츠/.test(text)) g.kind = 'sns';
     const base = (parsed || []).find(p => p.kind === g.kind)?.data || {}; const title = String(g.title).trim().slice(0, 80); const S = v => (typeof v === 'string' ? v.trim() : ''); let data;
     const date = isD(g.date) ? g.date : '';
     if (g.kind === 'event') data = { ...base, title, date: date || base.date || today, endDate: isD(g.endDate) && g.endDate > (date || '') ? g.endDate : '', start: isT(g.start) ? g.start : g.allDay ? '' : base.start || '', end: isT(g.end) ? g.end : '', who: whoIn(g.who, text, people, base.who), place: S(g.place), area: S(g.area), scope: g.scope === 'personal' ? 'personal' : 'work', repeat: /^(daily|weekly|monthly|weekdays)$/.test(g.repeat || '') ? g.repeat : '', memo: S(g.memo) || base.memo || '', _dated: !!(date || base.date), _allday: !!g.allDay };
@@ -173,7 +201,7 @@ ${calendarTable(today)}
     else if (g.kind === 'buy') data = { ...base, title, url: base.url || S(g.url), price: Number(base.price) || Number(g.amount) || 0, qty: 1, need: 'must' };
     else if (g.kind === 'idea' || g.kind === 'note') data = { ...base, title, body: base.body || text, tags: base.tags || [] };
     else if (g.kind === 'grant') data = { ...base, title, deadline: date || base.deadline || '', status: base.status || '검토', amount: base.amount ?? (Number(g.amount) || null), url: base.url || S(g.url) };
-    else if (g.kind === 'sns') data = { ...base, title, platform: base.platform || '인스타그램', status: base.status || '아이디어', date: date || base.date || '' };
+    else if (g.kind === 'sns') data = { ...base, title, platform: base.platform || (/유튜브|쇼츠/.test(text) ? '유튜브' : /틱톡/.test(text) ? '틱톡' : /블로그/.test(text) ? '블로그' : /트위터|\bX\b/.test(text) ? 'X' : '인스타그램'), status: base.status || '아이디어', date: date || base.date || '' };
     else data = { ...base, title, url: base.url || S(g.url) };
     out.push({ kind: g.kind, label: KO[g.kind], confidence: 0.85, data, src: text, ai: true });
   }
