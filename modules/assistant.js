@@ -31,7 +31,7 @@ export default {
 
     // 기존 대화
     const msgs = (await db.list('chat')).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-60);
-    if (!msgs.length) list.append(botBubble(h('div', h('p', '안녕하세요 하진님. 이렇게 말해 보세요.'), h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, ['"다음 주 화요일 2시 홍대 촬영"', '"어도비 구독 3만7천원 결제"', '"김민서 010-1234-5678 디자이너"', '"오늘 일정 보여줘"', '회의나 생각을 길게 말하면 요약·키워드·할 일로 정리해요'].map(x => h('li.small', x))))));
+    if (!msgs.length) list.append(botBubble(h('div', h('p', '안녕하세요 하진님. 이렇게 말해 보세요.'), h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, ['"다음 주 화요일 2시 홍대 촬영"', '"어도비 구독 3만7천원 결제"', '"홍길동 010-1234-5678 디자이너"', '"오늘 일정 보여줘"', '회의나 생각을 길게 말하면 요약·키워드·할 일로 정리해요'].map(x => h('li.small', x))))));
     const pending = new Map((await store.drafts()).map(d => [d.id, d]));
     for (const m of msgs) await drawMsg(m, pending, false);
     scrollDown();
@@ -48,7 +48,7 @@ export default {
       const v = ta.value.trim();
       if (!v) return;
       if (v.length > 220) { preview.append(h('span.chip.acc', ic('sparkles', 12), '긴 글 → 요약·키워드·할 일로 정리')); return; }
-      for (const p of brain.interpret(v).slice(0, 4)) {
+      for (const p of brain.interpret(v).filter(x => x.kind !== 'talk').slice(0, 4)) {
         const k = store.KINDS[p.kind];
         preview.append(h('span.chip.acc', ic(k?.icon || (p.kind === 'query' ? 'search' : 'right'), 12), p.kind === 'query' ? '찾아보기' : p.kind === 'nav' ? '이동' : k?.label));
         const desc = p.kind === 'query' || p.kind === 'nav' ? '' : describe(p.kind, p.data);
@@ -68,6 +68,10 @@ export default {
     }
 
     async function handle(text, origin) {
+      const CH = await import('../js/chat.js');
+      text = await CH.applyAlias(text);
+      const talk = async src => { const r = await CH.reply(src, { name: (await db.kvGet('name', '')) || '' }); await drawMsg(await db.put('chat', { role: 'bot', q: src, text: r.text, list: r.list, chips: r.chips }), new Map()); };
+      if (CH.isTalk(text)) return talk(text);
       const projects = await store.projects();
       const people = [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean);
       // 길게 쓰거나 말한 건 → 원문은 메모로 저장(내가 쓴 거라 확정), 요약·할 일은 임시
@@ -97,6 +101,7 @@ export default {
       const ids = []; const replies = [];
       for (const p of parsed) {
         if (p.kind === 'nav') { const map = { 캘린더: 'calendar', 일정: 'calendar', '할 일': 'tasks', 할일: 'tasks', 회의: 'meetings', 기획: 'plan', 인맥: 'people', 연락처: 'people', 비용: 'money', 지출: 'money', 스타트업: 'startup', SNS: 'studio', 스튜디오: 'studio', 피그마: 'figma', 설정: 'settings', 대기함: 'inbox', '확인 대기함': 'inbox' }; go(map[p.data.to.replace(/\s+/g, ' ')] || 'today'); return; }
+        if (p.kind === 'talk') { await talk(p.src || text); continue; }
         if (p.kind === 'query') { const a = await answer(text); replies.push(a); continue; }
         ids.push((await store.draft(p.kind, p.data, { source: p.src || text, confidence: p.confidence, origin })).id);
       }
@@ -122,6 +127,15 @@ export default {
         if (d.status === 'pending') box.append(draftCard(d, () => updateBadge()));
         else box.append(h('div.draft' + (d.status === 'approved' ? '.done' : '.gone'), h('div.k', ic(store.KINDS[d.kind]?.icon || 'file')), h('div.grow', h('div.small', { style: { fontWeight: 650 } }, d.data.title || d.data.name), h('div.faint.tiny', d.status === 'approved' ? '확정됨' : '버림'))));
       }
+      if (m.list?.length) box.append(h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px', lineHeight: 1.8 } }, m.list.map(x => h('li', x))));
+      if (m.chips?.length && !m.chipDone) { const row = h('div.chips', { style: { marginTop: '8px' } }); const done = async label => { await db.patch(m.id, { chipDone: label }); row.replaceWith(h('span.faint.tiny', label)); };
+        row.append(...m.chips.map(c => h('button.chip' + (c.make === 'task' ? '.acc' : ''), { onclick: async () => {
+          if (c.say) return send(c.say);
+          if (c.skip) return done('넘겼어요');
+          if (c.undoAlias) { const CH = await import('../js/chat.js'); const a = await CH.aliases(); delete a[c.undoAlias]; await db.kvSet('chat:alias', a); return done('기억을 지웠어요'); }
+          if (c.make) { const d = await store.draft(c.make, c.make === 'task' ? { title: brain.cleanTask(m.q) || m.q, due: '', priority: 'normal' } : c.make === 'note' ? { title: m.q.slice(0, 50), body: m.q, type: 'memo' } : { title: m.q }, { source: m.q, confidence: .6, origin: 'chat' }); updateBadge(); await done(`${store.KINDS[c.make]?.label || ''} 임시 항목을 만들었어요`); box.append(draftCard(d, () => updateBadge())); }
+        } }, c.label))); box.append(row); }
+      else if (m.chipDone) box.append(h('div.faint.tiny', { style: { marginTop: '6px' } }, m.chipDone));
       if (m.dm) { const DM = await import('../js/dm.js'); const j = await DM.judge(m.dm.body, m.dm.name);
         if (j.note) box.append(h('div.small.muted', { style: { marginTop: '4px' } }, j.note));
         box.append(h('div.chips', { style: { marginTop: '8px' } }, j.actions.map(a => h('button.chip.acc', { onclick: async () => { await store.draft(a.kind, a.data, { source: m.dm.body, origin: 'dm', confidence: .75 }); updateBadge(); toast('임시 항목을 만들었어요', { label: '확인 대기함', fn: () => go('inbox') }); } }, ic('plus', 12), a.label)),

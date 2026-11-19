@@ -308,6 +308,8 @@ export function interpret(input, ctx = {}) {
   for (const p of parts) out.push(...interpretOne(p, base, ctx).map(r => ({ ...r, src: p.trim() })));
   return out;
 }
+// 빠른 입력 칸처럼 '적어 두려고' 쓴 말은 신호가 없어도 할 일로 받음
+export function interpretCapture(input, ctx = {}) { return interpret(input, ctx).flatMap(p => p.kind === 'talk' ? interpret('할일: ' + (p.src || input), ctx).map(r => ({ ...r, src: p.src })) : [p]); }
 function splitCommands(input) {
   const lines = input.split(/\n+/).map(s => s.trim()).filter(Boolean);
   if (lines.length > 1 && lines.every(l => l.length < 160)) return lines;
@@ -341,7 +343,9 @@ function interpretOne(s, base, ctx) {
   const nav = t.match(/^(캘린더|일정|할\s*일|회의|회의록|기획|기획\s*보드|인맥|연락처|비용|지출|스타트업|SNS|스튜디오|피그마|설정|자가\s*점검|팀|확인\s*대기함|대기함)\s*(열어|가자|으로|로|화면)?\s*(줘)?$/i);
   if (nav) return [{ kind: 'nav', data: { to: nav[1] }, label: '이동', confidence: 0.9 }];
 
-  return [build(guessKind())];
+  const gk = guessKind();
+  if (gk === 'talk') return [{ kind: 'talk', data: { text: t }, label: '대화', confidence: 0.5 }];
+  return [build(gk)];
 
   function guessKind() {
     if (phone || email) return 'contact';
@@ -358,7 +362,7 @@ function interpretOne(s, base, ctx) {
     if (IDEA.test(t) || /(떠올|생각났|영감)/.test(t)) return 'idea';
     if (ACTION.test(t) || w.date || /(하기|할것|사기|보내기|챙기기|만들기)$/.test(t)) return 'task';
     if (t.length > 120) return 'note';
-    return 'task';
+    return 'talk'; // 분명한 신호가 없으면 만들지 않고 대화로 받음
   }
 
   function build(kind, body = t) {

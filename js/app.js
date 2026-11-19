@@ -127,7 +127,7 @@ export async function openPalette() {
     const q = inp.value.trim();
     items = [];
     if (q) {
-      const parsed = brain.interpret(q).filter(x => !['query', 'nav'].includes(x.kind));
+      const parsed = brain.interpretCapture(q).filter(x => !['query', 'nav'].includes(x.kind));
       if (parsed.length) items.push({ icon: 'zap', title: `${parsed.map(p => p.label).join(' + ')}로 만들기`, sub: parsed.map(p => p.data.title || p.data.name).join(' / '), run: async () => { for (const p of parsed) await store.draft(p.kind, p.data, { source: p.src || q, confidence: p.confidence, origin: 'palette' }); updateBadge(); toast('확인 대기함에 넣었어요', { label: '보기', fn: () => go('inbox') }); } });
     }
     const ql = q.toLowerCase();

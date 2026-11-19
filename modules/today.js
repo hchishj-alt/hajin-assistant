@@ -27,11 +27,11 @@ export default {
     // 빠른 입력
     const qi = h('input', { placeholder: '생각나는 대로 적기 — 일정·할 일·지출 무엇이든', 'aria-label': '빠른 입력' });
     const qp = h('div.chips', { style: { padding: '4px 6px 0', minHeight: '20px' } });
-    qi.addEventListener('input', () => { clear(qp); const v = qi.value.trim(); if (!v) return; for (const p of brain.interpret(v).slice(0, 3)) qp.append(h('span.chip.acc', ic(store.KINDS[p.kind]?.icon || 'search', 12), p.kind === 'query' ? '찾아보기' : store.KINDS[p.kind]?.label || '')); });
+    qi.addEventListener('input', () => { clear(qp); const v = qi.value.trim(); if (!v) return; for (const p of brain.interpretCapture(v).slice(0, 3)) qp.append(h('span.chip.acc', ic(store.KINDS[p.kind]?.icon || 'search', 12), p.kind === 'query' ? '찾아보기' : store.KINDS[p.kind]?.label || '')); });
     qi.addEventListener('keydown', async e => {
       if (e.key !== 'Enter' || e.isComposing || !qi.value.trim()) return;
       const v = qi.value.trim();
-      const ps = brain.interpret(v, { projects: await store.projects(), people: [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean) });
+      const ps = brain.interpretCapture(v, { projects: await store.projects(), people: [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean) });
       if (ps.some(p => p.kind === 'query' || p.kind === 'nav')) { sessionStorage.setItem('assistant:prefill', v); go('assistant'); return; }
       for (const p of ps) await store.draft(p.kind, p.data, { source: p.src || v, confidence: p.confidence, origin: 'quick' });
       qi.value = ''; clear(qp); updateBadge();
