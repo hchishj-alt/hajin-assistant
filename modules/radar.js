@@ -20,6 +20,8 @@ export function score(it, marks = {}, base = new Date()) {
   let fit = 0; const why = [];
   for (const [re, w] of FIT) { const m = text.match(re); if (m) { fit += w; why.push(m[0]); } }
   for (const re of MISFIT) if (re.test(text)) fit -= 12;
+  // 지금 신청할 수 있는 공고인지, 이미 끝난 소식인지
+  if (it.type === 'grant' && !it.manual) { if (/모집|공고|접수|신청|참가자|지원\s*대상|선착순|참여\s*기업/.test(text)) { fit += 8; why.push('모집 중'); } if (/시상|수상|성료|협약|개최했|마쳤|선정됐|선정했|발표했|마무리|성과\s*공유|수료/.test(text)) fit -= 16; }
   fit = Math.max(0, Math.min(40, Math.round(fit * 1.25)));
   const mk = marks[it.link] || {};
   const stars = Object.keys(mk.stars || {}).length;
@@ -67,7 +69,9 @@ export default {
       const all = [...leads.map(l => ({ ...l, manual: true })), ...feed.items.filter(i => !leads.some(l => l.link === i.link)), ...PORTALS.map(([type, title, link, desc]) => ({ type, title, link, desc, source: '늘 쓰는 곳', portal: true, date: null }))];
       const scored = all.map(it => ({ it, s: score(it, marks) })).filter(x => !x.s.hidden);
       const live = scored.filter(x => !x.it.portal);
-      const rank = [...live].sort((a, b) => b.s.total - a.s.total);
+      // 같은 소식을 여러 매체가 쓴 건 하나만 (제목이 절반 넘게 겹치면 같은 글로 봄)
+      const grams = t => { const n = t.replace(/[^가-힣a-zA-Z0-9]/g, ''); const g = new Set(); for (let i = 0; i < n.length - 1; i++) g.add(n.slice(i, i + 2)); return g; };
+      const rank = []; for (const x of [...live].sort((a, b) => b.s.total - a.s.total)) { const g = grams(x.it.title); const dup = rank.find(y => { let c = 0; for (const k of g) if (y.g.has(k)) c++; return c / Math.max(1, Math.min(g.size, y.g.size)) > .55; }); if (dup) dup.more = (dup.more || 0) + 1; else rank.push(Object.assign(x, { g })); }
       const soon = live.filter(x => x.s.dday != null && x.s.dday <= 7).length;
       body.append(h('div.tiles', { style: { marginBottom: '14px' } }, tile('layers', live.length, '모인 글'), tile('flag', soon, '7일 안 마감', soon ? 'warn' : 'ok'), tile('star', live.filter(x => x.s.stars).length, '팀이 찜한 글'), tile('target', grants.filter(g => !['선정', '탈락'].includes(g.status)).length, '준비 중인 지원사업', '', 'startup')));
       const search = h('input.in', { placeholder: '찾기 (예: 콘텐츠, 청년, 입주)', value: q, style: { maxWidth: '260px' }, oninput: debounce(e => { q = e.target.value; draw().then(() => { const i = body.querySelector('input.in'); i.focus(); i.setSelectionRange(q.length, q.length); }); }, 250) });
@@ -85,10 +89,23 @@ export default {
       top.forEach((x, i) => left.append(row(x, i + 1, marks, me)));
       const rest = [...live].filter(match).sort((a, b) => (b.it.date || '').localeCompare(a.it.date || ''));
       const right = h('div.card', h('div.card-h', h('h3', ic('file'), '모든 글 (최신순)'), h('span.faint.tiny', rest.length + '개')),
-        h('div.list', { style: { maxHeight: '70vh', overflow: 'auto' } }, rest.slice(0, 150).map(x => h('a.li.click', { href: x.it.link, target: '_blank', rel: 'noopener', title: '원문 열기' }, h('span.chip' + (x.it.type === 'grant' ? '.acc' : ''), TYPE[x.it.type]?.[0] || '글'), h('div.grow', { style: { minWidth: 0 } }, h('div.small', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, x.it.title), h('div.faint.tiny', [x.it.source, x.it.date && rel(x.it.date.slice(0, 10)), x.s.dday != null ? `D-${x.s.dday}` : ''].filter(Boolean).join(' · '))), h('span.mono.tiny.faint', x.s.total)))));
+        h('div.list', { style: { maxHeight: '70vh', overflow: 'auto' } }, rest.slice(0, 150).map(x => h('button.li.click.rd-li', { onclick: () => detail(x), title: '자세히' }, h('span.chip' + (x.it.type === 'grant' ? '.acc' : ''), TYPE[x.it.type]?.[0] || '글'), h('div.grow', { style: { minWidth: 0 } }, h('div.small', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, x.it.title), h('div.faint.tiny', [x.it.source, x.it.date && rel(x.it.date.slice(0, 10)), x.s.dday != null ? `D-${x.s.dday}` : ''].filter(Boolean).join(' · '))), h('span.mono.tiny.faint', x.s.total)))));
       body.append(h('div.grid', { class: 'editor-grid', style: { gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', alignItems: 'start' } }, left, right));
     }
 
+    // 앱 안에서 바로 읽기: 요약·마감·맞는 이유를 보여 주고, 필요할 때만 원문으로
+    function detail(x) {
+      const { it, s } = x;
+      modal(TYPE[it.type]?.[0] || '글', close => h('div',
+        h('h3', { style: { lineHeight: 1.4 } }, it.title),
+        h('div.chips', { style: { margin: '8px 0' } }, s.dday != null ? h('span.chip' + (s.dday <= 3 ? '.bad' : s.dday <= 7 ? '.warn' : ''), s.dday === 0 ? '오늘 마감' : `D-${s.dday} (${s.due})`) : h('span.chip', '마감일 못 찾음'), ...s.why.map(w => h('span.chip.acc', w)), h('span.chip', `점수 ${s.total}`)),
+        h('p.small', { style: { lineHeight: 1.7, whiteSpace: 'pre-wrap' } }, it.desc && it.desc.replace(it.title, '').trim().length > 20 ? it.desc : '이 글은 제목만 모였어요. 자세한 조건은 원문에서 확인해 주세요.'),
+        h('p.faint.tiny', [it.source, it.date && new Date(it.date).toLocaleDateString('ko-KR'), it.q].filter(Boolean).join(' · ')),
+        h('div.modal-f', { style: { flexWrap: 'wrap' } },
+          h('a.btn.ghost', { href: it.link, target: '_blank', rel: 'noopener' }, ic('link', 14), '원문'),
+          h('button.btn', { onclick: async () => { const store = await import('../js/store.js'); await store.draft('task', { title: `지원 검토: ${it.title.slice(0, 50)}`, due: s.due || '', priority: s.dday != null && s.dday <= 7 ? 'high' : 'normal', memo: it.link }, { source: it.title, origin: 'radar', confidence: .8 }); (await import('../js/app.js')).updateBadge(); close(); toast('할 일 임시 항목을 만들었어요', { label: '확인 대기함', fn: () => go('inbox') }); } }, ic('check2', 14), '할 일로'),
+          it.type === 'grant' ? h('button.btn.pri', { onclick: async () => { await db.put('grants', { title: it.title, url: it.link, deadline: s.due || '', status: '검토', org: it.source || '', team: (await db.get('team-main')) ? 'team-main' : '' }); close(); toast('지원사업 준비 목록에 담았어요', { label: '보기', fn: () => go('startup') }); } }, ic('plus', 14), '준비 목록에 담기') : null)));
+    }
     function row(x, n, marks, me) {
       const { it, s } = x;
       const starred = !!(marks[it.link]?.stars || {})[me];
@@ -96,8 +113,8 @@ export default {
       const mark = async patch => { const cur = marks[it.link] || { id: 'mk-' + [...it.link].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36) + it.link.length, link: it.link, stars: {}, team: (await db.get('team-main')) ? 'team-main' : '' }; await db.put('leadmarks', { ...cur, ...patch(cur) }); draw(); };
       return h('div.rank', h('div.rank-n' + (n <= 3 ? '.top' : ''), n),
         h('div.grow', { style: { minWidth: 0 } },
-          h('a.rank-t', { href: it.link, target: '_blank', rel: 'noopener' }, it.title),
-          h('div.chips', { style: { margin: '4px 0 6px' } }, h('span.chip' + (it.type === 'grant' ? '.acc' : ''), TYPE[it.type]?.[0] || '글'), s.dday != null ? h('span.chip' + (s.dday <= 3 ? '.bad' : s.dday <= 7 ? '.warn' : ''), s.dday === 0 ? '오늘 마감' : `D-${s.dday}`) : null, s.stars ? h('span.chip.ok', `찜 ${s.stars}`) : null, ...s.why.map(w => h('span.chip', w)), h('span.faint.tiny', [it.source, it.by && it.by + ' 넣음'].filter(Boolean).join(' · '))),
+          h('button.rank-t', { onclick: () => detail(x) }, it.title),
+          h('div.chips', { style: { margin: '4px 0 6px' } }, h('span.chip' + (it.type === 'grant' ? '.acc' : ''), TYPE[it.type]?.[0] || '글'), s.dday != null ? h('span.chip' + (s.dday <= 3 ? '.bad' : s.dday <= 7 ? '.warn' : ''), s.dday === 0 ? '오늘 마감' : `D-${s.dday}`) : null, s.stars ? h('span.chip.ok', `찜 ${s.stars}`) : null, x.more ? h('span.chip', `같은 소식 ${x.more}건`) : null, ...s.why.map(w => h('span.chip', w)), h('span.faint.tiny', [it.source, it.by && it.by + ' 넣음'].filter(Boolean).join(' · '))),
           h('div.row', { style: { gap: '4px' } }, bar(s.urg, 40, 'var(--bad)', '시급성'), bar(s.fit, 40, 'var(--acc)', '유익성'), bar(s.pri, 20, 'var(--ok)', '우선순위')),
           h('div.faint.tiny', { style: { marginTop: '3px' } }, `시급성 ${s.urg} · 유익성 ${s.fit} · 우선순위 ${s.pri}`)),
         h('div.rank-s', s.total),

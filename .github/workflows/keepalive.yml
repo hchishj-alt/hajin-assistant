@@ -20,8 +20,9 @@ jobs:
           curl -sS -o /dev/null -w "%{http_code}\n" -X POST "$URL/rest/v1/rpc/check_code" \
             -H "apikey: $KEY" -H "Content-Type: application/json" -d '{"p_code":"PING0"}'
       - name: 주간 기록 (예약 작업이 꺼지지 않게)
-        if: github.event.schedule && (github.run_number % 7 == 0)
+        if: github.event_name == 'schedule'
         run: |
+          if [ "$(date -u +%u)" != "1" ]; then exit 0; fi
           date -u +%FT%TZ > .github/heartbeat
           git config user.name "keepalive-bot"
           git config user.email "keepalive@users.noreply.github.com"

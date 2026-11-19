@@ -709,3 +709,4 @@ a.buy-t:hover{text-decoration:underline}
 .clip-acts{flex-basis:100%;order:9;gap:4px;padding-left:56px;flex-wrap:wrap}.clip-acts .btn{background:var(--bg2)}
 /* 손가락으로 누르는 기기: 작은 칩·선택 상자도 넉넉하게 */
 @media (pointer:coarse){button.chip,a.chip{min-height:36px;padding-top:6px;padding-bottom:6px}#view select{min-height:36px}}
+button.rank-t,button.rd-li{border:0;background:none;color:inherit;font-family:inherit;text-align:left;cursor:pointer;width:100%}button.rank-t{padding:0;width:auto}button.rd-li{font-size:inherit}
