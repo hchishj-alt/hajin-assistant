@@ -88,6 +88,8 @@ export default {
       }
       // "민서한테 ~라고 전해줘" → 메신저로 전달
       { const DM = await import('../js/dm.js'); const sync = await import('../js/sync.js'); const meM = await sync.me();
+        const dv = text.match(/^(?:앱|웹|사이트)\s*(?:좀\s*)?(?:고쳐|개선|수정|바꿔)\s*(?:줘|주세요)?\s*[:：,]?\s*(.+)$/s) || text.match(/^코덱스\s*(?:요청)?\s*[:：]\s*(.+)$/s);
+        if (dv) { const C = await import('../js/codex.js'); const r = await C.build(dv[1]); await C.save(dv[1], r); try { await navigator.clipboard.writeText(r.body); } catch { } await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `요청서를 만들고 복사했어요. Codex에 붙여 넣으면 돼요.\n관련 화면: ${r.areas.join(', ') || '못 찾음'} · 먼저 볼 파일 ${r.files.length}개. 다시 보려면 메뉴의 “앱 개선 요청”을 열어요.` }), new Map()); return; }
         const cmd = DM.parseSend(text, (await db.kvGet('sync:roster', [])).filter(r => r.id && r.id !== meM?.id));
         if (cmd) { let t; try { await sync.dmSend(cmd.to.id, cmd.body); t = `${cmd.to.name} 님에게 전했어요: “${cmd.body}”. 답이 오면 바로 알려 드릴게요.`; } catch (e) { t = `${cmd.to.name} 님에게 못 전했어요. ${e.message}`; }
           await drawMsg(await db.put('chat', { role: 'bot', q: text, text: t }), new Map()); return; } }

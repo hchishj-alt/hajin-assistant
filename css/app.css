@@ -698,3 +698,11 @@ a.buy-t:hover{text-decoration:underline}
 .fd-right textarea{width:100%;resize:vertical}.fd-right>.in{margin-bottom:8px}
 .fd-cnt{font-size:12px;opacity:.65;flex:1;font-variant-numeric:tabular-nums}.fd-cnt.over{color:#e5484d;opacity:1;font-weight:700}
 @media(max-width:760px){.fd-edit{grid-template-columns:1fr;gap:10px}.fd-cropbox{max-height:44vh;width:auto}.fd-phone{border-radius:18px}}
+
+/* 앱 개선 요청 */
+.dev-out{width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:calc(12px*var(--fs,1));line-height:1.55;resize:vertical}
+.dev-st{border:0;border-radius:99px;padding:4px 10px;font:inherit;font-size:calc(11px*var(--fs,1));font-weight:700;background:var(--bg2);color:var(--ink2);cursor:pointer;flex:none}.dev-st.done{background:color-mix(in srgb,#1fae84 18%,transparent);color:#1fae84}
+.dev-lim summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:32px}.dev-lim summary::-webkit-details-marker{display:none}
+.dev-lims{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
+.dev-l{padding:12px;border-radius:calc(12px*var(--rd,1));background:var(--bg2)}.dev-l b{font-size:calc(13px*var(--fs,1))}
+.dev-l p{margin:5px 0 0;font-size:calc(12px*var(--fs,1));line-height:1.5;opacity:.7}.dev-l p.alt{opacity:1;display:flex;gap:6px;align-items:flex-start}.dev-l p.alt .ic{color:#1fae84;flex:none;margin-top:2px}

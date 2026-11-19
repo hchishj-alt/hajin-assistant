@@ -25,6 +25,7 @@ export const MODULES = [
   { id: 'startup', title: '스타트업 PM', icon: 'rocket', group: '회사', short: '스타트업' },
   { id: 'look', title: '꾸미기', icon: 'palette', group: '시스템' },
   { id: 'admin', title: '관리자', icon: 'shield', group: '시스템', adminOnly: true },
+  { id: 'dev', title: '앱 개선 요청', icon: 'zap', group: '시스템', short: '개선 요청' },
   { id: 'settings', title: '설정', icon: 'sliders', group: '시스템' },
   { id: 'health', title: '자가 점검', icon: 'shield', group: '시스템' },
   { id: 'menu', title: '메뉴', icon: 'menu', hidden: true, tab: 5 },

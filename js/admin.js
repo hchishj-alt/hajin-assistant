@@ -4,7 +4,7 @@
 // · 팀에 공유된 항목은 누가·언제·무엇을·어떻게 바꿨는지 전부 기록 (관리자 화면에서 봄).
 import * as db from './db.js';
 
-const FREE = new Set(['tasks', 'pollvotes', 'polls', 'leadmarks', 'events', 'audit', 'drafts', '_kv', 'buys', 'boards', 'dms', 'feedback', 'accts', 'posts']); // 누구나 고칠 수 있는 공유 항목
+const FREE = new Set(['tasks', 'pollvotes', 'polls', 'leadmarks', 'events', 'audit', 'drafts', '_kv', 'buys', 'boards', 'dms', 'feedback', 'accts', 'posts', 'devreqs']); // 누구나 고칠 수 있는 공유 항목
 const ADMIN_ONLY_COLS = new Set(['teams', 'projects', 'reffolders', 'labelsets']);                                   // 만들기부터 관리자만
 const SKIP = new Set(['updatedAt', 'createdAt', 'dirty', 'id', 'col', 'sharedMembers', 'code', 'space']);
 const BIG = new Set(['snap', 'comments', 'versions', 'history', 'transcript', 'body', 'avail', 'summary', 'summaryDraft', 'pages']);
