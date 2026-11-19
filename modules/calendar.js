@@ -5,8 +5,9 @@ import * as brain from '../js/brain.js';
 import { FIELDS } from '../js/fields.js';
 import * as LB from '../js/labels.js';
 import * as G from '../js/gcal.js';
+import * as SC from '../js/scope.js';
 const evColor = e => LB.colorOf(e.label) || e.color || colorFor((e.title || '').replace(/^◆ /, ''));
-let labF = '';
+let labF = '', scopeF = 'mine';
 
 let mode = matchMedia('(max-width:900px)').matches ? 'agenda' : 'month', cursor = new Date();
 export default {
@@ -29,12 +30,16 @@ export default {
 
     async function draw() {
       clear(body);
-      const events = await db.list('events');
-      const tasks = (await db.list('tasks')).filter(t => t.due && !t.done);
+      const me = await db.kvGet('name', ''); const team = await store.teammateNames();
+      const sc = e => SC.of(e, { team });
+      // 내 일정 = 개인 일정 + 내가 낀 팀 업무 / 팀 업무 = 팀 전체 업무 일정
+      const pass = e => scopeF === 'all' ? true : scopeF === 'work' ? sc(e) === 'work' : scopeF === 'personal' ? sc(e) === 'personal' : (sc(e) === 'personal' || SC.involves(e, me));
+      const events = (await db.list('events')).filter(pass).map(e => ({ ...e, _sc: sc(e) }));
+      const tasks = (await db.list('tasks')).filter(t => t.due && !t.done).filter(t => scopeF === 'all' ? true : scopeF === 'work' ? sc(t) === 'work' : scopeF === 'personal' ? sc(t) === 'personal' : (sc(t) === 'personal' || !t.who || SC.involves({ who: t.who, by: t.by }, me)));
       const nav = h('div.row.between', { style: { marginBottom: '12px' } },
         h('div.row', h('button.btn.icon.ghost', { 'aria-label': '이전', onclick: () => move(-1) }, ic('left')), h('h2', { style: { minWidth: '150px', textAlign: 'center' } }, title()), h('button.btn.icon.ghost', { 'aria-label': '다음', onclick: () => move(1) }, ic('right')), h('button.btn.sm', { onclick: () => { cursor = new Date(); draw(); } }, '오늘')),
         seg([['month', '월'], ['week', '주'], ['agenda', '목록']], mode, v => { mode = v; draw(); }));
-      body.append(nav, h('div.labels', { style: { marginBottom: '10px' } }, [{ id: '', name: '전체', color: 'var(--line2)' }, ...LB.all()].map(l => h('button.lab' + (labF === l.id ? '.on' : ''), { style: { '--lc': l.color }, onclick: () => { labF = l.id; draw(); } }, h('i'), l.name))));
+      body.append(nav, h('div.row.between', { style: { marginBottom: '10px', gap: '8px', flexWrap: 'wrap' } }, seg([['mine', '내 일정'], ['work', '팀 업무'], ['personal', '개인만'], ['all', '전체']], scopeF, v => { scopeF = v; draw(); }), h('span.faint.tiny', { mine: '개인 일정과 내가 낀 팀 업무를 같이 봐요', work: '팀 전체가 보는 업무 일정이에요', personal: '나만 보는 일정이에요', all: '개인과 팀 업무 전부예요' }[scopeF])), h('div.labels', { style: { marginBottom: '10px' } }, [{ id: '', name: '전체', color: 'var(--line2)' }, ...LB.all()].map(l => h('button.lab' + (labF === l.id ? '.on' : ''), { style: { '--lc': l.color }, onclick: () => { labF = l.id; draw(); } }, h('i'), l.name))));
       const on = d => events.filter(e => (!labF || e.label === labF) && (e.date === d || store.repeatsOn(e, d))).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
       if (mode === 'month') body.append(month(on, tasks));
       else if (mode === 'week') body.append(week(on));
@@ -61,7 +66,7 @@ export default {
         const evs = on(ds), tk = tasks.filter(t => t.due === ds);
         const cell = h('div.d' + (d.getMonth() !== cursor.getMonth() ? '.out' : '') + (ds === todayStr() ? '.today' : ''), { onclick: () => dayModal(ds, on) },
           h('div.row.between', h('span.n', d.getDate()), tk.length ? h('span.tiny.faint', `✓${tk.length}`) : null),
-          evs.slice(0, 3).map(e => h('div.ev', { style: { background: evColor(e) } }, (e.start ? e.start + ' ' : '') + e.title)),
+          evs.slice(0, 3).map(e => h('div.ev' + (e._sc === 'personal' ? '.mine' : ''), { style: { background: evColor(e), '--ec': evColor(e) }, title: SC.LABEL[e._sc] }, (e.start ? e.start + ' ' : '') + e.title)),
           evs.length > 3 ? h('div.tiny.faint', `+${evs.length - 3}`) : null);
         g.append(cell);
       }
@@ -82,7 +87,7 @@ export default {
         for (const e of on(ds)) {
           if (!e.start) { col.prepend(h('div.blk', { style: { top: '0', height: '18px', background: evColor(e), opacity: .8 }, onclick: () => edit(e) }, e.title)); continue; }
           const [a, b] = [e.start, e.end || store.addMins(e.start, 60)].map(t => { const [x, y] = t.split(':').map(Number); return x + y / 60; });
-          col.append(h('div.blk', { style: { top: ((a - H0) * PX) + 'px', height: Math.max(20, (b - a) * PX - 2) + 'px', background: e.kind === 'focus' ? 'var(--ink2)' : evColor(e) }, onclick: () => edit(e) }, h('b', e.start), ' ', e.title));
+          col.append(h('div.blk', { style: { top: ((a - H0) * PX) + 'px', height: Math.max(20, (b - a) * PX - 2) + 'px', background: e.kind === 'focus' ? 'var(--ink2)' : evColor(e), '--ec': evColor(e) }, class: 'blk' + (e._sc === 'personal' ? ' mine' : ''), onclick: () => edit(e) }, h('b', e.start), ' ', e.title));
         }
         if (ds === todayStr()) { const n = new Date(); const y = (n.getHours() + n.getMinutes() / 60 - H0) * PX; if (y > 0) col.append(h('div.nowline', { style: { top: y + 'px' } })); }
         g.append(col);
@@ -106,7 +111,7 @@ export default {
     function evRow(e) {
       return h('div.li.click', { onclick: () => edit(e) }, h('span.dot', { style: { background: evColor(e) } }),
         h('div.mono.small', { style: { width: '92px' } }, e.start ? `${e.start}${e.end ? '–' + e.end : ''}` : '종일'),
-        h('div.grow', h('div.t.small', e.title), e.place ? h('div.faint.tiny', e.place) : null), e.repeat ? ic('refresh', 14) : null);
+        h('div.grow', h('div.t.small', e.title), e.place || e.who ? h('div.faint.tiny', [e.place, e.who && e.who + '와 함께'].filter(Boolean).join(' · ')) : null), h('span.chip.tiny' + (e._sc === 'personal' ? '' : '.acc'), SC.LABEL[e._sc || 'work']), e.repeat ? ic('refresh', 14) : null);
     }
     async function dayModal(ds, on) {
       const slots = await store.freeSlots(ds);

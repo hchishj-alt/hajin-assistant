@@ -731,3 +731,6 @@ button.rank-t,button.rd-li{border:0;background:none;color:inherit;font-family:in
 .rdw-q{padding:0 12px 8px}.rdw-f{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line)}.rdw-f .in{flex:1;min-width:0}
 @media (max-width:900px){.rdw-fab,.rdw{bottom:calc(84px + env(safe-area-inset-bottom));right:12px}}
 button.rank-t{min-height:30px}
+/* 개인 일정은 속을 비워서 팀 업무(채움)와 구분 */
+.cal .ev.mine,.week .blk.mine{background:color-mix(in srgb,var(--ec) 14%,transparent)!important;color:var(--ink);box-shadow:inset 3px 0 0 var(--ec)}
+.chip.tiny{font-size:calc(11px*var(--fs,1));padding:2px 7px;flex:none}

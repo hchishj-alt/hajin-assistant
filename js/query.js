@@ -21,6 +21,7 @@ export function rangeOf(q, base = new Date()) {
   return null;
 }
 
+const fmtK = d => { const x = new Date(d); return `${x.getMonth() + 1}월 ${x.getDate()}일(${'일월화수목금토'[x.getDay()]})`; };
 // 반환: { text, items:[{icon,title,sub,route}] }
 export async function answer(q, base = new Date()) {
   const r = rangeOf(q, base);
@@ -35,6 +36,23 @@ export async function answer(q, base = new Date()) {
     if (r) ms = ms.filter(m => (m.date || '') >= r[0] && (m.date || '') <= r[1]);
     const items = ms.slice(0, 6).map(m => { const s = m.summaryConfirmed ? m.summary : m.summaryDraft; return { icon: 'mic', title: m.title + (m.summaryConfirmed ? '' : ' (요약 확인 전)'), sub: (s?.decisions?.[0] || s?.summary?.[0] || '').slice(0, 80), route: 'meetings/' + m.id }; });
     return { text: items.length ? `${r ? r[2] + ' ' : ''}회의 ${items.length}개예요. 눌러서 정리를 보세요.` : '해당하는 회의록이 없어요.', items };
+  }
+  // "내일 뭐 해야 돼?", "이번 주 뭐 있어?" → 그 기간의 일정과 할 일을 같이
+  if (r && /(뭐\s*(해|하지|있|해야|하기로)|뭐가\s*있|할\s*거\s*있|해야\s*(돼|해|하지|할))/.test(q) && !/(일정|스케줄|할\s*일|할일|지출|비용)/.test(q)) {
+    const evs = (await db.list('events')).filter(e => { for (let d = new Date(r[0]); ymd(d) <= r[1]; d = addD(d, 1)) if (e.date === ymd(d) || store.repeatsOn(e, ymd(d))) return true; return false; }).sort((x, y) => ((x.date || '') + (x.start || '')).localeCompare((y.date || '') + (y.start || '')));
+    const ts = (await store.openTasks()).filter(t => t.due && t.due <= r[1]).sort((x, y) => x.due.localeCompare(y.due));
+    return { text: evs.length || ts.length ? `${r[2]}까지 일정 ${evs.length}개, 끝낼 할 일 ${ts.length}개가 있어요.` : `${r[2]}에는 잡힌 일정도, 마감인 할 일도 없어요.`, items: [...evs.map(e => ({ icon: 'calendar', title: e.title, sub: [e.start || '종일', e.place, e.who].filter(Boolean).join(' · '), route: 'calendar/' + e.date })), ...ts.slice(0, 12).map(t => ({ icon: 'check2', title: t.title, sub: (t.due < today ? '밀림 · ' : '') + '마감 ' + t.due.slice(5).replace('-', '/'), route: 'tasks' }))] };
+  }
+  // "전시 언제였지", "충주 미팅 언제야" → 그 말이 들어간 일정을 날짜와 함께
+  if (/언제/.test(q) && !/비|빈\s*시간/.test(q)) {
+    const kws = q.replace(/(언제(였지|였더라|야|지|예요|에요|더라|인지|였어|임)?|알려\s*줘|뭐였지|일정|약속|\?)/g, ' ').split(/\s+/).map(x => x.replace(/(은|는|이|가|을|를)$/, '')).filter(x => x.length >= 2);
+    if (kws.length) {
+      const hay = e => `${e.title} ${e.place || ''} ${e.who || ''} ${e.area || ''}`;
+      const evs = (await db.list('events')).filter(e => kws.every(k => hay(e).includes(k))).sort((x, y) => (y.date || '').localeCompare(x.date || ''));
+      const ts = (await db.list('tasks')).filter(t => t.due && kws.every(k => t.title.includes(k)));
+      if (evs.length || ts.length) { const e = evs.find(x => x.date >= today) || evs[0]; return { text: e ? `“${e.title}” 일정은 ${fmtK(e.date)}${e.start ? ' ' + e.start : ''}${e.date < today ? '이었어요' : '이에요'}.` : `그 말이 들어간 할 일 ${ts.length}개가 있어요.`, items: [...evs.slice(0, 8).map(x => ({ icon: 'calendar', title: x.title, sub: [x.date.slice(5).replace('-', '/'), x.start, x.place].filter(Boolean).join(' · '), route: 'calendar/' + x.date })), ...ts.slice(0, 5).map(t => ({ icon: 'check2', title: t.title, sub: '마감 ' + t.due.slice(5).replace('-', '/'), route: 'tasks' }))] }; }
+      return { text: `‘${kws.join(' ')}’ 일정을 못 찾았어요. 캘린더에 아직 없는 것 같아요.`, items: [] };
+    }
   }
   if (/(일정|스케줄|약속|회의\s*언제|미팅)/.test(q)) {
     const [a, b, label] = r || [today, ymd(addD(base, 6)), '앞으로 7일'];

@@ -36,7 +36,7 @@ export function diff(prev, item) {
 async function guard(prev, item) {
   if (item.col === 'audit' || item.col === '_kv' || item.col === 'drafts') return;
   if (prev && item.team === 'auto') item.team = prev.team || '';
-  if (!item.deleted) { const A = await import('./auto.js'); if (!prev) await A.fill(item, { hasTeam: !!(await db.get('team-main')), projects: (await db.list('projects')).map(p => p.name) }); else await A.learn(prev, item); }
+  if (!item.deleted) { const A = await import('./auto.js'); if (!prev) await A.fill(item, { hasTeam: !!(await db.get('team-main')), projects: (await db.list('projects')).map(p => p.name), teamNames: (await db.kvGet('sync:roster', [])).map(r => r.name).filter(Boolean) }); else await A.learn(prev, item); }
   const shared = !!(item.team || prev?.team || item.space || prev?.space);
   const me = await who();
   if (!prev && shared && !item.by) item.by = me.name;

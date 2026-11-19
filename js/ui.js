@@ -10,7 +10,7 @@ export function h(sel, attrs, ...kids) {
     if (v == null || v === false) continue;
     if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else if (k === 'class') el.className += ' ' + v;
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'style' && typeof v === 'object') { for (const [sk, sv] of Object.entries(v)) sk.startsWith('--') ? el.style.setProperty(sk, sv) : (el.style[sk] = sv); }
     else if (k === 'html') el.innerHTML = v;
     else if (k in el && !['list', 'type', 'form'].includes(k)) { try { el[k] = v; } catch { el.setAttribute(k, v); } }
     else el.setAttribute(k, v === true ? '' : v);

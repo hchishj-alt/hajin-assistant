@@ -13,7 +13,7 @@ export const FIELDS = {
     { k: 'repeat', label: '반복', type: 'select', options: [['', '안 함'], ['daily', '매일'], ['weekdays', '평일'], ['weekly', '매주'], ['monthly', '매월']] },
     { k: 'remind', label: '알림(분 전)', type: 'number', default: 10 },
     { k: 'label', label: '중요도 색', type: 'label', full: true },
-    { k: 'team', label: '공유', type: 'select', options: [['auto', '알아서 (내용 보고 정함)'], ['', '나만 보기'], ['team-main', '팀에 공유']], default: 'auto' },
+    { k: 'scope', label: '구분', type: 'select', options: [['', '알아서 (내용 보고 정함)'], ['work', '팀 업무 (팀 전체 일정)'], ['personal', '개인 (나만 보기)']], default: '' },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
   ],
   task: [
@@ -24,7 +24,7 @@ export const FIELDS = {
     { k: 'est', label: '예상 시간(분)', type: 'number', default: 30 },
     { k: 'project', label: '프로젝트' },
     { k: 'who', label: '담당' },
-    { k: 'team', label: '공유', type: 'select', options: [['auto', '알아서 (내용 보고 정함)'], ['', '나만 보기'], ['team-main', '팀에 공유']], default: 'auto' },
+    { k: 'scope', label: '구분', type: 'select', options: [['', '알아서 (내용 보고 정함)'], ['work', '팀 업무 (팀 전체 일정)'], ['personal', '개인 (나만 보기)']], default: '' },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
   ],
   expense: [
@@ -98,6 +98,7 @@ export const FIELDS = {
 // 보기용 한 줄 요약
 export function describe(kind, d) {
   const p = [];
+  if ((kind === 'event' || kind === 'task') && d.scope) p.push(d.scope === 'personal' ? '개인' : '팀 업무');
   if (kind === 'event') { if (d.date) p.push(d.date.slice(5).replace('-', '/')); if (d.start) p.push(d.start + (d.end ? '–' + d.end : '')); if (d.place) p.push(d.area && !d.place.includes(d.area) ? `${d.place} (${d.area})` : d.place); else if (d.area) p.push(d.area); if (d.who) p.push(d.who + '와 함께'); if (d.addr) p.push(d.addr); }
   if (kind === 'task') { if (d.due) p.push('마감 ' + d.due.slice(5).replace('-', '/')); if (d.who) p.push('담당 ' + d.who); if (d.priority === 'high') p.push('중요'); if (d.project) p.push(d.project); }
   if (kind === 'expense') { p.push((Number(d.amount) || 0).toLocaleString() + '원'); if (d.category) p.push(d.category); if (d.pay) p.push(d.pay); }

@@ -1,4 +1,5 @@
 // ─────────────────────────────────────────────────────────────
+import { guess as guessScope } from './scope.js';
 // 하진 비서의 기본 두뇌 (외부 AI 없이 기기 안에서 돌아가는 한국어 분석 로직)
 //  - parseWhen   : "다음 주 화요일 오후 3시" 같은 날짜·시간 인식
 //  - keywords    : 핵심 키워드 추출
@@ -41,7 +42,11 @@ export function parseWhen(text, base = new Date()) {
   }
   // 상대 날짜
   if (!date) {
-    if ((m = hit(t.match(/(오늘|금일)/)))) date = b;
+    if ((m = hit(t.match(/(오늘|금일)\s*(안에|안으로|중으로|중에|내로)/)))) date = b;
+    else if ((m = hit(t.match(/(내일|낼)\s*(안에|안으로|중으로|중에|내로)/)))) date = addD(b, 1);
+    else if ((m = hit(t.match(/(이번\s*주|금주)\s*(안에|안으로|내로|내에|중으로|중에|까지)/)))) { const fri = addD(b, -((b.getDay() + 6) % 7) + 4); date = fri < b ? addD(fri, 2) : fri; }
+    else if ((m = hit(t.match(/((이번\s*달|이달)\s*말|월말|말일)/)))) date = new Date(b.getFullYear(), b.getMonth() + 1, 0);
+    else if ((m = hit(t.match(/(오늘|금일)/)))) date = b;
     else if ((m = hit(t.match(/(내일|낼)(?!모레)/)))) date = addD(b, 1);
     else if ((m = hit(t.match(/(모레|내일모레)/)))) date = addD(b, 2);
     else if ((m = hit(t.match(/글피/)))) date = addD(b, 3);
@@ -222,7 +227,7 @@ const tidy = s => s.replace(/^((그리고|그래서|근데|그런데|일단|아|
 
 // ── 회의·메모 분석 ───────────────────────────────────────────
 const DECIDE = /(결정|확정|으로\s*(가기로|정했|결정)|로\s*가기로|정했|합의|채택|으로\s*가자|로\s*가자|하자고\s*했|으로\s*간다|로\s*픽스|픽스)/;
-const ACTION = /(해야|할\s*것|하기로|해\s*주세요|해주세요|해\s*줘|해줘|부탁|맡|담당|준비|보내|제출|전달|공유하|정리하|만들|작성|수정|체크|확인하|확인해|예약|연락|요청|업로드|올리|뽑|찾아|알아보|검토|리뷰|컨펌|피드백|까지|마감|todo|TODO|할\s*일|챙기|구매|주문|결제|신청|발송|출력|인쇄)/;
+const ACTION = /(해야|야\s*(함|해|돼|됨|한다|하는데|겠)|끝내|넘기|넘겨|받아|받기|신고|할\s*것|하기로|해\s*주세요|해주세요|해\s*줘|해줘|부탁|맡|담당|준비|보내|제출|전달|공유하|정리하|만들|작성|수정|체크|확인하|확인해|예약|연락|요청|업로드|올리|뽑|찾아|알아보|검토|리뷰|컨펌|피드백|까지|마감|todo|TODO|할\s*일|챙기|구매|주문|결제|신청|발송|출력|인쇄)/;
 const QUESTION = /(\?|인가요|일까(?!지)|할까(?!지)|될까(?!지)|[^끝]나요$|는지\s|궁금|고민|문제|이슈|리스크|걱정|애매|미정|모르겠)/;
 const IDEA = /(아이디어|어떨까|하면 좋|해보면|해 보면|넣으면|컨셉|콘셉트|느낌으로|제안|해볼까|하는 건 어때)/;
 
@@ -238,7 +243,8 @@ export function findAssignee(s, people = []) {
 }
 
 export function cleanTask(s, who = '') {
-  let r = tidy(s);
+  let r = tidy(s).replace(/(^|\s)(급하게|급히|빨리|꼭|반드시|무조건)(?=\s)/g, ' ').replace(/(이번\s*주|금주|오늘|내일|월말|말일|이번\s*달\s*말)\s*(안에|안으로|중으로|중에|내로|내에|까지)/g, ' ');
+  { const end = { 겨: '기기', 려: '리기', 봐: '보기', 워: '우기', 와: '오기', 써: '쓰기', 줘: '주기', 꿔: '꾸기', 춰: '추기', 내: '내기', 해: '하기' }; r = r.replace(/(겨|려|봐|워|와|써|줘|꿔|춰|내|해)야\s*(해|돼|함|됨|겠다|한다|하는데|되는데|지)\S*\s*$/, (m0, a) => end[a]).replace(/([받찾닫믿얻])아야\s*(해|돼|함|됨|겠다|한다|지)\S*\s*$/, '$1기'); }
   if (who && who !== '나') r = r.replace(new RegExp(who + '(님|씨)?(이가|이|가|은|는|께서|한테|에게|께)?\\s*'), '');
   r = r.replace(/(다음\s*주|이번\s*주|담주|다다음\s*주)?\s*[월화수목금토일]요일/g, ' ')
     .replace(/(오늘|내일|모레|글피|다음\s*주|이번\s*주|\d+월\s*\d+일|\d{1,2}\/\d{1,2}|오전|오후|저녁|아침|\d+시(\s*반|\s*\d+분)?)(까지|에|부터)?/g, ' ')
@@ -325,7 +331,9 @@ function interpretOne(s, base, ctx) {
   const urls = parseUrls(t);
   const tags = parseTags(t);
   const forced = (learned.kind || {});
-  for (const [k, v] of Object.entries(forced)) if (t.includes(k)) return [build(v)];
+  // 종류를 고쳐 준 적이 있는 낱말이면 그 종류로. 단, 시간·금액·전화번호처럼 분명한 신호가 있으면 그쪽이 우선이고, 사람 이름으로는 배우지 않음
+  const strong = (w.time && !isDeadline(t)) || (money != null && /(원|결제|샀|구매|썼|지출|냈)/.test(t)) || phone || email;
+  if (!strong) for (const [k, v] of Object.entries(forced)) if (t.includes(k) && !new RegExp(`(${KIN}|${FAMILY})$`).test(k) && !(ctx.people || []).some(n => n && (n === k || n.slice(1) === k))) return [build(v)];
 
   // 명시 접두어: "일정:", "할일:", "지출:" ...
   const pre = t.match(/^(일정|약속|회의|미팅|할\s*일|할일|투두|todo|지출|비용|결제|연락처|번호|메모|노트|아이디어|레퍼런스|참고|sns|콘텐츠|기록|목표|okr|지원사업|공모)\s*[:：]\s*/i);
@@ -353,10 +361,12 @@ function interpretOne(s, base, ctx) {
     if (urls.length && /(레퍼런스|참고|ref|무드|영감|예시|느낌)/i.test(t)) return 'reference';
     if (urls.length) return 'reference';
     if (/(목표|OKR|KR|핵심\s*결과|분기)/i.test(t)) return 'okr';
+    if (w.time && /(설명회|간담회|세미나|미팅|회의|상담|행사|교육|워크숍|발표|면접|방문|관람)/.test(t)) return 'event';
+    if (/(지원사업|공모전|공모|정부지원|창업지원|예비창업|초기창업|액셀러레이터|TIPS|팁스)/i.test(t) && isDeadline(t) && ACTION.test(t.replace(/까지|마감/g, ''))) return 'task';
     if (/(지원사업|공모전|공모|정부지원|창업지원|예비창업|초기창업|액셀러레이터|TIPS|팁스)/i.test(t) || (/(IR|투자\s*유치|데모데이)/.test(t) && !ACTION.test(t))) return 'grant';
-    if (/(릴스|쇼츠|틱톡|유튜브|인스타|브이로그|썸네일|업로드|게시물|피드)/.test(t) && /(올리|찍|만들|편집|콘텐츠|아이디어|기획)/.test(t)) return 'sns';
+    if (/(릴스|쇼츠|틱톡|유튜브|인스타|브이로그|썸네일|업로드|게시물|피드)/.test(t) && /(올리|찍|만들|편집|콘텐츠|아이디어|기획)/.test(t) && !isDeadline(t)) return 'sns';
     if ((/\d+(\.\d+)?\s*(시간|분)/.test(t) && /(했음|했다|했어|했고|함$|완료|끝냄|작업|공부|집중)/.test(t) && !w.time) || /작업\s*(했|함|기록)/.test(t)) return 'timelog';
-    if ((w.time || w.date) && /(회의|미팅|약속|만나|만남|수업|면접|발표|전시|촬영|병원|저녁|점심|콜|통화|줌|zoom|meet|일정|스케줄|행사|세미나|오픈|마감식|파티|회식|생일|여행|공연|콘서트|(?<!업)데이트|식사|모임|스터디|레슨|강의|워크숍|휴가)/i.test(t) && !(isDeadline(t) && ACTION.test(t))) return 'event';
+    if ((w.time || w.date) && /(회의|미팅|약속|만나|만남|수업|면접|발표|전시|촬영|병원|저녁|점심|콜|통화|줌|zoom|meet|일정|스케줄|행사|세미나|오픈|마감식|파티|회식|생일|여행|공연|콘서트|(?<!업)데이트|식사|모임|스터디|레슨|강의|워크숍|휴가|설명회|간담회|관람|방문|상담|진료|치과|인터뷰)/i.test(t) && !(isDeadline(t) && ACTION.test(t))) return 'event';
     if (w.time && !ACTION.test(t)) return 'event';
     if (/(회의|미팅|약속|만나|수업|면접|발표|행사|세미나|전시)/.test(t) && w.date) return 'event';
     if (IDEA.test(t) || /(떠올|생각났|영감)/.test(t)) return 'idea';
@@ -369,10 +379,17 @@ function interpretOne(s, base, ctx) {
     const bw = body === t ? w : parseWhen(body, base);
     const cleanTitle = strip(body, bw.hits);
     switch (kind) {
-      case 'event': { const rep = /매일|날마다/.test(body) ? 'daily' : /평일마다|매\s*평일|평일\s*매일/.test(body) ? 'weekdays' : /매주|주마다/.test(body) ? 'weekly' : /매달|매월|달마다/.test(body) ? 'monthly' : ''; const r0 = { kind, label: rep ? '반복 일정' : '일정', confidence: bw.time ? 0.9 : 0.7, data: { repeat: rep, title: cleanTitle.replace(/(매일|날마다|평일마다|매\s*평일|매주|주마다|매달|매월|달마다)\s*/g, '').trim() || '일정', date: bw.date || ymd(base), start: bw.time || '', end: bw.end || '', place: placeOf(body), tags } }; const ev = r0.data; const pp = eventParts(ev.title, ctx.people || []); if (pp) { ev.title = pp.title; if (pp.who) ev.who = pp.who; if (pp.place) ev.place = pp.place; if (pp.area) ev.area = pp.area; } return r0; }
+      case 'event': { const rep = /매일|날마다/.test(body) ? 'daily' : /평일마다|매\s*평일|평일\s*매일/.test(body) ? 'weekdays' : /매주|주마다/.test(body) ? 'weekly' : /매달|매월|달마다/.test(body) ? 'monthly' : ''; const r0 = { kind, label: rep ? '반복 일정' : '일정', confidence: bw.time ? 0.9 : 0.7, data: { repeat: rep, title: cleanTitle.replace(/(매일|날마다|평일마다|매\s*평일|매주|주마다|매달|매월|달마다)\s*/g, '').trim() || '일정', date: bw.date || ymd(base), start: bw.time || '', end: bw.end || '', place: '', tags } }; const ev = r0.data; const pp = eventParts(ev.title, ctx.people || []); if (pp) { ev.title = pp.title; if (pp.who) ev.who = pp.who; if (pp.place) ev.place = pp.place; if (pp.area) ev.area = pp.area; } if (!ev.place && !ev.area) ev.place = placeOf(body); ev.scope = guessScope(body, { who: ev.who || '', team: ctx.people || [] }); return r0; }
       case 'task': { const who0 = findAssignee(body, ctx.people || []); const who = who0 === '나' ? '' : who0; return { kind, label: '할 일', confidence: 0.75, data: { who, title: cleanTask(cleanTitle, who) || cleanTitle || body, due: bw.date || '', time: isDeadline(body) ? '' : (bw.time || ''), priority: /(급|급함|asap|ASAP|중요|빨리|꼭|반드시|!!)/.test(body) ? 'high' : 'normal', project: projectOf(body, ctx), tags } }; }
       case 'expense': { const amt = parseMoney(body) || 0; return { kind, label: '지출', confidence: 0.85, data: { title: strip(body.replace(/(\d+(?:\.\d+)?\s*만\s*(\d+\s*천)?\s*원?|\d[\d,]*\s*원|₩\s*[\d,]+)/g, ''), bw.hits).replace(/(법인\s*카드|회사\s*카드|개인\s*카드|카드|현금|계좌\s*이체)/g, '').replace(/(결제|샀다|샀어|썼다|썼어|지출|냈다|냈어|했다)\s*$/, '').replace(/\s+/g, ' ').trim() || '지출', amount: amt, date: bw.date || ymd(base), category: guessCategory(body), project: projectOf(body, ctx), pay: /(법인|회사|팀)\s*카드/.test(body) ? '법인카드' : /(현금)/.test(body) ? '현금' : '개인카드' } }; }
-      case 'contact': { const ph = parsePhone(body), em = parseEmail(body); let name = body.replace(ph ? /(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/ : /$^/, '').replace(em || /$^/, '').replace(/(번호|전화|연락처|이메일|메일|저장|추가|해줘|해 줘)/g, ' ').trim(); const nm = (name.match(/[가-힣]{2,4}|[A-Za-z]+(?:\s[A-Za-z]+)?/) || [''])[0]; const rest = name.replace(nm, '').replace(/\s+/g, ' ').trim(); return { kind, label: '연락처', confidence: 0.85, data: { name: nm, phone: ph || '', email: em || '', org: (rest.match(/([가-힣A-Za-z0-9]+)\s*(회사|대표|팀장|매니저|PD|디자이너|교수|님)?/) || [''])[0], memo: rest, tags } }; }
+      case 'contact': { const ph = parsePhone(body), em = parseEmail(body); const raw = body.replace(ph ? /(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/ : /$^/, ' ').replace(em || /$^/, ' ').replace(/(번호|전화|연락처|이메일|메일|저장|추가|해줘|해 줘)/g, ' ').replace(/#[\p{L}\p{N}_]+/gu, ' ').replace(/\s+/g, ' ').trim();
+        const ROLE = /^(.*?)(대표|이사|팀장|실장|부장|차장|과장|대리|주임|사원|주무관|매니저|PD|피디|교수|작가|감독|디자이너|개발자|기획자|마케터|에디터|사장|선생님|쌤|원장|담당자?)(님)?$/; const ws = raw.split(' ').filter(Boolean); let nm = '', role = '', org = '';
+        const ti = ws.findIndex(x => ROLE.test(x) && x.match(ROLE)[1].length >= 1 && x.match(ROLE)[1].length <= 3); // "김대리", "박대표님"
+        const ni = ws.findIndex(x => /^[가-힣]{2,4}$/.test(x) && !ROLE.test(x) && !PLACE_SUF.test(x) && !/(프린팅|디자인|스튜디오|컴퍼니|상사|기획|미디어|랩|웍스|코리아|주식회사)$/.test(x));
+        if (ni >= 0) { nm = ws[ni]; const others = ws.filter((_, k) => k !== ni); role = others.find(x => ROLE.test(x) && !x.match(ROLE)[1]) || ''; org = others.filter(x => x !== role).join(' '); }
+        else if (ti >= 0) { nm = ws[ti]; role = ws[ti].match(ROLE)[2]; org = ws.filter((_, k) => k !== ti).join(' '); }
+        else { nm = (raw.match(/[가-힣]{2,4}|[A-Za-z]+(?:\s[A-Za-z]+)?/) || [''])[0]; org = raw.replace(nm, '').trim(); }
+        return { kind, label: '연락처', confidence: 0.85, data: { name: nm, phone: ph || '', email: em || '', org, role, memo: '', tags } }; }
       case 'reference': return { kind, label: '레퍼런스', confidence: 0.8, data: { title: strip(body.replace(/https?:\/\/\S+/g, ''), []) || (parseUrls(body)[0] || '레퍼런스'), url: parseUrls(body)[0] || '', tags: tags.length ? tags : keywords(body.replace(/레퍼런스|참고/g, ''), 4) } };
       case 'idea': return { kind, label: '아이디어', confidence: 0.7, data: { title: summarize(body, 1)[0]?.slice(0, 60) || body.slice(0, 60), body, tags: tags.length ? tags : keywords(body, 5) } };
       case 'note': return { kind, label: '메모', confidence: 0.6, data: { title: (summarize(body, 1)[0] || body).slice(0, 60), body, tags: tags.length ? tags : keywords(body, 6) } };
@@ -393,18 +410,35 @@ function interpretOne(s, base, ctx) {
 const KIN = '오빠|언니|누나|형|형님|씨|님|쌤|선생님|교수님|대표님|팀장님|실장님|작가님|감독님|엄마|아빠|친구|동생|선배|후배|이모|삼촌|할머니|할아버지|사장님|피디님|PD님';
 const AREA = /^((서|동|남|북)?[가-힣]{1,3}(시|군|구|동|읍|면|도)|서충주|충주|서울|홍대|강남|성수|합정|연남|망원|이태원|한남|을지로|종로|대학로|잠실|여의도|판교|분당|일산|부산|해운대|대전|대구|광주|인천|수원|청주|제주|전주|춘천|강릉|원주|천안|세종|울산|창원|포항|경주|여수|목포)$/;
 const DOING = /(?:\s|^)((?:전시|공연|영화|팝업|박람회|페어|콘서트|축제|행사)?\s*(?:방문|관람|구경|보기|보러\s*가기|미팅|회의|촬영|답사|식사|점심|저녁|약속|모임|견학|투어|상담|인터뷰|수업|강의|워크숍|설치|철수|회식|데이트|나들이|여행|전시|공연|팝업))$/;
+const FAMILY = '엄마|아빠|어머니|아버지|할머니|할아버지|이모|고모|삼촌|언니|오빠|누나|형|동생|친구|남친|여친|남자친구|여자친구|남편|아내|와이프';
+const TITLE_SUF = '대표님?|팀장님?|실장님?|교수님?|선생님|쌤|작가님?|감독님?|피디님?|PD님?|사장님|주무관님?|대리님?|과장님?|차장님?|부장님?|매니저님?|님';
+const PLACE_SUF = /(역|카페|센터|빌딩|학교|대학교|대학|캠퍼스|사무실|스튜디오|홀|관|시청|구청|도청|군청|청사|병원|치과|의원|미술관|박물관|도서관|공원|극장|갤러리|플라자|타워|식당|집|본점|지점|점|DDP|코엑스|킨텍스|벡스코)$/;
+const MEET = '미팅|회의|상담|인터뷰|식사|점심|저녁|약속|통화|콜|회식|모임|촬영|수업';
+const esc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export function eventParts(title, people = []) {
-  let t = String(title || '').trim(); if (!t) return null; let who = '', area = '', place = '';
-  const names = people.filter(Boolean).map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-  const wm = t.match(new RegExp(`(^|\\s)(${names ? '(?:' + names + ')(?:님|씨)?|' : ''}[가-힣A-Za-z]{1,6}\\s?(?:${KIN}))(?:이랑|랑|하고|와|과)(?:\\s*(?:같이|함께))?(?=\\s|$)`)) || t.match(/(^|\s)([가-힣A-Za-z]{2,6})(?:이랑|랑|하고|와|과)\s*(?:같이|함께)(?=\s|$)/);
-  if (wm) { who = wm[2]; t = (t.slice(0, wm.index) + ' ' + t.slice(wm.index + wm[0].length)).replace(/\s+/g, ' ').trim(); }
-  const words = t.split(' ');
-  if (words.length > 1 && AREA.test(words[0].replace(/(에서|에)$/, ''))) { area = words.shift().replace(/(에서|에)$/, ''); t = words.join(' '); }
+  let t = String(title || '').replace(/\s+/g, ' ').trim(); if (!t) return null; let who = '', area = '', place = '';
+  const cut = (m, keep = '') => { t = (t.slice(0, m.index) + ' ' + keep + ' ' + t.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim(); };
+  // 누구랑: 아는 이름(성 빼고 불러도), 호칭(오빠·대표님…), 가족
+  const names = [...new Set(people.filter(Boolean).flatMap(n => /^[가-힣]{3,4}$/.test(n) ? [n, n.slice(1)] : [n]))].sort((a, b) => b.length - a.length).map(esc).join('|');
+  const person = `(?:${names ? '(?:' + names + ')(?:이|님|씨)?|' : ''}[가-힣A-Za-z]{1,6}\\s?(?:${KIN})|${FAMILY})`;
+  let m = t.match(new RegExp(`(^|\\s)(${person})(?:이랑|랑|하고|와|과)(?:\\s*(?:같이|함께|둘이))?(?=\\s|$)`)) || t.match(/(^|\s)([가-힣A-Za-z]{2,6})(?:이랑|랑|하고|와|과)\s*(?:같이|함께)(?=\s|$)/);
+  if (m) { who = m[2]; cut(m); }
+  else if ((m = t.match(new RegExp(`(^|\\s)([가-힣A-Za-z]{1,6}(?:${TITLE_SUF}))\\s+(?=(?:\\S+\\s)?(?:${MEET})$)`)))) { who = m[2]; }
+  if (who && names) { const full = people.find(n => n && n !== who && n.slice(1) === who.replace(/(이|님|씨)$/, '')); if (full) who = full; else who = who.replace(/(?<=[가-힣]{2})이$/, ''); }
+  // 온라인
+  if ((m = t.match(/(^|\s)(줌|zoom|구글\s*밋|구글\s*미트|google\s*meet|팀즈|디스코드|온라인|화상|전화|통화)(으로|로)(?=\s|$)/i))) { place = /전화|통화/.test(m[2]) ? '전화' : `온라인 (${m[2]})`.replace(' (온라인)', '').replace(' (화상)', ''); cut(m); }
+  // "○○에서"
+  if (!place && (m = t.match(/(^|\s)((?:\S+\s)?\S+?)에서(?=\s|$)/))) { const ph = m[2].trim(); const ws = ph.split(' '); if (ws.length === 2 && AREA.test(ws[0])) area = ws[0]; if (AREA.test(ph)) area = ph; else place = ph; cut(m); }
+  let words = t.split(' ');
+  if (!area && words.length > 1 && AREA.test(words[0].replace(/(에서|에)$/, ''))) { area = words.shift().replace(/(에서|에)$/, ''); t = words.join(' '); }
+  // 이름 끝이 장소 같은 말 (○○센터, ○○시청, ○○역…): 앞에 붙은 말까지 묶음
+  if (!place) { words = t.split(' '); const k = words.findIndex(x => PLACE_SUF.test(x) && x.length >= 2); if (k >= 0 && k <= 2 && !(who && words.slice(0, k + 1).join(' ').includes(who))) { place = words.slice(0, k + 1).join(' '); const restT = words.slice(k + 1).join(' '); if (restT.length >= 2) t = restT; } }
+  // 보러 가는 일정이면 앞말이 장소
   const dm = t.match(DOING);
-  if (dm && dm.index > 0) { const head = t.slice(0, dm.index).trim().replace(/(에서|에|으로|로)$/, ''); if (head && head.split(' ').length <= 3 && !/(하|되)$/.test(head) && /(방문|관람|구경|보기|가기|견학|투어|답사|전시|공연|팝업|나들이|여행|데이트)$/.test(dm[1])) place = head; }
+  if (!place && dm && dm.index > 0) { const head = t.slice(0, dm.index).trim().replace(/(에서|에|으로|로)$/, ''); if (head && head.split(' ').length <= 3 && !/(하|되)$/.test(head) && /(방문|관람|구경|보기|가기|견학|투어|답사|전시|공연|팝업|나들이|여행|데이트)$/.test(dm[1])) place = head; }
   if (!who && !area && !place) return null;
-  if (who && t.length <= 3) t = `${who} ${t}`.trim();
-  return { title: t || title, who, area, place: place || '' };
+  if (t.length <= 3 && who && !t.includes(who)) { const c = who.charCodeAt(who.length - 1); const bat = c >= 0xac00 && c <= 0xd7a3 ? (c - 0xac00) % 28 > 0 : false; t = `${who}${bat ? '과' : '와'} ${t}`.trim(); } else if (t.length <= 3 && area) t = `${area} ${t}`.trim(); else if (!t) t = place || title;
+  return { title: t || title, who, area, place };
 }
 function placeOf(s) { const m = s.match(/([가-힣A-Za-z0-9]+(?:역|카페|센터|빌딩|학교|대학교|캠퍼스|사무실|스튜디오|홀|관|층|호|점))(?:에서|서)?/); return m ? m[1] : ''; }
 function projectOf(s, ctx) { for (const p of ctx.projects || []) if (p && s.includes(p)) return p; const m = s.match(/\[([^\]]+)\]/); return m ? m[1] : ''; }
@@ -435,7 +469,7 @@ export function learn(kind, originalText, final) {
   if (final.who && final.who !== '나' && !learned.people.includes(final.who)) learned.people.push(final.who);
   return learned;
 }
-export function learnKind(text, kind) { const kw = keywords(text, 1).filter(x => !x.includes(' '))[0]; if (kw) learned.kind[kw] = kind; return learned; }
+export function learnKind(text, kind) { const kw = keywords(text, 6).filter(x => !x.includes(' ') && !new RegExp(`(${KIN}|${FAMILY})$`).test(x) && !AREA.test(x)).pop(); if (kw) learned.kind[kw] = kind; return learned; }
 
 // ── 레퍼런스 추천 (로컬 지식 사전) ───────────────────────────
 // 키워드 → 스타일 태그 → 참고할 만한 사이트·검색어
