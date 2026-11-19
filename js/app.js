@@ -168,14 +168,17 @@ async function setupSW() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
   try {
     const reg = await navigator.serviceWorker.register('sw.js');
-    const prompt = w => toast('새 버전이 준비됐어요', { label: '업데이트', fn: () => { w.postMessage('skip'); } });
-    if (reg.waiting) prompt(reg.waiting);
+    // 앱을 막 열어서 아직 아무것도 안 눌렀으면 묻지 않고 새 버전으로 바꿈(고친 것이 바로 닿게). 쓰는 중이면 알림만 띄움
+    let touched = false; for (const ev of ['pointerdown', 'keydown', 'input']) addEventListener(ev, () => { touched = true; }, { once: true, capture: true });
+    const prompt = w => { if (!touched && navigator.serviceWorker.controller) w.postMessage('skip'); else toast('새 버전이 준비됐어요', { label: '업데이트', fn: () => { w.postMessage('skip'); } }); };
     reg.addEventListener('updatefound', () => {
       const w = reg.installing;
       w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) prompt(w); });
     });
     let reloaded = false; const hadController = !!navigator.serviceWorker.controller; // 처음 설치될 때는 새로고침할 필요가 없다
     navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded && hadController) { reloaded = true; location.reload(); } });
+    if (reg.waiting) prompt(reg.waiting);
+    addEventListener('hashchange', () => { if (reg.waiting && navigator.serviceWorker.controller) reg.waiting.postMessage('skip'); }); // 알림을 놓쳤어도 화면을 옮길 때 새 버전으로 (적던 것이 없는 순간)
     setInterval(() => reg.update().catch(() => { }), 30 * 60 * 1000);
     document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && reg.update().catch(() => { }));
   } catch (e) { store.logError(e, 'sw'); }

@@ -52,7 +52,7 @@ export default {
           h('button.btn.sm.ghost.danger', { onclick: async () => { if (!(await confirmBox('모든 기록을 지울까요? 되돌릴 수 없어요. 먼저 백업을 권해요.', '모두 지우기'))) return; indexedDB.deleteDatabase('hajin-assistant'); toast('지웠어요'); setTimeout(() => location.reload(), 600); } }, '모두 지우기')),
         h('p.faint.tiny', { style: { marginTop: '8px' } }, '동기화를 켜면 폰과 PC가 자동으로 맞춰져요. 백업 파일은 만약을 위한 사본이에요.')),
       sec('업데이트', 'refresh', h('p.small.muted', '새 버전이 올라오면 앱이 스스로 받아 두고 "업데이트" 알림을 띄워요. 기록은 그대로 남아요.'),
-        h('div.row', { style: { marginTop: '8px' } }, h('span.chip', `현재 v${VERSION}`), h('button.btn.sm', { onclick: async () => { const r = await navigator.serviceWorker?.getRegistration(); if (!r) { toast('오프라인 모드가 아직 준비 안 됐어요'); return; } await r.update(); toast(r.waiting || r.installing ? '새 버전을 받는 중이에요' : '최신 버전이에요'); } }, '지금 확인'))),
+        h('div.row', { style: { marginTop: '8px' } }, h('span.chip', `현재 v${VERSION}`), h('button.btn.sm', { onclick: async () => { const r = await navigator.serviceWorker?.getRegistration(); if (!r) { toast('오프라인 모드가 아직 준비 안 됐어요'); return; } await r.update().catch(() => { }); if (r.waiting) { toast('새 버전으로 바꾸는 중이에요'); r.waiting.postMessage('skip'); return; } if (r.installing) { const w = r.installing; toast('새 버전을 받는 중이에요'); w.addEventListener('statechange', () => { if (w.state === 'installed') w.postMessage('skip'); }); return; } toast('최신 버전이에요'); } }, '지금 확인'))),
       sec('폰에 설치', 'phone', h('div.list',
         h('div.li', h('b.small', { style: { width: '70px' } }, '아이폰'), h('span.small', 'Safari로 열기 → 공유 버튼 → "홈 화면에 추가"')),
         h('div.li', h('b.small', { style: { width: '70px' } }, '안드로이드'), h('span.small', 'Chrome으로 열기 → 메뉴 ⋮ → "앱 설치" 또는 "홈 화면에 추가"')),
