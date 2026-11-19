@@ -16,8 +16,9 @@ export default {
       const v = quick.value.trim();
       const p = brain.interpret('할일: ' + v)[0];
       const tags = brain.parseTags(v);
-      await store.commit('task', { ...p.data, title: p.data.title.replace(/[!！]?중요/g, '').trim(), project: p.data.project || tags[0] || proj || '', est: 30 });
-      quick.value = ''; clear(hint); toast('추가했어요'); draw();
+      quick.value = ''; clear(hint); quick.disabled = true; const AI = await import('../js/ai.js'); if (await AI.enabled()) toast('AI가 읽고 있어요');
+      let n = 0; try { for (const d of await AI.readOne('task', v, p)) { await store.commit('task', { ...d, title: d.title.replace(/#\S+/g, '').replace(/[!！]?중요/g, '').trim() || p.data.title, project: d.project || tags[0] || proj || '', est: 30 }); n++; } } finally { quick.disabled = false; quick.focus(); }
+      toast(n > 1 ? `${n}개 추가했어요` : '추가했어요'); draw();
     });
     root.append(head('할 일', '직접 적은 할 일은 바로 확정돼요. 비서가 뽑은 건 확인 대기함으로 가요.',
       h('button.btn.sm', { onclick: autoPlan }, ic('sparkles', 14), '오늘 빈 시간에 배치'),

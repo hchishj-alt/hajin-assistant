@@ -124,7 +124,7 @@ function calendarTable(today) {
   for (let i = -7; i <= 27; i++) { const d = new Date(b); d.setDate(b.getDate() + i); const y = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; const wk = Math.floor((i + ((b.getDay() + 6) % 7)) / 7); rows.push(`${y} ${'일월화수목금토'[d.getDay()]}${i === 0 ? ' (오늘)' : ''} [${wk === 0 ? '이번 주' : wk === 1 ? '다음 주' : wk === 2 ? '다다음 주' : wk === -1 ? '지난 주' : wk + '주 뒤'}]`); }
   return rows.join('\n');
 }
-export async function refine(text, parsed, { today, people = [], projects = [], vendors = [] } = {}) {
+export async function refine(text, parsed, { today, people = [], projects = [], vendors = [], ms = 12000 } = {}) {
   if (!(await enabled()) || !text || text.trim().length < 4 || text.length > 1500) return null;
   if ((parsed || []).some(p => p.kind === 'query' || p.kind === 'nav')) return null;
   const hint = (parsed || []).filter(p => p.kind !== 'talk').map(p => ({ kind: p.kind, ...p.data }));
@@ -137,7 +137,7 @@ ${calendarTable(today)}
 프로젝트: ${projects.slice(0, 20).join(', ') || '없음'}
 업체: ${vendors.slice(0, 30).join(', ') || '없음'}
 
-항목 모양: {"kind":"event|task|expense|contact|idea|note|vendor|buy|reference|sns|grant","title":"짧은 명사형 제목(날짜·사람·장소·조사는 뺌)","date":"YYYY-MM-DD","endDate":"여러 날이면 끝 날짜","start":"HH:MM","end":"HH:MM","allDay":false,"who":"같이 하는/맡은 사람","place":"가게·건물·전시 이름","area":"동네·도시","scope":"work|personal","priority":"high|normal","project":"","amount":0,"category":"","memo":"제목에 못 담은 조건","repeat":"daily|weekly|monthly|weekdays 또는 빈칸","phone":"","email":"","org":"","url":"","cat":"업체 분야","prices":[{"item":"품목","price":0,"note":""}]}
+항목 모양: {"kind":"event|task|expense|contact|idea|note|vendor|buy|reference|sns|grant","title":"짧은 명사형 제목(날짜·사람·장소·조사는 뺌)","date":"YYYY-MM-DD","endDate":"여러 날이면 끝 날짜","start":"HH:MM","end":"HH:MM","allDay":false,"who":"같이 하는/맡은 사람","place":"가게·건물·전시 이름","area":"동네·도시","scope":"work|personal","priority":"high|normal","project":"","amount":0,"category":"","memo":"제목에 못 담은 조건","repeat":"daily|weekly|monthly|weekdays 또는 빈칸","phone":"","email":"","org":"","role":"직함","url":"","cat":"업체 분야","prices":[{"item":"품목","price":0,"note":""}]}
 없는 칸은 빼거나 빈칸으로 둬.
 
 읽는 법:
@@ -147,13 +147,16 @@ ${calendarTable(today)}
 - "3시"처럼 오전·오후가 없으면 1~7시는 오후로.
 - 사람 이름은 말에 나온 사람만. 아는 사람 목록에 있으면 전체 이름으로 쓰고, 목록에 없는 사람(예: \"수집오빠\", \"엄마\")은 말한 그대로 써. 목록의 다른 사람으로 바꾸지 마.
 - 제목만 봐도 무슨 일인지 알 수 있게. 불참·휴가·지각처럼 사람이 주어인 일은 제목에 이름을 넣어(예: \"서연 불참\").
+- 시각 없이 오전·오후·저녁만 말했으면 start는 비우고 memo에 그 말을 적어. 시각을 지어내지 마.
+- \"12월 첫째 주\"처럼 주만 말했으면 그 달 1일이 든 주를 첫째 주로 세고, 그 주에서 그 달에 속한 첫 평일을 date로 넣어.
+- contact는 사람이 주인공일 때(이름은 title, 직함은 role, 회사·가게는 org). vendor는 가게·업체가 주인공일 때(담당자 이름은 memo).
 - scope: 가족·친구·개인 볼일은 personal, 나머지는 work.
 - 말에 없는 내용은 지어내지 마. 뭘 만들 말이 아니면(인사, 감탄, 질문) 빈 배열 [].
 
 규칙이 먼저 읽은 초안(틀렸으면 고쳐 써): ${JSON.stringify(hint).slice(0, 1500)}
 
 사용자 말: ${text}`;
-  let arr; try { const j = await ask(prompt, { json: true, ms: 12000 }); arr = Array.isArray(j) ? j : j.items; } catch (e) { console.warn('ai', e); return null; }
+  let arr; try { const j = await ask(prompt, { json: true, ms }); arr = Array.isArray(j) ? j : j.items; } catch (e) { console.warn('ai', e); return null; }
   if (!Array.isArray(arr)) return null;
   const out = [];
   for (const g of arr.slice(0, 8)) {
@@ -163,7 +166,7 @@ ${calendarTable(today)}
     if (g.kind === 'event') data = { ...base, title, date: date || base.date || today, endDate: isD(g.endDate) && g.endDate > (date || '') ? g.endDate : '', start: isT(g.start) ? g.start : g.allDay ? '' : base.start || '', end: isT(g.end) ? g.end : '', who: whoIn(g.who, text, people, base.who), place: S(g.place), area: S(g.area), scope: g.scope === 'personal' ? 'personal' : 'work', repeat: /^(daily|weekly|monthly|weekdays)$/.test(g.repeat || '') ? g.repeat : '', memo: S(g.memo) || base.memo || '', _dated: !!(date || base.date), _allday: !!g.allDay };
     else if (g.kind === 'task') data = { ...base, title, due: date || '', time: isT(g.start) ? g.start : '', who: whoIn(g.who, text, people, base.who), priority: g.priority === 'high' || base.priority === 'high' ? 'high' : 'normal', project: S(g.project) || base.project || '', scope: g.scope === 'personal' ? 'personal' : 'work', memo: S(g.memo) || base.memo || '' };
     else if (g.kind === 'expense') data = { ...base, title, amount: Number(base.amount) || Number(g.amount) || 0, date: date || base.date || today, category: base.category || S(g.category) || '기타', project: S(g.project) || base.project || '', pay: base.pay || '개인카드' };
-    else if (g.kind === 'contact') data = { ...base, name: base.name && base.phone ? (S(g.title) || base.name) : title, phone: base.phone || S(g.phone), email: base.email || S(g.email), org: S(g.org) || base.org || '', role: base.role || '', memo: S(g.memo) };
+    else if (g.kind === 'contact') data = { ...base, name: base.name && base.phone ? (S(g.title) || base.name) : title, phone: base.phone || S(g.phone), email: base.email || S(g.email), org: S(g.org) || base.org || '', role: base.role || S(g.role), memo: S(g.memo) };
     else if (g.kind === 'vendor') data = { ...base, name: title, cat: S(g.cat) || base.cat || '기타', phone: base.phone || S(g.phone), link: base.link || S(g.url), kakao: base.kakao || '', memo: S(g.memo) || base.memo || '', prices: (base.prices && base.prices.length ? base.prices : (g.prices || []).filter(x => x && x.item).map(x => ({ item: String(x.item).slice(0, 40), price: String(Number(x.price) || ''), note: S(x.note), at: today }))) };
     else if (g.kind === 'buy') data = { ...base, title, url: base.url || S(g.url), price: Number(base.price) || Number(g.amount) || 0, qty: 1, need: 'must' };
     else if (g.kind === 'idea' || g.kind === 'note') data = { ...base, title, body: base.body || text, tags: base.tags || [] };
@@ -173,4 +176,18 @@ ${calendarTable(today)}
     out.push({ kind: g.kind, label: KO[g.kind], confidence: 0.85, data, src: text, ai: true });
   }
   return out.length ? out : (arr.length === 0 ? [] : null);
+}
+
+// 캘린더·할 일 화면의 한 줄 입력처럼 종류가 정해진 곳에서 쓴다.
+// AI가 같은 종류로 읽은 항목이 있으면 그걸, 없거나 늦으면 규칙이 읽은 값을 그대로 돌려준다.
+export async function readOne(kind, text, rule) {
+  const clean = d => Object.fromEntries(Object.entries(d).filter(([k]) => !k.startsWith('_')));
+  if (!(await enabled())) return [clean(rule.data)];
+  try {
+    const store = await import('./store.js'); const d = new Date();
+    const people = [...new Set([...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean))];
+    const got = await refine(text, [rule], { today: new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10), people, projects: (await db.list('projects')).map(x => x.name), ms: 6000 });
+    const hit = (got || []).filter(x => x.kind === kind);
+    return hit.length ? hit.map(x => clean(x.data)) : [clean(rule.data)];
+  } catch { return [clean(rule.data)]; }
 }

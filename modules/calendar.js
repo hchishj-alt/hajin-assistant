@@ -17,9 +17,10 @@ export default {
     const quick = h('input', { placeholder: '일정 바로 추가: "다음 주 수요일 2시~4시 홍대 촬영"', 'aria-label': '일정 추가' });
     quick.addEventListener('keydown', async e => {
       if (e.key !== 'Enter' || e.isComposing || !quick.value.trim()) return;
-      const p = brain.interpret('일정: ' + quick.value.trim())[0];
-      const ev = await db.put('events', p.data);
-      quick.value = ''; cursor = new Date(ev.date); toast(`${fmtDate(ev.date)} ${ev.start || '종일'} 추가`); draw();
+      const v = quick.value.trim(); const p = brain.interpret('일정: ' + v)[0];
+      quick.value = ''; quick.disabled = true; const AI = await import('../js/ai.js'); if (await AI.enabled()) toast('AI가 읽고 있어요');
+      let ev; try { for (const d of await AI.readOne('event', v, p)) ev = await db.put('events', d); } finally { quick.disabled = false; quick.focus(); }
+      cursor = new Date(ev.date); toast(`${fmtDate(ev.date)} ${ev.start || '종일'} 추가`); draw();
     });
     root.append(head('캘린더', null,
       h('button.btn.sm.ghost', { onclick: importIcs, title: '구글·애플 캘린더에서 내보낸 .ics 파일 가져오기' }, ic('upload', 14), '.ics 가져오기'),
