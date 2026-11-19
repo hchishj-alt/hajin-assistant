@@ -86,6 +86,11 @@ export default {
         updateBadge();
         return;
       }
+      // "민서한테 ~라고 전해줘" → 메신저로 전달
+      { const DM = await import('../js/dm.js'); const sync = await import('../js/sync.js'); const meM = await sync.me();
+        const cmd = DM.parseSend(text, (await db.kvGet('sync:roster', [])).filter(r => r.id && r.id !== meM?.id));
+        if (cmd) { let t; try { await sync.dmSend(cmd.to.id, cmd.body); t = `${cmd.to.name} 님에게 전했어요: “${cmd.body}”. 답이 오면 바로 알려 드릴게요.`; } catch (e) { t = `${cmd.to.name} 님에게 못 전했어요. ${e.message}`; }
+          await drawMsg(await db.put('chat', { role: 'bot', q: text, text: t }), new Map()); return; } }
       const parsed = brain.interpret(text, { projects, people: [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean) });
       const ids = []; const replies = [];
       for (const p of parsed) {
@@ -115,6 +120,11 @@ export default {
         if (d.status === 'pending') box.append(draftCard(d, () => updateBadge()));
         else box.append(h('div.draft' + (d.status === 'approved' ? '.done' : '.gone'), h('div.k', ic(store.KINDS[d.kind]?.icon || 'file')), h('div.grow', h('div.small', { style: { fontWeight: 650 } }, d.data.title || d.data.name), h('div.faint.tiny', d.status === 'approved' ? '확정됨' : '버림'))));
       }
+      if (m.dm) { const DM = await import('../js/dm.js'); const j = await DM.judge(m.dm.body, m.dm.name);
+        if (j.note) box.append(h('div.small.muted', { style: { marginTop: '4px' } }, j.note));
+        box.append(h('div.chips', { style: { marginTop: '8px' } }, j.actions.map(a => h('button.chip.acc', { onclick: async () => { await store.draft(a.kind, a.data, { source: m.dm.body, origin: 'dm', confidence: .75 }); updateBadge(); toast('임시 항목을 만들었어요', { label: '확인 대기함', fn: () => go('inbox') }); } }, ic('plus', 12), a.label)),
+          j.replies.map(r => h('button.chip', { onclick: async e => { const b = e.currentTarget; try { await (await import('../js/sync.js')).dmSend(m.dm.from, r); b.replaceWith(h('span.chip.ok', ic('check', 12), '답장함')); } catch (er) { toast(er.message); } } }, ic('send', 12), r)),
+          h('a.chip', { href: '#/talk/' + m.dm.from }, '대화 열기'))); }
       if (m.q) box.append(FB.widget({ kind: 'chat', ref: m.id, source: m.q }));
       const b = botBubble(box, (m.draftIds?.length || m.items?.length) ? 'wide' : '');
       if (!animate) b.style.animation = 'none';
@@ -134,7 +144,9 @@ export default {
       recorder = createRecorder({ record: false, onLevel: v => wave.level(v), onInterim: t => (live.textContent = t || '듣고 있어요…'), onText: full => (live.textContent = full.slice(-80)) });
       try { await recorder.start(); } catch (e) { toast(e.message); recBar.classList.add('hide'); micBtn.classList.remove('rec'); clearInterval(timer); }
     }
-    return () => { if (recorder?.running) recorder.stop(); clearInterval(timer); };
+    const onChat = async e => { await drawMsg(e.detail, new Map()); scrollDown(); };
+    window.addEventListener('hajin:chat', onChat);
+    return () => { window.removeEventListener('hajin:chat', onChat); if (recorder?.running) recorder.stop(); clearInterval(timer); };
   },
 };
 const meBubble = t => h('div.bubble.me', t);

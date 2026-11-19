@@ -225,3 +225,39 @@ drop policy if exists refs_upload on storage.objects;
 create policy refs_upload on storage.objects for insert to authenticated with check (bucket_id = 'refs' and public.is_active());
 drop policy if exists refs_delete on storage.objects;
 create policy refs_delete on storage.objects for delete to authenticated using (bucket_id = 'refs' and owner = auth.uid());
+
+
+-- ─────────────────────────────────────────────
+-- 8) 개인 메신저 (두 사람만 보는 메시지. 비서를 통해 주고받음)
+create table if not exists public.dms (
+  id uuid primary key default gen_random_uuid(),
+  from_member uuid not null references public.members(id) on delete cascade,
+  to_member uuid not null references public.members(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 4000),
+  meta jsonb not null default '{}'::jsonb,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists dms_to_idx on public.dms (to_member, created_at);
+create index if not exists dms_from_idx on public.dms (from_member, created_at);
+alter table public.dms enable row level security;
+
+create or replace function public.my_member() returns uuid
+language sql stable security definer set search_path = public as $$
+  select id from public.members where user_id = auth.uid() and active limit 1
+$$;
+grant execute on function public.my_member() to authenticated;
+
+drop policy if exists dms_read on public.dms;
+create policy dms_read on public.dms for select to authenticated
+  using (from_member = public.my_member() or to_member = public.my_member());
+drop policy if exists dms_send on public.dms;
+create policy dms_send on public.dms for insert to authenticated
+  with check (from_member = public.my_member());
+drop policy if exists dms_mark on public.dms;
+create policy dms_mark on public.dms for update to authenticated
+  using (to_member = public.my_member()) with check (to_member = public.my_member());
+
+do $$ begin
+  begin alter publication supabase_realtime add table public.dms; exception when duplicate_object then null; end;
+end $$;

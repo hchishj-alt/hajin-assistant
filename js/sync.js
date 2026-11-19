@@ -6,7 +6,7 @@
 import * as db from './db.js';
 import { SUPABASE } from './config.js';
 
-const SHARE_COLS = new Set(['teams', 'events', 'polls', 'pollvotes', 'tasks', 'meetings', 'expenses', 'docs', 'notes', 'figmafiles', 'refs', 'reffolders', 'projects', 'leads', 'leadmarks', 'grants', 'contacts', 'audit', 'labelsets', 'buys', 'boards', 'bnodes', 'dms', 'feedback']);
+const SHARE_COLS = new Set(['teams', 'events', 'polls', 'pollvotes', 'tasks', 'meetings', 'expenses', 'docs', 'notes', 'figmafiles', 'refs', 'reffolders', 'projects', 'leads', 'leadmarks', 'grants', 'contacts', 'audit', 'labelsets', 'buys', 'boards', 'bnodes', 'feedback']);
 const CHUNK = 200;
 let client = null, session = null, channel = null;
 let pushT = null, pullT = null, busy = null, started = false, pendingAgain = false, wired = false;
@@ -72,6 +72,7 @@ function listen() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter: `owner=eq.${session.user.id}` }, () => schedulePull())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'space_items' }, () => schedulePull())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'space_members' }, () => schedulePull())
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dms' }, p => dmStore([p.new], true).catch(() => { }))
     .subscribe();
 }
 function schedulePush() { clearTimeout(pushT); pushT = setTimeout(() => syncNow(), 1500); }
@@ -173,6 +174,7 @@ export async function syncNow() {
     set({ status: 'syncing', error: '' });
     try {
       const pulled = await pull();
+      try { await dmPull(); } catch { }
       const pushed = await push();
       set({ status: 'idle', last: new Date().toISOString(), pulled, pushed });
       if (pulled) window.dispatchEvent(new CustomEvent('hajin:remote', { detail: { pulled } }));
@@ -259,7 +261,7 @@ async function pull() {
   const spaces = {};
   for (const m of mem) { const s = spaces[m.space] ||= { id: m.space, name: m.spaces?.name, code: m.spaces?.code, members: [] }; s.members.push({ user: m.user_id, name: m.name || '팀원' }); }
   await db.kvSetRaw('sync:spaces', Object.values(spaces));
-  try { const { data: ros } = await client.rpc('list_members'); if (ros) await db.kvSetRaw('sync:roster', ros.map(x => (typeof x === 'string' ? JSON.parse(x) : x)).filter(x => x.active).map(x => ({ name: x.name, role: x.role, gmail: x.gmail, user: x.user_id }))); } catch { }
+  try { const { data: ros } = await client.rpc('list_members'); if (ros) await db.kvSetRaw('sync:roster', ros.map(x => (typeof x === 'string' ? JSON.parse(x) : x)).filter(x => x.active).map(x => ({ id: x.id, name: x.name, role: x.role, gmail: x.gmail, user: x.user_id }))); } catch { }
   for (const s of Object.values(spaces)) {
     if (!s.members.some(m => m.user === session.user.id)) continue;
     n += await pullTable('space_items', 'space', s.id, 'sync:cur:space:' + s.id, s.id);
@@ -326,4 +328,42 @@ export function room(name, onMsg) {
     ch.on('broadcast', { event: 'm' }, p => { try { onMsg(p.payload); } catch { } }).subscribe();
     return { send: payload => { try { ch.send({ type: 'broadcast', event: 'm', payload }); } catch { } }, close: () => { try { client.removeChannel(ch); } catch { } } };
   } catch { return null; }
+}
+
+// ── 개인 메신저 (dms 테이블: 보낸 사람·받는 사람만 읽을 수 있음) ──
+async function dmStore(rows, live = false) {
+  const my = (await me())?.id; if (!my) return 0; let n = 0;
+  const roster = await db.kvGet('sync:roster', []);
+  for (const r of rows || []) {
+    if (!r?.id || (r.from_member !== my && r.to_member !== my)) continue;
+    const had = await db.get('dm-' + r.id);
+    const mine = r.from_member === my, other = mine ? r.to_member : r.from_member;
+    const it = { id: 'dm-' + r.id, col: 'dms', sid: r.id, mine, other, otherName: roster.find(x => x.id === other)?.name || '멤버', body: r.body, meta: r.meta || {}, readAt: r.read_at || '', createdAt: r.created_at, updatedAt: r.created_at, deleted: false, dirty: false };
+    await db.putRaw({ ...(had || {}), ...it, handled: had?.handled });
+    if (!had) { n++; if (!mine) window.dispatchEvent(new CustomEvent('hajin:dm', { detail: { item: it, live } })); }
+  }
+  return n;
+}
+export async function dmPull() {
+  if (!client || !session || !(await me())) return 0;
+  const cur = await db.kvGet('sync:dmCursor', '1970-01-01T00:00:00Z');
+  const { data, error } = await client.from('dms').select('*').gt('created_at', cur).order('created_at').limit(500);
+  if (error) { if (/does not exist|schema cache/i.test(error.message)) return 0; throw new Error(koErr(error.message)); }
+  const n = await dmStore(data);
+  if (data?.length) await db.kvSetRaw('sync:dmCursor', data[data.length - 1].created_at);
+  return n;
+}
+export async function dmSend(toId, body, meta = {}) {
+  const my = (await me())?.id; if (!client || !session || !my) throw new Error('멤버 코드로 로그인해야 메시지를 보낼 수 있어요');
+  const row = { id: crypto.randomUUID(), from_member: my, to_member: toId, body: String(body).slice(0, 4000), meta, created_at: new Date().toISOString() };
+  const { error } = await client.from('dms').insert(row);
+  if (error) throw new Error(koErr(error.message));
+  await dmStore([row]);
+  return row;
+}
+export async function dmRead(otherId) {
+  const my = (await me())?.id; if (!client || !session || !my) return;
+  const now = new Date().toISOString();
+  for (const d of (await db.list('dms')).filter(d => !d.mine && d.other === otherId && !d.readAt)) await db.putRaw({ ...d, readAt: now });
+  try { await client.from('dms').update({ read_at: now }).eq('to_member', my).eq('from_member', otherId).is('read_at', null); } catch { }
 }

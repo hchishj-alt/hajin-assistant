@@ -16,6 +16,7 @@ export const MODULES = [
   { id: 'studio', title: 'SNS 스튜디오', icon: 'film', group: '작업', short: 'SNS' },
   { id: 'archive', title: '레퍼런스', icon: 'image', group: '작업', short: '레퍼런스' },
   { id: 'figma', title: '피그마 정리', icon: 'layers', group: '작업', short: '피그마' },
+  { id: 'talk', title: '메신저', icon: 'msg', group: '사람' },
   { id: 'people', title: '인맥 · 연락처', icon: 'users', group: '사람', short: '인맥' },
   { id: 'team', title: '팀 · 일정 조율', icon: 'grid', group: '사람', short: '팀' },
   { id: 'money', title: '비용 처리', icon: 'wallet', group: '회사', short: '비용' },
@@ -85,6 +86,7 @@ export async function buildNav() {
     if (m.group !== g) { g = m.group; nav.append(h('div.grp', g)); }
     const a = h('a.navlink', { href: '#/' + m.id, 'data-nav': m.id }, ic(m.icon), h('span.grow', m.title));
     if (m.id === 'inbox') a.append(h('span.badge#inbox-badge.hide'));
+    if (m.id === 'talk') a.append(h('span.badge#talk-badge.hide'));
     nav.append(a);
   }
   const tb = document.getElementById('tabbar');
@@ -94,10 +96,12 @@ export async function buildNav() {
     if (m.id === 'assistant') a.classList.add('center');
     tb.append(a);
   }
+  updateBadge();
 }
 
 export async function updateBadge() {
   const n = (await store.drafts()).length;
+  { const u = (await db.list('dms')).filter(d => !d.mine && !d.readAt).length; const tb = document.getElementById('talk-badge'); if (tb) { tb.textContent = u; tb.classList.toggle('hide', !u); } }
   for (const id of ['inbox-badge', 'inbox-badge-m']) {
     const b = document.getElementById(id);
     if (!b) continue;
@@ -202,6 +206,15 @@ async function boot() {
   import('./sync.js').then(s => { let was = ''; s.onState(async st => { if (st.status === was) return; was = st.status; (await import('./admin.js')).clearCache(); await buildNav(); document.body.classList.toggle('not-admin', !(await (await import('./admin.js')).isAdmin())); }); return s.start(); }).catch(e => store.logError(e, 'sync'));
   // 피그마 실시간 감시 (토큰 있을 때만, 바뀐 파일만 다시 읽음)
   import('./figma-api.js').then(async F => { if (await F.getToken()) F.watch(f => { toast(`피그마 "${f.name}"이 바뀌어서 다시 정리했어요`, { label: '보기', fn: () => go('figma/' + f.id) }); updateBadge(); }); }).catch(e => store.logError(e, 'figma'));
+  window.addEventListener('hajin:dm', async e => {
+    const d = e.detail.item; updateBadge();
+    if (await db.get('chatdm-' + d.sid)) return;
+    const cm = await db.put('chat', { id: 'chatdm-' + d.sid, role: 'bot', text: `${d.otherName} 님이 보낸 메시지예요: “${d.body}”`, dm: { id: d.id, from: d.other, name: d.otherName, body: d.body } });
+    window.dispatchEvent(new CustomEvent('hajin:chat', { detail: cm }));
+    if (!e.detail.live && Date.now() - new Date(d.createdAt) > 10 * 60 * 1000) return; // 오래된 건 조용히
+    toast(`${d.otherName}: ${d.body.slice(0, 40)}`, { label: '보기', fn: () => go('talk/' + d.other) });
+    try { if (document.visibilityState !== 'visible' && Notification?.permission === 'granted') (await navigator.serviceWorker?.ready)?.showNotification(`${d.otherName} 님의 메시지`, { body: d.body.slice(0, 120), tag: 'dm-' + d.other, icon: 'icons/icon-192.png', data: { route: 'talk/' + d.other } }); } catch { }
+  });
   window.addEventListener('hajin:remote', () => {
     updateBadge(); applyTheme();
     const a = document.activeElement;
