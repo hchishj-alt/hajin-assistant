@@ -70,12 +70,14 @@ async function newMeeting(root) {
     markBtn.disabled = true; interim.textContent = '';
   }
   markBtn.onclick = () => { ta.value = ta.value.trimEnd() + ` ★[${fmtSec(sec)} 중요] `; base = ta.value; };
+  let saved = false;
   doneBtn.onclick = async () => {
     if (rec?.running) await stopRec();
     if (!ta.value.trim() && !blob) { toast('녹음이나 메모가 없어요'); return; }
     busy(doneBtn, true, '정리 중');
     const audioKey = blob ? await db.putBlob(blob) : null;
     const m = await db.put('meetings', { title: title.value.trim() || `${fmtDate(new Date())} 회의`, date: todayStr(), attendees: att.value.trim(), project: proj.value.trim(), transcript: ta.value.trim(), audioKey, seconds: sec });
+    saved = true;
     if (m.transcript) await analyze(m);
     go('meetings/' + m.id);
   };
@@ -84,7 +86,13 @@ async function newMeeting(root) {
   root.append(head('새 회의', '말하는 동안 받아쓰고, ★ 버튼으로 중요한 순간을 표시해요.', h('a.btn.sm.ghost', { href: '#/meetings' }, '목록')),
     h('div.grid.g3', { style: { marginBottom: '12px' } }, title, att, proj), dl, pj,
     h('div.card', h('div.row.between', { style: { marginBottom: '10px' } }, h('div.row', recBtn, markBtn, upBtn), h('div.row', wave, timer)), ta, interim, h('div.modal-f', doneBtn)));
-  return () => { if (rec?.running) rec.stop(); clearInterval(iv); };
+  root.dataset.live = '1';
+  // 저장을 안 누르고 화면을 떠나도 녹음과 메모가 사라지지 않게 회의록에 남김
+  return () => { clearInterval(iv); delete root.dataset.live; const text = ta.value.trim(); const running = rec?.running;
+    if (saved || (!text && !blob && !running)) { if (running) rec.stop(); return; }
+    (async () => { try { let b = blob; if (running) { const r = await rec.stop(); if (r.blob) b = b ? new Blob([b, r.blob], { type: r.blob.type }) : r.blob; }
+      const audioKey = b ? await db.putBlob(b) : null; await db.put('meetings', { title: (title.value.trim() || `${fmtDate(new Date())} 회의`) + ' (작성 중 저장)', date: todayStr(), attendees: att.value.trim(), project: proj.value.trim(), transcript: text, audioKey, seconds: sec });
+      toast('작성 중이던 회의를 회의록에 저장해 뒀어요', { label: '보기', fn: () => go('meetings') }); } catch (e) { store.logError(e, 'meeting-autosave'); } })(); };
 }
 
 // 회의 분석 → 요약은 임시(확인 대기), 할 일·일정도 임시

@@ -47,9 +47,10 @@ async function list(root) {
 // 목록용 작은 미리보기
 function thumb(ns) {
   if (!ns.length) return h('div');
+  ns = ns.map(n => ({ ...n, x: Number(n.x) || 0, y: Number(n.y) || 0 })); const safeC = c => /^(#[0-9a-f]{3,8}|var\(--[a-z0-9-]+\)|rgba?\([\d.,\s%]+\))$/i.test(c || '') ? c : 'var(--card)';
   const xs = ns.map(n => n.x), ys = ns.map(n => n.y); const x0 = Math.min(...xs) - 40, x1 = Math.max(...xs) + NW + 40, y0 = Math.min(...ys) - 30, y1 = Math.max(...ys) + 60;
   const byId = new Map(ns.map(n => [n.id, n]));
-  const svg = `<svg viewBox="${x0} ${y0} ${Math.max(200, x1 - x0)} ${Math.max(120, y1 - y0)}" preserveAspectRatio="xMidYMid meet">${ns.filter(n => byId.has(n.parent)).map(n => { const p = byId.get(n.parent); return `<path d="M${p.x + NW} ${p.y + 18} C${p.x + NW + 40} ${p.y + 18} ${n.x - 40} ${n.y + 18} ${n.x} ${n.y + 18}" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-width="3"/>`; }).join('')}${ns.map(n => `<rect x="${n.x}" y="${n.y}" width="${NW}" height="36" rx="18" fill="${n.root ? 'currentColor' : (LB.colorOf(n.label) || 'var(--card)')}" stroke="currentColor" stroke-opacity=".25" stroke-width="2"/>`).join('')}</svg>`;
+  const svg = `<svg viewBox="${x0} ${y0} ${Math.max(200, x1 - x0)} ${Math.max(120, y1 - y0)}" preserveAspectRatio="xMidYMid meet">${ns.filter(n => byId.has(n.parent)).map(n => { const p = byId.get(n.parent); return `<path d="M${p.x + NW} ${p.y + 18} C${p.x + NW + 40} ${p.y + 18} ${n.x - 40} ${n.y + 18} ${n.x} ${n.y + 18}" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-width="3"/>`; }).join('')}${ns.map(n => `<rect x="${n.x}" y="${n.y}" width="${NW}" height="36" rx="18" fill="${n.root ? 'currentColor' : safeC(LB.colorOf(n.label) || 'var(--card)')}" stroke="currentColor" stroke-opacity=".25" stroke-width="2"/>`).join('')}</svg>`;
   return h('div', { html: svg });
 }
 
@@ -108,6 +109,7 @@ async function canvas(root, id) {
   async function save(n, patch) { const it = await db.put('bnodes', { ...n, ...patch }); nodes.set(it.id, it); room?.send({ t: 'n', item: it }); return it; }
   function applyRemote(item) {
     if (item.kind === 'msg') { const i = msgs.findIndex(m => m.id === item.id); if (item.deleted) { if (i >= 0) msgs.splice(i, 1); } else if (i >= 0) msgs[i] = item; else msgs.push(item); drawChat(); return; }
+    item = { ...item, x: Number(item.x) || 0, y: Number(item.y) || 0 };
     const cur = nodes.get(item.id);
     if (cur && (cur.updatedAt || '') >= (item.updatedAt || '')) return;
     if (item.deleted) nodes.delete(item.id); else nodes.set(item.id, item);
@@ -142,6 +144,7 @@ async function canvas(root, id) {
   }
   function nodeW(n) { return (world.querySelector(`.mm-n[data-id="${n.id}"]`)?.offsetWidth) || Math.min(260, 40 + (n.text || '').length * 14); }
   function elbow(x1, y1, x2, y2) {
+    x1 = Number(x1) || 0; y1 = Number(y1) || 0; x2 = Number(x2) || 0; y2 = Number(y2) || 0;
     if (x2 < x1 + 24) return `M${x1} ${y1} C${x1 + 60} ${y1} ${x2 - 60} ${y2} ${x2} ${y2}`;
     const mx = x1 + Math.min(40, (x2 - x1) / 2), r = Math.min(14, Math.abs(y2 - y1) / 2), d = y2 > y1 ? 1 : -1;
     if (Math.abs(y2 - y1) < 2) return `M${x1} ${y1} H${x2}`;

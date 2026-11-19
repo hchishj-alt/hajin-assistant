@@ -40,7 +40,7 @@ export default {
           h('div.row.between', h('span.chip' + (n.type === 'memo' ? '' : '.acc'), n.template || (n.type === 'memo' ? '메모' : '문서')), h('span.faint.tiny', fmtDate(n.updatedAt))),
           h('h3', { style: { margin: '8px 0 4px' } }, n.title || '(제목 없음)'),
           h('p.faint.small', { style: { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, (n.body || '').replace(/[#\-*]/g, '').slice(0, 160)),
-          h('div.chips', { style: { marginTop: '8px' } }, (n.tags || []).slice(0, 4).map(t => h('span.chip', '#' + t)), n.project ? h('span.chip.acc', n.project) : null))));
+          h('div.chips', { style: { marginTop: '8px' } }, (Array.isArray(n.tags) ? n.tags : []).slice(0, 4).map(t => h('span.chip', '#' + t)), n.project ? h('span.chip.acc', n.project) : null))));
         body.append(g);
       }
       if (tab === 'ideas') {
@@ -146,7 +146,7 @@ async function editor(root, id) {
     const refs = await db.list('refs'); const notes = (await db.list('notes')).filter(x => x.id !== id);
     const r = brain.recommendRefs(text, [...refs.map(x => ({ id: x.id, title: x.title, text: `${x.title} ${x.memo || ''} ${(x.tags || []).join(' ')}`, route: 'plan', url: x.url })), ...notes.map(x => ({ id: x.id, title: x.title, text: `${x.title} ${x.body || ''}`, route: 'plan/' + x.id }))]);
     side.append(h('div.card', h('div.card-h', h('h3', ic('star'), '레퍼런스 추천')),
-      r.mine.length ? h('div', h('div.tiny.faint', { style: { fontWeight: 650 } }, '내 기록 중 비슷한 것'), r.mine.map(m => h('div.li.click', { onclick: () => m.url ? window.open(m.url, '_blank') : go(m.route) }, ic('file', 14), h('div.small.grow', m.title || '(제목 없음)')))) : null,
+      r.mine.length ? h('div', h('div.tiny.faint', { style: { fontWeight: 650 } }, '내 기록 중 비슷한 것'), r.mine.map(m => h('div.li.click', { onclick: () => /^https?:\/\//i.test(m.url || '') ? window.open(m.url, '_blank', 'noopener') : go(m.route) }, ic('file', 14), h('div.small.grow', m.title || '(제목 없음)')))) : null,
       h('div.tiny.faint', { style: { fontWeight: 650, marginTop: '8px' } }, '찾아볼 곳'),
       r.links.map(l => h('a.li.click', { href: l.url, target: '_blank', rel: 'noopener', style: { textDecoration: 'none', color: 'inherit' } }, ic('globe', 14), h('div.grow', h('div.small', l.site), h('div.faint.tiny', l.q)))),
       r.moods.length || r.styleTags.length ? h('div.chips', { style: { marginTop: '8px' } }, [...r.styleTags, ...r.moods].map(t => h('span.chip', t))) : null,

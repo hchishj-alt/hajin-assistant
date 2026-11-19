@@ -68,7 +68,7 @@ export default {
   },
 };
 const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
-function initial(n = '') { const c = n.charCodeAt(0); if (c >= 0xac00 && c <= 0xd7a3) return CHO[Math.floor((c - 0xac00) / 588)].replace('ㄲ', 'ㄱ').replace('ㄸ', 'ㄷ').replace('ㅃ', 'ㅂ').replace('ㅆ', 'ㅅ').replace('ㅉ', 'ㅈ'); return (n[0] || '#').toUpperCase(); }
+function initial(n = '') { n = String(n || ''); const c = n.charCodeAt(0); if (c >= 0xac00 && c <= 0xd7a3) return CHO[Math.floor((c - 0xac00) / 588)].replace('ㄲ', 'ㄱ').replace('ㄸ', 'ㄷ').replace('ㅃ', 'ㅂ').replace('ㅆ', 'ㅅ').replace('ㅉ', 'ㅈ'); return (n[0] || '#').toUpperCase(); }
 export const avatar = (c, size = 36) => h('div.avatar', { style: { background: colorFor(c.name || ''), width: size + 'px', height: size + 'px' } }, (c.name || '?').slice(c.name?.length > 2 ? 1 : 0, c.name?.length > 2 ? 3 : 2));
 
 async function detail(root, id) {

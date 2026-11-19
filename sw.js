@@ -1,11 +1,11 @@
 // 오프라인 실행 + 자동 업데이트. 배포 때 VERSION을 js/version.js와 같이 올리면 새 버전이 설치돼요.
 const VERSION = '1.13.7';
 const CACHE = 'hajin-' + VERSION;
-const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png',
-  'js/app.js', 'js/ui.js', 'js/db.js', 'js/icons.js', 'js/brain.js', 'js/store.js', 'js/fields.js', 'js/draftcard.js', 'js/query.js', 'js/voice.js', 'js/video.js', 'js/ext.js', 'js/seed.js', 'js/selftest.js', 'js/version.js', 'js/sync.js', 'js/config.js', 'js/figma-api.js', 'js/linkpreview.js', 'js/theme.js', 'js/admin.js', 'js/look.js', 'js/labels.js', 'js/auto.js', 'js/feedback.js', 'js/dm.js', 'js/gcal.js', 'js/codex.js', 'js/chat.js', 'js/outline.js', 'js/taste.js', 'js/place.js', 'js/scope.js', 'js/queue.js', 'js/ai.js', 'js/keyshare.js', 'js/vendor-qr.js', 'js/vendor-jsqr.js', 'js/act.js', 'js/ask.js', 'js/xlsx.js', 'js/product.js', 'js/vendor-supabase.js',
+const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable.png', 'supabase/setup.sql',
+  'js/app.js', 'js/ui.js', 'js/db.js', 'js/icons.js', 'js/brain.js', 'js/store.js', 'js/fields.js', 'js/draftcard.js', 'js/query.js', 'js/voice.js', 'js/video.js', 'js/ext.js', 'js/seed.js', 'js/selftest.js', 'js/version.js', 'js/sync.js', 'js/config.js', 'js/figma-api.js', 'js/linkpreview.js', 'js/theme.js', 'js/admin.js', 'js/look.js', 'js/labels.js', 'js/auto.js', 'js/feedback.js', 'js/dm.js', 'js/gcal.js', 'js/codex.js', 'js/chat.js', 'js/outline.js', 'js/taste.js', 'js/place.js', 'js/scope.js', 'js/queue.js', 'js/ai.js', 'js/keyshare.js', 'js/vendor-qr.js', 'js/vendor-jsqr.js', 'js/act.js', 'js/ask.js', 'js/follow.js', 'js/xlsx.js', 'js/product.js', 'js/vendor-supabase.js',
   ...['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'studio', 'figma', 'archive', 'radar', 'admin', 'look', 'shop', 'board', 'talk', 'feed', 'vendors', 'dev', 'people', 'team', 'money', 'startup', 'settings', 'health', 'menu'].map(m => `modules/${m}.js`)];
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => { })))));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))));
 });
 self.addEventListener('message', e => { if (e.data === 'skip') self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -26,7 +26,7 @@ self.addEventListener('fetch', e => {
       const hit = await c.match(e.request, { ignoreSearch: true });
       if (hit) return hit;
       try { const r = await fetch(e.request); if (r.ok) c.put(e.request, r.clone()); return r; }
-      catch { return (await c.match('index.html')) || Response.error(); }
+      catch { return e.request.mode === 'navigate' ? ((await c.match('index.html')) || Response.error()) : Response.error(); }
     })());
     return;
   }

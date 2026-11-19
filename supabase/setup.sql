@@ -275,3 +275,87 @@ drop policy if exists cal_select on storage.objects;
 create policy cal_select on storage.objects for select to authenticated using (bucket_id = 'cal' and owner = auth.uid());
 drop policy if exists cal_delete on storage.objects;
 create policy cal_delete on storage.objects for delete to authenticated using (bucket_id = 'cal' and owner = auth.uid());
+
+
+-- ─────────────────────────────────────────────
+-- 10) 보안 보강 (2026-11 점검에서 나온 것. 다시 실행해도 안전)
+-- 팀 공간은 활동 중인 멤버만 읽고 씀. 팀·프로젝트·폴더·중요도 색은 관리자만 고침. 완전 삭제는 관리자만(앱은 지움 표시만 함)
+drop policy if exists sitems_rw on public.space_items;
+drop policy if exists sitems_read on public.space_items;
+create policy sitems_read on public.space_items for select to authenticated
+  using (public.is_member(space) and public.is_active());
+drop policy if exists sitems_ins on public.space_items;
+create policy sitems_ins on public.space_items for insert to authenticated
+  with check (public.is_member(space) and public.is_active() and col <> '_kv'
+    and (col not in ('teams', 'projects', 'reffolders', 'labelsets') or public.is_admin()));
+drop policy if exists sitems_upd on public.space_items;
+create policy sitems_upd on public.space_items for update to authenticated
+  using (public.is_member(space) and public.is_active()
+    and (col not in ('teams', 'projects', 'reffolders', 'labelsets') or public.is_admin()))
+  with check (public.is_member(space) and public.is_active() and col <> '_kv'
+    and (col not in ('teams', 'projects', 'reffolders', 'labelsets') or public.is_admin()));
+drop policy if exists sitems_del on public.space_items;
+create policy sitems_del on public.space_items for delete to authenticated
+  using (public.is_member(space) and public.is_admin());
+
+-- 올린 사람은 서버가 찍고, 수정 기록(audit)은 한 번 올라가면 바뀌지 않음
+create or replace function public.space_items_guard() returns trigger language plpgsql as $$
+begin
+  if tg_op = 'INSERT' then new.by := auth.uid(); return new; end if;
+  if old.col = 'audit' then return old; end if;
+  new.by := old.by; new.col := old.col;
+  return new;
+end $$;
+drop trigger if exists space_items_guard on public.space_items;
+create trigger space_items_guard before insert or update on public.space_items for each row execute function public.space_items_guard();
+
+-- 팀 공간 만들기·참여도 활동 중인 멤버만
+create or replace function public.create_space(p_name text, p_my_name text)
+returns public.spaces language plpgsql security definer set search_path = public as $$
+declare s public.spaces;
+begin
+  if auth.uid() is null or not public.is_active() then raise exception '로그인이 필요해요'; end if;
+  insert into public.spaces (name) values (p_name) returning * into s;
+  insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), coalesce(p_my_name, ''));
+  return s;
+end $$;
+create or replace function public.join_space(p_code text, p_my_name text)
+returns public.spaces language plpgsql security definer set search_path = public as $$
+declare s public.spaces;
+begin
+  if auth.uid() is null or not public.is_active() then raise exception '로그인이 필요해요'; end if;
+  select * into s from public.spaces where code = upper(trim(p_code)) and not coalesce(is_main, false);
+  if s.id is null then raise exception '참여 코드가 맞지 않아요'; end if;
+  insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), coalesce(p_my_name, ''))
+    on conflict (space, user_id) do update set name = excluded.name;
+  return s;
+end $$;
+-- 내 참여 정보는 이름만 고칠 수 있음 (다른 공간으로 옮겨 적지 못하게)
+revoke update on public.space_members from authenticated;
+grant update (name) on public.space_members to authenticated;
+-- 받은 메시지는 '읽음'만 바꿀 수 있음 (내용은 못 고침)
+revoke update on public.dms from authenticated;
+grant update (read_at) on public.dms to authenticated;
+
+-- 멤버 코드 맞히기 막기: 같은 곳에서 10분에 10번, 전체로 10분에 80번 넘게 틀리면 잠시 막음
+create table if not exists public.code_tries (
+  at timestamptz not null default now(),
+  ip text not null default '',
+  ok boolean not null default false
+);
+create index if not exists code_tries_at on public.code_tries (at);
+alter table public.code_tries enable row level security; -- 직접 읽기·쓰기 금지, 아래 함수로만
+create or replace function public.check_code(p_code text) returns json
+language plpgsql security definer set search_path = public as $$
+declare v_ip text := coalesce(split_part(coalesce(current_setting('request.headers', true), '{}')::json ->> 'x-forwarded-for', ',', 1), '');
+  r json; n_ip int; n_all int;
+begin
+  delete from public.code_tries where at < now() - interval '1 day';
+  select count(*) filter (where ip = v_ip), count(*) into n_ip, n_all from public.code_tries where at > now() - interval '10 minutes' and not ok;
+  if n_ip >= 10 or n_all >= 80 then raise exception '코드를 여러 번 틀렸어요. 10분 뒤에 다시 해 주세요'; end if;
+  select json_build_object('id', id, 'name', name) into r from public.members where code = upper(trim(p_code)) and active;
+  insert into public.code_tries (ip, ok) values (v_ip, r is not null);
+  if r is null then perform pg_sleep(0.4); end if;
+  return r;
+end $$;
+grant execute on function public.check_code(text) to anon, authenticated;

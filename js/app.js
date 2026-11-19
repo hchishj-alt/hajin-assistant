@@ -41,7 +41,7 @@ let current = null, cleanup = null, lastHash = '';
 export function go(route) { const h = '#/' + route; if (location.hash === h) render(); else location.hash = h; }
 function parse() {
   const [id, ...rest] = (location.hash.replace(/^#\/?/, '') || 'today').split('/');
-  return { id: MODULES.some(m => m.id === id) ? id : 'today', params: rest.map(decodeURIComponent) };
+  return { id: MODULES.some(m => m.id === id) ? id : 'today', params: rest.map(s => { try { return decodeURIComponent(s); } catch { return s; } }) };
 }
 
 let seq = 0;
@@ -187,11 +187,12 @@ async function tickReminders() {
   const now = new Date();
   const evs = await store.eventsOn(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
   for (const e of evs) {
-    if (!e.start || notified.has(e.id)) continue;
+    const nk = e.id + '|' + now.toDateString(); // 반복 일정은 날마다 다시 알림
+    if (!e.start || notified.has(nk)) continue;
     const [hh, mm] = e.start.split(':').map(Number);
     const diff = (hh * 60 + mm) - (now.getHours() * 60 + now.getMinutes());
     if (diff <= (e.remind ?? 10) && diff >= 0) {
-      notified.add(e.id);
+      notified.add(nk);
       try { (await navigator.serviceWorker?.getRegistration())?.showNotification(e.title, { body: `${e.start} 시작${e.place ? ' · ' + e.place : ''}`, icon: 'icons/icon-192.png', tag: e.id }) || new Notification(e.title, { body: e.start }); } catch { }
     }
   }
@@ -199,7 +200,7 @@ async function tickReminders() {
 
 async function boot() {
   window.addEventListener('error', e => store.logError(e.error || e.message, 'window'));
-  window.addEventListener('unhandledrejection', e => { if (/관리자만|올린 사람과 관리자/.test(e.reason?.message || '')) { toast(e.reason.message); e.preventDefault(); return; } store.logError(e.reason, 'promise'); });
+  window.addEventListener('unhandledrejection', e => { if (/관리자만|올린 사람과 관리자/.test(e.reason?.message || '')) { toast(e.reason.message); e.preventDefault(); return; } store.logError(e.reason, 'promise'); if (/QuotaExceeded|InvalidState|저장소/.test(String(e.reason?.name || '') + String(e.reason?.message || ''))) toast('저장하지 못했어요. 기기 저장 공간이나 브라우저 설정을 확인해 주세요.'); });
   (await import('./admin.js')).install();
   await (await import('./labels.js')).load();
   await applyTheme();
@@ -232,9 +233,9 @@ async function boot() {
   window.addEventListener('hajin:remote', () => {
     updateBadge(); applyTheme();
     const a = document.activeElement;
-    if (document.querySelector('.modal-bg') || (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || document.querySelector('.avail.painting')) return;
+    if (document.querySelector('.modal-bg') || (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || document.querySelector('.avail.painting') || document.querySelector('[data-live]')) return; // 녹음·작성 중인 화면은 건드리지 않음
     render();
   });
   if (!(await db.kvGet('onboarded', false))) { await db.kvSet('onboarded', true); (await import('./seed.js')).welcome(); }
 }
-boot();
+boot().catch(e => { console.error(e); const v = document.getElementById('view') || document.body; const box = document.createElement('div'); box.style.cssText = 'padding:24px;line-height:1.7'; box.textContent = '앱을 열지 못했어요. 사생활 보호(시크릿) 창이거나 브라우저가 기기 저장소를 막아 둔 것 같아요. 일반 창에서 다시 열어 주세요. (' + (e && e.message || e) + ')'; v.append(box); });

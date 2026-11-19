@@ -102,8 +102,9 @@ export async function loginWithCode(code) {
   const info = Array.isArray(me) ? me[0] : me;
   await db.kvSetRaw('me:member', info);
   const curName = await db.kvGet('name', '하진');
-  if (!curName || curName === '하진') await db.kvSet('name', info.name.length === 3 ? info.name.slice(1) : info.name);
   await afterLogin();
+  // 이름은 다른 기기에서 정해 둔 게 있으면 그걸 따르고, 없을 때만 멤버 이름으로
+  { const nm = await db.kvGet('name', ''); if (!nm || nm === '하진') await db.kvSet('name', info.name.length === 3 ? info.name.slice(1) : info.name); }
   return info;
 }
 export async function me() { return session ? await db.kvGet('me:member', null) : null; }
@@ -200,7 +201,7 @@ export function spaceFor(it, tmap) {
   if (it.col === 'teams') return it.space || null;
   return (it.team && tmap[it.team]) || null;
 }
-const row = it => { const { dirty, ...data } = it; return { id: it.id, col: it.col, data, deleted: !!it.deleted, updated_at: it.updatedAt || new Date().toISOString() }; };
+const row = it => { const { dirty, sharedMembers, ...data } = it; return { id: it.id, col: it.col, data, deleted: !!it.deleted, updated_at: it.updatedAt || new Date().toISOString() }; };
 
 async function push() {
   const dirty = await db.dirtyItems();
@@ -215,27 +216,35 @@ async function push() {
     const { error } = await client.from('items').upsert(mine.slice(i, i + CHUNK), { onConflict: 'owner,id' });
     if (error) throw error;
   }
+  const denied = new Set();
   for (let i = 0; i < shared.length; i += CHUNK) {
-    const { error } = await client.from('space_items').upsert(shared.slice(i, i + CHUNK), { onConflict: 'space,id' });
-    if (error) throw error;
+    const part = shared.slice(i, i + CHUNK);
+    const { error } = await client.from('space_items').upsert(part, { onConflict: 'space,id' });
+    if (!error) continue;
+    if (!/row-level security|permission denied|42501/i.test(`${error.code || ''} ${error.message || ''}`)) throw error;
+    // 권한이 없는 줄 하나 때문에 전체가 멈추지 않게: 하나씩 올리고, 막힌 것은 건너뜀
+    for (const one of part) { const r1 = await client.from('space_items').upsert([one], { onConflict: 'space,id' }); if (r1.error) { if (/row-level security|permission denied|42501/i.test(`${r1.error.code || ''} ${r1.error.message || ''}`)) denied.add(one.id); else throw r1.error; } }
   }
   // 올리는 동안 또 고친 건 dirty 유지
   for (const it of dirty) {
     const cur = await db.get(it.id);
-    if (cur && cur.updatedAt === it.updatedAt && cur.dirty) await db.putRaw({ ...cur, dirty: false });
+    if (cur && cur.updatedAt === it.updatedAt && cur.dirty) await db.putRaw({ ...cur, dirty: false, ...(denied.has(it.id) ? { syncDenied: true } : {}) });
   }
   return dirty.length;
 }
 
 async function apply(r, space) {
   r = { ...r, updated_at: new Date(r.updated_at).toISOString() }; // 서버 형식(+00:00) → 앱 형식(Z)
+  // 팀 공간에서는 공유하는 종류만 받음. 설정(_kv)이나 내 개인 기록을 남이 덮어쓰지 못하게
+  if (space && !SHARE_COLS.has(r.col)) return false;
   const cur = await db.get(r.id);
-  if (cur && (cur.updatedAt || '') > r.updated_at) return false; // 내 쪽이 더 최근 (나중에 고친 쪽이 이김)
+  if (space && cur && (cur.col !== r.col || !SHARE_COLS.has(cur.col))) return false;
+  if (cur && cur.dirty && (cur.updatedAt || '') > r.updated_at) return false; // 아직 안 올린 내 수정이 더 최근이면 내 것을 둠. 이미 올린 건 서버 것을 따라 기기 시계가 달라도 맞춰짐
   if (cur && !cur.dirty && cur.updatedAt === r.updated_at && !!cur.deleted === r.deleted) return false;
-  const item = { ...r.data, id: r.id, col: r.col, deleted: r.deleted, updatedAt: r.updated_at, dirty: false };
+  const item = db.clean({ ...r.data, id: r.id, col: r.col, deleted: r.deleted, updatedAt: r.updated_at, dirty: false }); if (!item) return false;
   if (space && r.col === 'teams') { item.space = space; if (cur?.sharedMembers) item.sharedMembers = cur.sharedMembers; }
   await db.putRaw(item);
-  if (r.col === '_kv' && item.key) await db.kvSetRaw(item.key, item.deleted ? null : item.value);
+  if (!space && r.col === '_kv' && item.key && db.SYNC_KV.includes(item.key)) await db.kvSetRaw(item.key, item.deleted ? null : item.value);
   return true;
 }
 
@@ -347,7 +356,8 @@ async function dmStore(rows, live = false) {
 export async function dmPull() {
   if (!client || !session || !(await me())) return 0;
   const cur = await db.kvGet('sync:dmCursor', '1970-01-01T00:00:00Z');
-  const { data, error } = await client.from('dms').select('*').gt('created_at', cur).order('created_at').limit(500);
+  const back = new Date(new Date(cur).getTime() - 5 * 60 * 1000).toISOString(); // 보낸 기기 시계가 조금 느려도 빠뜨리지 않게 5분 겹쳐서 받음 (같은 건 id로 걸러짐)
+  const { data, error } = await client.from('dms').select('*').gt('created_at', back).order('created_at').limit(500);
   if (error) { if (/does not exist|schema cache/i.test(error.message)) return 0; throw new Error(koErr(error.message)); }
   const n = await dmStore(data);
   if (data?.length) await db.kvSetRaw('sync:dmCursor', data[data.length - 1].created_at);
@@ -355,7 +365,7 @@ export async function dmPull() {
 }
 export async function dmSend(toId, body, meta = {}) {
   const my = (await me())?.id; if (!client || !session || !my) throw new Error('멤버 코드로 로그인해야 메시지를 보낼 수 있어요');
-  const row = { id: crypto.randomUUID(), from_member: my, to_member: toId, body: String(body).slice(0, 4000), meta, created_at: new Date().toISOString() };
+  const row = { id: crypto.randomUUID(), from_member: my, to_member: toId, body: String(body).slice(0, 4000), meta }; // 보낸 시각은 서버가 찍음
   const { error } = await client.from('dms').insert(row);
   if (error) throw new Error(koErr(error.message));
   await dmStore([row]);

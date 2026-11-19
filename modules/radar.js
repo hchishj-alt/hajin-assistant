@@ -76,7 +76,7 @@ export default {
       const scored = all.map(it => ({ it, s: score(it, marks, new Date(), prof, me) })).filter(x => !x.s.hidden);
       const live = scored.filter(x => !x.it.portal);
       // 같은 소식을 여러 매체가 쓴 건 하나만 (제목이 절반 넘게 겹치면 같은 글로 봄)
-      const grams = t => { const n = t.replace(/[^가-힣a-zA-Z0-9]/g, ''); const g = new Set(); for (let i = 0; i < n.length - 1; i++) g.add(n.slice(i, i + 2)); return g; };
+      const grams = t => { const n = String(t || '').replace(/[^가-힣a-zA-Z0-9]/g, ''); const g = new Set(); for (let i = 0; i < n.length - 1; i++) g.add(n.slice(i, i + 2)); return g; };
       const rank = []; for (const x of [...live].sort((a, b) => b.s.total - a.s.total)) { const g = grams(x.it.title); const dup = rank.find(y => { let c = 0; for (const k of g) if (y.g.has(k)) c++; return c / Math.max(1, Math.min(g.size, y.g.size)) > .55; }); if (dup) dup.more = (dup.more || 0) + 1; else rank.push(Object.assign(x, { g })); }
       const soon = live.filter(x => x.s.dday != null && x.s.dday <= 7).length;
       body.append(h('div.tiles', { style: { marginBottom: '14px' } }, tile('layers', live.length, '모인 글'), tile('flag', soon, '7일 안 마감', soon ? 'warn' : 'ok'), tile('star', live.filter(x => x.s.stars).length, '팀이 찜한 글'), tile('target', grants.filter(g => !['선정', '탈락'].includes(g.status)).length, '준비 중인 지원사업', '', 'startup')));

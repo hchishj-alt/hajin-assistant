@@ -10,6 +10,7 @@ export function h(sel, attrs, ...kids) {
   if (m && m[2]) for (const p of m[2].match(/[.#][\w-]+/g) || []) p[0] === '.' ? el.classList.add(p.slice(1)) : (el.id = p.slice(1));
   for (const [k, v] of Object.entries(attrs)) {
     if (v == null || v === false) continue;
+    if ((k === 'href' || k === 'src') && typeof v === 'string' && /^\s*(javascript|vbscript|data:text)/i.test(v)) continue; // 저장된 주소에 스크립트가 들어 있어도 실행되지 않게
     if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else if (k === 'class') el.className += ' ' + v;
     else if (k === 'style' && typeof v === 'object') { for (const [sk, sv] of Object.entries(v)) sk.startsWith('--') ? el.style.setProperty(sk, sv) : (el.style[sk] = sv); }

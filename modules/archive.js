@@ -93,7 +93,8 @@ export default {
 
     function open(r, src) {
       modal(r.title || '레퍼런스', close => {
-        const media = r.embed && r.kind === 'video' ? (/\.(mp4|webm|mov)/i.test(r.embed) ? h('video', { src: r.embed, controls: true, style: { width: '100%', borderRadius: '12px' } }) : h('div.ratio', h('iframe', { src: r.embed, allow: 'autoplay; encrypted-media; picture-in-picture', allowfullscreen: true, loading: 'lazy', referrerpolicy: 'strict-origin-when-cross-origin' })))
+        const okEmbed = /^https:\/\//i.test(r.embed || '');
+        const media = okEmbed && r.kind === 'video' ? (/\.(mp4|webm|mov)/i.test(r.embed) ? h('video', { src: r.embed, controls: true, style: { width: '100%', borderRadius: '12px' } }) : h('div.ratio', h('iframe', { src: r.embed, allow: 'autoplay; encrypted-media; picture-in-picture', allowfullscreen: true, loading: 'lazy', referrerpolicy: 'strict-origin-when-cross-origin' })))
           : src ? h('img', { src, referrerpolicy: 'no-referrer', style: { width: '100%', borderRadius: '12px', display: 'block', maxHeight: '60vh', objectFit: 'contain', background: 'var(--bg2)' } }) : null;
         return h('div',
           media,
@@ -107,7 +108,7 @@ export default {
             src && !r.colors?.length ? h('button.btn', { onclick: async e => { const btn = e.currentTarget; busy(btn, true, '분석 중'); try { await db.patch(r.id, await LP.analyzeColors(src)); toast('색을 분석했어요'); close(); draw(); } catch { toast('이 이미지는 색을 못 읽었어요'); busy(btn, false); } } }, '색 분석') : null,
             r.url && r.kind === 'web' ? h('button.btn', { onclick: () => { close(); pickImages([r.url], { project: r.project, sub: r.sub, memo: '' }); } }, ic('image', 14), '페이지 이미지 고르기') : null,
             h('button.btn', { onclick: () => { close(); edit(r); } }, ic('edit', 14), '고치기'),
-            r.url ? h('a.btn.pri', { href: r.url, target: '_blank', rel: 'noopener' }, '원본 열기') : null));
+            /^https?:\/\//i.test(r.url || '') ? h('a.btn.pri', { href: r.url, target: '_blank', rel: 'noopener' }, '원본 열기') : null));
       }, { wide: true });
     }
 

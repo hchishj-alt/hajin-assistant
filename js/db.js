@@ -20,8 +20,9 @@ function open() {
       if (!db.objectStoreNames.contains('blobs')) db.createObjectStore('blobs');
       if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
     };
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
+    r.onsuccess = () => { const d = r.result; d.onclose = d.onversionchange = () => { try { d.close(); } catch { } dbp = null; }; res(d); }; // 브라우저가 연결을 닫으면 다음에 다시 엶
+    r.onerror = () => { dbp = null; rej(r.error); };
+    r.onblocked = () => { dbp = null; rej(new Error('저장소가 다른 탭에서 잠겨 있어요')); };
   });
   return dbp;
 }
@@ -106,7 +107,7 @@ export async function exportAll({ withBlobs = false } = {}) {
   const kv = {};
   await tx('kv', 'readonly', s => new Promise(res => {
     const c = s.openCursor();
-    c.onsuccess = () => { const cur = c.result; if (cur) { if (!String(cur.key).startsWith('secret:')) kv[cur.key] = cur.value; cur.continue(); } else res(); };
+    c.onsuccess = () => { const cur = c.result; if (cur) { if (!/^(secret:|sync:|me:)/.test(String(cur.key))) kv[cur.key] = cur.value; cur.continue(); } else res(); };
   }));
   const out = { app: 'hajin-assistant', version: 1, exportedAt: now(), items, kv };
   if (withBlobs) {
@@ -119,13 +120,29 @@ export async function exportAll({ withBlobs = false } = {}) {
   }
   return out;
 }
+// 밖에서 들어오는 기록(동기화·백업 파일)을 화면이 깨지지 않는 모양으로 다듬음. 못 쓰는 건 null
+export function clean(it) {
+  if (!it || typeof it !== 'object' || typeof it.id !== 'string' || typeof it.col !== 'string') return null;
+  const o = { ...it }; const str = k => { if (o[k] != null && typeof o[k] !== 'string') o[k] = String(o[k]); };
+  for (const k of ['title', 'name', 'memo', 'body', 'who', 'place', 'project', 'date', 'due', 'start', 'end', 'time', 'text', 'attendees']) str(k);
+  for (const k of ['tags', 'members', 'prices', 'krs', 'handoffs', 'skip']) if (o[k] != null && !Array.isArray(o[k])) o[k] = [];
+  for (const k of ['url', 'link', 'embed', 'mapUrl', 'image', 'thumb', 'src', 'href']) if (o[k] != null && (typeof o[k] !== 'string' || /^\s*(javascript|vbscript|data:(?!image\/))/i.test(o[k]))) o[k] = ''; // javascript: 같은 주소는 버림
+  if (o.embed && !/^https:\/\//i.test(o.embed)) o.embed = '';
+  if (o.col === 'bnodes') { o.x = Number(o.x) || 0; o.y = Number(o.y) || 0; }
+  if (o.col === 'contacts' && !o.name) o.name = '(이름 없음)';
+  if (o.col === 'leads' && !o.title) o.title = '(제목 없음)';
+  if (o.col === 'polls') { if (typeof o.from !== 'string') o.from = '09:00'; if (typeof o.to !== 'string') o.to = '18:00'; }
+  return o;
+}
 export async function importAll(json) {
   if (json.app !== 'hajin-assistant') throw new Error('하진 비서 백업 파일이 아니에요');
-  for (const it of json.items || []) {
+  for (const raw of json.items || []) {
+    const it = clean(raw); if (!it || it.col === '_kv' && !SYNC_KV.includes(it.key)) continue;
     const cur = await get(it.id);
     if (!cur || cur.updatedAt < it.updatedAt) await putRaw({ ...it, dirty: true });
   }
-  for (const [k, v] of Object.entries(json.kv || {})) await kvSetRaw(k, v);
+  // 로그인 정보와 서버 주소는 파일에서 받지 않음 (남의 파일로 관리자 표시나 서버가 바뀌지 않게)
+  for (const [k, v] of Object.entries(json.kv || {})) if (!/^(sync:|me:|secret:)/.test(k)) await kvSetRaw(k, v);
   for (const [k, v] of Object.entries(json.blobs || {})) await putBlob(await (await fetch(v.data)).blob(), k);
 }
 export function blobToDataURL(b) {

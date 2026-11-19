@@ -19,7 +19,7 @@ export default {
       h('button.btn.sm.pri', { onclick: () => editTeam() }, ic('plus', 14), '팀')),
       sync.enabled() ? '' : h('div.card.flat', { style: { marginBottom: '12px', display: 'flex', gap: '10px', alignItems: 'center' } }, ic('cloud', 18), h('p.small.muted.grow', '지금은 이 기기에만 저장돼요. 동기화에 로그인하면 팀을 공유하고, 팀원이 참여 코드로 들어와 직접 가능 시간을 칠할 수 있어요.'), h('a.btn.sm', { href: '#/settings/sync' }, '동기화 켜기')),
       h('div.tiles', { style: { marginBottom: '14px' } }, tile('grid', teams.length, '팀'), tile('users', new Set(teams.flatMap(t => t.space ? (t.sharedMembers || []).map(m => m.user) : (t.members || []))).size, '팀원'), tile('calendar', evs.filter(e => e.date >= todayStr()).length, '예정된 팀 일정'), tile('clock', polls.filter(p => !p.decided).length, '조율 중', polls.some(p => !p.decided) ? 'warn' : '')));
-    if (polls.filter(p => !p.decided).length) root.append(h('div.card', { style: { marginBottom: '14px' } }, h('div.card-h', h('h3', ic('clock'), '조율 중인 시간')), polls.filter(p => !p.decided).map(p => h('div.li.click', { onclick: () => go('team/poll/' + p.id) }, ic('grid', 16), h('div.grow', h('div.t.small', p.title), h('div.faint.tiny', `${p.dates.length}일 · ${p.from}–${p.to} · 응답 ${answered(p)}/${p.members.length}`))))));
+    if (polls.filter(p => !p.decided).length) root.append(h('div.card', { style: { marginBottom: '14px' } }, h('div.card-h', h('h3', ic('clock'), '조율 중인 시간')), polls.filter(p => !p.decided).map(p => h('div.li.click', { onclick: () => go('team/poll/' + p.id) }, ic('grid', 16), h('div.grow', h('div.t.small', p.title), h('div.faint.tiny', `${(p.dates || []).length}일 · ${p.from}–${p.to} · 응답 ${answered(p)}/${p.members.length}`))))));
     if (sync.enabled()) root.append(await membersCard());
     const g = h('div.grid.g2');
     if (!teams.length) g.append(h('div.card', h('div.empty', '팀을 만들고 인맥에서 멤버를 골라 보세요')));
@@ -113,7 +113,7 @@ async function poll(root, id) {
     p.members = [...all];
     who = myId || p.members[0];
   }
-  const toM = s => { const [a, b] = s.split(':').map(Number); return a * 60 + b; };
+  const toM = s => { const [a, b] = String(s || '0:0').split(':').map(Number); return (a || 0) * 60 + (b || 0); };
   const slots = []; for (let m = toM(p.from); m < toM(p.to); m += 30) slots.push(m);
   const lab = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   p.avail = p.avail || {};
