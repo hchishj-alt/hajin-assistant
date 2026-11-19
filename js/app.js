@@ -13,6 +13,7 @@ export const MODULES = [
   { id: 'meetings', title: '회의록', icon: 'mic', group: '작업' },
   { id: 'plan', title: '기획 보드', icon: 'bulb', group: '작업', short: '기획' },
   { id: 'studio', title: 'SNS 스튜디오', icon: 'film', group: '작업', short: 'SNS' },
+  { id: 'archive', title: '레퍼런스', icon: 'image', group: '작업', short: '레퍼런스' },
   { id: 'figma', title: '피그마 정리', icon: 'layers', group: '작업', short: '피그마' },
   { id: 'people', title: '인맥 · 연락처', icon: 'users', group: '사람', short: '인맥' },
   { id: 'team', title: '팀 · 일정 조율', icon: 'grid', group: '사람', short: '팀' },

@@ -59,7 +59,7 @@ export default {
         }
         body.append(kan);
       }
-      if (tab === 'refs') body.append(await refsView(refs.filter(pf), draw));
+      if (tab === 'refs') { tab = 'docs'; go('archive' + (projF ? '/p/' + encodeURIComponent(projF) : '')); return; }
       if (tab === 'projects') {
         const g = h('div.grid.gauto');
         const tasks = await db.list('tasks'); const exps = await db.list('expenses'); const logs = await db.list('timelogs');
