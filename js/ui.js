@@ -1,6 +1,8 @@
 import { icon } from './icons.js';
 
 // 작은 DOM 헬퍼: h('div.card#id', {onclick}, children...)
+// 화면에 null·false를 그대로 붙이면 "null" 글자가 보이므로, 붙이는 순간에 걸러 냄
+if (typeof Element !== 'undefined' && !Element.prototype.__hajinAppend) { for (const P of [Element.prototype, DocumentFragment.prototype]) for (const fn of ['append', 'prepend']) { const o = P[fn]; P[fn] = function (...xs) { return o.apply(this, xs.filter(x => x != null && x !== false)); }; } Element.prototype.__hajinAppend = true; }
 export function h(sel, attrs, ...kids) {
   if (attrs == null || typeof attrs !== 'object' || attrs instanceof Node || Array.isArray(attrs)) { kids.unshift(attrs); attrs = {}; }
   const m = sel.match(/^([a-z0-9-]+)?((?:[.#][\w-]+)*)$/i);
