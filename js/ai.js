@@ -60,9 +60,9 @@ async function candidates(key) {
     listed = ms.sort((a, b) => (/lite/.test(b) ? 1 : 0) - (/lite/.test(a) ? 1 : 0) || ver(b) - ver(a)).slice(0, 3); } catch { } }
   return [...new Set([saved, ...FALLBACK, ...listed].filter(Boolean))];
 }
-export async function ask(prompt, { json = false, ms = 25000 } = {}) {
+export async function ask(prompt, { json = false, ms = 25000, temp = 0.2 } = {}) {
   const key = await db.kvGet(KEY, ''); if (!key) throw new Error('AI 키가 없어요');
-  const call = (m, t) => timed(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, ...(json ? { responseMimeType: 'application/json' } : {}) } }) }, t);
+  const call = (m, t) => timed(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: temp, ...(json ? { responseMimeType: 'application/json' } : {}) } }) }, t);
   const list = await candidates(key); let r = null, last = '';
   for (const [i, m] of list.entries()) {
     try { r = await call(m, i < list.length - 1 ? Math.min(ms, 14000) : ms); } catch { last = '응답이 너무 늦어요'; r = null; continue; } // 늦으면 다음 후보
@@ -141,12 +141,14 @@ ${calendarTable(today)}
 없는 칸은 빼거나 빈칸으로 둬.
 
 읽는 법:
-- event: 시간이 정해진 약속·회의·방문·행사·휴가·불참. task: 해야 할 일(date는 마감). 둘 다 있으면 항목을 나눠.
+- event: 시간이 정해진 약속·회의·방문·행사·발표·휴가·불참. task: 해야 할 일(date는 마감).
+- 한 문장에 약속과 그걸 위한 할 일이 같이 있으면 반드시 event와 task를 따로 만들어. 예: \"28일 오후에 최종 발표, 그 전날까지 PPT 완성\" → event \"최종 발표\"(28일, memo \"오후\") + task \"PPT 완성\"(27일). 서로 다른 할 일이 여러 개여도 하나씩 나눠.
+- 인스타·릴스·유튜브·블로그에 올릴 거리는 sns. 그냥 떠오른 생각은 idea.
 - "다음주 중 작업, 목요일까지 제출"처럼 주 표현과 요일이 떨어져 있어도 그 주의 요일로 읽어. 주를 말하지 않은 요일은 오늘 이후 가장 가까운 그 요일(오늘과 같은 요일이면 다음 주).
 - 날짜는 반드시 위 달력에서 골라. 계산하지 말고 찾아.
 - "3시"처럼 오전·오후가 없으면 1~7시는 오후로.
 - 사람 이름은 말에 나온 사람만. 아는 사람 목록에 있으면 전체 이름으로 쓰고, 목록에 없는 사람(예: \"수집오빠\", \"엄마\")은 말한 그대로 써. 목록의 다른 사람으로 바꾸지 마.
-- 제목만 봐도 무슨 일인지 알 수 있게. 불참·휴가·지각처럼 사람이 주어인 일은 제목에 이름을 넣어(예: \"서연 불참\").
+- 제목은 일 자체만(예: \"저녁 식사\", \"클라이언트 미팅\"). 같이 하는 사람은 who에만 쓰고 제목에 넣지 마. 불참·휴가·지각·생일처럼 그 사람이 주어일 때만 제목에 이름을 넣어(예: \"서연 불참\", \"민서 생일\").
 - 시각 없이 오전·오후·저녁만 말했으면 start는 비우고 memo에 그 말을 적어. 시각을 지어내지 마.
 - \"12월 첫째 주\"처럼 주만 말했으면 그 달 1일이 든 주를 첫째 주로 세고, 그 주에서 그 달에 속한 첫 평일을 date로 넣어.
 - contact는 사람이 주인공일 때(이름은 title, 직함은 role, 회사·가게는 org). vendor는 가게·업체가 주인공일 때(담당자 이름은 memo).
@@ -156,7 +158,7 @@ ${calendarTable(today)}
 규칙이 먼저 읽은 초안(틀렸으면 고쳐 써): ${JSON.stringify(hint).slice(0, 1500)}
 
 사용자 말: ${text}`;
-  let arr; try { const j = await ask(prompt, { json: true, ms }); arr = Array.isArray(j) ? j : j.items; } catch (e) { console.warn('ai', e); return null; }
+  let arr; try { const j = await ask(prompt, { json: true, ms, temp: 0 }); arr = Array.isArray(j) ? j : j.items; } catch (e) { console.warn('ai', e); return null; }
   if (!Array.isArray(arr)) return null;
   const out = [];
   for (const g of arr.slice(0, 8)) {
@@ -167,7 +169,7 @@ ${calendarTable(today)}
     else if (g.kind === 'task') data = { ...base, title, due: date || '', time: isT(g.start) ? g.start : '', who: whoIn(g.who, text, people, base.who), priority: g.priority === 'high' || base.priority === 'high' ? 'high' : 'normal', project: S(g.project) || base.project || '', scope: g.scope === 'personal' ? 'personal' : 'work', memo: S(g.memo) || base.memo || '' };
     else if (g.kind === 'expense') data = { ...base, title, amount: Number(base.amount) || Number(g.amount) || 0, date: date || base.date || today, category: base.category || S(g.category) || '기타', project: S(g.project) || base.project || '', pay: base.pay || '개인카드' };
     else if (g.kind === 'contact') data = { ...base, name: base.name && base.phone ? (S(g.title) || base.name) : title, phone: base.phone || S(g.phone), email: base.email || S(g.email), org: S(g.org) || base.org || '', role: base.role || S(g.role), memo: S(g.memo) };
-    else if (g.kind === 'vendor') data = { ...base, name: title, cat: S(g.cat) || base.cat || '기타', phone: base.phone || S(g.phone), link: base.link || S(g.url), kakao: base.kakao || '', memo: S(g.memo) || base.memo || '', prices: (base.prices && base.prices.length ? base.prices : (g.prices || []).filter(x => x && x.item).map(x => ({ item: String(x.item).slice(0, 40), price: String(Number(x.price) || ''), note: S(x.note), at: today }))) };
+    else if (g.kind === 'vendor') data = { ...base, name: title, cat: S(g.cat) || base.cat || '기타', phone: base.phone || S(g.phone), link: base.link || S(g.url), kakao: base.kakao || '', memo: S(g.memo), prices: (base.prices && base.prices.length ? base.prices : (g.prices || []).filter(x => x && x.item).map(x => ({ item: String(x.item).slice(0, 40), price: String(Number(x.price) || ''), note: S(x.note), at: today }))) };
     else if (g.kind === 'buy') data = { ...base, title, url: base.url || S(g.url), price: Number(base.price) || Number(g.amount) || 0, qty: 1, need: 'must' };
     else if (g.kind === 'idea' || g.kind === 'note') data = { ...base, title, body: base.body || text, tags: base.tags || [] };
     else if (g.kind === 'grant') data = { ...base, title, deadline: date || base.deadline || '', status: base.status || '검토', amount: base.amount ?? (Number(g.amount) || null), url: base.url || S(g.url) };
