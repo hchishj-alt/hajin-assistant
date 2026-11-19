@@ -1,5 +1,6 @@
 import { h, ic, modal, form, toast, md } from './ui.js';
 import * as store from './store.js';
+import * as db from './db.js';
 import { FIELDS, describe } from './fields.js';
 
 export function confBars(c) {
@@ -12,7 +13,9 @@ function placeRow(e) { const q = [e.area && !(e.place || '').includes(e.area) ? 
   return h('div.chips', { style: { marginTop: '6px' } }, e.addr ? h('span.faint.tiny', `${e.placeBy || '지도'}에서 찾은 주소예요`) : h('span.faint.tiny', '주소는 못 찾았어요. 지도에서 확인해 주세요'), e.mapUrl ? a(e.mapUrl, '장소 정보') : null, a('https://map.naver.com/p/search/' + encodeURIComponent(q), '네이버 지도'), a('https://map.kakao.com/?q=' + encodeURIComponent(q), '카카오맵')); }
 export function draftCard(d, onDone) {
   const k = store.KINDS[d.kind] || { label: d.kind, icon: 'file' };
-  const el = h('div.draft');
+  const el = h('div.draft', { 'data-did': d.id });
+  // 말로 고친 뒤일 수 있으니, 누르는 순간의 최신 내용으로 처리
+  const fresh = async () => { const cur = await db.get(d.id); if (!cur || cur.status !== 'pending') { finish(cur?.status === 'approved' ? 'approved' : 'rejected', true); return null; } d = cur; return cur; };
   const title = d.kind === 'summary' ? (d.data.title || '요약') : (d.data.title || d.data.name || '(제목 없음)');
   const body = h('div.grow',
     h('div.row.nowrap', h('span.chip.acc', k.label), confBars(d.confidence), h('span.faint.tiny', d.origin === 'meeting' ? '회의에서' : d.origin === 'voice' ? '음성에서' : d.origin === 'palette' ? '빠른 입력' : '')),
@@ -21,28 +24,29 @@ export function draftCard(d, onDone) {
     d.kind === 'event' && (d.data.place || d.data.area) ? placeRow(d.data) : null,
     d.source && d.kind !== 'summary' ? h('div.faint.tiny', { style: { marginTop: '4px' } }, '“' + d.source.slice(0, 120) + (d.source.length > 120 ? '…' : '') + '”') : null,
     h('div.row', { style: { marginTop: '8px', gap: '6px' } },
-      h('button.btn.sm.pri', { onclick: async () => { await store.approve(d); finish('approved'); } }, ic('check', 14), '확정'),
+      h('button.btn.sm.pri', { onclick: async () => { const cur = await fresh(); if (!cur) return; await store.approve(cur); finish('approved'); } }, ic('check', 14), '확정'),
       d.kind !== 'summary' ? h('button.btn.sm', { onclick: () => edit() }, ic('edit', 14), '고치기') : null,
       d.kind !== 'summary' ? kindMenu() : null,
-      h('button.btn.sm.ghost', { onclick: async () => { await store.reject(d); finish('rejected'); } }, '버리기')));
+      h('button.btn.sm.ghost', { onclick: async () => { const cur = await fresh(); if (!cur) return; await store.reject(cur); finish('rejected'); toast('버렸어요', { label: '되살리기', fn: async () => { await db.patch(cur.id, { status: 'pending' }); const nd = await db.get(cur.id); el.replaceWith(draftCard(nd, onDone)); onDone && onDone('pending'); } }); } }, '버리기')));
   el.append(h('div.k', ic(k.icon)), body);
 
-  function finish(st) {
+  function finish(st, quiet) {
     el.classList.add(st === 'approved' ? 'done' : 'gone');
-    el.querySelectorAll('button').forEach(b => (b.disabled = true));
-    if (st === 'approved') toast(`${k.label} 확정했어요`);
+    el.querySelectorAll('button, select').forEach(b => (b.disabled = true));
+    if (st === 'approved' && !quiet) toast(`${k.label} 확정했어요`);
     onDone && onDone(st, el);
   }
   function edit() {
     const fields = FIELDS[d.kind] || FIELDS.note;
     modal(`${k.label} 고치기`, close => form(fields, d.data, async vals => {
-      const merged = { ...d.data, ...vals };
-      await store.approve(d, merged);
+      const cur = await fresh(); if (!cur) { close(); return; }
+      const merged = { ...cur.data, ...vals };
+      await store.approve(cur, merged);
       close(); finish('approved');
     }, { submitLabel: '고쳐서 확정' }));
   }
   function kindMenu() {
-    const sel = h('select.in', { style: { width: 'auto', padding: '4px 8px', fontSize: '13px' }, onchange: async () => { const nd = await store.changeKind(d, sel.value); toast(`${store.KINDS[sel.value].label}(으)로 바꿨어요. 다음부터 비슷한 말은 이렇게 알아들을게요.`); const repl = draftCard(nd, onDone); el.replaceWith(repl); } },
+    const sel = h('select.in', { style: { width: 'auto', padding: '4px 8px', fontSize: '13px' }, onchange: async () => { const cur = await fresh(); if (!cur) return; const nd = await store.changeKind(cur, sel.value); toast(`${store.KINDS[sel.value].label}(으)로 바꿨어요. 다음부터 비슷한 말은 이렇게 알아들을게요.`); const repl = draftCard(nd, onDone); el.replaceWith(repl); } },
       Object.entries(store.KINDS).filter(([key, v]) => v.col && key !== 'meeting').map(([key, v]) => h('option', { value: key, selected: key === d.kind }, v.label)));
     return sel;
   }

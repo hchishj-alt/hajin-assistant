@@ -11,7 +11,7 @@ export const FIELDS = {
     { k: 'addr', label: '주소 (자동으로 찾음)', full: true },
     { k: 'start', label: '시작', type: 'time' },
     { k: 'end', label: '끝', type: 'time' },
-    { k: 'repeat', label: '반복', type: 'select', options: [['', '안 함'], ['daily', '매일'], ['weekdays', '평일'], ['weekly', '매주'], ['monthly', '매월']] },
+    { k: 'repeat', label: '반복', type: 'select', options: [['', '안 함'], ['daily', '매일'], ['weekdays', '평일'], ['weekly', '매주'], ['biweekly', '격주'], ['monthly', '매월']] },
     { k: 'remind', label: '알림(분 전)', type: 'number', default: 10 },
     { k: 'label', label: '중요도 색', type: 'label', full: true },
     { k: 'scope', label: '구분', type: 'select', options: [['', '알아서 (내용 보고 정함)'], ['work', '팀 업무 (팀 전체 일정)'], ['personal', '개인 (나만 보기)']], default: '' },
@@ -36,6 +36,16 @@ export const FIELDS = {
     { k: 'pay', label: '결제 수단', type: 'select', options: ['개인카드', '법인카드', '현금', '계좌이체'] },
     { k: 'project', label: '프로젝트' },
     { k: 'status', label: '처리 상태', type: 'select', options: [['todo', '정산 전'], ['submitted', '결재 요청'], ['approved', '승인됨'], ['done', '정산 완료']], default: 'todo' },
+    { k: 'team', label: '공유', type: 'select', options: [['auto', '알아서 (내용 보고 정함)'], ['', '나만 보기'], ['team-main', '팀에 공유']], default: 'auto' },
+    { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
+  ],
+  income: [
+    { k: 'title', label: '내용', full: true },
+    { k: 'amount', label: '금액(원)', type: 'number', inputmode: 'numeric' },
+    { k: 'date', label: '받는 날 (받기로 한 날)', type: 'date' },
+    { k: 'from', label: '누구에게서' },
+    { k: 'project', label: '프로젝트' },
+    { k: 'status', label: '상태', type: 'select', options: [['due', '받을 예정'], ['got', '받음']], default: 'due' },
     { k: 'team', label: '공유', type: 'select', options: [['auto', '알아서 (내용 보고 정함)'], ['', '나만 보기'], ['team-main', '팀에 공유']], default: 'auto' },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
   ],
@@ -116,7 +126,8 @@ export function describe(kind, d) {
   if ((kind === 'event' || kind === 'task') && d.scope) p.push(d.scope === 'personal' ? '개인' : '팀 업무');
   if (kind === 'event') { if (d.date) p.push(d.date.slice(5).replace('-', '/') + (d.endDate && d.endDate > d.date ? '–' + d.endDate.slice(5).replace('-', '/') : '')); if (d.start) p.push(d.start + (d.end ? '–' + d.end : '')); if (d.place) p.push(d.area && !d.place.includes(d.area) ? `${d.place} (${d.area})` : d.place); else if (d.area) p.push(d.area); if (d.who) p.push((w => w + (((w.charCodeAt(w.length - 1) - 0xAC00) % 28) > 0 && /[가-힣]$/.test(w) ? '과' : '와') + ' 함께')(d.who)); if (d.addr) p.push(d.addr); }
   if (kind === 'task') { if (d.due) p.push('마감 ' + d.due.slice(5).replace('-', '/')); if (d.who) p.push('담당 ' + d.who); if (d.priority === 'high') p.push('중요'); if (d.project) p.push(d.project); if (d.memo) p.push(String(d.memo).slice(0, 40)); }
-  if (kind === 'expense') { p.push((Number(d.amount) || 0).toLocaleString() + '원'); if (d.category) p.push(d.category); if (d.pay) p.push(d.pay); }
+  if (kind === 'expense') { p.push((Number(d.amount) || 0).toLocaleString() + '원'); if (d.category) p.push(d.category); if (d.pay) p.push(d.pay); if (d.project) p.push(d.project); if (d.memo) p.push(String(d.memo).slice(0, 40)); }
+  if (kind === 'income') { p.push((Number(d.amount) || 0).toLocaleString() + '원'); p.push(d.status === 'got' ? '받음' : '받을 예정'); if (d.date) p.push(d.date.slice(5).replace('-', '/')); if (d.from) p.push(d.from); if (d.project) p.push(d.project); if (d.memo) p.push(String(d.memo).slice(0, 40)); }
   if (kind === 'contact') { if (d.phone) p.push(d.phone); if (d.org) p.push(d.org); if (d.email) p.push(d.email); }
   if (kind === 'vendor') { if (d.cat) p.push(d.cat); if (d.phone) p.push(d.phone); if (d.kakao) p.push(d.kakao); if (d.link) p.push(d.link.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]); for (const x of (d.prices || []).slice(0, 3)) p.push(`${x.item} ${Number(x.price).toLocaleString()}원${x.note ? ' (' + x.note + ')' : ''}`); if (d.memo) p.push(d.memo); }
   if (kind === 'buy') { if (d.price) p.push(Number(d.price).toLocaleString() + '원'); if (d.url) { try { p.push(new URL(d.url).hostname.replace(/^www\./, '')); } catch { } } }

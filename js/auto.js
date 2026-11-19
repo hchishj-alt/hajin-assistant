@@ -4,7 +4,7 @@ import * as db from './db.js';
 import * as brain from './brain.js';
 import * as SC from './scope.js';
 
-const COLS = { contacts: [], events: ['share', 'label', 'project'], tasks: ['share', 'project'], meetings: ['share', 'label', 'project'], refs: ['share'], buys: ['share'], notes: ['share', 'project'], docs: ['share'], grants: ['share'] };
+const COLS = { contacts: [], events: ['share', 'label', 'project'], tasks: ['share', 'project'], meetings: ['share', 'label', 'project'], refs: ['share'], buys: ['share'], expenses: ['share', 'project'], incomes: ['share', 'project'], notes: ['share', 'project'], docs: ['share'], grants: ['share'] };
 const PRIVATE = /병원|치과|약국|진료|검진|개인|사적|가족|엄마|아빠|부모님|동생|언니|오빠|누나|형\b|남친|여친|애인|데이트|소개팅|친구|생일|기념일|집\s|이사|월세|관리비|은행|대출|적금|운동|헬스|필라테스|요가|pt\b|미용실|네일|휴가|여행|결혼식|장례|과외|알바|면접|수업|학교|과제|시험|동아리|종강|개강|자취|택배|약속/i;
 const TEAMY = /팀|회의|미팅|킥오프|클라이언트|고객|외주|납품|시안|피드백|촬영|편집|업로드|발표|제안서|견적|계약|정산|공유|리뷰|스프린트|마감|전시|부스|워크숍|회식/;
 const LABEL = [['urgent', /긴급|급함|급해|급하게|당장|오늘\s*까지|내일\s*까지|asap|지금\s*바로|마감\s*임박|데드라인/i], ['important', /중요|발표|클라이언트|고객|계약|제출|납품|마감|심사|면접|킥오프|최종|결정|보고/], ['idea', /아이디어|브레인스토밍|구상|컨셉|콘셉트|레퍼런스\s*찾|리서치/], ['easy', /여유|천천히|시간\s*날\s*때|언젠가|나중에|가볍게/]];
@@ -18,14 +18,15 @@ function vote(map, ws) { const sc = {}; for (const w of ws) for (const [k, n] of
 // 새 항목: 비어 있는 칸만 채움 (사람이 고른 값은 건드리지 않음)
 export async function fill(item, { hasTeam, projects = [], loggedIn, teamNames = [] }) {
   if (item.team === 'auto') item.team = undefined;
+  const pickedTeam = item.team === 'team-main'; // 사람이 직접 '팀에 공유'를 고른 것
   const want = COLS[item.col]; if (!want || item.autoOff) { if (item.team === undefined) item.team = ''; return; }
   const text = textOf(item), ws = words(text), lr = await learned(); const auto = {};
   const scoped = item.col === 'events' || item.col === 'tasks';
   // 개인 / 팀 업무: 사람이 고른 값이 있으면 그대로, 없으면 배운 것 → 글의 맥락 순으로
   let scope = item.scope || (item.team === 'team-main' ? 'work' : item.team === '' ? 'personal' : '');
-  if (!scope) { const v = vote(lr.share, ws); scope = v ? (v === 'priv' ? 'personal' : 'work') : scoped ? SC.guess(text, { who: item.who || item.attendees || '', team: teamNames }) : (PRIVATE.test(text) && !TEAMY.test(text) ? 'personal' : 'work'); auto.team = true; }
+  if (!scope) { const v = vote(lr.share, ws); scope = v ? (v === 'priv' ? 'personal' : 'work') : scoped ? SC.guess(text, { who: item.who || item.attendees || '', team: teamNames }) : item.col === 'expenses' ? ((item.pay === '법인카드' || item.project || TEAMY.test(text) || ['회의비', '재료비', '장비', '마케팅', '인건비'].includes(item.category)) && !PRIVATE.test(text) ? 'work' : 'personal') : (PRIVATE.test(text) && !TEAMY.test(text) ? 'personal' : 'work'); auto.team = true; }
   if (scoped) item.scope = scope;
-  item.team = scope === 'work' && want.includes('share') && hasTeam ? 'team-main' : '';
+  item.team = scope === 'work' && (want.includes('share') || pickedTeam) && hasTeam ? 'team-main' : '';
   if (want.includes('label') && !item.label) {
     let id = vote(lr.label, ws) || (LABEL.find(([, re]) => re.test(text)) || [])[0];
     if (!id && item.date) { const d = Math.round((new Date(item.date) - new Date(new Date().toISOString().slice(0, 10))) / 864e5); if (d >= 0 && d <= 1 && TEAMY.test(text)) id = 'important'; }

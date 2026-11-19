@@ -69,57 +69,80 @@ export default {
 
     // 일정에 빠진 필수 정보(날짜·시간)와 누구랑·어디서를 되물어 채움
     const ASK = {
+      day: ['무슨 요일이에요?', ['월요일', '화요일', '수요일', '목요일', '금요일', '아직 몰라']],
       date: ['언제예요?', ['오늘', '내일', '이번 주 토요일', '아직 몰라']],
       time: ['몇 시예요?', ['오전 10시', '오후 2시', '저녁 7시', '종일']],
       more: ['누구랑, 어디서 하는지도 알려 주면 채워 둘게요.', ['없어']],
       who: ['누구랑 가요?', ['혼자', '팀이랑']],
     };
-    async function askNext(d, need, lead = '') {
-      const k = need[0];
-      if (!k) { await db.kvSet('chat:ask', null); await drawMsg(await db.put('chat', { role: 'bot', text: (lead || '다 채웠어요.') + ' 맞으면 확정해 주세요.', draftIds: [d.id] }), new Map([[d.id, await db.get(d.id)]])); updateBadge(); return; }
-      await db.kvSet('chat:ask', { id: d.id, need });
-      await drawMsg(await db.put('chat', { role: 'bot', text: `${lead}${lead ? ' ' : ''}“${d.data.title}” ${ASK[k][0]}`, chips: ASK[k][1].map(x => ({ label: x, say: x })) }), new Map());
+    // 되묻는 동안에도 임시 카드를 같이 보여 줌(첫 물음에 한 번). 답이 올 때마다 그 카드를 새로 그림
+    async function askNext(d, need, lead = '', carded = false) {
+      const k = need[0]; await refreshCards([d.id]);
+      if (!k) { await db.kvSet('chat:ask', null); await drawMsg(await db.put('chat', { role: 'bot', text: (lead || '다 채웠어요.') + ' 맞으면 확정해 주세요.', draftIds: carded && list.querySelector(`.draft[data-did="${d.id}"]`) ? [] : [d.id] }), new Map([[d.id, await db.get(d.id)]])); updateBadge(); return; }
+      const week = k === 'date' ? ((d.source || '').match(/(다다음\s*주|다담주|다음\s*주|담주|이번\s*주|금주|\d{1,2}\s*월\s*(?:첫|둘|셋|넷|다섯|마지막)\s*째?\s*주)/) || [''])[0] : '';
+      await db.kvSet('chat:ask', { id: d.id, need, carded: true, week });
+      const A = ASK[k === 'date' && week ? 'day' : k];
+      await drawMsg(await db.put('chat', { role: 'bot', text: `${lead}${lead ? ' ' : ''}“${d.data.title}” ${week ? week + ' ' : ''}${A[0]}`, chips: A[1].map(x => ({ label: x, say: x })), draftIds: carded ? [] : [d.id] }), new Map([[d.id, await db.get(d.id)]]));
     }
-    const missing = (data, src) => { const w = brain.parseWhen(src || ''); const need = []; if (!w.date && !data._dated) need.push('date'); if (!data.start && !data._allday) need.push('time'); if (!data._asked && ((!data.who && !data.place && !data.area) || (!data.who && /(방문|관람|구경|저녁|점심|식사|약속|영화|여행|나들이|데이트|모임)/.test(data.title || '')))) need.push(data.place || data.area ? 'who' : 'more'); return need; };
+    async function refreshCards(ids) { for (const id of ids || []) { const els = list.querySelectorAll(`.draft[data-did="${id}"]`); if (!els.length) continue; const d = await db.get(id); if (!d) continue; els.forEach(el => el.replaceWith(d.status === 'pending' ? draftCard(d, () => updateBadge()) : staticCard(d))); } }
+    const staticCard = d => h('div.draft' + (d.status === 'approved' ? '.done' : '.gone'), { 'data-did': d.id }, h('div.k', ic(store.KINDS[d.kind]?.icon || 'file')), h('div.grow', h('div.small', { style: { fontWeight: 650 } }, d.data.title || d.data.name), h('div.faint.tiny', d.status === 'approved' ? '확정됨' : '버림')));
+    // 되묻는 중에 온 말이 답이 아니라 새로 적는 말인지 (예: "몇 시예요?"에 "점심 9000원")
+    const looksNew = (text, k, ctx) => { const ps = brain.interpret(text, ctx); if (!ps.length) return false; if (ps.length > 1) return true; const p = ps[0];
+      if (['expense', 'income', 'contact', 'vendor', 'query', 'reference', 'buy', 'nav', 'timelog'].includes(p.kind)) return true;
+      const w = brain.parseWhen(text); const rest = w.hits.reduce((x, hh) => x.replace(hh, ' '), text).replace(/(쯤|경|정도|일\s*듯|인\s*듯|같아요?|이요|부터|까지|으로|로|에|이야|야|예요|이에요|요|해|하자|할게|일걸|쯤이야)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+      if (k === 'date' || k === 'time') return (p.kind === 'task' || p.kind === 'event' || p.kind === 'note') && rest.length >= 5 && !/^(아직|몰라|미정|나중에|종일|하루\s*종일)/.test(rest);
+      return (p.kind === 'task' || p.kind === 'event') && w.hits.length > 0 && rest.length >= 4; };
+    const missing = (data, src) => { const w = brain.parseWhen(src || ''); const need = []; if ((!w.date || w.vague) && !data._dated) need.push('date'); if (!data.start && !data._allday && !/(오전|오후|아침|저녁|밤|점심|새벽|종일|하루\s*종일)/.test(src || '')) need.push('time'); if (!data._asked && ((!data.who && !data.place && !data.area) || (!data.who && /(방문|관람|구경|저녁|점심|식사|약속|영화|여행|나들이|데이트|모임)/.test(data.title || '')))) need.push(data.place || data.area ? 'who' : 'more'); return need; };
     async function answerAsk(pend, text) {
       const d = await db.get(pend.id); if (!d || d.status !== 'pending') { await db.kvSet('chat:ask', null); return false; }
       const k = pend.need[0]; const w = brain.parseWhen(text); const skip = /^(없어|없음|몰라|아직|미정|모름|나중에|건너|패스|스킵|그냥|됐어|아니|혼자)/.test(text.trim()); const data = { ...d.data }; let lead = '';
       if (/^(취소|그만|안\s*해|버려)/.test(text.trim())) { await db.kvSet('chat:ask', null); await store.reject(d); await drawMsg(await db.put('chat', { role: 'bot', text: '알겠어요. 그 일정은 버렸어요.' }), new Map()); updateBadge(); return true; }
-      if (k === 'date') { if (w.date) { data.date = w.date; data._dated = true; if (w.time) data.start = w.time; lead = '날짜를 넣었어요.'; } else if (skip) { data._dated = true; lead = '날짜는 오늘로 두었어요.'; } else { await db.kvSet('chat:ask', null); return false; } }
-      else if (k === 'time') { if (w.time) { data.start = w.time; if (w.end) data.end = w.end; lead = '시간을 넣었어요.'; } else if (/종일|하루/.test(text)) { data._allday = true; lead = '종일 일정으로 두었어요.'; } else if (skip) { data._allday = true; lead = '시간은 비워 두었어요.'; } else if (w.date) { data.date = w.date; data._dated = true; lead = '날짜를 바꿨어요.'; await db.patch(d.id, { data }); return askNext({ ...d, data }, pend.need, lead), true; } else { await db.kvSet('chat:ask', null); return false; } }
+      if (k === 'date') { const w2 = pend.week && w.hits.length && !/(주|달|월)/.test(w.hits.join(' ')) ? brain.parseWhen(`${pend.week} ${text}`) : w;
+        if (w2.date) { data.date = w2.date; data._dated = true; if (w2.time) data.start = w2.time; lead = '날짜를 넣었어요.'; }
+        else if (skip) { data.date = ''; data._dated = true; await db.patch(d.id, { data }); await askNext({ ...d, data }, pend.need.filter(x => x !== 'date' && x !== 'time'), '날짜는 비워 뒀어요. 정해지면 “방금 거 금요일로”처럼 말해 주세요.', pend.carded); return true; }
+        else { await db.kvSet('chat:ask', null); return false; } }
+      else if (k === 'time') { if (w.time) { data.start = w.time; if (w.end) data.end = w.end; lead = '시간을 넣었어요.'; } else if (/종일|하루/.test(text)) { data._allday = true; lead = '종일 일정으로 두었어요.'; } else if (skip) { data._allday = true; lead = '시간은 비워 두었어요.'; } else if (w.date) { data.date = w.date; data._dated = true; lead = '날짜를 바꿨어요.'; await db.patch(d.id, { data }); return askNext({ ...d, data }, pend.need, lead, pend.carded), true; } else { await db.kvSet('chat:ask', null); return false; } }
       else { data._asked = true; if (/^팀(이랑|원|\s*전체)?/.test(text.trim())) { data.who = '팀 전체'; data.scope = 'work'; lead = '넣었어요.'; } else if (!skip) { const people = [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean); const pp = brain.eventParts(text.trim() + ' 방문', people) || {}; const wm = !pp.who && text.match(/([가-힣A-Za-z]{2,8}?)(이랑|랑|하고|와|과)(\s|$)/); const who = pp.who || (wm && wm[1]) || ''; const place = pp.place || ''; if (who) data.who = who; if (place) data.place = place; if (pp.area) data.area = pp.area; if (!who && !place && !pp.area) data.place = text.trim().replace(/(에서|에|요)$/, '').slice(0, 30);
           if (data.place || data.area) { try { const PL = await import('../js/place.js'); const hit = await PL.lookup(data.place || data.area, data.place ? data.area : ''); if (hit) { data.addr = hit.addr; data.mapUrl = hit.url || ''; data.placeBy = hit.by; } } catch { } }
           const SCm = await import('../js/scope.js'); data.scope = SCm.guess(`${data.title} ${data.place || ''}`, { who: data.who || '', team: people }); lead = '넣었어요.'; } }
       await db.patch(d.id, { data });
-      await askNext({ ...d, data }, pend.need.slice(1), lead); return true;
+      await askNext({ ...d, data }, pend.need.slice(1), lead, pend.carded); return true;
     }
 
     async function handle(text, origin) {
       const CH = await import('../js/chat.js');
       text = await CH.applyAlias(text);
-      { const pend = await db.kvGet('chat:ask', null); if (pend && await answerAsk(pend, text)) return; }
+      const projects = await store.projects();
+      const people = await store.peopleNames();
+      const vendorNames = (await db.list('vendors')).map(v => v.name).filter(Boolean);
+      const F = await import('../js/follow.js');
+      { const pend = await db.kvGet('chat:ask', null); if (pend) { if (looksNew(text, pend.need[0], { projects, people, vendors: vendorNames })) await db.kvSet('chat:ask', null); else if (await answerAsk(pend, text)) return; } }
+      // 방금 만든 것을 말로 고치기·취소하기
+      { const r = await F.tryFollow(text, { people }); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: r.chips }), new Map()); updateBadge(); return; } }
       const talk = async src => { const r = await CH.reply(src, { name: (await db.kvGet('name', '')) || '' }); await drawMsg(await db.put('chat', { role: 'bot', q: src, text: r.text, list: r.list, chips: r.chips }), new Map()); };
       { const T = await import('../js/taste.js'); if (T.isFeedback(text)) { const r = await T.talk(text); if (r) { await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: (r.chips || []).filter(c => c.say) }), new Map()); return; } } }
       // "○○한테 ~ 전해줘"인데 메신저를 못 쓰는 상태면 그렇다고 말하고 대신 적어 둘지 물음
-      { const dm = text.match(/^(.{1,10}?)\s*(?:님)?\s*(?:한테|에게|께)\s+(.+?)\s*(?:전해|말해|알려|보내)\s*(?:줘|주세요|줄래)$/s); if (dm) { const sync = await import('../js/sync.js'); const roster = (await sync.me()) ? (await db.kvGet('sync:roster', [])) : [];
+      { const dm = text.match(/^(.{1,10}?)\s*(?:님)?\s*(?:한테|에게|께)\s+(.+?)\s*(?:전해|말해|알려|보내|물어봐|물어)\s*(?:줘|주세요|줄래)$/s); if (dm) { const sync = await import('../js/sync.js'); const roster = (await sync.me()) ? (await db.kvGet('sync:roster', [])) : [];
         if (!roster.some(r => r.name && (r.name === dm[1].trim() || r.name.slice(1) === dm[1].trim()))) { await drawMsg(await db.put('chat', { role: 'bot', q: `${dm[1].trim()}에게 ${dm[2]} 전하기`, text: `${dm[1].trim()} 님에게 바로 전하려면 팀 동기화에 로그인돼 있어야 해요. 지금은 연결이 안 돼 있어서, 잊지 않게 할 일로 적어 둘까요?`, chips: [{ label: '할 일로', make: 'task' }, { label: '괜찮아요', skip: true }] }), new Map()); return; } } }
       if (CH.isTalk(text)) return talk(text);
-      const projects = await store.projects();
-      const people = [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean);
       // 이미 있는 걸 말로 고치기 (완료·옮기기·취소·넘기기·담당)
-      { const ACT = await import('../js/act.js'); const r = await ACT.tryAct(text, { people }); if (r) { await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: r.chips }), new Map()); return; } }
+      { const ACT = await import('../js/act.js'); const r = await ACT.tryAct(text, { people }); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: r.chips }), new Map()); return; } }
       // 길게 쓰거나 말한 건 → 원문은 메모로 저장(내가 쓴 거라 확정), 요약·할 일은 임시
       const nSent = brain.sentences(text).length;
-      const long = /^(회의록|회의\s*(내용|정리|메모)|미팅\s*(내용|정리))\s*[:：]/.test(text) || (nSent >= 3 && text.length > 60 && !text.includes('\n')) || text.length > 220 || (origin === 'voice' && text.length > 90) || (text.length > 100 && nSent >= 3 && !text.includes('\n')) || text.split('\n').length > 6;
+      const isMeeting = /^(회의록|회의\s*(내용|정리|메모)|미팅\s*(내용|정리|메모))\s*[:：]/.test(text);
+      const long = !brain.isBlock(text) && (isMeeting || (nSent >= 3 && text.length > 60 && !text.includes('\n')) || text.length > 220 || (origin === 'voice' && text.length > 90) || (text.length > 100 && nSent >= 3 && !text.includes('\n')) || text.split('\n').length > 6);
       if (long) {
         const a = await FB.refine(brain.analyzeNotes(text, { people }), text); await (await import('../js/ai.js')).enhance(a, text, { today: todayStr(), people });
-        const note = await db.put('notes', { type: 'memo', title: (a.summary[0] || text).slice(0, 50), body: text, tags: a.keywords.slice(0, 6), origin });
+        // "회의록: …"으로 시작하면 메모가 아니라 회의록에 넣음
+        const bodyText = isMeeting ? text.replace(/^[^:：]+[:：]\s*/, '') : text;
+        const note = isMeeting ? await db.put('meetings', { title: `${fmtDate(new Date())} 회의`, date: todayStr(), attendees: '', project: '', transcript: bodyText, seconds: 0, summaryDraft: a }) : await db.put('notes', { type: 'memo', title: (a.summary[0] || text).slice(0, 50), body: text, tags: a.keywords.slice(0, 6), origin });
         const ids = [];
         ids.push((await store.draft('summary', { title: `“${note.title}” 요약`, ...a }, { sourceRef: note.id, source: text, confidence: 0.7, origin })).id);
         for (const t of a.actions) ids.push((await store.draft('task', { title: t.title, due: t.due || '', who: t.who || '', priority: 'normal', project: '', memo: t.src }, { source: t.src, sourceRef: note.id, confidence: 0.7, origin })).id);
         for (const d of a.dates) ids.push((await store.draft('event', { title: d.title || '일정', date: d.date, start: d.time || '', end: d.end || '', memo: d.src }, { source: d.src, sourceRef: note.id, confidence: 0.6, origin })).id);
         for (const i of a.ideas) ids.push((await store.draft('idea', { title: i.slice(0, 60), body: i, tags: brain.keywords(i, 4) }, { source: i, sourceRef: note.id, confidence: 0.55, origin })).id);
-        const msg = await db.put('chat', { role: 'bot', q: text, text: `메모로 저장하고 정리했어요. 문장 ${a.stats.sentences}개 → 요약 ${a.summary.length}줄, 할 일 ${a.actions.length}개, 일정 ${a.dates.length}개, 아이디어 ${a.ideas.length}개. 확인해 주세요.`, draftIds: ids });
+        await F.remember(ids);
+        const msg = await db.put('chat', { role: 'bot', q: text, text: `${isMeeting ? '회의록에 넣고' : '메모로 저장하고'} 정리했어요. 문장 ${a.stats.sentences}개 → 요약 ${a.summary.length}줄, 할 일 ${a.actions.length}개, 일정 ${a.dates.length}개, 아이디어 ${a.ideas.length}개. 확인해 주세요.`, draftIds: ids });
         await drawMsg(msg, new Map((await store.drafts()).map(d => [d.id, d])));
         updateBadge();
         return;
@@ -141,7 +164,7 @@ export default {
           wait.remove(); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `${ai ? 'AI가' : '앱 안에서'} 읽고 ${a.summary.length}줄로 줄였어요. 원문은 메모에 넣어 뒀어요.${ai ? '' : ' 설정에서 무료 AI 키를 넣으면 요약이 더 자연스러워져요.'}`, draftIds: [d.id] }), new Map((await store.drafts()).map(x => [x.id, x]))); updateBadge();
         } catch (e) { wait.remove(); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `이 링크는 읽지 못했어요. 로그인이 필요하거나 막아 둔 사이트일 수 있어요. 내용을 붙여 넣어 주시면 정리해 드릴게요.` }), new Map()); }
         return; } }
-      let parsed = brain.interpret(text, { projects, people, vendors: (await db.list('vendors')).map(v => v.name) });
+      let parsed = brain.interpret(text, { projects, people, vendors: vendorNames });
       // 키가 연결돼 있으면 Gemini가 먼저 읽음(규칙 초안을 힌트로). 못 읽거나 연결이 없으면 규칙 결과 그대로
       let byAI = false, aiLate = false;
       if (!parsed.some(p => p.kind === 'query' || p.kind === 'nav') && text.trim().length >= 4) { const AI = await import('../js/ai.js');
@@ -157,6 +180,7 @@ export default {
         if (p.kind === 'event' && (p.data.place || p.data.area)) { try { const PL = await import('../js/place.js'); const hit = await PL.lookup(p.data.place || p.data.area, p.data.place ? p.data.area : ''); if (hit) { p.data.addr = hit.addr; p.data.mapUrl = hit.url || ''; p.data.placeBy = hit.by; } } catch { } }
         ids.push((await store.draft(p.kind, p.data, { source: p.src || text, confidence: p.confidence, origin })).id);
       }
+      await F.remember(ids);
       for (const a of replies) {
         const msg = await db.put('chat', { role: 'bot', q: text, text: a.text, items: a.items.slice(0, 12) });
         await drawMsg(msg, new Map());
@@ -181,17 +205,18 @@ export default {
         const d = pending.get(id) || (await db.get(id));
         if (!d) continue;
         if (d.status === 'pending') box.append(draftCard(d, () => updateBadge()));
-        else box.append(h('div.draft' + (d.status === 'approved' ? '.done' : '.gone'), h('div.k', ic(store.KINDS[d.kind]?.icon || 'file')), h('div.grow', h('div.small', { style: { fontWeight: 650 } }, d.data.title || d.data.name), h('div.faint.tiny', d.status === 'approved' ? '확정됨' : '버림'))));
+        else box.append(staticCard(d));
       }
       if (m.list?.length) box.append(h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px', lineHeight: 1.8 } }, m.list.map(x => h('li', x))));
       if (m.chips?.length && !m.chipDone) { const row = h('div.chips', { style: { marginTop: '8px' } }); const done = async label => { await db.patch(m.id, { chipDone: label }); row.replaceWith(h('span.faint.tiny', label)); };
         row.append(...m.chips.map(c => h('button.chip' + (c.make === 'task' ? '.acc' : ''), { onclick: async () => {
           if (c.say) return send(c.say);
           if (c.skip) return done('넘겼어요');
-          if (c.act) { const ACT = await import('../js/act.js'); const r = await ACT.run(c.act); await done(c.label); if (r) await drawMsg(await db.put('chat', { role: 'bot', text: r.text, chips: r.chips }), new Map()); return; }
+          if (c.act) { const ACT = await import('../js/act.js'); const r = await ACT.run(c.act); await done(c.label); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', text: r.text, chips: r.chips }), new Map()); } updateBadge(); return; }
+          if (c.follow) { const F = await import('../js/follow.js'); const r = await F.run(c.follow); await done(c.label); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', text: r.text }), new Map()); } updateBadge(); return; }
           if (c.undoAlias) { const CH = await import('../js/chat.js'); const a = await CH.aliases(); delete a[c.undoAlias]; await db.kvSet('chat:alias', a); return done('기억을 지웠어요'); }
-          if (c.make === 'event') { const d = await store.draft('event', { title: m.q.trim().slice(0, 60), date: todayStr(), start: '', end: '', place: '' }, { source: m.q, confidence: .6, origin: 'chat' }); await done('일정으로 받을게요'); return askNext(d, missing(d.data, m.q)); }
-          if (c.make) { const d = await store.draft(c.make, c.make === 'task' ? { title: brain.cleanTask(m.q) || m.q, due: '', priority: 'normal' } : c.make === 'note' ? { title: m.q.slice(0, 50), body: m.q, type: 'memo' } : { title: m.q }, { source: m.q, confidence: .6, origin: 'chat' }); updateBadge(); await done(`${store.KINDS[c.make]?.label || ''} 임시 항목을 만들었어요`); box.append(draftCard(d, () => updateBadge())); }
+          if (c.make === 'event') { const d = await store.draft('event', { title: m.q.trim().slice(0, 60), date: todayStr(), start: '', end: '', place: '' }, { source: m.q, confidence: .6, origin: 'chat' }); await (await import('../js/follow.js')).remember([d.id]); await done('일정으로 받을게요'); return askNext(d, missing(d.data, m.q)); }
+          if (c.make) { const d = await store.draft(c.make, c.make === 'task' ? { title: brain.cleanTask(m.q) || m.q, due: '', priority: 'normal' } : c.make === 'note' ? { title: m.q.slice(0, 50), body: m.q, type: 'memo' } : { title: m.q }, { source: m.q, confidence: .6, origin: 'chat' }); await (await import('../js/follow.js')).remember([d.id]); updateBadge(); await done(`${store.KINDS[c.make]?.label || ''} 임시 항목을 만들었어요`); box.append(draftCard(d, () => updateBadge())); }
         } }, c.label))); box.append(row); }
       else if (m.chipDone) box.append(h('div.faint.tiny', { style: { marginTop: '6px' } }, m.chipDone));
       if (m.dm) { const DM = await import('../js/dm.js'); const j = await DM.judge(m.dm.body, m.dm.name);
@@ -204,7 +229,9 @@ export default {
       if (!animate) b.style.animation = 'none';
       list.append(b);
     }
-    async function clearChat() { for (const m of await db.list('chat')) await db.remove(m.id); clear(list); toast('대화를 지웠어요. 확정한 항목은 그대로 있어요.'); }
+    async function clearChat() { const all = await db.list('chat'); if (!all.length) return; const { confirmBox } = await import('../js/ui.js'); if (!(await confirmBox('대화 내용을 지울까요? 확정한 항목과 대기함은 그대로 있어요.', '지우기'))) return;
+      for (const m of all) await db.remove(m.id); clear(list);
+      toast('대화를 지웠어요.', { label: '되돌리기', fn: async () => { for (const m of all) await db.put('chat', { ...m, deleted: false }); clear(list); const pend = new Map((await store.drafts()).map(d => [d.id, d])); for (const m of all.sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-60)) await drawMsg(m, pend, false); scrollDown(); } }); }
 
     // 음성
     let recorder = null, timer = 0;

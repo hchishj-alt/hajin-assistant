@@ -17,17 +17,19 @@ const RX = {
   scold: /(바보|멍청|못\s*알아\s*(들|듣)|왜\s*이래|답답해|엉망이)|^(이상해|틀렸어|별로야?|아니야 틀렸어)[.!~ ]*$/,
   bored: /(심심|뭐\s*하지|뭐해|놀자)/,
   laugh: /^[ㅋㅎ]{2,}[.!~ ]*$|^(ㅋ|ㅎ)+$/,
-  bye: /^(잘\s*자|굿나잇|바이|bye|안녕히|수고했어|수고|퇴근)/i,
+  bye: /^(잘\s*자|굿나잇|바이|bye|안녕히|수고했어요?|수고하셨|수고(?=$|[\s.!~])|퇴근(할게요?|합니다|해요|한다|함|이다)?[.!~ ]*$|내일\s*(봐|봬|뵙)|먼저\s*(갈게|들어가))/i,
+  food: /(뭐\s*먹|뭘\s*먹|메뉴\s*추천|점심\s*추천|저녁\s*추천)/,
   // 비서 행동에 대한 말: "할 일로 만들지 말고 대화처럼"
   meta: /((할\s*일|일정|항목|임시).{0,12}(만들지\s*마|만들기가?\s*아니|말고|하지\s*마|그만))|(대화(처럼|로|하듯)|말동무|그냥\s*(말|얘기|대화))/,
   fix: /^[“"']?(.{1,20}?)[”"']?\s*(?:이|가|은|는)?\s*아니(?:라|고|야[,.]?)\s*[“"']?(.{1,20}?)[”"']?\s*(?:이야|야|예요|이에요|임|입니다|라고|이라고)?[.!~]*$/,
 };
 
 // 묻는 말에 답하기: 앱의 개념과 쓰는 법 (규칙 기반이라 여기 있는 것만 답할 수 있음)
-const ASKS = /(차이|다른\s*점|뭐가\s*달라|뭐야|뭔데|뭐지|뭐예요|무슨\s*(뜻|말|기능)|어떻게|어떡해|방법|왜|되나|돼\??$|되는\s*거|할\s*수\s*있|가능해|어디(서|에)|언제\s*(써|쓰)|기준|안전)/;
+const ASKS = /(차이|다른\s*점|뭐가\s*달라|뭐야|뭔데|뭐지|뭐예요|뭐에요|뭔가요|무슨\s*(뜻|말|기능)|어떻게|어떡해|방법|왜|되나|돼\??$|되는\s*거|할\s*수\s*있|가능해|어디(서|에)|언제\s*(써|쓰)|기준|안전)/;
 const KB = [
   [/(할\s*일|투두).*(일정|캘린더)|(일정|캘린더).*(할\s*일|투두)/, '일정은 “언제 하는지”가 정해진 것이에요. 날짜와 시간에 자리를 차지해서 캘린더에 보이고, 구글 캘린더로 넘어가 알림이 울려요. 예: “내일 3시 클라이언트 미팅”.\n할 일은 “언제까지 끝내면 되는지”만 있는 것이에요. 체크해서 끝내고, 마감이 지나면 밀린 할 일로 떠요. 예: “금요일까지 시안 보내야 해”.\n그래서 “오늘 디지털 페인팅 디벨롭 해야 함”은 시간이 없으니 할 일(오늘 마감)로 만들었어요. “오늘 2시부터 4시 디지털 페인팅”처럼 시간을 말하면 일정이 돼요. 임시 카드의 종류 칸에서 바꿀 수도 있어요.'],
-  [/확인\s*대기함|임시\s*항목|임시|확정/, '비서나 회의 정리가 만든 건 바로 저장하지 않고 “임시 항목”으로 확인 대기함에 모아요. 제가 잘못 알아들을 수 있어서예요. 확정을 누르면 진짜로 저장되고, 고치기로 내용을 바꾸거나 버릴 수 있어요.'],
+  [/지워|지우|취소|잘못\s*(만들|적|말)|되돌리/, '방금 만든 건 “방금 거 취소”라고 말하면 버려요. “아니 4시야”, “금요일로”, “장소는 성수”처럼 말하면 방금 것만 고쳐요. 이미 확정한 건 “내일 미팅 취소해줘”처럼 이름을 말하거나, 그 화면에서 항목을 눌러 지우면 돼요. 지운 직후에는 되돌리기가 떠요.'],
+  [/확인\s*대기|임시\s*항목|임시|확정/, '비서나 회의 정리가 만든 건 바로 저장하지 않고 “임시 항목”으로 확인 대기함에 모아요. 제가 잘못 알아들을 수 있어서예요. 확정을 누르면 진짜로 저장되고, 고치기로 내용을 바꾸거나 버릴 수 있어요.'],
   [/메모.*아이디어|아이디어.*메모/, '메모는 그냥 적어 두는 기록이고, 아이디어는 기획 보드에 모여서 나중에 프로젝트나 콘텐츠로 키우는 재료예요.'],
   [/공유|나만\s*보기|팀에\s*보이|같이\s*보/, '항목을 만들 때 공유 칸이 “알아서”로 돼 있으면 내용을 보고 팀 일인지 개인 일인지 제가 정해요. 고쳐 주면 그걸 배워서 다음부터 그렇게 해요. 병원, 가족 같은 말은 나만 보기로, 프로젝트 이름이나 회의·클라이언트 같은 말은 팀 공유로 가요.'],
   [/마인드맵|노드/, '마인드맵 회의에서 Tab은 하위 노드, Enter는 옆 노드예요. “대화 → 노드”를 켜면 말하거나 적은 문장을 주제와 하위 항목으로 쪼개서 알맞은 가지에 붙여요. 끝나면 “AI 정리”로 회의록에 보관해요.'],
@@ -35,7 +37,8 @@ const KB = [
   [/구글\s*캘린더|알림|알람/, '캘린더 화면의 “구글 캘린더”에서 자동 연동을 켜고 “구글 캘린더에 연결하기”를 한 번 누르면, 구글 캘린더가 내 일정을 가져가서 폰 알림이 울려요. 급한 일정은 일정을 열고 “구글에 추가”를 누르면 바로 들어가요.'],
   [/메신저|메시지|연락|전해/, '“민서한테 내일 가능하냐고 물어봐줘”처럼 저한테 말하면 그 팀원에게 전해요. 답이 오면 바로 알려 드리고, 일정이 겹치는지 보고 답장 문구와 할 일·일정 추가를 제안해요.'],
   [/꾸미기|테마|색\s*바꾸|폰트|글씨|배경/, '메뉴의 “꾸미기”에서 색, 글씨 크기와 폰트, 둥글기, 투명도, 배경 사진, 메인 화면 순서를 바꿀 수 있어요. 사람마다 따로 저장돼요.'],
-  [/로그인|멤버\s*코드|코드/, '설정 → 동기화에서 5자리 멤버 코드를 넣으면 로그인돼요. 코드는 관리자가 관리자 화면에서 만들어요.'],
+  [/로그인|멤버\s*코드|코드/, '설정 → 동기화에서 관리자에게 받은 멤버 코드(5자리 이내)를 넣으면 로그인돼요. 코드는 관리자가 관리자 화면에서 만들어요. 로그인하지 않아도 이 기기 안에서는 다 쓸 수 있어요.'],
+  [/받을\s*돈|입금|계약금|잔금|미수금/, '“오로라 계약금 300만원 25일 입금 예정”처럼 말하면 받을 돈으로 적어요. 비용 화면 위쪽 “받을 돈”에 모이고, 들어오면 “받았어요”를 누르면 돼요. “받을 돈 얼마야?”라고 물어볼 수도 있어요.'],
   [/설치|홈\s*화면|오프라인|인터넷\s*없/, '브라우저 메뉴에서 “홈 화면에 추가”를 누르면 앱처럼 쓸 수 있어요. 인터넷이 없어도 열리고, 그동안 적은 건 연결되면 알아서 맞춰져요.'],
   [/피드백|학습|배우|똑똑/, '제 대답 아래 엄지나 “고칠 점 알려주기”로 한마디 해 주면 그걸 규칙으로 기억해서 다음 정리부터 반영해요. 자가 점검 화면에서 배운 규칙을 볼 수 있어요.'],
   [/레퍼런스|핀터레스트|미리보기/, '레퍼런스에 링크나 이미지를 넣으면 미리보기와 색, 태그가 붙어요. 핀터레스트는 사진을 우클릭해 “이미지 주소 복사”한 링크를 넣으면 미리보기가 떠요.'],
@@ -63,12 +66,13 @@ export function isTalk(t) {
   if (RX.fix.test(t) || RX.meta.test(t)) return true;
   if (know(t)) return true;
   if (/\d/.test(t) || /https?:/.test(t)) return false;
-  return t.length <= 30 && [RX.hi, RX.thanks, RX.ok, RX.no, RX.who, RX.can, RX.tired, RX.happy, RX.praise, RX.scold, RX.bored, RX.laugh, RX.bye].some(r => r.test(t));
+  if (/(쓰기|하기|보내기|올리기|만들기|정리|제출|까지|해야\s*(해|돼|함))\s*$/.test(t)) return false; // 할 일로 끝나는 말은 대화가 아님
+  return t.length <= 30 && [RX.hi, RX.thanks, RX.ok, RX.no, RX.who, RX.can, RX.tired, RX.happy, RX.praise, RX.scold, RX.bored, RX.laugh, RX.bye, RX.food].some(r => r.test(t));
 }
 
 // 이름 바로잡기 기억: "김민서가 아니라 최민서야" → 다음부터 알아서 바꿔 들음
 export const aliases = () => db.kvGet('chat:alias', {});
-export async function applyAlias(text) { const a = await aliases(); for (const [from, to] of Object.entries(a)) if (text.includes(from) && !text.includes(to)) text = text.split(from).join(to); return text; }
+export async function applyAlias(text) { const a = await aliases(); for (const [from, to] of Object.entries(a)) { if (/\d/.test(from) || !text.includes(from) || text.includes(to)) continue; const E = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); text = text.replace(new RegExp(`(^|[^가-힣A-Za-z])${E}(?=$|[^가-힣A-Za-z]|이|가|은|는|을|를|의|랑|한테|에게|님|씨|도|와|과)`, 'g'), `$1${to}`); } return text; }
 
 export async function reply(text, { name = '' } = {}) {
   const t = text.trim(); const you = name ? name + ' 님' : '';
@@ -76,16 +80,24 @@ export async function reply(text, { name = '' } = {}) {
   const fx = t.match(RX.fix);
   if (fx && fx[1].trim() !== fx[2].trim() && fx[1].trim().split(/\s+/).length <= 2 && fx[2].trim().split(/\s+/).length <= 2) {
     const from = fx[1].trim(), to = fx[2].trim(); let n = 0;
-    // 아직 확정 전인 임시 항목과, 저장된 연락처·할 일·일정에서 바로잡기
-    for (const d of await store.drafts()) { const s = JSON.stringify(d.data); if (s.includes(from)) { await db.patch(d.id, { data: JSON.parse(s.split(from).join(to)) }); n++; } }
-    for (const col of ['contacts', 'tasks', 'events']) for (const it of await db.list(col)) { const patch = {}; for (const k of ['name', 'title', 'who', 'memo']) if (typeof it[k] === 'string' && it[k].includes(from)) patch[k] = it[k].split(from).join(to); if (Object.keys(patch).length) { await db.patch(it.id, patch); n++; } }
-    await db.kvSet('chat:alias', { ...(await aliases()), [from]: to });
-    return { text: n ? `‘${from}’을(를) ‘${to}’(으)로 ${n}곳 고쳤어요. 앞으로도 ‘${to}’(으)로 알아들을게요.` : `알겠어요. 앞으로 ‘${from}’이라고 하면 ‘${to}’(으)로 알아들을게요.`, chips: [{ label: '되돌리기', undoAlias: from }] };
+    const valueish = x => /\d|요일$|^(오전|오후|아침|저녁|밤|내일|오늘|모레)$/.test(x);
+    if (valueish(from) || valueish(to)) return { text: '어떤 항목을 고칠지 모르겠어요. “내일 미팅 4시로 옮겨줘”처럼 어떤 건지 같이 말해 주세요. 방금 만든 걸 고치려면 만든 직후에 “아니 4시야”라고 하면 돼요.' };
+    const nameish = x => /^[가-힣]{2,4}$/.test(x) || /^[A-Za-z]{2,12}$/.test(x);
+    const swap = v => v.split(from).join(to);
+    // 아직 확정 전인 임시 항목은 이름·제목 칸에서, 저장된 기록은 사람 이름 칸에서만 바로잡음
+    for (const d of await store.drafts()) { const data = { ...d.data }; let hit = false; for (const k of ['title', 'name', 'who', 'place']) if (typeof data[k] === 'string' && data[k].includes(from)) { data[k] = swap(data[k]); hit = true; } if (hit) { await db.patch(d.id, { data }); n++; } }
+    if (nameish(from) && nameish(to)) {
+      for (const col of ['contacts', 'tasks', 'events']) for (const it of await db.list(col)) { const patch = {}; for (const k of ['name', 'who']) if (typeof it[k] === 'string' && it[k].split(/[,\s]+/).includes(from)) patch[k] = it[k].split(/([,\s]+)/).map(x => x === from ? to : x).join(''); if (Object.keys(patch).length) { await db.patch(it.id, patch); n++; } }
+      await db.kvSet('chat:alias', { ...(await aliases()), [from]: to });
+      return { text: n ? `‘${from}’을(를) ‘${to}’(으)로 ${n}곳 고쳤어요. 앞으로도 ‘${to}’(으)로 알아들을게요.` : `알겠어요. 앞으로 ‘${from}’이라고 하면 ‘${to}’(으)로 알아들을게요.`, chips: [{ label: '되돌리기', undoAlias: from }] };
+    }
+    return { text: n ? `확인 전인 항목 ${n}개에서 ‘${from}’을(를) ‘${to}’(으)로 고쳤어요.` : `‘${from}’이 들어간 확인 전 항목이 없어요. 이미 확정한 건 그 화면에서 고쳐 주세요.` };
   }
   { const k = know(t); if (k && !RX.who.test(t) && !RX.can.test(t)) return { text: k }; }
   if (RX.who.test(t)) return { text: '하진 님 팀의 비서예요. 일정·할 일·지출·연락처를 말 한 줄로 받아 적고, 팀원에게 말을 전하고, 회의 내용을 정리해요. 정해진 규칙으로 움직여서 사람처럼 뭐든 답하지는 못해요.' };
   if (RX.can.test(t)) return { text: '이렇게 말해 보세요.', list: ['“내일 3시 클라이언트 미팅” → 일정', '“금요일까지 시안 보내야 해” → 할 일', '“점심 9000원” → 지출', '“민서한테 내일 가능하냐고 물어봐줘” → 메신저로 전달', '“레드프린팅 인쇄 업체 02-123-4567 A3 포스터 100장 45000원” → 업체와 가격', '“포스터 시안 끝냈어”, “내일 미팅 4시로 옮겨줘”, “포스터 인쇄 민서한테 넘겨줘” → 있는 것 고치기', '“누가 제일 바빠?”, “오늘 뭐부터 해야 돼?”, “가을 팝업 어디까지 됐어?”, “A3 포스터 어디가 제일 싸?” → 물어보기', '“(링크) 요약해줘”, “회의록: …” → 읽고 정리', '“앱 고쳐줘: …” → 코덱스용 요청서'], chips: [{ label: '오늘 뭐부터 해야 돼?', say: '오늘 뭐부터 해야 돼?' }, { label: '누가 제일 바빠?', say: '누가 제일 바빠?' }, { label: '밀린 일', say: '밀린 일 뭐 있어?' }] };
   if (RX.hi.test(t)) { const h = hour(); return { text: `${h < 11 ? '좋은 아침이에요' : h < 18 ? '안녕하세요' : '좋은 저녁이에요'}${you ? ', ' + you : ''}. ${await brief()}` }; }
+  if (RX.food.test(t)) return { text: '메뉴는 제가 골라 드리기 어려워요. 대신 점심 약속이나 식비는 말해 주면 적어 둘게요. 예: “내일 12시 민서랑 점심”, “점심 9000원”' };
   if (RX.thanks.test(t)) return { text: pick(['별말씀을요.', '도움이 됐다니 좋아요.', '언제든요.']) };
   if (RX.bye.test(t)) return { text: pick(['오늘도 수고했어요. 푹 쉬어요.', '수고 많았어요. 내일 봬요.']) };
   if (RX.laugh.test(t)) return { text: pick(['ㅎㅎ', '웃을 일이 있었나 봐요.', 'ㅋㅋ 좋네요.']) };

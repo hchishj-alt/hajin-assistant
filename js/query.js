@@ -41,17 +41,22 @@ export async function answer(q, base = new Date()) {
   }
   // "내일 뭐 해야 돼?", "이번 주 뭐 있어?" → 그 기간의 일정과 할 일을 같이
   if (r && /(뭐\s*(해|하지|있|해야|하기로)|뭐가\s*있|할\s*거\s*있|해야\s*(돼|해|하지|할))/.test(q) && !/(일정|스케줄|할\s*일|할일|지출|비용)/.test(q)) {
-    const evs = (await db.list('events')).filter(e => { for (let d = new Date(r[0]); ymd(d) <= r[1]; d = addD(d, 1)) if (e.date === ymd(d) || store.repeatsOn(e, ymd(d))) return true; return false; }).sort((x, y) => ((x.date || '') + (x.start || '')).localeCompare((y.date || '') + (y.start || '')));
+    const evs = (await db.list('events')).filter(e => { for (let d = new Date(r[0]); ymd(d) <= r[1]; d = addD(d, 1)) if (store.occursOn(e, ymd(d))) return true; return false; }).sort((x, y) => ((x.date || '') + (x.start || '')).localeCompare((y.date || '') + (y.start || '')));
     const ts = (await store.openTasks()).filter(t => t.due && t.due <= r[1]).sort((x, y) => x.due.localeCompare(y.due));
     return { text: evs.length || ts.length ? `${r[2]}까지 일정 ${evs.length}개, 끝낼 할 일 ${ts.length}개가 있어요.` : `${r[2]}에는 잡힌 일정도, 마감인 할 일도 없어요.`, items: [...evs.map(e => ({ icon: 'calendar', title: e.title, sub: [e.start || '종일', e.place, e.who].filter(Boolean).join(' · '), route: 'calendar/' + e.date })), ...ts.slice(0, 12).map(t => ({ icon: 'check2', title: t.title, sub: (t.due < today ? '밀림 · ' : '') + '마감 ' + t.due.slice(5).replace('-', '/'), route: 'tasks' }))] };
   }
   // "전시 언제였지", "충주 미팅 언제야" → 그 말이 들어간 일정을 날짜와 함께
-  if (/언제/.test(q) && !/비|빈\s*시간/.test(q)) {
-    const kws = q.replace(/(언제(였지|였더라|야|지|예요|에요|더라|인지|였어|임)?|알려\s*줘|뭐였지|일정|약속|\?)/g, ' ').split(/\s+/).map(x => x.replace(/(은|는|이|가|을|를)$/, '')).filter(x => x.length >= 2);
+  if ((/언제/.test(q) && !/비|빈\s*시간/.test(q)) || /(몇\s*시|어디서|어디야|어디지|어디였|장소|누구랑|누가\s*(와|오|가|참석))/.test(q)) {
+    const kws = q.replace(/(언제(까지)?(였지|였더라|야|지|예요|에요|더라|인지|였어|임)?|몇\s*시(였지|야|지|예요|에요|더라|부터)?|어디서(\s*해|\s*하지|\s*했지)?|어디(야|지|였지|였더라|예요|에요)?|장소|누구랑(\s*해|\s*하지|\s*가)?|누가\s*(와|오지|가|참석해)|알려\s*줘|뭐였지|일정|약속|마감|해요?$|\?)/g, ' ').split(/\s+/).map(x => x.replace(/(은|는|이|가|을|를)$/, '')).filter(x => x.length >= 2);
     if (kws.length) {
       const hay = e => `${e.title} ${e.place || ''} ${e.who || ''} ${e.area || ''}`;
       const evs = (await db.list('events')).filter(e => kws.every(k => hay(e).includes(k))).sort((x, y) => (y.date || '').localeCompare(x.date || ''));
-      const ts = (await db.list('tasks')).filter(t => t.due && kws.every(k => t.title.includes(k)));
+      const ts = (await db.list('tasks')).filter(t => t.due && !t.done && kws.every(k => `${t.title} ${t.project || ''}`.includes(k))).sort((x, y) => x.due.localeCompare(y.due));
+      if (/마감/.test(q) && ts.length) return { text: `“${ts[0].title}” 마감은 ${fmtK(ts[0].due)}${ts[0].time ? ' ' + ts[0].time : ''}이에요.${ts[0].who ? ` 담당은 ${ts[0].who}예요.` : ''}`, items: ts.slice(0, 6).map(t => ({ icon: 'check2', title: t.title, sub: '마감 ' + t.due.slice(5).replace('-', '/') + (t.time ? ' ' + t.time : ''), route: 'tasks' })) };
+      { const e = evs.find(x => x.date >= today) || evs[0];
+        if (e && /(어디|장소)/.test(q)) return { text: e.place || e.area ? `“${e.title}”은 ${[e.area, e.place].filter(Boolean).join(' ')}에서 해요. ${fmtK(e.date)}${e.start ? ' ' + e.start : ''}이에요.` : `“${e.title}”에는 장소를 안 적어 뒀어요. ${fmtK(e.date)}${e.start ? ' ' + e.start : ''}이에요.`, items: [{ icon: 'calendar', title: e.title, sub: [e.date.slice(5).replace('-', '/'), e.start, e.place].filter(Boolean).join(' · '), route: 'calendar/' + e.date }] };
+        if (e && /(누구랑|누가)/.test(q)) return { text: e.who ? `“${e.title}”은 ${e.who}와(과) 같이 해요.` : `“${e.title}”에는 같이 하는 사람을 안 적어 뒀어요.`, items: [{ icon: 'calendar', title: e.title, sub: [e.date.slice(5).replace('-', '/'), e.start, e.who].filter(Boolean).join(' · '), route: 'calendar/' + e.date }] };
+        if (e && /몇\s*시/.test(q)) return { text: e.start ? `“${e.title}”은 ${fmtK(e.date)} ${e.start}${e.end ? '–' + e.end : ''}이에요.` : `“${e.title}”은 ${fmtK(e.date)}인데 시간은 안 정해져 있어요.`, items: [{ icon: 'calendar', title: e.title, sub: [e.date.slice(5).replace('-', '/'), e.start, e.place].filter(Boolean).join(' · '), route: 'calendar/' + e.date }] }; }
       if (evs.length || ts.length) { const e = evs.find(x => x.date >= today) || evs[0]; return { text: e ? `“${e.title}” 일정은 ${fmtK(e.date)}${e.start ? ' ' + e.start : ''}${e.date < today ? '이었어요' : '이에요'}.` : `그 말이 들어간 할 일 ${ts.length}개가 있어요.`, items: [...evs.slice(0, 8).map(x => ({ icon: 'calendar', title: x.title, sub: [x.date.slice(5).replace('-', '/'), x.start, x.place].filter(Boolean).join(' · '), route: 'calendar/' + x.date })), ...ts.slice(0, 5).map(t => ({ icon: 'check2', title: t.title, sub: '마감 ' + t.due.slice(5).replace('-', '/'), route: 'tasks' }))] }; }
       return { text: `‘${kws.join(' ')}’ 일정을 못 찾았어요. 캘린더에 아직 없는 것 같아요.`, items: [] };
     }
@@ -60,23 +65,28 @@ export async function answer(q, base = new Date()) {
     const [a, b, label0] = r || [today, ymd(addD(base, 6)), '앞으로 7일'];
     // "개인 일정", "팀 일정"처럼 물으면 그쪽만
     const want = /개인|내\s*개인|사적/.test(q) ? 'personal' : /팀|업무|회사/.test(q) ? 'work' : ''; const label = label0 + (want ? ' ' + SC.LABEL[want] + ' 쪽' : '');
-    const all = (await db.list('events')).filter(e => !want || SC.of(e) === want);
+    const all = [...(await db.list('events')), ...(await store.drafts()).filter(d => d.kind === 'event' && d.data?.date).map(d => ({ ...d.data, title: '(확인 전) ' + d.data.title }))].filter(e => !want || SC.of(e) === want);
     const out = [];
-    for (let d = new Date(a); ymd(d) <= b; d = addD(d, 1)) for (const e of all) if (e.date === ymd(d) || store.repeatsOn(e, ymd(d))) out.push({ ...e, _d: ymd(d) });
+    for (let d = new Date(a); ymd(d) <= b; d = addD(d, 1)) for (const e of all) if (store.occursOn(e, ymd(d))) out.push({ ...e, _d: ymd(d) });
     out.sort((x, y) => (x._d + (x.start || '')).localeCompare(y._d + (y.start || '')));
     return { text: out.length ? `${label} 일정 ${out.length}개예요.` : `${label}에는 일정이 없어요.`, items: out.map(e => ({ icon: 'calendar', title: e.title, sub: `${e._d.slice(5).replace('-', '/')} ${e.start || '종일'}${e.place ? ' · ' + e.place : ''}${e.who ? ' · ' + e.who : ''} · ${SC.LABEL[SC.of(e)]}`, route: 'calendar/' + e._d })) };
   }
   if (/(할\s*일|할일|투두|todo|해야\s*할|마감)/i.test(q)) {
-    let ts = await store.openTasks();
+    let ts = [...(await store.openTasks()), ...(await store.drafts()).filter(d => d.kind === 'task' && d.data?.title).map(d => ({ ...d.data, title: '(확인 전) ' + d.data.title }))];
     if (r) ts = ts.filter(t => t.due && t.due >= r[0] && t.due <= r[1]);
     if (/밀린|지난|늦은/.test(q)) ts = ts.filter(t => t.due && t.due < today);
     ts.sort((a, b) => (a.due || '9').localeCompare(b.due || '9'));
     return { text: ts.length ? `${r ? r[2] + ' ' : ''}남은 할 일 ${ts.length}개예요.` : '남은 할 일이 없어요. 깔끔해요.', items: ts.slice(0, 20).map(t => ({ icon: 'check2', title: t.title, sub: [t.due && '마감 ' + t.due.slice(5).replace('-', '/'), t.who, t.project].filter(Boolean).join(' · '), route: 'tasks' })) };
   }
   if (/(지출|비용|돈|얼마|썼|정산|영수증)/.test(q)) {
-    const [a, b, label] = r || [ymd(new Date(base.getFullYear(), base.getMonth(), 1)), today, '이번 달'];
+    const [a, b, label] = r || [ymd(new Date(base.getFullYear(), base.getMonth(), 1)), ymd(new Date(base.getFullYear(), base.getMonth() + 1, 0)), '이번 달'];
     let xs = (await db.list('expenses')).filter(e => e.date >= a && e.date <= b);
     if (/정산\s*(안|전)|미정산/.test(q)) xs = xs.filter(e => e.status !== 'done');
+    // "메타 광고비 얼마 썼지", "식비 얼마" → 그 말이 든 것만
+    const ws = brain.parseWhen(q, base).hits.reduce((x, hh) => x.replace(hh, ' '), q).replace(/(이번\s*(주|달)|지난\s*(주|달)|다음\s*주|올해|지출|비용|돈|얼마나?|썼(지|어|나|더라|는지)?|나갔(지|어|나)?|들었(지|어|나)?|정산|영수증|내역|알려\s*줘|보여\s*줘|총|전부|다\s|에|은|는|이|가|\?)/g, ' ').split(/\s+/).filter(x => x.length >= 2);
+    if (ws.length) { const hit = xs.filter(e => ws.every(k => `${e.title} ${e.category || ''} ${e.project || ''} ${e.pay || ''} ${e.memo || ''}`.includes(k))); const any = hit.length ? hit : xs.filter(e => ws.some(k => `${e.title} ${e.category || ''} ${e.project || ''} ${e.pay || ''}`.includes(k)));
+      if (any.length) { const s2 = any.reduce((s, e) => s + (Number(e.amount) || 0), 0); return { text: `${label} ‘${ws.join(' ')}’ 지출은 ${s2.toLocaleString()}원 (${any.length}건)이에요.`, items: any.sort((x, y) => (y.date || '').localeCompare(x.date || '')).slice(0, 12).map(e => ({ icon: 'receipt', title: e.title, sub: `${(Number(e.amount) || 0).toLocaleString()}원 · ${e.date.slice(5).replace('-', '/')} · ${e.category || ''}`, route: 'money' })) }; }
+      if (ws.some(k => k.length >= 2) && !/^(이번|지난|전체)$/.test(ws.join(''))) return { text: `${label}에는 ‘${ws.join(' ')}’(으)로 적힌 지출이 없어요. 전체 지출은 ${xs.reduce((s, e) => s + (Number(e.amount) || 0), 0).toLocaleString()}원이에요.`, items: [] }; }
     const sum = xs.reduce((s, e) => s + (Number(e.amount) || 0), 0);
     const byCat = {}; xs.forEach(e => (byCat[e.category || '기타'] = (byCat[e.category || '기타'] || 0) + (Number(e.amount) || 0)));
     return { text: `${label} 지출은 ${sum.toLocaleString()}원 (${xs.length}건)이에요.`, items: Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => ({ icon: 'receipt', title: c, sub: v.toLocaleString() + '원', route: 'money' })) };

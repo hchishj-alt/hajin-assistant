@@ -8,7 +8,7 @@ const pad = n => String(n).padStart(2, '0');
 const dt = (d, t) => d.replace(/-/g, '') + (t ? 'T' + t.replace(':', '') + '00' : '');
 const nextDay = d => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + 1); return `${x.getFullYear()}${pad(x.getMonth() + 1)}${pad(x.getDate())}`; };
 const esc = s => String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, '\\$&');
-const RR = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY', weekdays: 'WEEKLY;BYDAY=MO,TU,WE,TH,FR' };
+const RR = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY', biweekly: 'WEEKLY;INTERVAL=2', weekdays: 'WEEKLY;BYDAY=MO,TU,WE,TH,FR' };
 const TZ = 'Asia/Seoul';
 
 // 구글 캘린더 "일정 추가" 화면이 내용이 채워진 채로 열리는 주소

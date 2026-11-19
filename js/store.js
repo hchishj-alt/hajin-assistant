@@ -7,6 +7,7 @@ export const KINDS = {
   event: { col: 'events', label: '일정', icon: 'calendar', route: 'calendar' },
   task: { col: 'tasks', label: '할 일', icon: 'check2', route: 'tasks' },
   expense: { col: 'expenses', label: '지출', icon: 'receipt', route: 'money' },
+  income: { col: 'incomes', label: '받을 돈', icon: 'wallet', route: 'money' },
   contact: { col: 'contacts', label: '연락처', icon: 'user', route: 'people' },
   note: { col: 'notes', label: '메모', icon: 'file', route: 'plan' },
   idea: { col: 'notes', label: '아이디어', icon: 'bulb', route: 'plan' },
@@ -31,17 +32,20 @@ export async function drafts() {
 }
 export async function approve(d, edited) {
   const data = edited || d.data;
-  const k = KINDS[d.kind];
+  let k = KINDS[d.kind];
   let saved = null;
   if (k && k.col) {
-    const payload = Object.fromEntries(Object.entries(data).filter(([key]) => !key.startsWith('_'))); // 되묻기용 임시 표시는 저장하지 않음
+    let payload = Object.fromEntries(Object.entries(data).filter(([key]) => !key.startsWith('_'))); // 되묻기용 임시 표시는 저장하지 않음
+    if (payload.who && (d.kind === 'task' || d.kind === 'event')) payload.who = await canonWho(payload.who);
+    // 날짜를 아직 모르는 일정은 캘린더에 둘 자리가 없으니, 잊지 않게 할 일로 둠
+    if (d.kind === 'event' && !payload.date) { k = KINDS.task; payload = { title: payload.title, due: '', who: payload.who || '', priority: 'normal', project: payload.project || '', scope: payload.scope || '', memo: ['날짜가 아직 안 정해진 일정', payload.place, payload.memo].filter(Boolean).join(' · '), done: false }; }
     if (data._allday) payload.allDay = true;
     if (d.kind === 'idea') payload.type = 'idea';
     if (d.kind === 'note') payload.type = payload.type || 'note';
     if (d.kind === 'task') payload.done = false;
     if (d.sourceRef) payload.sourceRef = d.sourceRef;
     if (d.kind === 'vendor') saved = await saveVendor(payload);
-    else saved = await db.put(k.col, await teamify(d.kind, payload));
+    else saved = await db.put(k.col, await teamify(k === KINDS.task ? 'task' : d.kind, ['expense', 'income'].includes(d.kind) && payload.team === undefined ? { ...payload, team: 'auto' } : payload));
   } else if (d.kind === 'summary' && d.sourceRef) {
     // 회의·메모 요약 승인 → 원본에 확정 요약으로 붙임
     await db.patch(d.sourceRef, { summary: data, summaryConfirmed: true });
@@ -60,6 +64,8 @@ export async function saveVendor(v) {
   return db.patch(ex.id, { phone: v.phone || ex.phone || '', link: v.link || ex.link || '', kakao: v.kakao || ex.kakao || '', cat: ex.cat && ex.cat !== '기타' ? ex.cat : v.cat || ex.cat || '기타', memo: [ex.memo, v.memo].filter((x, i, a) => x && a.indexOf(x) === i).join(' / ').slice(0, 200), prices });
 }
 export async function reject(d) { await db.patch(d.id, { status: 'rejected' }); }
+// 확정한 것을 다시 임시로: 저장된 기록은 지우고 대기함으로 돌려보냄
+export async function unapprove(d) { if (d.resultId) { const rec = await db.get(d.resultId); if (rec && !rec.deleted) await db.remove(rec.id); } return db.patch(d.id, { status: 'pending', resultId: null }); }
 export async function changeKind(d, kind) {
   brain.learnKind(d.source || d.data.title || '', kind); await saveLearned();
   const re = brain.interpret(`${KINDS[kind]?.label || kind}: ${d.source || d.data.title}`)[0];
@@ -85,13 +91,17 @@ export async function projects() {
 }
 export async function eventsOn(date) {
   const evs = await db.list('events');
-  return evs.filter(e => e.date === date || repeatsOn(e, date)).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+  return evs.filter(e => occursOn(e, date)).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
 }
+// 그 날에 이 일정이 있는지 (한 번만 뺀 날은 제외)
+export function occursOn(e, date) { return !(e.skip || []).includes(date) && (e.date === date || repeatsOn(e, date)); }
 export function repeatsOn(e, date) {
   if (e.endDate && date > e.date && date <= e.endDate) return true; // 여러 날 이어지는 일정
   if (!e.repeat || date < e.date) return false;
   if (e.until && date > e.until) return false;
-  const a = new Date(e.date), b = new Date(date);
+  if ((e.skip || []).includes(date)) return false;
+  const a = new Date(e.date + 'T00:00'), b = new Date(date + 'T00:00');
+  if (e.repeat === 'biweekly') return a.getDay() === b.getDay() && Math.round((b - a) / 864e5) % 14 === 0;
   if (e.repeat === 'daily') return true;
   if (e.repeat === 'weekly') return a.getDay() === b.getDay();
   if (e.repeat === 'monthly') return a.getDate() === b.getDate();
@@ -111,6 +121,19 @@ export async function myNames() {
 export async function mineFilter() {
   const names = await myNames();
   return t => !t.team || !t.who || names.some(n => sameName(n, t.who));
+}
+// 이 기기가 아는 사람 이름: 연락처, 팀원, 할 일의 담당. 동기화 전에도 "민서 할 일"을 알아듣게
+export async function peopleNames() {
+  const mine = await myNames(); const set = new Set(); const add = n => { n = String(n || '').trim().replace(/(님|씨)$/, ''); if (n.length >= 2 && n.length <= 10 && !mine.some(x => sameName(x, n))) set.add(n); };
+  (await db.list('contacts')).forEach(c => add(c.name)); (await teammateNames()).forEach(add);
+  for (const t of await db.list('tasks')) if (t.who && /^[가-힣]{2,4}$/.test(t.who)) add(t.who);
+  const all = [...set]; return all.filter(n => !(n.length === 2 && all.some(f => /^[가-힣]{3}$/.test(f) && f.slice(1) === n))); // "민서"는 "최민서"가 있으면 뺌
+}
+// 담당·같이 하는 사람을 저장할 때 아는 이름으로 맞춤 (민서 → 최민서). 딱 한 명과 맞을 때만
+export async function canonWho(who) {
+  const w = String(who || '').trim().replace(/(님|씨)$/, ''); if (!w || /[,\s]/.test(w)) return who;
+  const names = [...new Set([...(await db.list('contacts')).map(c => c.name), ...(await teammateNames())].filter(Boolean))];
+  if (names.includes(w)) return w; const hits = names.filter(n => /^[가-힣]{3}$/.test(n) && n.slice(1) === w); return hits.length === 1 ? hits[0] : w;
 }
 export async function teammateNames() {
   const sp = await db.kvGet('sync:spaces', []);
@@ -159,6 +182,7 @@ export async function corpus() {
     add('events', 'calendar', x => ({ title: x.title, text: `${x.title} ${x.place || ''} ${x.memo || ''}` })),
     add('contacts', 'people', x => ({ title: x.name, text: `${x.name} ${x.org || ''} ${x.role || ''} ${x.memo || ''} ${(x.tags || []).join(' ')}` })),
     add('expenses', 'money', x => ({ title: x.title, text: `${x.title} ${x.category} ${x.project || ''}` })),
+    add('incomes', 'money', x => ({ title: x.title, text: `${x.title} ${x.from || ''} ${x.project || ''}` })),
     add('sns', 'studio', x => ({ title: x.title, text: `${x.title} ${x.caption || ''}` })),
   ]);
   return out;

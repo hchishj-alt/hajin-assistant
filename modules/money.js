@@ -8,21 +8,25 @@ const ST = { todo: ['정산 전', 'warn'], submitted: ['결재 요청', 'acc'], 
 export default {
   async render(root) {
     const body = h('div');
-    const quick = h('input', { placeholder: '"택시 12,300원 법인카드 #이터니아"처럼 적고 Enter', 'aria-label': '지출 추가' });
-    quick.addEventListener('keydown', async e => {
-      if (e.key !== 'Enter' || e.isComposing || !quick.value.trim()) return;
-      const p = brain.interpret('지출: ' + quick.value.trim())[0];
-      const tags = brain.parseTags(quick.value);
-      if (!p.data.amount) { toast('금액을 못 찾았어요. "12000원"처럼 적어 주세요'); return; }
-      await db.put('expenses', { ...p.data, title: p.data.title.replace(/#\S+/g, '').trim(), project: p.data.project || tags[0] || '', status: 'todo' });
-      quick.value = ''; toast(`${p.data.amount.toLocaleString()}원 · ${p.data.category}`); draw();
-    });
+    const quick = h('input', { placeholder: '“택시 12,300원 법인카드”, “오로라 계약금 300만원 25일 입금 예정”처럼 적고 Enter', 'aria-label': '지출이나 받을 돈 추가', enterkeyhint: 'done' });
+    const addQuick = async () => {
+      const v = quick.value.trim(); if (!v) return;
+      const ctx = { projects: (await db.list('projects')).map(x => x.name).filter(Boolean), vendors: (await db.list('vendors')).map(x => x.name).filter(Boolean) };
+      let p = brain.interpret(v, ctx)[0]; if (!p || (p.kind !== 'expense' && p.kind !== 'income')) p = brain.interpret('지출: ' + v, ctx)[0];
+      const tags = brain.parseTags(v);
+      if (!p.data.amount) { toast('금액을 못 찾았어요. “12000원”처럼 적어 주세요'); return; }
+      const income = p.kind === 'income';
+      const saved = await db.put(income ? 'incomes' : 'expenses', { ...p.data, title: String(p.data.title || '').replace(/^지출\s*[:：]\s*/, '').replace(/#\S+/g, '').trim() || (income ? '받을 돈' : '지출'), project: p.data.project || tags[0] || '', ...(income ? {} : { status: 'todo' }), team: 'auto' });
+      quick.value = ''; toast(`${income ? (saved.status === 'got' ? '받은 돈' : '받을 돈') : '지출'} · ${saved.title} ${Number(saved.amount).toLocaleString()}원${income ? '' : ' · ' + saved.category}`, { label: '되돌리기', fn: async () => { await db.remove(saved.id); draw(); } }); draw();
+    };
+    quick.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) addQuick(); });
     root.append(head('비용 처리', '쓰자마자 적고, 정산 상태까지 한눈에.',
       h('button.btn.sm.ghost', { onclick: setBudget }, ic('target', 14), '예산'),
       h('button.btn.sm.ghost', { onclick: exportCsv }, ic('download', 14), '엑셀(CSV)'),
       h('button.btn.sm.ghost', { onclick: printReport }, ic('file', 14), '지출결의서'),
+      h('button.btn.sm', { onclick: () => editIncome() }, ic('plus', 14), '받을 돈'),
       h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '지출')),
-      h('div.quick', { style: { marginBottom: '12px' } }, ic('receipt'), quick), body);
+      h('div.quick', { style: { marginBottom: '12px' } }, ic('receipt'), quick, h('button.btn.icon.ghost', { 'aria-label': '추가', onclick: addQuick }, ic('right', 18))), body);
     await draw();
 
     async function draw() {
@@ -46,13 +50,23 @@ export default {
         tile('target', budget ? Math.round(sum / budget * 100) + '%' : '–', budget ? `예산 ${shortWon(budget)}` : '예산 미설정', budget && sum > budget ? 'bad' : 'ok')));
       // 팀 결재: 팀원이 '결재 요청'으로 올린 팀 비용 → 관리자가 승인/반려
       const sync = await import('../js/sync.js');
-      const admin = await sync.isAdmin();
+      const admin = await sync.isAdmin(); const member = !!(await sync.me());
       const waiting = all.filter(e => e.team && e.status === 'submitted');
       if (waiting.length) body.append(h('div.card', { style: { marginBottom: '14px', borderColor: 'var(--acc)' } },
         h('div.card-h', h('h3', ic('inbox'), `결재 ${admin ? '대기' : '요청 중'} ${waiting.length}건`), h('span.mono.small', waiting.reduce((s, e) => s + (Number(e.amount) || 0), 0).toLocaleString() + '원')),
         h('div.list', waiting.map(e => h('div.li', h('div.grow', h('div.t.small', e.title), h('div.faint.tiny', [e.by, e.date, e.category, e.pay].filter(Boolean).join(' · '))), h('span.mono.small', (Number(e.amount) || 0).toLocaleString()),
           admin ? h('button.btn.sm.ghost', { onclick: async () => { await db.patch(e.id, { status: 'todo', reviewed: '반려', reviewedBy: await db.kvGet('name', '') }); toast('반려했어요'); draw(); } }, '반려') : null,
           admin ? h('button.btn.sm.pri', { onclick: async () => { await db.patch(e.id, { status: 'approved', reviewed: '승인', reviewedBy: await db.kvGet('name', '') }); toast('승인했어요'); draw(); } }, '승인') : null)))));
+      // 받을 돈: 계약금·잔금처럼 들어올 돈. 받으면 한 번 눌러 '받음'으로
+      const incomes = (await db.list('incomes')).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'));
+      const dueIn = incomes.filter(x => x.status !== 'got'), gotIn = incomes.filter(x => x.status === 'got' && (x.date || '').startsWith(month));
+      if (incomes.length) { const t0 = todayStr(); const row = x => h('div.li', h('div.grow', { style: { cursor: 'pointer' }, onclick: () => editIncome(x) }, h('div.t.small', x.title), h('div.faint.tiny', [x.status === 'got' ? '받음' : x.date ? (x.date < t0 ? '받기로 한 날 지남 · ' : '') + fmtDate(x.date) : '날짜 미정', x.from, x.project, x.memo].filter(Boolean).join(' · '))),
+          h('span.mono', { style: { fontWeight: 650 } }, (Number(x.amount) || 0).toLocaleString()),
+          x.status === 'got' ? h('span.chip.ok', '받음') : h('button.btn.sm', { onclick: async () => { await db.patch(x.id, { status: 'got', gotAt: todayStr(), date: x.date && x.date <= todayStr() ? x.date : todayStr(), dueDate: x.date || '' }); toast('받음으로 바꿨어요', { label: '되돌리기', fn: async () => { await db.patch(x.id, { status: 'due', date: x.date || '' }); draw(); } }); draw(); } }, ic('check', 14), '받았어요'));
+        body.append(h('div.card', { style: { marginBottom: '14px' } },
+          h('div.card-h', h('h3', ic('wallet'), '받을 돈'), h('span.mono.small', dueIn.length ? `남은 ${dueIn.reduce((s, x) => s + (Number(x.amount) || 0), 0).toLocaleString()}원 · ${dueIn.length}건` : '다 받았어요')),
+          dueIn.length ? h('div.list', dueIn.map(row)) : null,
+          gotIn.length ? h('details', { style: { marginTop: '6px' } }, h('summary.small.muted', `이번 달 받은 돈 ${gotIn.reduce((s, x) => s + (Number(x.amount) || 0), 0).toLocaleString()}원 · ${gotIn.length}건`), h('div.list', gotIn.map(row))) : null)); }
       // 분류별
       const byCat = {}; xs.forEach(e => (byCat[e.category || '기타'] = (byCat[e.category || '기타'] || 0) + (Number(e.amount) || 0)));
       const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
@@ -65,7 +79,7 @@ export default {
       const list = xs.filter(e => !stF || (e.status || 'todo') === stF).sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
       const c = h('div.card');
       const sel = new Set();
-      const bulk = h('div.row.hide', { style: { marginBottom: '8px' } }, h('span.small.muted.grow'), ...Object.entries(ST).map(([k, [l]]) => h('button.btn.sm', { onclick: async () => { for (const id of sel) await db.patch(id, { status: k }); toast(`${sel.size}건 → ${l}`); draw(); } }, l)));
+      const bulk = h('div.row.hide', { style: { marginBottom: '8px' } }, h('span.small.muted.grow'), ...Object.entries(ST).filter(([k]) => admin || !member || k === 'todo' || k === 'submitted').map(([k, [l]]) => h('button.btn.sm', { onclick: async () => { for (const id of sel) await db.patch(id, { status: k }); toast(`${sel.size}건 → ${l}`); draw(); } }, l)));
       c.append(bulk);
       let d0 = '';
       if (!list.length) c.append(h('div.empty', '해당하는 지출이 없어요'));
@@ -85,9 +99,18 @@ export default {
       let receiptKey = e.receiptKey || null;
       const drawRec = async () => { clear(rec); if (receiptKey) { const b = await db.getBlob(receiptKey); if (b) rec.append(h('img', { src: URL.createObjectURL(b), style: { width: '80px', height: '80px', objectFit: 'cover', borderRadius: '10px' } })); } rec.append(h('label.btn.sm', ic('camera', 14), receiptKey ? '영수증 바꾸기' : '영수증 사진', h('input', { type: 'file', accept: 'image/*', capture: 'environment', style: { display: 'none' }, onchange: async ev => { const f = ev.target.files[0]; if (f) { receiptKey = await db.putBlob(await shrink(f)); drawRec(); } } }))); };
       drawRec();
+      // 팀 비용의 승인·정산 완료는 관리자만 (로그인한 팀원이 자기 것을 스스로 승인하지 못하게)
+      const S = await import('../js/sync.js'); const limited = !!(await S.me()) && !(await S.isAdmin());
       modal(e.id ? '지출 고치기' : '새 지출', close => {
-        const f = form(FIELDS.expense, e, async v => { if (!v.category || v.category === '기타') v.category = brain.guessCategory(v.title); await db.put('expenses', { ...e, ...v, receiptKey }); close(); draw(); }, { extra: rec });
-        if (e.id) f.querySelector('.modal-f').prepend(h('button.btn.danger', { type: 'button', onclick: async () => { if (await confirmBox('지울까요?', '지우기')) { await db.remove(e.id); close(); draw(); } } }, ic('trash', 14), '지우기'));
+        const f = form(FIELDS.expense.map(x => x.k === 'status' && limited ? { ...x, options: x.options.filter(o => ['todo', 'submitted', e.status].includes(o[0])) } : x), e, async v => { if (!v.category || v.category === '기타') v.category = brain.guessCategory(v.title); await db.put('expenses', { ...e, ...v, receiptKey }); close(); draw(); }, { extra: rec });
+        if (e.id) f.querySelector('.modal-f').prepend(h('button.btn.danger', { type: 'button', onclick: async () => { await db.remove(e.id); close(); toast('지웠어요', { label: '되돌리기', fn: async () => { await db.put('expenses', { ...e, deleted: false }); draw(); } }); draw(); } }, ic('trash', 14), '지우기'));
+        return f;
+      });
+    }
+    async function editIncome(x = { date: '', status: 'due', team: 'auto' }) {
+      modal(x.id ? '받을 돈 고치기' : '새 받을 돈', close => {
+        const f = form(FIELDS.income, x, async v => { await db.put('incomes', { ...x, ...v }); close(); toast('저장했어요'); draw(); });
+        if (x.id) f.querySelector('.modal-f').prepend(h('button.btn.danger', { type: 'button', onclick: async () => { await db.remove(x.id); close(); toast('지웠어요', { label: '되돌리기', fn: async () => { await db.put('incomes', { ...x, deleted: false }); draw(); } }); draw(); } }, ic('trash', 14), '지우기'));
         return f;
       });
     }
