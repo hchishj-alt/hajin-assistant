@@ -85,3 +85,17 @@ export async function understand(text, { today, people = [] } = {}) {
     return arr.length ? arr : null;
   } catch (e) { console.warn('ai', e); return null; }
 }
+
+// 회의록·긴 글 정리를 AI로 한 번 더: 요약·결정·할 일을 바꿔 끼움. 키가 없거나 실패하면 앱 안 규칙 결과 그대로 (false)
+export async function enhance(a, text, { today = '', people = [], meeting = false } = {}) {
+  if (!(await enabled()) || (text || '').length < 120) return false;
+  try {
+    const j = await ask(`다음은 ${meeting ? '회의를 받아 적은 글' : '메모'}이야. 오늘은 ${today}. 참석자·아는 사람: ${people.slice(0, 30).join(', ') || '없음'}.\n한국어로 정리해서 JSON으로만 답해: {"summary":["핵심 3~6줄, 한 줄 한 문장"],"decisions":["정해진 것"],"actions":[{"title":"할 일(명사형, 짧게)","who":"맡은 사람 또는 빈칸","due":"YYYY-MM-DD 또는 빈칸"}],"questions":["아직 안 정해진 것"]}\n규칙: 글에 없는 내용은 지어내지 말 것. 받아쓰기 오타는 문맥으로 바로잡을 것. 숫자·날짜·금액은 그대로.\n\n${text.slice(0, 14000)}`, { json: true, ms: 30000 });
+    if (!Array.isArray(j.summary) || !j.summary.length) return false;
+    a.summary = j.summary.map(String).slice(0, 8);
+    if (Array.isArray(j.decisions)) a.decisions = j.decisions.map(String).slice(0, 12);
+    if (Array.isArray(j.questions)) a.questions = j.questions.map(String).slice(0, 12);
+    if (Array.isArray(j.actions) && j.actions.length) a.actions = j.actions.filter(x => x && x.title).slice(0, 20).map(x => ({ title: String(x.title).slice(0, 80), who: String(x.who || ''), due: /^\d{4}-\d{2}-\d{2}$/.test(x.due || '') ? x.due : '', src: String(x.title) }));
+    return true;
+  } catch (e) { console.warn('ai', e); return false; }
+}

@@ -40,6 +40,11 @@ export function parseWhen(text, base = new Date()) {
       if (date < addD(b, -60)) date.setFullYear(date.getFullYear() + 1);
     }
   }
+  else if ((m = hit(t.match(/(\d{1,2})\s*월\s*(말|초|중순)/))) && +m[1] >= 1 && +m[1] <= 12) { date = m[2] === '말' ? new Date(b.getFullYear(), +m[1], 0) : new Date(b.getFullYear(), +m[1] - 1, m[2] === '초' ? 1 : 15); if (date < addD(b, -60)) date.setFullYear(date.getFullYear() + 1); }
+  else if ((m = hit(t.match(/(다음\s*달|담달|이번\s*달|이달)\s*(\d{1,2})\s*일/))) && +m[2] >= 1 && +m[2] <= 31) date = new Date(b.getFullYear(), b.getMonth() + (/다음|담/.test(m[1]) ? 1 : 0), +m[2]);
+  // 여러 날: 시작일 바로 뒤의 "6일", "~6일", "부터 6일까지"
+  let endDate = null;
+  if (date) { const last = hits.at(-1); const rest = t.slice(t.indexOf(last) + last.length); const em = rest.match(/^\s*(?:~|-|부터|,)?\s*(?:(\d{1,2})\s*월\s*)?(\d{1,2})\s*일(?:까지)?/); if (em && /일$/.test(last)) { const e = new Date(date.getFullYear(), em[1] ? +em[1] - 1 : date.getMonth(), +em[2]); if (e > date && e - date < 15 * 864e5) { endDate = e; hits.push(em[0].trim()); } } }
   // 상대 날짜
   if (!date) {
     if ((m = hit(t.match(/(오늘|금일)\s*(안에|안으로|중으로|중에|내로)/)))) date = b;
@@ -108,7 +113,7 @@ export function parseWhen(text, base = new Date()) {
   else if ((m = t.match(/(\d+)\s*분\s*(동안|정도|간)?/)) && !time) mins = +m[1];
   if (time && !end && mins) { const [hh, mm] = time.split(':').map(Number); const e = hh * 60 + mm + mins; end = `${pad(Math.min(23, Math.floor(e / 60)))}:${pad(e % 60)}`; }
 
-  return { date: date ? ymd(date) : null, time, end, mins, hits };
+  return { date: date ? ymd(date) : null, time, end, mins, hits, endDate: endDate ? ymd(endDate) : null };
 }
 
 // "까지" → 마감일
@@ -322,6 +327,34 @@ function splitCommands(input) {
   if (input.length > 220) return [input]; // 긴 글은 하나의 기록으로
   return input.split(/\s*(?:그리고|,\s*그리고|;\s*|\s+또\s+|\s+그 다음에\s+)\s*/).filter(s => s.trim().length > 1);
 }
+// 업체: "레드프린팅 인쇄 업체 02-123-4567 A3 포스터 100장 45000원" → 이름·분야·전화·링크·품목별 가격
+const VCAT = [['인쇄', /인쇄|프린팅|출력|명함|포스터|리플렛|전단|책자/], ['굿즈 제작', /굿즈|키링|아크릴|스티커|뱃지|에코백|머그|티셔츠/], ['현수막·실사', /현수막|배너|실사/], ['촬영·스튜디오', /촬영|스튜디오|사진관/], ['대관·장소', /대관|공간\s*대여|장소\s*대여/], ['영상·편집', /영상|편집/], ['포장·배송', /포장|택배|퀵|박스/], ['케이터링', /케이터링|다과|도시락/]];
+const VWORD = /(업체|거래처|인쇄소|제작소|공방|견적)/;
+const VSKIP = /^(업체|거래처|견적|추가|등록|새|새로|저장|정리|목록|리스트|:|：)$/;
+const bareUrl = t => (t.match(/https?:\/\/[^\s<>"']+/) || t.match(/(?:www\.)?[a-z0-9][a-z0-9-]*\.(?:co\.kr|com|kr|net|shop|store|io)(?:\/[^\s]*)?/i) || [''])[0];
+export function vendorParts(t, known = []) {
+  const phone = parsePhone(t) || (t.match(/\b1[5-9]\d{2}[-\s]?\d{4}\b/) || [''])[0]; const link = bareUrl(t);
+  let rest = t.replace(/^(업체|거래처)\s*[:：]\s*/, ''); if (phone) rest = rest.replace(phone, ' '); if (link) rest = rest.replace(link, ' ');
+  rest = rest.replace(/(\d{2,4})[-\s]?(\d{3,4})[-\s]?(\d{4})/g, m => (phone && m.replace(/\D/g, '') === String(phone).replace(/\D/g, '') ? ' ' : m));
+  const kakao = (rest.match(/(?:카톡|카카오톡|담당자?)\s*[:：]?\s*([가-힣A-Za-z0-9_]{2,12}(?:\s?(?:대리|과장|팀장|실장|사장|대표)님?)?)/) || [])[1] || '';
+  if (kakao) rest = rest.replace(/(?:카톡|카카오톡|담당자?)\s*[:：]?\s*[가-힣A-Za-z0-9_]{2,12}(?:\s?(?:대리|과장|팀장|실장|사장|대표)님?)?/, ' ');
+  const hit = known.filter(Boolean).sort((a, b) => b.length - a.length).find(n => t.replace(/\s/g, '').includes(n.replace(/\s/g, '')));
+  const toks = rest.split(/[\s,·/]+/).filter(Boolean);
+  let name = hit || toks.find(x => !VSKIP.test(x) && !/^\d/.test(x) && !VCAT.some(([c, re]) => x === c || (re.test(x) && x.length <= 3))) || '';
+  name = name.replace(/(은|는|이|가|에서|에|한테|의)$/, m => (name.length - m.length >= 2 ? '' : m));
+  const explicit = (rest.match(/([가-힣·]+)\s*(?:업체|거래처)/) || [])[1] || '';
+  const cat = (VCAT.find(([c, re]) => re.test(explicit)) || (hit ? [''] : null) || VCAT.find(([c, re]) => re.test(name)) || VCAT.find(([c, re]) => re.test(rest)) || ['기타'])[0];
+  // 품목 + 가격 쌍
+  const prices = []; let body = rest; if (name) body = body.replace(name, ' '); body = body.replace(/^.*?(업체|거래처|견적)(는|은|가|이)?\s*/, ' ').replace(/(추가|등록|저장)(해\s*줘|해줘|해|요)?\s*$/, ' ');
+  const re = /(\d[\d,]*(?:\.\d+)?\s*만\s*(?:\d+\s*천)?\s*원?|\d[\d,]*\s*천\s*원|\d[\d,]{2,}\s*원?)(?!\s*(장|개|매|부|권|세트|박스|ea|mm|cm|g|ml))/gi;
+  let last = 0, m; const today = new Date().toISOString().slice(0, 10); let memoBits = [];
+  while ((m = re.exec(body))) { let item = body.slice(last, m.index).replace(/[,·:：/]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^((추가|등록|저장|견적|그리고|또)\s+)+/, '').replace(/\s*(은|는|이|가|에|으로|로)$/, ''); const price = parseMoney(m[0].includes('원') ? m[0] : m[0] + '원');
+    const after = (body.slice(re.lastIndex).match(/^\s*\(([^)]{1,30})\)/) || [])[1] || ''; if (after) re.lastIndex += body.slice(re.lastIndex).indexOf(')') + 1;
+    if (item.length >= 2 && price) prices.push({ item: item.slice(0, 40), price: String(price), note: after, at: today }); else if (item) memoBits.push(item); last = re.lastIndex; }
+  const tail = body.slice(last).replace(/^\s*(으로|로)?\s*(올랐|내렸|바뀌|바꼈|변경|인상|인하)\S*/, ' ').replace(/\s+/g, ' ').trim().replace(/^[,·]+|[,·]+$/g, '');
+  const memo = [...(prices.length ? [] : memoBits), tail].filter(x => x && x.length > 1 && !VSKIP.test(x) && !VCAT.some(([c]) => x === c)).join(' ').slice(0, 120);
+  return { name, cat, phone: phone || '', kakao, link, memo, prices };
+}
 function interpretOne(s, base, ctx) {
   const t = s.trim();
   const w = parseWhen(t, base);
@@ -336,6 +369,8 @@ function interpretOne(s, base, ctx) {
   if (!strong) for (const [k, v] of Object.entries(forced)) if (t.includes(k) && !new RegExp(`(${KIN}|${FAMILY})$`).test(k) && !(ctx.people || []).some(n => n && (n === k || n.slice(1) === k))) return [build(v)];
 
   // 명시 접두어: "일정:", "할일:", "지출:" ...
+  if (/^(업체|거래처)\s*[:：]/.test(t)) return [build('vendor')];
+  if (/^(구매|살\s*것|장바구니)\s*[:：]/.test(t)) return [build('buy', t.replace(/^[^:：]+[:：]\s*/, ''))];
   const pre = t.match(/^(일정|약속|회의|미팅|할\s*일|할일|투두|todo|지출|비용|결제|연락처|번호|메모|노트|아이디어|레퍼런스|참고|sns|콘텐츠|기록|목표|okr|지원사업|공모)\s*[:：]\s*/i);
   if (pre) {
     const k = { 일정: 'event', 약속: 'event', 회의: 'event', 미팅: 'event', 할일: 'task', '할 일': 'task', 투두: 'task', todo: 'task', 지출: 'expense', 비용: 'expense', 결제: 'expense', 연락처: 'contact', 번호: 'contact', 메모: 'note', 노트: 'note', 기록: 'note', 아이디어: 'idea', 레퍼런스: 'reference', 참고: 'reference', sns: 'sns', 콘텐츠: 'sns', 목표: 'okr', okr: 'okr', 지원사업: 'grant', 공모: 'grant' }[pre[1].toLowerCase().replace(/\s/g, '') === '할일' ? '할일' : pre[1].toLowerCase()] || 'note';
@@ -353,23 +388,33 @@ function interpretOne(s, base, ctx) {
 
   const gk = guessKind();
   if (gk === 'talk') return [{ kind: 'talk', data: { text: t }, label: '대화', confidence: 0.5 }];
-  return [build(gk)];
+  const made = build(gk);
+  // 날짜·시간을 빼고 나니 남는 말이 없으면("금요일로 하자", "오늘 다 했어") 만들지 않고 대화로 받음
+  if ((made.kind === 'task' || made.kind === 'event') && /^(으로|로)?\s*(다|전부|모두)?\s*(하자|하기|해|함|했어|했다|했음|할게|하다|되기|끝|끝내기|일정)?$/.test((made.data.title || '').trim())) return [{ kind: 'talk', data: { text: t }, label: '대화', confidence: 0.5 }];
+  return [made];
 
   function guessKind() {
+    const vknown = (ctx.vendors || []).some(n => n && n.length >= 2 && t.replace(/\s/g, '').includes(n.replace(/\s/g, '')));
+    const vsig = phone || urls.length || bareUrl(t) || money != null || /\b1[5-9]\d{2}[-\s]?\d{4}\b/.test(t);
+    if ((VWORD.test(t) && (vsig || /(추가|등록|저장|정리)/.test(t)) && !/(받기|받아|요청|보내|문의하|연락하|알아보)/.test(t)) || (vknown && vsig && !/(결제|샀|구매했|썼|냈|입금)/.test(t))) return 'vendor';
+    if (urls.length && /(사야|살\s*거|살\s*것|구매\s*(목록|예정|할)|장바구니|주문해야|사자|사 ?줘)/.test(t)) return 'buy';
     if (phone || email) return 'contact';
     if (money != null && /(원|만원|천원|₩|결제|샀|구매|썼|지출|냈|비용|값|영수증|페이)/.test(t)) return 'expense';
     if (urls.length && /(레퍼런스|참고|ref|무드|영감|예시|느낌)/i.test(t)) return 'reference';
     if (urls.length) return 'reference';
     if (/(목표|OKR|KR|핵심\s*결과|분기)/i.test(t)) return 'okr';
+    if (w.time && w.end && /(했음|했다|했어|했고|함$|작업함|편집함|완료)\s*$/.test(t)) return 'timelog';
+    if ((w.date || w.time) && /(휴무|반차|연차|월차|휴가|출장|외근|재택|휴일|쉬는\s*날|대체\s*휴일|못\s*(온|와|옴|간|감|나온|나와)|불참|빠진대|빠질|안\s*온대)/.test(t) && !ACTION.test(t.replace(/까지/g, ''))) return 'event';
     if (w.time && /(설명회|간담회|세미나|미팅|회의|상담|행사|교육|워크숍|발표|면접|방문|관람)/.test(t)) return 'event';
     if (/(지원사업|공모전|공모|정부지원|창업지원|예비창업|초기창업|액셀러레이터|TIPS|팁스)/i.test(t) && isDeadline(t) && ACTION.test(t.replace(/까지|마감/g, ''))) return 'task';
     if (/(지원사업|공모전|공모|정부지원|창업지원|예비창업|초기창업|액셀러레이터|TIPS|팁스)/i.test(t) || (/(IR|투자\s*유치|데모데이)/.test(t) && !ACTION.test(t))) return 'grant';
-    if (/(릴스|쇼츠|틱톡|유튜브|인스타|브이로그|썸네일|업로드|게시물|피드)/.test(t) && /(올리|찍|만들|편집|콘텐츠|아이디어|기획)/.test(t) && !isDeadline(t)) return 'sns';
+    if (/(릴스|쇼츠|틱톡|유튜브|인스타|브이로그|썸네일|업로드|게시물|피드)/.test(t) && /(올리|찍|만들|편집|콘텐츠|아이디어|기획|업로드|예고|게시)/.test(t) && !isDeadline(t)) return 'sns';
     if ((/\d+(\.\d+)?\s*(시간|분)/.test(t) && /(했음|했다|했어|했고|함$|완료|끝냄|작업|공부|집중)/.test(t) && !w.time) || /작업\s*(했|함|기록)/.test(t)) return 'timelog';
     if ((w.time || w.date) && /(회의|미팅|약속|만나|만남|수업|면접|발표|전시|촬영|병원|저녁|점심|콜|통화|줌|zoom|meet|일정|스케줄|행사|세미나|오픈|마감식|파티|회식|생일|여행|공연|콘서트|(?<!업)데이트|식사|모임|스터디|레슨|강의|워크숍|휴가|설명회|간담회|관람|방문|상담|진료|치과|인터뷰|구경|팝업|나들이|답사|견학|투어|페어|박람회)/i.test(t) && !(isDeadline(t) && ACTION.test(t))) return 'event';
     if (w.time && !ACTION.test(t)) return 'event';
     if (/(회의|미팅|약속|만나|수업|면접|발표|행사|세미나|전시)/.test(t) && w.date) return 'event';
-    if (IDEA.test(t) || /(떠올|생각났|영감)/.test(t)) return 'idea';
+    if (IDEA.test(t) || /(떠올|생각났|영감|후보(는|가|로)?\s|후보\s*[:：])/.test(t)) return 'idea';
+    if (/(달라고\s*(함|했어|했음|하심|하셨어|한다|하네|해)|달래|달라심|해\s*달라는|떨어짐|떨어졌|다\s*씀|다\s*썼|고장|망가졌|안\s*됨$|안\s*나옴$)/.test(t)) return 'task';
     if (ACTION.test(t) || w.date || /(하기|할것|사기|보내기|챙기기|만들기)$/.test(t)) return 'task';
     if (t.length > 120) return 'note';
     return 'talk'; // 분명한 신호가 없으면 만들지 않고 대화로 받음
@@ -379,31 +424,42 @@ function interpretOne(s, base, ctx) {
     const bw = body === t ? w : parseWhen(body, base);
     const cleanTitle = strip(body, bw.hits);
     switch (kind) {
-      case 'event': { const rep = /매일|날마다/.test(body) ? 'daily' : /평일마다|매\s*평일|평일\s*매일/.test(body) ? 'weekdays' : /매주|주마다/.test(body) ? 'weekly' : /매달|매월|달마다/.test(body) ? 'monthly' : ''; const r0 = { kind, label: rep ? '반복 일정' : '일정', confidence: bw.time ? 0.9 : 0.7, data: { repeat: rep, title: cleanTitle.replace(/(매일|날마다|평일마다|매\s*평일|매주|주마다|매달|매월|달마다)\s*/g, '').trim() || '일정', date: bw.date || ymd(base), start: bw.time || '', end: bw.end || '', place: '', tags } }; const ev = r0.data; const pp = eventParts(ev.title, ctx.people || []); if (pp) { ev.title = pp.title; if (pp.who) ev.who = pp.who; if (pp.place) ev.place = pp.place; if (pp.area) ev.area = pp.area; } if (!ev.place && !ev.area) ev.place = placeOf(body); ev.scope = guessScope(body, { who: ev.who || '', team: ctx.people || [] }); return r0; }
-      case 'task': { const who0 = findAssignee(body, ctx.people || []); const who = who0 === '나' ? '' : who0; return { kind, label: '할 일', confidence: 0.75, data: { who, title: cleanTask(cleanTitle, who) || cleanTitle || body, due: bw.date || '', time: isDeadline(body) ? '' : (bw.time || ''), priority: /(급|급함|asap|ASAP|중요|빨리|꼭|반드시|!!)/.test(body) ? 'high' : 'normal', project: projectOf(body, ctx), tags } }; }
-      case 'expense': { const amt = parseMoney(body) || 0; return { kind, label: '지출', confidence: 0.85, data: { title: strip(body.replace(/(\d+(?:\.\d+)?\s*만\s*(\d+\s*천)?\s*원?|\d[\d,]*\s*원|₩\s*[\d,]+)/g, ''), bw.hits).replace(/(법인\s*카드|회사\s*카드|개인\s*카드|카드|현금|계좌\s*이체)/g, '').replace(/(결제|샀다|샀어|썼다|썼어|지출|냈다|냈어|했다)\s*$/, '').replace(/\s+/g, ' ').trim() || '지출', amount: amt, date: bw.date || ymd(base), category: guessCategory(body), project: projectOf(body, ctx), pay: /(법인|회사|팀)\s*카드/.test(body) ? '법인카드' : /(현금)/.test(body) ? '현금' : '개인카드' } }; }
-      case 'contact': { const ph = parsePhone(body), em = parseEmail(body); const raw = body.replace(ph ? /(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/ : /$^/, ' ').replace(em || /$^/, ' ').replace(/(번호|전화|연락처|이메일|메일|저장|추가|해줘|해 줘)/g, ' ').replace(/#[\p{L}\p{N}_]+/gu, ' ').replace(/\s+/g, ' ').trim();
+      case 'event': { const rep = /매일|날마다/.test(body) ? 'daily' : /평일마다|매\s*평일|평일\s*매일/.test(body) ? 'weekdays' : /매주|주마다/.test(body) ? 'weekly' : /매달|매월|달마다/.test(body) ? 'monthly' : ''; const r0 = { kind, label: rep ? '반복 일정' : '일정', confidence: bw.time ? 0.9 : 0.7, data: { repeat: rep, title: cleanTitle.replace(/(매일|날마다|평일마다|매\s*평일|매주|주마다|매달|매월|달마다)\s*/g, '').trim() || '일정', date: bw.date || ymd(base), start: bw.time || '', end: bw.end || '', place: '', tags } }; const ev = r0.data; if (bw.endDate) ev.endDate = bw.endDate; ev.title = ev.title.replace(/^(이틀|사흘|나흘|\d+박\s*\d+일|\d+일간)\s*/, '').trim() || ev.title;
+        { const ab = body.match(/(\S{2,4}?)(?:이가|이|가|는|은)?\s+.*?(못\s*(?:온|와|옴|간|감|나온|나와)\S*|불참|빠진대|빠질\S*|안\s*온대)/); if (ab) { const nm = (ctx.people || []).find(n => n === ab[1] || n.slice(1) === ab[1] || n.slice(1) === ab[1].replace(/이$/, '')) || ab[1].replace(/이$/, ''); ev.title = `${nm.length > 2 ? nm.slice(1) : nm} 불참`; ev.who = nm; ev._allday = true; } }
+        if (/(휴무|반차|연차|월차|휴가|출장|외근|재택|휴일)/.test(ev.title) && !ev.start) ev._allday = true;
+        const pp = ev.who && /불참$/.test(ev.title) ? null : eventParts(ev.title, ctx.people || []); if (pp) { ev.title = pp.title; if (pp.who) ev.who = pp.who; if (pp.place) ev.place = pp.place; if (pp.area) ev.area = pp.area; } if (!ev.place && !ev.area) ev.place = placeOf(body); ev.scope = guessScope(body, { who: ev.who || '', team: ctx.people || [] }); return r0; }
+      case 'task': { let who0 = findAssignee(body, ctx.people || []); let ct = cleanTitle.replace(/(^|\s)(급함|급해|급한\s*건데|asap|ASAP)[,:：!\s]*/g, ' ').replace(/\s*마감(임|이야|입니다)?\s*$/, '').trim(); let memo = '';
+        // "서연이한테 영상 편집 맡기기" → 담당 서연, 할 일 영상 편집
+        { const hm = ct.match(/^(\S{1,6}?)(?:이)?(?:한테|에게|께)\s+(.+?)\s*(?:맡기기|맡기|맡김|맡겨|시키기|시키)\S*$/); if (hm) { const nm = (ctx.people || []).find(n => n === hm[1] || n.slice(1) === hm[1]); if (nm || /^[가-힣]{2,3}$/.test(hm[1])) { who0 = nm || hm[1]; ct = hm[2]; } } }
+        // "클라이언트가 로고 색 바꿔달라고 함" → 로고 색 바꿔 주기 (클라이언트 요청)
+        { const rm = ct.match(/^(?:(\S{1,8}?)(?:이|가|께서|님이)\s+)?(.+?)\s*(?:달라고\s*(?:함|했어|했음|하심|하셨어|한다|하네|해)|달래|달라심)$/); if (rm) { ct = rm[2].replace(/\s*(해|줘)$/, m0 => m0) + ' 주기'; ct = ct.replace(/해\s*주기$/, '해 주기').replace(/\s+/g, ' '); if (rm[1] && !(ctx.people || []).some(n => n === rm[1] || n.slice(1) === rm[1])) memo = rm[1] + ' 요청'; if (rm[1] && who0 === rm[1]) who0 = ''; } }
+        const who = who0 === '나' ? '' : who0; return { kind, label: '할 일', confidence: 0.75, data: { who, ...(memo ? { memo } : {}), title: (/주기$/.test(ct) && memo ? ct : cleanTask(ct, who)) || ct || body, due: bw.date || '', time: isDeadline(body) ? '' : (bw.time || ''), priority: /(급|급함|asap|ASAP|중요|빨리|꼭|반드시|!!)/.test(body) ? 'high' : 'normal', project: projectOf(body, ctx), tags } }; }
+      case 'expense': { const amt = parseMoney(body) || 0; return { kind, label: '지출', confidence: 0.85, data: { title: strip(body.replace(/(\d+(?:\.\d+)?\s*만\s*(\d+\s*천)?\s*원?|\d[\d,]*\s*원|₩\s*[\d,]+)/g, ''), bw.hits).replace(/(법인\s*카드|회사\s*카드|개인\s*카드|카드|현금|계좌\s*이체)/g, '').replace(/\s*(내가|제가|우리가)?\s*(결제|샀다|샀어|샀음|삼|썼다|썼어|썼음|씀|지출|냈다|냈어|냈음|냄|했다|입금함|입금했어|입금|결제함|결제했어|긁음|긁었어)\s*$/, '').replace(/\s+/g, ' ').trim() || '지출', amount: amt, date: bw.date || ymd(base), category: guessCategory(body), project: projectOf(body, ctx), pay: /(법인|회사|팀)\s*카드/.test(body) ? '법인카드' : /(현금)/.test(body) ? '현금' : '개인카드' } }; }
+      case 'contact': { const ph = parsePhone(body), em = parseEmail(body); const raw = body.replace(ph ? /(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/ : /$^/, ' ').replace(em || /$^/, ' ').replace(/(명함\s*(받음|받았어|받았음|교환)?|번호|전화|연락처|이메일|메일|저장|추가|해줘|해 줘|받음|받았어|알게\s*됨|소개\s*받음)/g, ' ').replace(/#[\p{L}\p{N}_]+/gu, ' ').replace(/\s+/g, ' ').trim();
         const ROLE = /^(.*?)(대표|이사|팀장|실장|부장|차장|과장|대리|주임|사원|주무관|매니저|PD|피디|교수|작가|감독|디자이너|개발자|기획자|마케터|에디터|사장|선생님|쌤|원장|담당자?)(님)?$/; const ws = raw.split(' ').filter(Boolean); let nm = '', role = '', org = '';
         const ti = ws.findIndex(x => ROLE.test(x) && x.match(ROLE)[1].length >= 1 && x.match(ROLE)[1].length <= 3); // "김대리", "박대표님"
-        const ni = ws.findIndex(x => /^[가-힣]{2,4}$/.test(x) && !ROLE.test(x) && !PLACE_SUF.test(x) && !/(프린팅|디자인|스튜디오|컴퍼니|상사|기획|미디어|랩|웍스|코리아|주식회사)$/.test(x));
+        const ni = ws.findIndex(x => /^[가-힣]{2,4}$/.test(x) && !ROLE.test(x) && !PLACE_SUF.test(x) && !/(프린팅|디자인|스튜디오|컴퍼니|상사|기획|미디어|랩|웍스|코리아|주식회사|팀|부서|센터|회사|대학교|대학|학과|본부|지점|은행|병원|협회|재단)$/.test(x));
         if (ni >= 0) { nm = ws[ni]; const others = ws.filter((_, k) => k !== ni); role = others.find(x => ROLE.test(x) && !x.match(ROLE)[1]) || ''; org = others.filter(x => x !== role).join(' '); }
         else if (ti >= 0) { nm = ws[ti]; role = ws[ti].match(ROLE)[2]; org = ws.filter((_, k) => k !== ti).join(' '); }
         else { nm = (raw.match(/[가-힣]{2,4}|[A-Za-z]+(?:\s[A-Za-z]+)?/) || [''])[0]; org = raw.replace(nm, '').trim(); }
         return { kind, label: '연락처', confidence: 0.85, data: { name: nm, phone: ph || '', email: em || '', org, role, memo: '', tags } }; }
       case 'reference': return { kind, label: '레퍼런스', confidence: 0.8, data: { title: strip(body.replace(/https?:\/\/\S+/g, ''), []) || (parseUrls(body)[0] || '레퍼런스'), url: parseUrls(body)[0] || '', tags: tags.length ? tags : keywords(body.replace(/레퍼런스|참고/g, ''), 4) } };
+      case 'vendor': { const v = vendorParts(body, ctx.vendors || []); return { kind, label: '업체', confidence: v.name && (v.phone || v.link || v.prices.length) ? 0.8 : 0.6, data: v }; }
+      case 'buy': { const u = parseUrls(body)[0] || ''; return { kind, label: '살 것', confidence: 0.75, data: { title: strip(body.replace(/https?:\/\/\S+/g, '').replace(/\d[\d,]*\s*(만\s*)?(\d+\s*천\s*)?원/g, ' ').replace(/(사야\s*(돼|해|함|겠다)?|살\s*거|살\s*것|구매\s*(목록|예정|할\s*것)?(에)?\s*(추가|넣어)?(해\s*줘|줘)?|장바구니(에)?\s*(추가|넣어)?(해\s*줘|줘)?|주문해야\s*(돼|해)?)/g, ' '), []) || '(상품명을 적어 주세요)', url: u, price: parseMoney(body) || 0, qty: 1, need: 'must' } }; }
       case 'idea': return { kind, label: '아이디어', confidence: 0.7, data: { title: summarize(body, 1)[0]?.slice(0, 60) || body.slice(0, 60), body, tags: tags.length ? tags : keywords(body, 5) } };
       case 'note': return { kind, label: '메모', confidence: 0.6, data: { title: (summarize(body, 1)[0] || body).slice(0, 60), body, tags: tags.length ? tags : keywords(body, 6) } };
-      case 'timelog': { const m = parseWhen(body, base).mins || 60; return { kind, label: '작업 기록', confidence: 0.8, data: { title: strip(body, []).replace(/\d+\s*(시간|분)\s*(동안)?/g, '').replace(/\s*(작업)?\s*(했음|했다|했어|함|완료)$/, '').trim() || '작업', minutes: m, date: ymd(base), project: projectOf(body, ctx) } }; }
+      case 'timelog': { const tw = parseWhen(body, base); const span = tw.time && tw.end ? (+tw.end.slice(0, 2) * 60 + +tw.end.slice(3)) - (+tw.time.slice(0, 2) * 60 + +tw.time.slice(3)) : 0; const m = span > 0 ? span : tw.mins || 60; body = span > 0 ? strip(body, tw.hits).replace(/^(부터|까지)\s*/, '') : body; return { kind, label: '작업 기록', confidence: 0.8, data: { title: strip(body, []).replace(/\d+\s*(시간|분)\s*(동안)?/g, '').replace(/\s*(작업)?\s*(했음|했다|했어|함|완료)$/, '').trim() || '작업', minutes: m, date: (span > 0 && tw.date) || ymd(base), project: projectOf(body, ctx) } }; }
       case 'sns': return { kind, label: 'SNS 아이디어', confidence: 0.75, data: { title: cleanTitle, platform: /(릴스|인스타)/.test(body) ? '인스타그램' : /(쇼츠|유튜브)/.test(body) ? '유튜브' : /틱톡/.test(body) ? '틱톡' : '인스타그램', status: '아이디어', date: bw.date || '', tags } };
-      case 'okr': return { kind, label: '목표', confidence: 0.7, data: { title: cleanTitle, quarter: quarterOf(base), krs: [] } };
-      case 'grant': return { kind, label: '지원사업', confidence: 0.7, data: { title: cleanTitle, deadline: bw.date || '', status: '검토', amount: parseMoney(body) || null, url: parseUrls(body)[0] || '' } };
+      case 'okr': return { kind, label: '목표', confidence: 0.7, data: { title: cleanTitle.replace(/^(이번|다음|올해|\d분기)?\s*(분기|달|연도)?\s*(목표|OKR|okr)\s*(는|은|:|：)?\s*/, '').trim() || cleanTitle, quarter: quarterOf(base), krs: [] } };
+      case 'grant': { const ek = body.match(/(?:최대\s*)?(\d+(?:\.\d+)?)\s*억\s*(?:(\d+)\s*천)?\s*(?:만\s*)?원?/); const amt = ek ? Math.round(parseFloat(ek[1]) * 1e8 + (+(ek[2] || 0)) * 1e7) : parseMoney(body) || null;
+        return { kind, label: '지원사업', confidence: 0.7, data: { title: cleanTitle.replace(/(최대\s*)?\d+(\.\d+)?\s*억\s*(\d+\s*천)?\s*(만\s*)?원?/, ' ').replace(/(최대\s*)?\d[\d,]*\s*(만|천)?\s*원/, ' ').replace(/\s*(마감|접수\s*마감|신청\s*마감|지원금|최대)\s*/g, ' ').replace(/\s+/g, ' ').trim() || cleanTitle, deadline: bw.date || '', status: '검토', amount: amt, url: parseUrls(body)[0] || '' } }; }
       default: return { kind: 'note', label: '메모', confidence: 0.5, data: { title: body.slice(0, 60), body, tags } };
     }
   }
   function strip(x, hits) {
     let r = x;
     for (const hh of hits || []) r = r.replace(hh, ' ');
-    return r.replace(/#[\p{L}\p{N}_]+/gu, '').replace(/^(일정|할일|메모)\s*[:：]/, '').replace(/(에|에서|부터|까지)\s*$/, '').replace(/\s*(잡아\s*줘|추가해\s*줘|등록해\s*줘|넣어\s*줘|기록해\s*줘|저장해\s*줘|해줘|있음|있어|있다)\s*$/, '').replace(/\s+/g, ' ').trim().replace(/^(까지|부터|에서|에|은|는|쯤|경)\s+/, '').trim();
+    return r.replace(/#[\p{L}\p{N}_]+/gu, '').replace(/^(일정|할일|메모)\s*[:：]/, '').replace(/(에|에서|부터|까지)\s*$/, '').replace(/\s*(잡아\s*줘|추가해\s*줘|등록해\s*줘|넣어\s*줘|기록해\s*줘|저장해\s*줘|해줘|있음|있어|있다)\s*$/, '').replace(/\s+/g, ' ').trim().replace(/^(까지|부터|에서|으로|로|에|은|는|쯤|경)\s+/, '').trim();
   }
 }
 // "서충주 수집오빠랑 충주본색 전시 방문" → 누구랑 수집오빠 · 지역 서충주 · 장소 충주본색 · 제목 충주본색 전시 방문

@@ -15,6 +15,8 @@ export const KINDS = {
   sns: { col: 'sns', label: 'SNS 콘텐츠', icon: 'film', route: 'studio' },
   okr: { col: 'okrs', label: '목표', icon: 'target', route: 'startup' },
   grant: { col: 'grants', label: '지원사업', icon: 'flag', route: 'startup' },
+  vendor: { col: 'vendors', label: '업체', icon: 'briefcase', route: 'vendors' },
+  buy: { col: 'buys', label: '살 것', icon: 'cart', route: 'shop' },
   meeting: { col: 'meetings', label: '회의록', icon: 'mic', route: 'meetings' },
   summary: { col: null, label: '요약', icon: 'sparkles', route: 'inbox' },
 };
@@ -37,7 +39,8 @@ export async function approve(d, edited) {
     if (d.kind === 'note') payload.type = payload.type || 'note';
     if (d.kind === 'task') payload.done = false;
     if (d.sourceRef) payload.sourceRef = d.sourceRef;
-    saved = await db.put(k.col, await teamify(d.kind, payload));
+    if (d.kind === 'vendor') saved = await saveVendor(payload);
+    else saved = await db.put(k.col, await teamify(d.kind, payload));
   } else if (d.kind === 'summary' && d.sourceRef) {
     // 회의·메모 요약 승인 → 원본에 확정 요약으로 붙임
     await db.patch(d.sourceRef, { summary: data, summaryConfirmed: true });
@@ -45,6 +48,15 @@ export async function approve(d, edited) {
   if (edited) { brain.learn(d.kind, d.source || '', edited); await saveLearned(); }
   await db.patch(d.id, { status: 'approved', approvedAt: db.now(), resultId: saved?.id || null });
   return saved;
+}
+// 업체는 같은 이름이 있으면 새로 만들지 않고 합침: 빈 칸만 채우고, 같은 품목은 새 가격으로 바꿈
+export async function saveVendor(v) {
+  const key = s => String(s || '').replace(/\s+/g, '').toLowerCase();
+  const team = (await db.get('team-main')) ? 'team-main' : '';
+  const ex = (await db.list('vendors')).find(x => key(x.name) && key(x.name) === key(v.name));
+  if (!ex) return db.put('vendors', { ...v, name: (v.name || '이름 없는 업체').trim(), cat: v.cat || '기타', prices: v.prices || [], team });
+  const prices = [...(ex.prices || [])]; for (const p of v.prices || []) { const i = prices.findIndex(q => key(q.item) === key(p.item)); if (i >= 0) prices[i] = { ...prices[i], ...p, note: p.note || prices[i].note || '', was: prices[i].price !== p.price ? prices[i].price : prices[i].was }; else prices.push(p); }
+  return db.patch(ex.id, { phone: v.phone || ex.phone || '', link: v.link || ex.link || '', kakao: v.kakao || ex.kakao || '', cat: ex.cat && ex.cat !== '기타' ? ex.cat : v.cat || ex.cat || '기타', memo: [ex.memo, v.memo].filter((x, i, a) => x && a.indexOf(x) === i).join(' / ').slice(0, 200), prices });
 }
 export async function reject(d) { await db.patch(d.id, { status: 'rejected' }); }
 export async function changeKind(d, kind) {
@@ -71,9 +83,10 @@ export async function projects() {
 }
 export async function eventsOn(date) {
   const evs = await db.list('events');
-  return evs.filter(e => e.date === date || (e.repeat && repeatsOn(e, date))).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+  return evs.filter(e => e.date === date || repeatsOn(e, date)).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
 }
 export function repeatsOn(e, date) {
+  if (e.endDate && date > e.date && date <= e.endDate) return true; // 여러 날 이어지는 일정
   if (!e.repeat || date < e.date) return false;
   if (e.until && date > e.until) return false;
   const a = new Date(e.date), b = new Date(date);

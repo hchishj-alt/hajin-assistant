@@ -92,6 +92,7 @@ export async function analyze(m) {
   const people = [...(m.attendees || '').split(/[,，\s]+/).filter(Boolean), ...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())];
   const FB = await import('../js/feedback.js');
   const a = await FB.refine(brain.analyzeNotes(m.transcript || '', { people, base: new Date(m.date || Date.now()) }), m.transcript || '');
+  a.byAI = await (await import('../js/ai.js')).enhance(a, m.transcript || '', { today: (m.date || new Date().toISOString()).slice(0, 10), people, meeting: true });
   const stars = [...(m.transcript || '').matchAll(/★\[([\d:]+) 중요\]\s*([^★]{0,120})/g)].map(x => `${x[1]} ${x[2].trim()}`);
   if (stars.length) a.summary = [...stars.map(s => '★ ' + s), ...a.summary];
   await db.patch(m.id, { keywords: a.keywords, summaryDraft: a, summaryConfirmed: false });

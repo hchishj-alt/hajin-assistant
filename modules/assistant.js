@@ -100,14 +100,19 @@ export default {
       { const pend = await db.kvGet('chat:ask', null); if (pend && await answerAsk(pend, text)) return; }
       const talk = async src => { const r = await CH.reply(src, { name: (await db.kvGet('name', '')) || '' }); await drawMsg(await db.put('chat', { role: 'bot', q: src, text: r.text, list: r.list, chips: r.chips }), new Map()); };
       { const T = await import('../js/taste.js'); if (T.isFeedback(text)) { const r = await T.talk(text); if (r) { await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: (r.chips || []).filter(c => c.say) }), new Map()); return; } } }
+      // "○○한테 ~ 전해줘"인데 메신저를 못 쓰는 상태면 그렇다고 말하고 대신 적어 둘지 물음
+      { const dm = text.match(/^(.{1,10}?)\s*(?:님)?\s*(?:한테|에게|께)\s+(.+?)\s*(?:전해|말해|알려|보내)\s*(?:줘|주세요|줄래)$/s); if (dm) { const sync = await import('../js/sync.js'); const roster = (await sync.me()) ? (await db.kvGet('sync:roster', [])) : [];
+        if (!roster.some(r => r.name && (r.name === dm[1].trim() || r.name.slice(1) === dm[1].trim()))) { await drawMsg(await db.put('chat', { role: 'bot', q: `${dm[1].trim()}에게 ${dm[2]} 전하기`, text: `${dm[1].trim()} 님에게 바로 전하려면 팀 동기화에 로그인돼 있어야 해요. 지금은 연결이 안 돼 있어서, 잊지 않게 할 일로 적어 둘까요?`, chips: [{ label: '할 일로', make: 'task' }, { label: '괜찮아요', skip: true }] }), new Map()); return; } } }
       if (CH.isTalk(text)) return talk(text);
       const projects = await store.projects();
       const people = [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean);
+      // 이미 있는 걸 말로 고치기 (완료·옮기기·취소·넘기기·담당)
+      { const ACT = await import('../js/act.js'); const r = await ACT.tryAct(text, { people }); if (r) { await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: r.chips }), new Map()); return; } }
       // 길게 쓰거나 말한 건 → 원문은 메모로 저장(내가 쓴 거라 확정), 요약·할 일은 임시
       const nSent = brain.sentences(text).length;
-      const long = text.length > 220 || (origin === 'voice' && text.length > 90) || (text.length > 100 && nSent >= 3 && !text.includes('\n')) || text.split('\n').length > 6;
+      const long = /^(회의록|회의\s*(내용|정리|메모)|미팅\s*(내용|정리))\s*[:：]/.test(text) || (nSent >= 3 && text.length > 60 && !text.includes('\n')) || text.length > 220 || (origin === 'voice' && text.length > 90) || (text.length > 100 && nSent >= 3 && !text.includes('\n')) || text.split('\n').length > 6;
       if (long) {
-        const a = await FB.refine(brain.analyzeNotes(text, { people }), text);
+        const a = await FB.refine(brain.analyzeNotes(text, { people }), text); await (await import('../js/ai.js')).enhance(a, text, { today: todayStr(), people });
         const note = await db.put('notes', { type: 'memo', title: (a.summary[0] || text).slice(0, 50), body: text, tags: a.keywords.slice(0, 6), origin });
         const ids = [];
         ids.push((await store.draft('summary', { title: `“${note.title}” 요약`, ...a }, { sourceRef: note.id, source: text, confidence: 0.7, origin })).id);
@@ -136,7 +141,7 @@ export default {
           wait.remove(); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `${ai ? 'AI가' : '앱 안에서'} 읽고 ${a.summary.length}줄로 줄였어요. 원문은 메모에 넣어 뒀어요.${ai ? '' : ' 설정에서 무료 AI 키를 넣으면 요약이 더 자연스러워져요.'}`, draftIds: [d.id] }), new Map((await store.drafts()).map(x => [x.id, x]))); updateBadge();
         } catch (e) { wait.remove(); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `이 링크는 읽지 못했어요. 로그인이 필요하거나 막아 둔 사이트일 수 있어요. 내용을 붙여 넣어 주시면 정리해 드릴게요.` }), new Map()); }
         return; } }
-      let parsed = brain.interpret(text, { projects, people: [...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())].filter(Boolean) });
+      let parsed = brain.interpret(text, { projects, people, vendors: (await db.list('vendors')).map(v => v.name) });
       // 규칙으로 잘 모르겠는 말(대화·메모로만 읽힌 것)은 연결해 둔 무료 AI에 한 번 더 물어봄. 결과는 그대로 임시 카드
       if (parsed.length === 1 && (parsed[0].kind === 'talk' || (parsed[0].kind === 'note' && parsed[0].confidence <= 0.6)) && text.length >= 8) {
         const AI = await import('../js/ai.js'); const got = await AI.understand(text, { today: todayStr(), people });
@@ -184,6 +189,7 @@ export default {
         row.append(...m.chips.map(c => h('button.chip' + (c.make === 'task' ? '.acc' : ''), { onclick: async () => {
           if (c.say) return send(c.say);
           if (c.skip) return done('넘겼어요');
+          if (c.act) { const ACT = await import('../js/act.js'); const r = await ACT.run(c.act); await done(c.label); if (r) await drawMsg(await db.put('chat', { role: 'bot', text: r.text, chips: r.chips }), new Map()); return; }
           if (c.undoAlias) { const CH = await import('../js/chat.js'); const a = await CH.aliases(); delete a[c.undoAlias]; await db.kvSet('chat:alias', a); return done('기억을 지웠어요'); }
           if (c.make === 'event') { const d = await store.draft('event', { title: m.q.trim().slice(0, 60), date: todayStr(), start: '', end: '', place: '' }, { source: m.q, confidence: .6, origin: 'chat' }); await done('일정으로 받을게요'); return askNext(d, missing(d.data, m.q)); }
           if (c.make) { const d = await store.draft(c.make, c.make === 'task' ? { title: brain.cleanTask(m.q) || m.q, due: '', priority: 'normal' } : c.make === 'note' ? { title: m.q.slice(0, 50), body: m.q, type: 'memo' } : { title: m.q }, { source: m.q, confidence: .6, origin: 'chat' }); updateBadge(); await done(`${store.KINDS[c.make]?.label || ''} 임시 항목을 만들었어요`); box.append(draftCard(d, () => updateBadge())); }

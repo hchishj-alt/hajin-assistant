@@ -5,6 +5,7 @@ export const FIELDS = {
   event: [
     { k: 'title', label: '제목', full: true },
     { k: 'date', label: '날짜', type: 'date' },
+    { k: 'endDate', label: '끝나는 날 (여러 날일 때)', type: 'date' },
     { k: 'place', label: '장소' },
     { k: 'who', label: '누구랑' },
     { k: 'addr', label: '주소 (자동으로 찾음)', full: true },
@@ -37,6 +38,20 @@ export const FIELDS = {
     { k: 'status', label: '처리 상태', type: 'select', options: [['todo', '정산 전'], ['submitted', '결재 요청'], ['approved', '승인됨'], ['done', '정산 완료']], default: 'todo' },
     { k: 'team', label: '공유', type: 'select', options: [['auto', '알아서 (내용 보고 정함)'], ['', '나만 보기'], ['team-main', '팀에 공유']], default: 'auto' },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
+  ],
+  vendor: [
+    { k: 'name', label: '업체 이름' },
+    { k: 'cat', label: '분야' },
+    { k: 'phone', label: '전화', type: 'tel' },
+    { k: 'kakao', label: '카톡·담당자' },
+    { k: 'link', label: '링크', full: true },
+    { k: 'memo', label: '메모', full: true },
+  ],
+  buy: [
+    { k: 'title', label: '상품명', full: true },
+    { k: 'url', label: '링크', type: 'url', full: true },
+    { k: 'price', label: '가격', type: 'number' },
+    { k: 'qty', label: '수량', type: 'number' },
   ],
   contact: [
     { k: 'name', label: '이름' },
@@ -99,10 +114,12 @@ export const FIELDS = {
 export function describe(kind, d) {
   const p = [];
   if ((kind === 'event' || kind === 'task') && d.scope) p.push(d.scope === 'personal' ? '개인' : '팀 업무');
-  if (kind === 'event') { if (d.date) p.push(d.date.slice(5).replace('-', '/')); if (d.start) p.push(d.start + (d.end ? '–' + d.end : '')); if (d.place) p.push(d.area && !d.place.includes(d.area) ? `${d.place} (${d.area})` : d.place); else if (d.area) p.push(d.area); if (d.who) p.push(d.who + '와 함께'); if (d.addr) p.push(d.addr); }
+  if (kind === 'event') { if (d.date) p.push(d.date.slice(5).replace('-', '/') + (d.endDate && d.endDate > d.date ? '–' + d.endDate.slice(5).replace('-', '/') : '')); if (d.start) p.push(d.start + (d.end ? '–' + d.end : '')); if (d.place) p.push(d.area && !d.place.includes(d.area) ? `${d.place} (${d.area})` : d.place); else if (d.area) p.push(d.area); if (d.who) p.push(d.who + '와 함께'); if (d.addr) p.push(d.addr); }
   if (kind === 'task') { if (d.due) p.push('마감 ' + d.due.slice(5).replace('-', '/')); if (d.who) p.push('담당 ' + d.who); if (d.priority === 'high') p.push('중요'); if (d.project) p.push(d.project); }
   if (kind === 'expense') { p.push((Number(d.amount) || 0).toLocaleString() + '원'); if (d.category) p.push(d.category); if (d.pay) p.push(d.pay); }
   if (kind === 'contact') { if (d.phone) p.push(d.phone); if (d.org) p.push(d.org); if (d.email) p.push(d.email); }
+  if (kind === 'vendor') { if (d.cat) p.push(d.cat); if (d.phone) p.push(d.phone); if (d.kakao) p.push(d.kakao); if (d.link) p.push(d.link.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]); for (const x of (d.prices || []).slice(0, 3)) p.push(`${x.item} ${Number(x.price).toLocaleString()}원${x.note ? ' (' + x.note + ')' : ''}`); if (d.memo) p.push(d.memo); }
+  if (kind === 'buy') { if (d.price) p.push(Number(d.price).toLocaleString() + '원'); if (d.url) { try { p.push(new URL(d.url).hostname.replace(/^www\./, '')); } catch { } } }
   if (kind === 'timelog') { p.push(`${d.minutes}분`); if (d.project) p.push(d.project); }
   if (kind === 'reference' && d.url) { try { p.push(new URL(d.url).hostname); } catch { } }
   if (kind === 'grant' && d.deadline) p.push('마감 ' + d.deadline);
