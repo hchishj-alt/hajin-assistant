@@ -172,8 +172,8 @@ async function setupSW() {
       const w = reg.installing;
       w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) prompt(w); });
     });
-    let reloaded = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded) { reloaded = true; location.reload(); } });
+    let reloaded = false; const hadController = !!navigator.serviceWorker.controller; // 처음 설치될 때는 새로고침할 필요가 없다
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded && hadController) { reloaded = true; location.reload(); } });
     setInterval(() => reg.update().catch(() => { }), 30 * 60 * 1000);
     document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && reg.update().catch(() => { }));
   } catch (e) { store.logError(e, 'sw'); }
@@ -203,9 +203,10 @@ async function boot() {
   await (await import('./labels.js')).load();
   await applyTheme();
   if (!location.hash || location.hash === '#/') { const st = (await db.kvGet('look', null))?.start; if (st && st !== 'today' && MODULES.some(m => m.id === st)) history.replaceState(null, '', '#/' + st); }
+  if (/^#k=/.test(location.hash) || sessionStorage.getItem('hajin:pk')) await (await import('./keyshare.js')).takeFromHash();
   await store.loadLearned();
   await buildNav();
-  window.addEventListener('hashchange', render);
+  window.addEventListener('hashchange', async () => { if (/^#k=/.test(location.hash)) await (await import('./keyshare.js')).takeFromHash(); render(); });
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
   db.onChange(col => { if (col === 'drafts') updateBadge(); });
   import('./gcal.js').then(g => g.watch());

@@ -34,11 +34,14 @@ export default {
         (() => { const i = h('input.in', { type: 'password', placeholder: '카카오 REST API 키 (선택)', autocomplete: 'off', 'aria-label': '카카오 REST API 키' }); db.kvGet('secret:kakao', '').then(v => (i.value = v || '')); const out = h('span.faint.tiny');
           return h('div.stack', h('div.row', { style: { gap: '6px' } }, h('div.grow', i), h('button.btn.sm', { onclick: async () => { await db.kvSet('secret:kakao', i.value.trim()); out.textContent = '찾는 중…'; const PL = await import('../js/place.js'); const hit = await PL.lookup('서울시청'); out.textContent = hit ? `잘 돼요: ${hit.name} · ${hit.addr} (${hit.by})` : '찾지 못했어요. 키나 인터넷 연결을 확인해 주세요.'; } }, '저장하고 시험')), out,
             h('p.faint.tiny', '키 받는 곳: ', h('a', { href: 'https://developers.kakao.com/console/app', target: '_blank', rel: 'noopener' }, 'Kakao Developers'), ' → 앱 만들기 → 앱 키의 REST API 키 복사, 플랫폼(Web)에 이 앱 주소 등록.')); })()),
-      sec('외부 AI 연결', 'sparkles', h('p.small.muted', '링크 본문 읽기와 페이지 이미지 찾기는 키 없이 돼요. 구글 Gemini 무료 키를 넣으면 링크 요약이 자연스러워지고, 앱이 못 알아들은 말을 AI가 한 번 더 풀어 줘요. 결과는 늘 확인 대기로만 들어가요.'),
+      sec('외부 AI 연결', 'sparkles', h('p.small.muted', '링크 본문 읽기와 페이지 이미지 찾기는 키 없이 돼요. 구글 Gemini 무료 키를 넣으면 쓴 말을 AI가 먼저 읽어서 날짜·사람·종류를 정리하고, 링크와 회의 요약도 자연스러워져요. 인터넷이 없거나 키가 없으면 앱 안 규칙이 대신 읽어요. 결과는 늘 확인 대기로만 들어가요.'),
         (() => { const i = h('input.in', { type: 'password', placeholder: 'Gemini API 키 (선택)', autocomplete: 'off', 'aria-label': 'Gemini API 키' }); const on = h('input', { type: 'checkbox', onchange: () => db.kvSet('ai:on', on.checked) }); const out = h('span.faint.tiny');
           import('../js/ai.js').then(async AI => { i.value = (await db.kvGet(AI.KEY, '')) || ''; on.checked = await db.kvGet('ai:on', true); });
           return h('div.stack', h('div.row', { style: { gap: '6px' } }, h('div.grow', i), h('button.btn.sm', { onclick: async () => { const AI = await import('../js/ai.js'); await db.kvSet(AI.KEY, i.value.trim()); await db.kvSet('ai:model', ''); if (!i.value.trim()) { out.textContent = '키를 지웠어요. 앱 안 규칙만 써요.'; return; } out.textContent = '시험하는 중…'; try { const a = await AI.ask('“연결됐어요”라고만 답해.'); out.textContent = `잘 돼요: ${a.slice(0, 30)} (${await db.kvGet('ai:model', '')})`; } catch (e) { out.textContent = e.message; } } }, '저장하고 시험')), out,
-            h('label.row.small', { style: { gap: '8px', cursor: 'pointer' } }, on, '못 알아들은 말은 AI에 물어보기'),
+            h('label.row.small', { style: { gap: '8px', cursor: 'pointer' } }, on, '쓴 말을 AI가 먼저 읽기'),
+            h('div.row', { style: { gap: '6px', flexWrap: 'wrap' } },
+              h('button.btn.sm', { onclick: async () => (await import('../js/keyshare.js')).showQR() }, ic('phone', 14), '폰·아이패드로 키 보내기'),
+              h('button.btn.sm', { onclick: async () => (await import('../js/keyshare.js')).scan(k => { i.value = k; out.textContent = '키를 받았어요. 바로 쓸 수 있어요.'; }) }, ic('camera', 14), 'QR로 키 받기')),
             h('p.faint.tiny', '키 받는 곳: ', h('a', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener' }, 'Google AI Studio'), ' → API 키 만들기(무료, 카드 등록 없음). 키는 이 기기에만 저장되고 팀과 공유되지 않아요. AI를 쓸 때는 그 문장이나 링크 본문이 구글로 전송되고, 무료 등급은 구글이 품질 개선에 쓸 수 있으니 민감한 내용은 피해 주세요.')); })()),
       sec('데이터', 'shield',
         h('p.small.muted', `모든 기록은 이 기기 안에만 있어요. ${est ? `사용 ${(est.usage / 1e6).toFixed(1)}MB` : ''}${persisted ? ' · 자동 삭제 방지 켜짐' : ''}`),

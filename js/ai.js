@@ -108,6 +108,16 @@ export async function enhance(a, text, { today = '', people = [], meeting = fals
 // 규칙이 읽은 초안(parsed)을 같이 주고, AI가 뜻을 보고 고쳐 쓰게 함. 전화·금액·링크처럼 글자 그대로인 건 규칙 값을 믿고,
 // 날짜·종류·제목·누구랑·장소처럼 뜻을 읽어야 하는 건 AI 값을 씀. 실패하면 null → 규칙 결과 그대로
 const KO = { event: '일정', task: '할 일', expense: '지출', contact: '연락처', idea: '아이디어', note: '메모', vendor: '업체', buy: '살 것', reference: '레퍼런스', sns: 'SNS 아이디어', grant: '지원사업' };
+// AI가 말에 없는 사람을 지어내지 못하게: 말에 실제로 나온 이름만 남긴다(목록 사람은 성 뺀 이름도 인정).
+function whoIn(w, text, people, fallback) {
+  const t = String(text).replace(/\s/g, ''); const ok = [];
+  for (const n of String(w || '').split(/\s*[,·/]\s*/).map(x => x.trim()).filter(Boolean)) {
+    const full = people.find(p => p === n || (p.length >= 3 && p.slice(1) === n)) || n;
+    const bare = n.replace(/\s/g, ''); const given = full.length >= 3 && people.includes(full) ? full.slice(1) : '';
+    if ((t.includes(bare) || (given && t.includes(given))) && !ok.includes(full)) ok.push(full);
+  }
+  return ok.length ? ok.join(', ') : (fallback || '');
+}
 const isD = v => /^\d{4}-\d{2}-\d{2}$/.test(v || ''), isT = v => /^([01]\d|2[0-3]):[0-5]\d$/.test(v || '');
 function calendarTable(today) {
   const b = new Date(today + 'T00:00'); const rows = [];
@@ -135,7 +145,8 @@ ${calendarTable(today)}
 - "다음주 중 작업, 목요일까지 제출"처럼 주 표현과 요일이 떨어져 있어도 그 주의 요일로 읽어. 주를 말하지 않은 요일은 오늘 이후 가장 가까운 그 요일(오늘과 같은 요일이면 다음 주).
 - 날짜는 반드시 위 달력에서 골라. 계산하지 말고 찾아.
 - "3시"처럼 오전·오후가 없으면 1~7시는 오후로.
-- 사람 이름은 아는 사람 목록의 전체 이름으로 바꿔 써. 목록에 없으면 말한 그대로.
+- 사람 이름은 말에 나온 사람만. 아는 사람 목록에 있으면 전체 이름으로 쓰고, 목록에 없는 사람(예: \"수집오빠\", \"엄마\")은 말한 그대로 써. 목록의 다른 사람으로 바꾸지 마.
+- 제목만 봐도 무슨 일인지 알 수 있게. 불참·휴가·지각처럼 사람이 주어인 일은 제목에 이름을 넣어(예: \"서연 불참\").
 - scope: 가족·친구·개인 볼일은 personal, 나머지는 work.
 - 말에 없는 내용은 지어내지 마. 뭘 만들 말이 아니면(인사, 감탄, 질문) 빈 배열 [].
 
@@ -149,8 +160,8 @@ ${calendarTable(today)}
     if (!g || !KO[g.kind] || !String(g.title || '').trim()) continue;
     const base = (parsed || []).find(p => p.kind === g.kind)?.data || {}; const title = String(g.title).trim().slice(0, 80); const S = v => (typeof v === 'string' ? v.trim() : ''); let data;
     const date = isD(g.date) ? g.date : '';
-    if (g.kind === 'event') data = { ...base, title, date: date || base.date || today, endDate: isD(g.endDate) && g.endDate > (date || '') ? g.endDate : '', start: isT(g.start) ? g.start : g.allDay ? '' : base.start || '', end: isT(g.end) ? g.end : '', who: S(g.who), place: S(g.place), area: S(g.area), scope: g.scope === 'personal' ? 'personal' : 'work', repeat: /^(daily|weekly|monthly|weekdays)$/.test(g.repeat || '') ? g.repeat : '', memo: S(g.memo) || base.memo || '', _dated: !!(date || base.date), _allday: !!g.allDay };
-    else if (g.kind === 'task') data = { ...base, title, due: date || '', time: isT(g.start) ? g.start : '', who: S(g.who), priority: g.priority === 'high' || base.priority === 'high' ? 'high' : 'normal', project: S(g.project) || base.project || '', scope: g.scope === 'personal' ? 'personal' : 'work', memo: S(g.memo) || base.memo || '' };
+    if (g.kind === 'event') data = { ...base, title, date: date || base.date || today, endDate: isD(g.endDate) && g.endDate > (date || '') ? g.endDate : '', start: isT(g.start) ? g.start : g.allDay ? '' : base.start || '', end: isT(g.end) ? g.end : '', who: whoIn(g.who, text, people, base.who), place: S(g.place), area: S(g.area), scope: g.scope === 'personal' ? 'personal' : 'work', repeat: /^(daily|weekly|monthly|weekdays)$/.test(g.repeat || '') ? g.repeat : '', memo: S(g.memo) || base.memo || '', _dated: !!(date || base.date), _allday: !!g.allDay };
+    else if (g.kind === 'task') data = { ...base, title, due: date || '', time: isT(g.start) ? g.start : '', who: whoIn(g.who, text, people, base.who), priority: g.priority === 'high' || base.priority === 'high' ? 'high' : 'normal', project: S(g.project) || base.project || '', scope: g.scope === 'personal' ? 'personal' : 'work', memo: S(g.memo) || base.memo || '' };
     else if (g.kind === 'expense') data = { ...base, title, amount: Number(base.amount) || Number(g.amount) || 0, date: date || base.date || today, category: base.category || S(g.category) || '기타', project: S(g.project) || base.project || '', pay: base.pay || '개인카드' };
     else if (g.kind === 'contact') data = { ...base, name: base.name && base.phone ? (S(g.title) || base.name) : title, phone: base.phone || S(g.phone), email: base.email || S(g.email), org: S(g.org) || base.org || '', role: base.role || '', memo: S(g.memo) };
     else if (g.kind === 'vendor') data = { ...base, name: title, cat: S(g.cat) || base.cat || '기타', phone: base.phone || S(g.phone), link: base.link || S(g.url), kakao: base.kakao || '', memo: S(g.memo) || base.memo || '', prices: (base.prices && base.prices.length ? base.prices : (g.prices || []).filter(x => x && x.item).map(x => ({ item: String(x.item).slice(0, 40), price: String(Number(x.price) || ''), note: S(x.note), at: today }))) };

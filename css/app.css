@@ -810,3 +810,9 @@ button.vd-n:hover b{color:var(--acc)}
 .chips:empty{min-height:0!important;padding:0!important;margin:0!important}
 @media (pointer:coarse){.btn.icon{min-width:36px;min-height:36px}}
 @media (max-width:1200px){.rk .btn.icon,.radar .btn.icon{min-width:36px;min-height:36px}}
+/* AI 키 QR */
+.qr-box{align-items:center;text-align:center}
+.qr-cv{width:min(260px,70vw);height:auto;border-radius:12px;border:1px solid var(--line);background:#fff;image-rendering:pixelated}
+.qr-cam{position:relative;width:min(320px,78vw);aspect-ratio:1;border-radius:16px;overflow:hidden;background:#000}
+.qr-cam video{width:100%;height:100%;object-fit:cover}
+.qr-cam i{position:absolute;inset:14%;border:2px solid rgba(255,255,255,.85);border-radius:12px;pointer-events:none}
