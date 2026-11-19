@@ -105,6 +105,7 @@ export default {
           h('div.modal-f',
             h('button.btn.ghost.danger', { onclick: async () => { if (await confirmBox('이 레퍼런스를 지울까요?', '지우기')) { await db.remove(r.id); close(); draw(); } } }, ic('trash', 14)),
             src && !r.colors?.length ? h('button.btn', { onclick: async e => { const btn = e.currentTarget; busy(btn, true, '분석 중'); try { await db.patch(r.id, await LP.analyzeColors(src)); toast('색을 분석했어요'); close(); draw(); } catch { toast('이 이미지는 색을 못 읽었어요'); busy(btn, false); } } }, '색 분석') : null,
+            r.url && r.kind === 'web' ? h('button.btn', { onclick: () => { close(); pickImages([r.url], { project: r.project, sub: r.sub, memo: '' }); } }, ic('image', 14), '페이지 이미지 고르기') : null,
             h('button.btn', { onclick: () => { close(); edit(r); } }, ic('edit', 14), '고치기'),
             r.url ? h('a.btn.pri', { href: r.url, target: '_blank', rel: 'noopener' }, '원본 열기') : null));
       }, { wide: true });
@@ -133,23 +134,50 @@ export default {
         const f = form([...ff, { k: 'memo', label: '메모 (선택)', full: true }], { project: F.folder && F.folder !== '_none' ? F.folder : '', sub: F.sub }, async v => {
           const urls = [...new Set((ta.value.match(/https?:\/\/[^\s<>"']+|(?:www\.)[^\s<>"']+/g) || []))];
           if (!urls.length) { toast('링크를 찾지 못했어요'); return; }
-          const btn = document.querySelector('.modal button[type=submit]'); busy(btn, true, `불러오는 중 0/${urls.length}`);
-          const by = await meName(), team = await teamOf();
-          let n = 0;
-          for (const u of urls) {
-            const ex = (await db.list('refs')).find(x => x.url === u);
-            if (ex) { n++; continue; }
+          // 기다리지 않게 대기열로 넘기고 창은 바로 닫음
+          const by = await meName(), team = await teamOf(); const Q = await import('../js/queue.js');
+          for (const u of urls) Q.add('레퍼런스 불러오기', u.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40), async () => {
+            if ((await db.list('refs')).find(x => x.url === u)) return;
             let p; try { p = await LP.preview(u); } catch { p = { url: u, title: u, kind: 'web' }; }
             const item = await db.put('refs', { ...p, project: v.project, sub: v.sub, memo: v.memo, by, team, tags: brain.keywords(`${p.title} ${p.desc || ''} ${v.memo || ''}`, 4), uses: LP.usesOf(`${p.title} ${p.desc || ''} ${v.memo || ''}`) });
             if (p.thumb) LP.analyzeColors(p.thumb).then(c => db.patch(item.id, c)).then(() => draw()).catch(() => { });
-            btn.textContent = `불러오는 중 ${++n}/${urls.length}`;
-          }
-          toast(`${urls.length}개를 담았어요. 색은 곧 자동으로 골라져요`); close(); draw();
+          }, () => draw());
+          toast(`${urls.length}개를 대기열에 넣었어요. 불러오는 동안 다른 걸 해도 돼요`); close();
+          await db.kvSet('refs:pageimgs', pg.checked);
+          const pages = urls.filter(u => !LP.ytId(u) && !/\.(png|jpe?g|gif|webp|avif|mp4|mov|webm)(\?|$)/i.test(u));
+          if (pg.checked && pages.length) pickImages(pages, v);
         }, { submitLabel: '담기' });
+        const pg = h('input', { type: 'checkbox' }); db.kvGet('refs:pageimgs', true).then(x => (pg.checked = x));
+        f.insertBefore(h('label.row.small', { style: { gap: '8px', cursor: 'pointer', minHeight: '32px' } }, pg, h('span', '페이지 본문 이미지도 펼쳐서 골라 담기', h('span.faint', ' (메뉴·광고·아이콘은 알아서 빼요)'))), f.lastChild);
         f.prepend(ta);
         setTimeout(() => ta.focus(), 50);
         return f;
       });
+    }
+    // 링크 속 본문 이미지를 촤르륵 펼쳐서, 뺄 것만 눌러 빼고 담기. 작은 그림·깨진 그림은 자동으로 빠짐
+    async function pickImages(pages, v) {
+      const AI = await import('../js/ai.js'); const st = { items: [], off: new Set() };
+      modal('담을 이미지 고르기', close => {
+        const grid = h('div.pk-grid'), info = h('span.small.muted', '페이지를 읽는 중…'), go2 = h('button.btn.pri', { disabled: true }, '담기');
+        const alive = () => st.items.filter(x => !x.dead), chosen = () => alive().filter(x => !st.off.has(x.src));
+        const paint = () => { const n = chosen().length; go2.disabled = !n; go2.textContent = n ? `${n}장 담기` : '담기'; if (st.done) info.textContent = alive().length ? `${alive().length}장 찾음 · 뺄 건 눌러서 빼요` : '본문에서 담을 만한 이미지를 찾지 못했어요'; };
+        const add = (src, page, title, i) => { const it = { src, page, title }; st.items.push(it);
+          const img = h('img', { src, alt: '', referrerpolicy: 'no-referrer', loading: 'eager', decoding: 'async' });
+          const b = h('button.pk', { type: 'button', style: { '--i': Math.min(i, 30) }, 'aria-pressed': 'true', 'aria-label': '이미지 ' + (i + 1), onclick: () => { st.off.has(src) ? st.off.delete(src) : st.off.add(src); b.setAttribute('aria-pressed', String(!st.off.has(src))); paint(); } }, img, h('span.pk-c', ic('check', 12)));
+          const drop = () => { it.dead = true; b.remove(); paint(); };
+          img.onerror = drop; img.onload = () => { if (img.naturalWidth < 240 || img.naturalHeight < 160 || img.naturalWidth / img.naturalHeight > 5 || img.naturalHeight / img.naturalWidth > 5) drop(); else { it.w = img.naturalWidth; b.classList.add('in'); } };
+          grid.append(b); };
+        (async () => { let n = 0, fail = 0;
+          for (const u of pages) { try { const p = await AI.readPage(u); for (const src of p.images.slice(0, 60)) if (!st.items.some(x => x.src === src)) add(src, u, p.title, n++); } catch { fail++; } paint(); }
+          st.done = true; if (!n) { close(); toast(fail ? '페이지 이미지는 읽지 못했어요. 링크만 담았어요' : '본문에서 담을 만한 이미지를 찾지 못했어요. 링크만 담았어요'); } else paint(); })();
+        go2.onclick = async () => { const list = chosen(); const by = await meName(), team = await teamOf(); const Q = await import('../js/queue.js'); const have = new Set((await db.list('refs')).map(x => x.thumb));
+          list.filter(x => !have.has(x.src)).forEach((x, i) => Q.add('이미지 담기', `${x.title || hostOf(x.page)} ${i + 1}`, async () => { const item = await db.put('refs', { kind: 'image', title: `${x.title || hostOf(x.page)} ${i + 1}`.slice(0, 80), thumb: x.src, url: x.page, provider: hostOf(x.page), project: v.project || '', sub: v.sub || '', memo: v.memo || '', by, team, fromPage: true }); LP.analyzeColors(x.src).then(c => db.patch(item.id, c)).then(() => draw()).catch(() => { }); }, () => draw()));
+          close(); toast(`${list.length}장을 대기열에 넣었어요`); };
+        return h('div', h('div.row.between', { style: { marginBottom: '10px', gap: '8px', flexWrap: 'wrap' } }, info, h('div.row', { style: { gap: '6px' } },
+          h('button.btn.sm.ghost', { type: 'button', onclick: () => { st.off.clear(); grid.querySelectorAll('.pk').forEach(b => b.setAttribute('aria-pressed', 'true')); paint(); } }, '전부 고르기'),
+          h('button.btn.sm.ghost', { type: 'button', onclick: () => { alive().forEach(x => st.off.add(x.src)); grid.querySelectorAll('.pk').forEach(b => b.setAttribute('aria-pressed', 'false')); paint(); } }, '전부 빼기'))),
+          grid, h('div.modal-f', h('button.btn.ghost', { onclick: close }, '안 담기'), go2));
+      }, { wide: true });
     }
     // 이미지 (붙여넣기·올리기·끌어놓기): 링크는 선택, 팀 저장소에 webp로 줄여 올림 (로그인 안 했으면 이 기기에만)
     async function addImages(files, link = '') {
@@ -158,21 +186,18 @@ export default {
       modal(files.length > 1 ? `이미지 ${files.length}장 담기` : '이미지 담기', close => {
         const f = form([{ k: 'title', label: '제목 (비우면 파일 이름)', full: true }, { k: 'url', label: '원본 링크 (선택)', type: 'url', full: true, default: link }, ...ff, { k: 'memo', label: '메모 (선택)', full: true }],
           { project: F.folder && F.folder !== '_none' ? F.folder : '', sub: F.sub, url: link }, async v => {
-            const btn = document.querySelector('.modal button[type=submit]'); busy(btn, true, '담는 중');
             const by = await meName(), team = await teamOf();
-            const sync = await import('../js/sync.js');
-            let cloud = 0;
-            for (const [i, file] of files.entries()) {
+            const sync = await import('../js/sync.js'); const Q = await import('../js/queue.js');
+            close(); toast(`${files.length}장을 대기열에 넣었어요. 올리는 동안 다른 걸 해도 돼요`);
+            for (const [i, file] of files.entries()) Q.add('이미지 올리기', file.name || `이미지 ${i + 1}`, async () => {
               const small = await shrink(file);
               const pub = await sync.uploadImage(small).catch(() => null);
               const base = { kind: 'image', title: (files.length > 1 && v.title ? `${v.title} ${i + 1}` : v.title) || (file.name && !/^image\.\w+$/.test(file.name) ? file.name.replace(/\.\w+$/, '') : '붙여넣은 이미지'), url: v.url || '', project: v.project, sub: v.sub, memo: v.memo, by, provider: v.url ? hostOf(v.url) : pub ? '팀 저장소' : '이 기기에만' };
               let item;
-              if (pub) { cloud++; item = await db.put('refs', { ...base, thumb: pub, team }); }
+              if (pub) { item = await db.put('refs', { ...base, thumb: pub, team }); }
               else { const key = await db.putBlob(small); blobUrls.set(key, URL.createObjectURL(small)); item = await db.put('refs', { ...base, imgKey: key, team: '' }); }
               LP.analyzeColors(urls[i]).then(c => db.patch(item.id, c)).then(() => draw()).catch(() => { });
-            }
-            toast(cloud === files.length ? `${files.length}장 담았어요 · 팀도 같이 봐요` : `${files.length}장 담았어요${cloud ? ` (팀 공유 ${cloud}장)` : ' · 동기화에 로그인하면 팀과 같이 봐요'}`);
-            close(); draw();
+            }, () => draw());
           }, { submitLabel: '담기' });
         f.prepend(h('div', { style: { display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '10px' } }, urls.map(u => h('img', { src: u, style: { height: '120px', borderRadius: '10px', flex: 'none' } }))));
         return f;

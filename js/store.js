@@ -173,3 +173,19 @@ export async function logError(err, where = '') {
     await db.kvSet('errors', list.slice(0, 100));
   } catch { }
 }
+
+// 동시 작업: 고치는 창을 연 뒤 다른 사람(다른 기기)이 먼저 고쳤으면 알려 줌. 현업 도구들처럼 "마지막에 저장한 사람 기준 + 고친 기록 남김"
+export async function changedSince(opened) {
+  if (!opened?.id) return null; const cur = await db.get(opened.id);
+  if (!cur || cur.updatedAt === opened.updatedAt) return null;
+  const diff = Object.keys(cur).filter(k => !['updatedAt', 'dirty', 'rev', 'auto'].includes(k) && JSON.stringify(cur[k]) !== JSON.stringify(opened[k]));
+  return diff.length ? { cur, diff } : null;
+}
+// 인수인계: 담당은 늘 한 사람. 넘길 때 한 줄 메모를 남기고, 누가 누구에게 넘겼는지 기록이 쌓임
+export async function handoff(task, to, note = '') {
+  const from = task.who || (await db.kvGet('name', '')) || '나';
+  const log = [...(task.handoffs || []), { from, to, note, at: new Date().toISOString() }];
+  const t = await db.put('tasks', { ...task, who: to, handoffs: log });
+  try { const sync = await import('./sync.js'); const r = (await db.kvGet('sync:roster', [])).find(m => m.name === to); if (r?.id && await sync.me()) await sync.dmSend(r.id, `[인수인계] “${task.title}”을 넘겨받았어요.${note ? ' 메모: ' + note : ''}${task.due ? ' (마감 ' + task.due.slice(5).replace('-', '/') + ')' : ''}`); } catch { }
+  return t;
+}

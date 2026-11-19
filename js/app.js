@@ -21,6 +21,7 @@ export const MODULES = [
   { id: 'team', title: '팀 · 일정 조율', icon: 'grid', group: '사람', short: '팀' },
   { id: 'money', title: '비용 처리', icon: 'wallet', group: '회사', short: '비용' },
   { id: 'shop', title: '구매 목록', icon: 'cart', group: '회사', short: '구매' },
+  { id: 'vendors', title: '업체 목록', icon: 'briefcase', group: '회사', short: '업체' },
   { id: 'radar', title: '지원사업 · 정보 랭킹', icon: 'trend', group: '회사', short: '랭킹' },
   { id: 'startup', title: '스타트업 PM', icon: 'rocket', group: '회사', short: '스타트업' },
   { id: 'look', title: '꾸미기', icon: 'palette', group: '시스템' },
@@ -73,6 +74,7 @@ export function refresh() { render(); }
 
 function markNav(id) {
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === id || (id !== 'today' && a.dataset.nav === 'menu' && !MODULES.find(m => m.id === id)?.tab)));
+  { const box = document.querySelector(`#nav .navlink[data-nav="${id}"]`)?.closest('.navg'); if (box && !box.classList.contains('open')) { box.classList.add('open'); box.previousElementSibling?.setAttribute('aria-expanded', 'true'); } }
 }
 
 export async function buildNav() {
@@ -81,14 +83,22 @@ export async function buildNav() {
   clear(nav);
   nav.append(h('div.brand', h('img', { src: 'icons/icon.svg', alt: '' }), '하진 비서'));
   nav.append(h('button.searchbtn', { onclick: openPalette }, ic('search', 16), h('span.lbl', '검색·명령'), h('kbd', navigator.platform.includes('Mac') ? '⌘K' : 'Ctrl K')));
-  let g = '';
+  let g = '', box = null;
   const hid = (await db.kvGet('look', null))?.hidden || [];
+  // 카테고리별로 접기: 하루는 늘 펼침, 나머지는 접어 두고 지금 보는 화면의 묶음만 열림 (누르면 기억)
+  const fold = await db.kvGet('nav:fold', {}); const cur = (location.hash.replace(/^#\//, '').split('/')[0]) || 'today';
+  const curGroup = MODULES.find(m => m.id === cur)?.group;
   for (const m of MODULES.filter(m => !m.hidden && !hid.includes(m.id) && (!m.adminOnly || adm))) {
-    if (m.group !== g) { g = m.group; nav.append(h('div.grp', g)); }
+    if (m.group !== g) {
+      g = m.group; const name = g; const open = name === '하루' || name === curGroup || fold[name] === false;
+      box = h('div.navg' + (open ? '.open' : ''), { 'data-g': name });
+      const head = h('button.grp', { 'aria-expanded': String(open), onclick: async () => { const b2 = head.nextElementSibling; const now = !b2.classList.contains('open'); b2.classList.toggle('open', now); head.setAttribute('aria-expanded', String(now)); const f = await db.kvGet('nav:fold', {}); f[name] = !now; await db.kvSet('nav:fold', f); } }, h('span', name), ic('down', 12));
+      nav.append(head, box);
+    }
     const a = h('a.navlink', { href: '#/' + m.id, 'data-nav': m.id }, ic(m.icon), h('span.grow', m.title));
     if (m.id === 'inbox') a.append(h('span.badge#inbox-badge.hide'));
     if (m.id === 'talk') a.append(h('span.badge#talk-badge.hide'));
-    nav.append(a);
+    box.append(a);
   }
   const tb = document.getElementById('tabbar');
   clear(tb);

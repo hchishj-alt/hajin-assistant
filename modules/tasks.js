@@ -70,10 +70,18 @@ export default {
     }
     function edit(t = {}) {
       modal(t.id ? '할 일 고치기' : '새 할 일', close => {
-        const f = form(FIELDS.task, t, async v => { await store.commit('task', { ...t, ...v }); close(); draw(); });
+        const f = form(FIELDS.task, t, async v => { const ch = await store.changedSince(t); if (ch && !await confirmBox(`창을 연 사이에 ${ch.cur.by && ch.cur.by !== t.by ? ch.cur.by + ' 님이' : '다른 곳에서'} 이 할 일을 고쳤어요. 내 내용으로 저장할까요?`, '내 내용으로 저장')) return; await store.commit('task', { ...(ch ? ch.cur : t), ...v }); close(); draw(); });
+        if (t.id) f.querySelector('.modal-f').prepend(h('button.btn', { type: 'button', onclick: () => { close(); handoff(t); } }, ic('share', 14), '넘기기'));
+        if (t.handoffs?.length) f.querySelector('.modal-f').before(h('div.hand-log', h('div.small', { style: { fontWeight: 650 } }, '인수인계 기록'), t.handoffs.map(x => h('div.faint.tiny', `${x.at.slice(5, 10).replace('-', '/')} ${x.from} → ${x.to}${x.note ? ' · ' + x.note : ''}`))));
         if (t.id) f.querySelector('.modal-f').prepend(h('button.btn.danger', { type: 'button', onclick: async () => { if (await confirmBox('이 할 일을 지울까요?', '지우기')) { await db.remove(t.id); close(); draw(); } } }, ic('trash', 14), '지우기'));
         return f;
       });
+    }
+    async function handoff(t) {
+      const names = [...new Set([...(await store.teammateNames()), ...(await db.list('contacts')).filter(c => c.team || c.tags?.includes('팀')).map(c => c.name)])].filter(n => n && n !== t.who);
+      modal('할 일 넘기기', close => { const to = h('input.in', { placeholder: '받을 사람', list: 'hand-names', 'aria-label': '받을 사람' }); const note = h('textarea.in', { rows: 3, placeholder: '어디까지 했는지, 파일은 어디 있는지 한두 줄 (받는 사람이 바로 이어갈 수 있게)' });
+        return h('div', h('p.small.muted', `“${t.title}”의 담당을 바꿔요. 담당은 늘 한 사람이고, 넘긴 기록이 남아요.`), h('datalist#hand-names', names.map(n => h('option', { value: n }))), names.length ? h('div.chips', { style: { margin: '8px 0' } }, names.slice(0, 8).map(n => h('button.chip', { type: 'button', onclick: () => (to.value = n) }, n))) : null, h('label.f', '받을 사람', to), h('label.f', '넘기는 메모', note),
+          h('div.modal-f', h('button.btn.pri', { onclick: async () => { if (!to.value.trim()) return toast('받을 사람을 적어 주세요'); await store.handoff(t, to.value.trim(), note.value.trim()); close(); draw(); toast(`${to.value.trim()} 님에게 넘겼어요`); } }, '넘기기'))); });
     }
     async function autoPlan() {
       const today = todayStr();
@@ -124,7 +132,7 @@ export function taskRow(t, onChange, onEdit) {
       h('div.chips', { style: { marginTop: '2px' } },
         t.due ? h('span.chip' + (t.due < todayStr() && !t.done ? '.bad' : t.due === todayStr() ? '.warn' : ''), ic('calendar', 11), rel(t.due)) : null,
         t.time ? h('span.chip', ic('clock', 11), t.time) : null,
-        t.who ? h('span.chip', ic('user', 11), t.who) : null,
+        t.who ? h('span.chip', ic('user', 11), t.handoffs?.length ? `${t.handoffs[t.handoffs.length - 1].from} → ${t.who}` : t.who) : null,
         t.project ? h('span.chip.acc', '#' + t.project) : null,
         t.est ? h('span.chip', `${t.est}분`) : null)));
   cb.addEventListener('change', async () => {

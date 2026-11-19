@@ -110,10 +110,9 @@ export default {
         const ta = h('textarea.in', { rows: 4, placeholder: '상품 링크를 붙여넣어요. 여러 개면 줄마다 하나씩.' }, pre);
         const go2 = h('button.btn.pri', { onclick: async e => {
           const btn = e.currentTarget; const urls = [...new Set((ta.value.match(/https?:\/\/[^\s<>"']+/g) || []))]; if (!urls.length) return toast('링크를 찾지 못했어요');
-          busy(btn, true, `읽는 중 0/${urls.length}`); const by = await db.kvGet('name', '하진'); const team = (await db.get('team-main')) ? 'team-main' : ''; let miss = 0, last = null;
-          for (let i = 0; i < urls.length; i++) { const p = await P.lookup(urls[i]); const { auto, ...rest } = p; if (auto.length < 3) miss++; last = await db.put('buys', { ...rest, title: rest.title || '(상품명을 적어 주세요)', qty: 1, need: 'must', folder: F.folder && F.folder !== '_none' ? F.folder : '', by, team, autoFilled: auto }); btn.lastChild.textContent = `읽는 중 ${i + 1}/${urls.length}`; }
-          close(); F.tab = 'todo'; await draw();
-          if (urls.length === 1 && miss) { toast('자동으로 못 읽은 칸이 있어요. 확인해 주세요'); edit(last); } else toast(miss ? `${urls.length}개 담았어요. ${miss}개는 빈 칸을 직접 채워 주세요` : `${urls.length}개 담았어요`);
+          const by = await db.kvGet('name', '하진'); const team = (await db.get('team-main')) ? 'team-main' : ''; const folder = F.folder && F.folder !== '_none' ? F.folder : ''; const Q = await import('../js/queue.js');
+          for (const u of urls) Q.add('상품 읽기', u.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40), async () => { const p = await P.lookup(u); const { auto, ...rest } = p; const it = await db.put('buys', { ...rest, title: rest.title || '(상품명을 적어 주세요)', qty: 1, need: 'must', folder, by, team, autoFilled: auto }); if (urls.length === 1 && auto.length < 3 && box.isConnected && !document.querySelector('.modal')) { toast('자동으로 못 읽은 칸이 있어요. 확인해 주세요'); edit(it); } }, () => draw());
+          close(); F.tab = 'todo'; toast(`${urls.length}개를 대기열에 넣었어요. 못 읽은 칸은 담긴 뒤에 눌러서 채워 주세요`);
         } }, ic('plus', 14), '담기');
         return h('div.stack', ta, h('p.faint.tiny', '이미지·상품명·가격을 자동으로 읽어요. 쇼핑몰이 막아 둔 경우엔 빈 칸으로 담기고, 눌러서 직접 고치거나 이미지 주소만 따로 붙일 수 있어요.'), h('div.modal-f', go2));
       });

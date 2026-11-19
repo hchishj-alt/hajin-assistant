@@ -97,7 +97,7 @@ export async function reply(text, { name = '' } = {}) {
   if (RX.ok.test(t)) return { text: pick(['네!', '좋아요.', '알겠어요.']) };
   if (RX.no.test(t)) return { text: pick(['네, 그대로 둘게요.', '알겠어요.']) };
   // 무슨 말인지 딱 잡히지 않을 때: 만들지 않고 물어봄
-  return { text: pick(['들었어요.', '그렇군요.', '네, 알겠어요.']) + ' 적어 둘까요?', chips: [{ label: '할 일로', make: 'task' }, { label: '메모로', make: 'note' }, { label: '아이디어로', make: 'idea' }, { label: '그냥 넘기기', skip: true }] };
+  return { text: pick(['들었어요.', '그렇군요.', '네, 알겠어요.']) + ' 적어 둘까요?', chips: [{ label: '일정으로', make: 'event' }, { label: '할 일로', make: 'task' }, { label: '메모로', make: 'note' }, { label: '아이디어로', make: 'idea' }, { label: '그냥 넘기기', skip: true }] };
 }
 
 async function brief(soft) {

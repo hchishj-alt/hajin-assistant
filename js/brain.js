@@ -366,7 +366,7 @@ function interpretOne(s, base, ctx) {
     if (/(지원사업|공모전|공모|정부지원|창업지원|예비창업|초기창업|액셀러레이터|TIPS|팁스)/i.test(t) || (/(IR|투자\s*유치|데모데이)/.test(t) && !ACTION.test(t))) return 'grant';
     if (/(릴스|쇼츠|틱톡|유튜브|인스타|브이로그|썸네일|업로드|게시물|피드)/.test(t) && /(올리|찍|만들|편집|콘텐츠|아이디어|기획)/.test(t) && !isDeadline(t)) return 'sns';
     if ((/\d+(\.\d+)?\s*(시간|분)/.test(t) && /(했음|했다|했어|했고|함$|완료|끝냄|작업|공부|집중)/.test(t) && !w.time) || /작업\s*(했|함|기록)/.test(t)) return 'timelog';
-    if ((w.time || w.date) && /(회의|미팅|약속|만나|만남|수업|면접|발표|전시|촬영|병원|저녁|점심|콜|통화|줌|zoom|meet|일정|스케줄|행사|세미나|오픈|마감식|파티|회식|생일|여행|공연|콘서트|(?<!업)데이트|식사|모임|스터디|레슨|강의|워크숍|휴가|설명회|간담회|관람|방문|상담|진료|치과|인터뷰)/i.test(t) && !(isDeadline(t) && ACTION.test(t))) return 'event';
+    if ((w.time || w.date) && /(회의|미팅|약속|만나|만남|수업|면접|발표|전시|촬영|병원|저녁|점심|콜|통화|줌|zoom|meet|일정|스케줄|행사|세미나|오픈|마감식|파티|회식|생일|여행|공연|콘서트|(?<!업)데이트|식사|모임|스터디|레슨|강의|워크숍|휴가|설명회|간담회|관람|방문|상담|진료|치과|인터뷰|구경|팝업|나들이|답사|견학|투어|페어|박람회)/i.test(t) && !(isDeadline(t) && ACTION.test(t))) return 'event';
     if (w.time && !ACTION.test(t)) return 'event';
     if (/(회의|미팅|약속|만나|수업|면접|발표|행사|세미나|전시)/.test(t) && w.date) return 'event';
     if (IDEA.test(t) || /(떠올|생각났|영감)/.test(t)) return 'idea';

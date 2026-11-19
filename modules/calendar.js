@@ -7,7 +7,7 @@ import * as LB from '../js/labels.js';
 import * as G from '../js/gcal.js';
 import * as SC from '../js/scope.js';
 const evColor = e => LB.colorOf(e.label) || e.color || colorFor((e.title || '').replace(/^◆ /, ''));
-let labF = '', scopeF = 'mine';
+let labF = '', scopeF = 'mine', peopleF = [];
 
 let mode = matchMedia('(max-width:900px)').matches ? 'agenda' : 'month', cursor = new Date();
 export default {
@@ -34,26 +34,49 @@ export default {
       const sc = e => SC.of(e, { team });
       // 내 일정 = 개인 일정 + 내가 낀 팀 업무 / 팀 업무 = 팀 전체 업무 일정
       const pass = e => scopeF === 'all' ? true : scopeF === 'work' ? sc(e) === 'work' : scopeF === 'personal' ? sc(e) === 'personal' : (sc(e) === 'personal' || SC.involves(e, me));
-      const events = (await db.list('events')).filter(pass).map(e => ({ ...e, _sc: sc(e) }));
-      const tasks = (await db.list('tasks')).filter(t => t.due && !t.done).filter(t => scopeF === 'all' ? true : scopeF === 'work' ? sc(t) === 'work' : scopeF === 'personal' ? sc(t) === 'personal' : (sc(t) === 'personal' || !t.who || SC.involves({ who: t.who, by: t.by }, me)));
+      // 사람: 나 + 팀원. 일정의 주인 = 만든 사람과 '누구랑'에 적힌 팀원 ('팀 전체'면 모두)
+      const members = [me || '나', ...team]; const short = n => /^[가-힣]{3,4}$/.test(n) ? n.slice(1) : n;
+      const owners = x => { const ppl = [x.who, x.attendees].filter(Boolean).join(' '); if (/팀\s*전체|전원|모두/.test(ppl)) return members; const o = new Set([x.by || members[0]]); for (const m of members) if (ppl.includes(m) || ppl.includes(short(m))) o.add(m); return [...o]; };
+      const passP = x => !peopleF.length || owners(x).some(o => peopleF.includes(o));
+      const events = (await db.list('events')).filter(pass).filter(passP).map(e => ({ ...e, _sc: sc(e) }));
+      const tasks = (await db.list('tasks')).filter(t => t.due && !t.done).filter(t => scopeF === 'all' ? true : scopeF === 'work' ? sc(t) === 'work' : scopeF === 'personal' ? sc(t) === 'personal' : (sc(t) === 'personal' || !t.who || SC.involves({ who: t.who, by: t.by }, me))).filter(t => !peopleF.length || peopleF.some(n => (t.who || t.by || members[0]).includes(short(n))));
       const nav = h('div.row.between', { style: { marginBottom: '12px' } },
         h('div.row', h('button.btn.icon.ghost', { 'aria-label': '이전', onclick: () => move(-1) }, ic('left')), h('h2', { style: { minWidth: '150px', textAlign: 'center' } }, title()), h('button.btn.icon.ghost', { 'aria-label': '다음', onclick: () => move(1) }, ic('right')), h('button.btn.sm', { onclick: () => { cursor = new Date(); draw(); } }, '오늘')),
-        seg([['month', '월'], ['week', '주'], ['agenda', '목록']], mode, v => { mode = v; draw(); }));
+        seg([['month', '월'], ['week', '주'], ['agenda', '목록'], ['people', '사람별']], mode, v => { mode = v; draw(); }));
+      if (members.length > 1) body.append(h('div.chips.cal-people', h('span.faint.tiny', '사람'), ...members.map(n => h('button.chip' + (peopleF.includes(n) ? '.acc' : ''), { onclick: () => { peopleF = peopleF.includes(n) ? peopleF.filter(x => x !== n) : [...peopleF, n]; draw(); } }, h('span.avatar.xs', { style: { background: colorFor(n) } }, n[0]), n === me ? n + ' (나)' : n)), peopleF.length ? h('button.chip', { onclick: () => { peopleF = []; draw(); } }, '모두 보기') : null));
       body.append(nav, h('div.row.between', { style: { marginBottom: '10px', gap: '8px', flexWrap: 'wrap' } }, seg([['mine', '내 일정'], ['work', '팀 업무'], ['personal', '개인만'], ['all', '전체']], scopeF, v => { scopeF = v; draw(); }), h('span.faint.tiny', { mine: '개인 일정과 내가 낀 팀 업무를 같이 봐요', work: '팀 전체가 보는 업무 일정이에요', personal: '나만 보는 일정이에요', all: '개인과 팀 업무 전부예요' }[scopeF])), h('div.labels', { style: { marginBottom: '10px' } }, [{ id: '', name: '전체', color: 'var(--line2)' }, ...LB.all()].map(l => h('button.lab' + (labF === l.id ? '.on' : ''), { style: { '--lc': l.color }, onclick: () => { labF = l.id; draw(); } }, h('i'), l.name))));
       const on = d => events.filter(e => (!labF || e.label === labF) && (e.date === d || store.repeatsOn(e, d))).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
       if (mode === 'month') body.append(month(on, tasks));
       else if (mode === 'week') body.append(week(on));
+      else if (mode === 'people') body.append(await byPeople(on, tasks, members, owners, short));
       else body.append(agenda(on, tasks));
     }
     function title() {
       if (mode === 'month') return `${cursor.getFullYear()}년 ${cursor.getMonth() + 1}월`;
-      if (mode === 'week') { const s = startOfWeek(cursor); return `${s.getMonth() + 1}/${s.getDate()} – ${addDays(s, 6).getMonth() + 1}/${addDays(s, 6).getDate()}`; }
+      if (mode === 'week' || mode === 'people') { const s = startOfWeek(cursor); return `${s.getMonth() + 1}/${s.getDate()} – ${addDays(s, 6).getMonth() + 1}/${addDays(s, 6).getDate()}`; }
       return `${cursor.getMonth() + 1}월 ${cursor.getDate()}일부터`;
     }
     function move(n) {
+      if (mode === 'people') { cursor = addDays(cursor, n * 7); return draw(); }
       if (mode === 'month') cursor = new Date(cursor.getFullYear(), cursor.getMonth() + n, 1);
       else cursor = addDays(cursor, n * (mode === 'week' ? 7 : 14));
       draw();
+    }
+    // 사람별: 이번 주를 사람마다 접었다 폈다 하며 봄 (접은 상태는 기억)
+    async function byPeople(on, tasks, members, owners, short) {
+      const s = startOfWeek(cursor); const days = [...Array(7)].map((_, i) => ymd(addDays(s, i))); const fold = await db.kvGet('cal:fold', {});
+      const wrap = h('div.stack');
+      for (const n of members.filter(m => !peopleF.length || peopleF.includes(m))) {
+        const evs = days.flatMap(d => on(d).filter(e => owners(e).includes(n)).map(e => ({ ...e, _d: d })));
+        const tks = tasks.filter(t => days.includes(t.due) && (t.who ? t.who.includes(short(n)) : (t.by || members[0]) === n));
+        const open = fold[n] !== true;
+        const bodyEl = h('div.pp-body', days.map(d => { const de = evs.filter(e => e._d === d), dt = tks.filter(t => t.due === d); if (!de.length && !dt.length) return null; return h('div.pp-day', h('div.pp-d' + (d === todayStr() ? '.today' : ''), fmtDate(d)), h('div.list', de.map(e => evRow(e)), dt.map(t => h('div.li', ic('check2', 16), h('div.grow', h('div.small', t.title), h('div.faint.tiny', '마감' + (t.handoffs?.length ? ' · ' + t.handoffs[t.handoffs.length - 1].from + '에게서 넘겨받음' : '')))))));
+        }), !evs.length && !tks.length ? h('div.faint.small', { style: { padding: '4px 2px 10px' } }, '이번 주에 잡힌 게 없어요') : null);
+        const head = h('button.pp-h', { 'aria-expanded': String(open), onclick: async () => { const now = head.getAttribute('aria-expanded') !== 'true'; head.setAttribute('aria-expanded', String(now)); sec.classList.toggle('open', now); const f = await db.kvGet('cal:fold', {}); f[n] = !now; await db.kvSet('cal:fold', f); } },
+          h('span.avatar', { style: { background: colorFor(n) } }, n[0]), h('b.grow', n), h('span.chip', `일정 ${evs.length}`), h('span.chip', `할 일 ${tks.length}`), ic('down', 14));
+        const sec = h('div.card.pp' + (open ? '.open' : ''), head, h('div.pp-wrap', bodyEl)); wrap.append(sec);
+      }
+      return wrap;
     }
     function month(on, tasks) {
       const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -122,7 +145,7 @@ export default {
     }
     function edit(e = {}) {
       modal(e.id ? '일정 고치기' : '새 일정', close => {
-        const f = form(FIELDS.event, e, async v => { await db.put('events', { ...e, ...v }); close(); draw(); });
+        const f = form(FIELDS.event, e, async v => { const ch = await store.changedSince(e); if (ch && !await confirmBox(`창을 연 사이에 ${ch.cur.by && ch.cur.by !== e.by ? ch.cur.by + ' 님이' : '다른 곳에서'} 이 일정을 고쳤어요. 내 내용으로 저장할까요?`, '내 내용으로 저장')) return; await db.put('events', { ...(ch ? ch.cur : e), ...v }); close(); draw(); });
         if (e.id && e.date) f.querySelector('.modal-f').prepend(h('a.btn.ghost', { href: G.addUrl(e), target: '_blank', rel: 'noopener', title: '구글 캘린더에 이 일정을 넣어요 (구글 알림이 울려요)' }, ic('calendar', 14), '구글에 추가'));
         if (e.id) f.querySelector('.modal-f').prepend(h('button.btn.danger', { type: 'button', onclick: async () => { if (await confirmBox('이 일정을 지울까요?', '지우기')) { await db.remove(e.id); close(); draw(); } } }, ic('trash', 14), '지우기'));
         return f;
