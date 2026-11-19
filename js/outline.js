@@ -28,6 +28,9 @@ const josa = s => s.replace(/(을|를|이|가|은|는|도|만|의|에|에서|으
 // 말끝을 정리해 "~하기 / ~ 정리" 같은 짧은 항목으로
 export function act(s) {
   let t = s.trim().replace(/[.!?~]+$/, ''); let did = false;
+  // "지원할 수 있으니까 알아보자" → "지원 가능 여부 알아보기"
+  t = t.replace(/(\S+?)할\s*수\s*있(으니까?|는지|을지|나|을까|다니까|대서|다고\s*하니까?)\s*/, '$1 가능 여부 ').replace(/(\S+?)(이|가)?\s*되는지\s*/, '$1 되는지 ');
+  if (/(알아|찾아|살펴|물어|확인해|정리해|비교해|만들어|가|써|해)\s*보자$/.test(t)) { t = t.replace(/\s*보자$/, '보기').replace(/(알아|찾아|살펴|물어|가|써)보기$/, '$1보기'); return fin(t, true); }
   t = t.replace(/\s*(할|될)?\s*(듯|것\s*같(아요?|다|음)?)$/, '').replace(/야\s*(겠\S*|지|함|해요?|한다|돼요?|됨|해|하는데|되는데|할|될)$/, '야');
   if (/야$/.test(t) && t.length > 2) {
     did = true;
@@ -39,10 +42,28 @@ export function act(s) {
     if (m && m.index > 0) { t = t.slice(0, m.index).replace(/(으로|로)$/, ''); did = true; }
     else t = t.replace(/(겠다|겠어요?|같아요?|같다|이에요|예요|입니다|이야|임)$/, '');
   }
+  // "매주 올리자" → "매주 올리기"
+  if (!did && /\s\S*[가-힣]자$/.test(t) && !/(의자|과자|상자|글자|숫자|남자|여자|문자|피자|투자|이자|그림자|기자|환자|부자|제자|모자|감자|한자|액자|소비자|담당자|참석자|작성자|사용자|관리자)$/.test(t)) { t = t.replace(/자$/, '기'); did = true; }
+  return fin(t, did);
+}
+function fin(t, did) {
   if (/(있는|없는|하는|되는|받는|쓰는|보는|가는|오는|주는)$/.test(t)) t += ' 것';
   // "우선순위를 정리" → "우선순위 정리" (단, "받을 수 있는"의 '을'은 그대로)
   t = t.split(/\s+/).map((w, i, a) => i < a.length - 1 && a[i + 1] !== '수' && w.length > 2 ? w.replace(/(을|를)$/, '') : w).join(' ').replace(/\s+/g, ' ').trim();
   return { text: t.length > 24 ? t.slice(0, 23) + '…' : t, todo: did };
+}
+
+// "충주시랑 서울시에 지원할 수 있으니까 알아보자" → 충주시, 서울시 각각에 같은 항목
+const LINK = '(?:이랑|랑|하고|와|과|,|및)';
+const ENUM = new RegExp(`^((?:[^\\s,]{2,10}?${LINK}\\s*){1,4})([^\\s,]{2,10}?)(에서|에는|에도|에|은|는|을|를|도|이|가|한테|쪽은?|둘\\s*다)\\s+(.+)$`);
+function spread(c) {
+  const t = (' ' + c + ' ').replace(FILL, ' ').replace(/\s+/g, ' ').trim(); let m = t.match(ENUM), items;
+  if (m) items = [...m[1].split(new RegExp(`${LINK}\\s*`)).map(x => x.trim()).filter(Boolean), m[2]];
+  else if ((m = t.match(/^(\S{2,10})\s+(\S{2,10})\s+()(?:둘|모두|전부)\s*다?\s+(.+)$/))) items = [m[1], m[2]];
+  else return null;
+  if (items.some(x => PRON.test(x) || /^(오늘|내일|모레|이번|다음|\d)/.test(x) || /(하|되|있|없)$/.test(x))) return null;
+  const rest = (' ' + m[4] + ' ').replace(FILL, ' ').replace(/\s+/g, ' ').trim();
+  return items.map(topic => ({ topic, point: rest ? act(rest) : null }));
 }
 
 function clause(c) {
@@ -50,7 +71,7 @@ function clause(c) {
   let m;
   if ((m = c.match(/^([^\s].{0,18}?)\s*(?:[-–—>:：\/]|→)\s*(.{1,30})$/)) && !/^\d/.test(m[2])) return { topic: m[1].trim(), point: act(m[2]) };
   if ((m = c.match(/^(.{1,16}?)(?:에\s*(?:관한|대한|관해서?|대해서?)|\s*관련(?:해서|된|해)?|\s*쪽은?|\s*건은?|\s*같은\s*경우는?)\s+(.+)$/))) return { topic: josa(m[1].trim()), point: act(m[2]) };
-  if ((m = c.match(ANNOUNCE)) && !/(을|를|은|는|로|한테|에게)\s/.test(m[1]) && m[1].trim().split(/\s+/).length <= 3 && (m[2] || m[1].trim().split(/\s+/).length <= 2)) { const tp = josa(m[1].trim().replace(/\s*(회의|미팅|얘기|이야기|논의)$/, '')); if (tp.length >= 2 && !PRON.test(tp) && !/^(할\s*일|오늘|내일|이번\s*주)$/.test(tp)) return { topic: tp, point: null, announce: true }; }
+  if ((m = c.match(ANNOUNCE)) && !/(을|를|은|는|로|한테|에게|랑|와|과|하고)(\s|$)|오늘|내일|모레|이번|다음/.test(m[1]) && m[1].trim().split(/\s+/).length <= 3 && (m[2] || m[1].trim().split(/\s+/).length <= 2)) { const tp = josa(m[1].trim().replace(/\s*(회의|미팅|얘기|이야기|논의)$/, '')); if (tp.length >= 2 && !PRON.test(tp) && !/^(할\s*일|오늘|내일|이번\s*주)$/.test(tp)) return { topic: tp, point: null, announce: true }; }
   if ((m = c.match(/^(.{1,16}?)(은|는)\s+(.+)$/)) && !PRON.test(m[1]) && !/[을를]|\S(하|되|있|없|받|보|가|오|주|쓰)$/.test(m[1]) && m[1].split(/\s+/).length <= 3) return { topic: m[1].trim(), point: act(m[3]) };
   if ((m = c.match(/^(.{1,20}?)(을|를)\s+(?!수\s)(.+)$/)) && !PRON.test(m[1]) && m[1].split(/\s+/).length <= 4) return { topic: m[1].trim(), point: act(m[3]) };
   const words = c.split(/\s+/);
@@ -62,14 +83,18 @@ function clause(c) {
 // → [{ topic, points: [{ text, label }], hints: [] }]
 export function structure(text) {
   const groups = []; let last = null;
-  for (const raw of String(text).split(SPLIT).map(s => s && s.trim()).filter(Boolean).slice(0, 8)) {
-    const r = clause(raw); if (!r) continue;
+  const parts = []; for (const sen of String(text).split(/[.!?\n]+/).map(x => x.trim()).filter(Boolean)) { if (spread(sen)) parts.push(sen); else parts.push(...sen.split(SPLIT).map(x => x && x.trim()).filter(Boolean)); }
+  for (const raw of parts.slice(0, 8)) {
+    const many = spread(raw);
+    for (const r of many || [clause(raw)]) { if (!r) continue;
     const label = /급하|급해|당장|빨리|오늘\s*까지|오늘\s*안/.test(raw) ? 'urgent' : /결정|확정|하기로|으로\s*가자/.test(raw) ? 'important' : /\?|할까|어떨까|고민|문제/.test(raw) ? 'idea' : '';
     let g = r.topic ? groups.find(x => x.topic === r.topic) : last;
     if (!g) { if (!r.topic) { g = { topic: '', points: [] }; } else g = { topic: r.topic, points: [] }; groups.push(g); }
-    if (r.point && r.point.text && r.point.text !== g.topic && !g.points.some(p => p.text === r.point.text)) g.points.push({ text: r.point.text, label, todo: r.point.todo });
+    // "스티커랑 엽서"처럼 나열된 항목은 따로따로
+    const pm = r.point && r.point.text.match(/^([^\s]{2,10}?)(?:이랑|랑|와|과|하고)\s*([^\s]{2,10})$/);
+    for (const pt of !r.point ? [] : pm ? [{ ...r.point, text: pm[1] }, { ...r.point, text: pm[2] }] : [r.point]) if (pt.text && pt.text !== g.topic && !g.points.some(p => p.text === pt.text)) g.points.push({ text: pt.text, label, todo: pt.todo && !pm });
     if (r.announce) g.full = true;
-    last = g;
+    last = g; }
   }
   for (const g of groups) if (g.full) { const hs = hintsFor(g.topic); g.set = (hs.length ? hs : GENERIC).filter(hn => !g.points.some(p => p.text === hn)); }
   for (const g of groups) g.hints = g.topic ? hintsFor(g.topic).filter(hn => !g.points.some(p => p.text.includes(hn.split(' ')[0]))).slice(0, 3) : [];
