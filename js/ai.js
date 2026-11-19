@@ -50,23 +50,27 @@ export function fromHtml(html, url) {
 }
 
 // ── Gemini (무료 키) ──
-async function model(key) {
-  const saved = await db.kvGet('ai:model', ''); if (saved) return saved;
-  let pick = 'gemini-2.5-flash';
-  try { const j = await (await timed(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(key)}`, {}, 8000)).json();
-    const ms = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent') && /flash/.test(m.name) && !/image|tts|audio|live|embed|preview|exp/.test(m.name)).map(m => m.name.replace('models/', ''));
+// 모델 고르기: 가볍고 빠른 "lite" 별칭을 먼저 쓰고(무료 등급에서 가장 잘 돌아감), 막히거나 느리면 다음 후보로 넘어감. 되는 걸 기억해 둠
+const FALLBACK = ['gemini-flash-lite-latest', 'gemini-flash-latest'];
+async function candidates(key) {
+  const saved = await db.kvGet('ai:model', ''); let listed = [];
+  if (!saved) { try { const j = await (await timed(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(key)}`, {}, 8000)).json();
+    const ms = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent') && /^models\/gemini-[\d.]+-flash(-lite)?$/.test(m.name)).map(m => m.name.replace('models/', ''));
     const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0);
-    ms.sort((a, b) => ver(b) - ver(a) || (/lite/.test(a) ? 1 : 0) - (/lite/.test(b) ? 1 : 0)); if (ms[0]) pick = ms[0];
-  } catch { }
-  await db.kvSet('ai:model', pick); return pick;
+    listed = ms.sort((a, b) => (/lite/.test(b) ? 1 : 0) - (/lite/.test(a) ? 1 : 0) || ver(b) - ver(a)).slice(0, 3); } catch { } }
+  return [...new Set([saved, ...FALLBACK, ...listed].filter(Boolean))];
 }
 export async function ask(prompt, { json = false, ms = 25000 } = {}) {
   const key = await db.kvGet(KEY, ''); if (!key) throw new Error('AI 키가 없어요');
-  const call = async m => timed(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, ...(json ? { responseMimeType: 'application/json' } : {}) } }) }, ms);
-  let r = await call(await model(key));
-  if (r.status === 404) { await db.kvSet('ai:model', ''); r = await call(await model(key)); } // 모델 이름이 바뀌었으면 다시 고름
-  if (r.status === 429) throw new Error('무료 사용량을 잠깐 넘었어요. 조금 뒤에 다시 해 주세요');
-  if (!r.ok) throw new Error(r.status === 400 || r.status === 403 ? 'AI 키를 확인해 주세요' : 'AI가 답하지 못했어요 (' + r.status + ')');
+  const call = (m, t) => timed(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, ...(json ? { responseMimeType: 'application/json' } : {}) } }) }, t);
+  const list = await candidates(key); let r = null, last = '';
+  for (const [i, m] of list.entries()) {
+    try { r = await call(m, i < list.length - 1 ? Math.min(ms, 14000) : ms); } catch { last = '응답이 너무 늦어요'; r = null; continue; } // 늦으면 다음 후보
+    if (r.ok) { if ((await db.kvGet('ai:model', '')) !== m) await db.kvSet('ai:model', m); break; }
+    last = r.status === 429 ? '무료 사용량을 잠깐 넘었어요. 조금 뒤에 다시 해 주세요' : r.status === 400 || r.status === 403 ? 'AI 키를 확인해 주세요' : 'AI가 답하지 못했어요 (' + r.status + ')';
+    if (r.status === 400 || r.status === 403) break; r = null;
+  }
+  if (!r || !r.ok) { await db.kvSet('ai:model', ''); throw new Error(last || 'AI가 답하지 못했어요'); }
   const out = ((await r.json()).candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
   if (!json) return out;
   try { return JSON.parse(out.replace(/^```(?:json)?\s*|\s*```$/g, '')); } catch { throw new Error('AI 답을 읽지 못했어요'); }

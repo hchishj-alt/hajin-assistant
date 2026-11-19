@@ -134,7 +134,7 @@ export default {
     function evRow(e) {
       return h('div.li.click', { onclick: () => edit(e) }, h('span.dot', { style: { background: evColor(e) } }),
         h('div.mono.small', { style: { width: '92px' } }, e.start ? `${e.start}${e.end ? '–' + e.end : ''}` : '종일'),
-        h('div.grow', h('div.t.small', e.title), e.place || e.who ? h('div.faint.tiny', [e.place, e.who && e.who + '와 함께'].filter(Boolean).join(' · ')) : null), h('span.chip.tiny' + (e._sc === 'personal' ? '' : '.acc'), SC.LABEL[e._sc || 'work']), e.repeat ? ic('refresh', 14) : null);
+        h('div.grow', h('div.t.small', e.title), e.place || e.who ? h('div.faint.tiny', [e.place, e.who && (w => w + (((w.charCodeAt(w.length - 1) - 0xAC00) % 28) > 0 && /[가-힣]$/.test(w) ? '과' : '와') + ' 함께')(e.who)].filter(Boolean).join(' · ')) : null), h('span.chip.tiny' + (e._sc === 'personal' ? '' : '.acc'), SC.LABEL[e._sc || 'work']), e.repeat ? ic('refresh', 14) : null);
     }
     async function dayModal(ds, on) {
       const slots = await store.freeSlots(ds);

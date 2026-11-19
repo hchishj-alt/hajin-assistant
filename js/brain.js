@@ -172,7 +172,7 @@ export function sentences(text) {
 
 // ── 키워드 ───────────────────────────────────────────────────
 export function keywords(text, k = 8, corpus = null) {
-  const toks = tokens(text);
+  const toks = tokens(text).filter(w => !/^\d/.test(w) && !/(이다|였다|했다|한다|된다|있다|없다)$/.test(w)); // 숫자·서술어 조각은 열쇠말이 아님
   if (!toks.length) return [];
   const tf = new Map();
   toks.forEach((w, i) => {
