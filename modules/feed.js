@@ -3,6 +3,7 @@ import { h, ic, clear, toast, modal, seg, confirmBox, download, pickFile, todayS
 import * as db from '../js/db.js';
 
 // 플랫폼별 규격. ratios: [이름, 가로, 세로]. 'orig'는 사진 비율 그대로
+const URLS = { instagram: 'https://www.instagram.com/', x: 'https://x.com/', youtube: 'https://www.youtube.com/@', tiktok: 'https://www.tiktok.com/@' };
 export const PLATFORMS = {
   instagram: { name: '인스타그램', max: 2200, tags: 30, ratios: [['4:5', 1080, 1350], ['3:4', 1080, 1440], ['1:1', 1080, 1080], ['1.91:1', 1080, 566], ['9:16', 1080, 1920]], grids: ['3:4', '1:1'] },
   x: { name: 'X (트위터)', max: 280, weighted: true, tags: 3, ratios: [['16:9', 1600, 900], ['1:1', 1200, 1200], ['3:4', 1200, 1600], ['orig', 0, 0]] },
@@ -79,6 +80,8 @@ export async function feedView(redraw) {
   };
   const bar = h('div.fd-bar',
     h('button.btn.sm.pri', { onclick: () => openPost({ acct: acct.id, status: '초안', imgs: [], caption: '', order: (posts[0]?.order || 0) + 1 }) }, ic('plus', 14), '새 게시글'),
+    h('button.btn.sm', { title: '이미 올린 게시물을 캡처·저장한 사진으로 한꺼번에 넣어요 (최신 것부터 고르기)', onclick: async () => { const fs = await pickFile('image/*', true); if (!fs?.length) return; let o = Math.min(0, ...posts.map(x => x.order || 0)); let n = 0; for (const f of fs) { try { await db.put('posts', { acct: acct.id, status: '게시', imgs: [{ ...(await ingest(f)), ratio: P.ratios[0][0] }], caption: '', order: --o }); n++; } catch { } } toast(`지금 피드 ${n}장을 가져왔어요. 그 위에 새 게시글을 놓아 보세요`); redraw(); } }, ic('download', 14), '내 피드 가져오기'),
+    acct.handle && URLS[acct.platform] ? h('a.btn.sm.ghost', { href: URLS[acct.platform] + acct.handle.replace(/^@/, ''), target: '_blank', rel: 'noopener' }, ic('link', 14), '실제 계정 열기') : null,
     posts.length > 1 ? h('button.btn.sm' + (swap ? '.pri' : ''), { onclick: () => { swap = !swap; picked = ''; redraw(); }, title: '하나를 누르고, 옮길 자리를 누르면 순서가 바뀌어요' }, ic('grid', 14), swap ? '순서 바꾸기 끝' : '순서 바꾸기') : null,
     P.grids ? seg(P.grids.map(g => [g, '격자 ' + g]), acct.grid || P.grids[0], async v => { await db.patch(acct.id, { grid: v }); redraw(); }) : null,
     h('span.faint.tiny', `초안 ${posts.filter(p => p.status !== '게시').length} · 게시 ${posts.filter(p => p.status === '게시').length}`));
