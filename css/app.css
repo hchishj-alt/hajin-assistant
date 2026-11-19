@@ -706,3 +706,4 @@ a.buy-t:hover{text-decoration:underline}
 .dev-lims{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
 .dev-l{padding:12px;border-radius:calc(12px*var(--rd,1));background:var(--bg2)}.dev-l b{font-size:calc(13px*var(--fs,1))}
 .dev-l p{margin:5px 0 0;font-size:calc(12px*var(--fs,1));line-height:1.5;opacity:.7}.dev-l p.alt{opacity:1;display:flex;gap:6px;align-items:flex-start}.dev-l p.alt .ic{color:#1fae84;flex:none;margin-top:2px}
+.clip-acts{flex-basis:100%;order:9;gap:4px;padding-left:56px;flex-wrap:wrap}.clip-acts .btn{background:var(--bg2)}

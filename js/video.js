@@ -116,7 +116,7 @@ export function totalDuration(clips, c) {
 }
 export const clipLen = k => k.type === 'image' ? (k.dur || 3) : Math.max(.3, (k.out ?? k.el.duration ?? 0) - (k.in || 0));
 
-export function createPlayer(canvas, clips, concept, subs, { logo = null, music = null, musicVol = .35, onTime, onEnd, record = false } = {}) {
+export function createPlayer(canvas, clips, concept, subs, { logo = null, music = null, musicVol = .35, sfx = [], onTime, onEnd, record = false } = {}) {
   const [W, H] = RATIOS[concept.ratio] || RATIOS['9:16'];
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -126,7 +126,7 @@ export function createPlayer(canvas, clips, concept, subs, { logo = null, music 
   function audioSetup() {
     ac = new (window.AudioContext || window.webkitAudioContext)();
     dest = ac.createMediaStreamDestination();
-    for (const k of clips) if (k.type === 'video' && !nodes.has(k.el)) { try { const n = ac.createMediaElementSource(k.el); n.connect(dest); if (!record) n.connect(ac.destination); nodes.set(k.el, n); } catch { } }
+    for (const k of clips) if (k.type === 'video' && !nodes.has(k.el)) { try { const n = ac.createMediaElementSource(k.el); const g = ac.createGain(); g.gain.value = k.vol ?? 1; n.connect(g); g.connect(dest); if (!record) g.connect(ac.destination); nodes.set(k.el, n); } catch { } }
     if (music) { try { const n = ac.createMediaElementSource(music); const g = ac.createGain(); g.gain.value = musicVol; n.connect(g); g.connect(dest); if (!record) g.connect(ac.destination); } catch { } }
   }
   async function startClip(i) {
@@ -174,6 +174,7 @@ export function createPlayer(canvas, clips, concept, subs, { logo = null, music 
       }
       if (music) { music.currentTime = 0; music.loop = true; try { await music.play(); } catch { } }
       t0 = performance.now(); stopped = false;
+      for (const x of sfx) { try { const b = ac.createBufferSource(); b.buffer = sfxBuffer(ac, x.kind); const g = ac.createGain(); g.gain.value = x.vol ?? .8; b.connect(g); g.connect(dest); if (!record) g.connect(ac.destination); b.start(ac.currentTime + Math.max(0, x.t || 0)); } catch { } }
       await startClip(0);
       raf = requestAnimationFrame(frame);
     },
@@ -252,4 +253,43 @@ export function distributeSubs(text, total, startAt = 0) {
 export function toSrt(subs) {
   const f = s => { const ms = Math.round(s * 1000); const hh = Math.floor(ms / 3600000), mm = Math.floor(ms % 3600000 / 60000), ss = Math.floor(ms % 60000 / 1000), r = ms % 1000; return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')},${String(r).padStart(3, '0')}`; };
   return subs.map((s, i) => `${i + 1}\n${f(s.start)} --> ${f(s.end)}\n${s.text}\n`).join('\n');
+}
+
+// 효과음: 소리 파일 없이 앱이 직접 만들어 내는 소리라 저작권 걱정이 없음
+export const SFX = { pop: '뿅', ding: '딩', whoosh: '휙', click: '딸깍', boom: '쿵', rise: '올라가는 소리', sparkle: '반짝' };
+const bufCache = new Map();
+export function sfxBuffer(ac, kind) {
+  const key = kind + ac.sampleRate; if (bufCache.has(key)) return bufCache.get(key);
+  const sr = ac.sampleRate, len = { pop: .14, ding: .9, whoosh: .5, click: .04, boom: .7, rise: .6, sparkle: .7 }[kind] || .2;
+  const b = ac.createBuffer(1, Math.ceil(sr * len), sr), d = b.getChannelData(0); let ph = 0, lp = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / sr, u = t / len; let f = 440, v = 0;
+    if (kind === 'pop') { f = 620 * Math.pow(.28, u); ph += 2 * Math.PI * f / sr; v = Math.sin(ph) * Math.exp(-u * 5); }
+    else if (kind === 'ding') v = (Math.sin(2 * Math.PI * 1320 * t) + .5 * Math.sin(2 * Math.PI * 1980 * t) + .25 * Math.sin(2 * Math.PI * 2640 * t)) / 1.75 * Math.exp(-t * 5);
+    else if (kind === 'whoosh') { lp += ((Math.random() * 2 - 1) - lp) * (.04 + .25 * Math.sin(Math.PI * u)); v = lp * 2.2 * Math.pow(Math.sin(Math.PI * u), 2); }
+    else if (kind === 'click') v = (Math.random() * 2 - 1) * Math.exp(-u * 6);
+    else if (kind === 'boom') { f = 95 * Math.pow(.4, u); ph += 2 * Math.PI * f / sr; v = Math.sin(ph) * Math.exp(-u * 3.2); }
+    else if (kind === 'rise') { f = 300 * Math.pow(4, u); ph += 2 * Math.PI * f / sr; v = Math.sin(ph) * Math.sin(Math.PI * u) * .8; }
+    else if (kind === 'sparkle') { const n = Math.floor(u * 6); f = [1568, 2093, 2637, 3136, 2637, 3520][n] || 2093; v = Math.sin(2 * Math.PI * f * t) * Math.exp(-((u * 6) % 1) * 4) * .7 * (1 - u * .5); }
+    d[i] = Math.max(-1, Math.min(1, v));
+  }
+  bufCache.set(key, b); return b;
+}
+let demoAc = null;
+export function playSfx(kind, vol = .8) { demoAc = demoAc || new (window.AudioContext || window.webkitAudioContext)(); const b = demoAc.createBufferSource(); b.buffer = sfxBuffer(demoAc, kind); const g = demoAc.createGain(); g.gain.value = vol; b.connect(g); g.connect(demoAc.destination); b.start(); }
+
+// 자동 컷 나누기: 화면이 확 바뀌는 곳을 찾음. 0.4초마다 작은 그림으로 줄여 밝기 차이를 봄
+export async function detectCuts(el, from = 0, to = el.duration, onProgress) {
+  const cv = document.createElement('canvas'); cv.width = 32; cv.height = 18; const c = cv.getContext('2d', { willReadFrequently: true });
+  const step = Math.max(.25, Math.min(.5, (to - from) / 240)); let prev = null; const diffs = [];
+  for (let t = from; t < to - .05; t += step) {
+    await seek(el, t); c.drawImage(el, 0, 0, 32, 18); const px = c.getImageData(0, 0, 32, 18).data; const cur = new Float32Array(576);
+    for (let i = 0; i < 576; i++) cur[i] = .3 * px[i * 4] + .59 * px[i * 4 + 1] + .11 * px[i * 4 + 2];
+    if (prev) { let s = 0; for (let i = 0; i < 576; i++) s += Math.abs(cur[i] - prev[i]); diffs.push({ t, d: s / 576 }); }
+    prev = cur; onProgress && onProgress((t - from) / (to - from));
+  }
+  if (!diffs.length) return [];
+  const mean = diffs.reduce((a, x) => a + x.d, 0) / diffs.length; const th = Math.max(22, mean * 3);
+  const cuts = []; for (const x of diffs) if (x.d > th && (!cuts.length || x.t - cuts[cuts.length - 1] > 1)) cuts.push(+(x.t - step / 2).toFixed(2));
+  return cuts.filter(t => t - from > .6 && to - t > .6);
 }

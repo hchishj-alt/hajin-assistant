@@ -119,11 +119,13 @@ async function editor(root, id) {
   let clips = [];
   for (const k of p.clips || []) { const b = await db.getBlob(k.key); if (b) clips.push(await loadClip(b, k)); }
   let subs = p.subs || [];
+  let sfx = p.sfx || [], musicVol = p.musicVol ?? .35;
+  const sfxList = h('div.stack');
   let musicEl = p.musicKey ? Object.assign(new Audio(URL.createObjectURL(await db.getBlob(p.musicKey))), { preload: 'auto' }) : null;
   let logo = concept.logoKey ? await blobImg(await db.getBlob(concept.logoKey)) : null;
   let player = null;
 
-  const save = debounce(async () => { await db.patch(id, { title: titleIn.value, conceptId: concept.id || null, clips: clips.map(k => ({ key: k.key, type: k.type, in: k.in, out: k.out, dur: k.dur })), subs }); }, 500);
+  const save = debounce(async () => { await db.patch(id, { title: titleIn.value, conceptId: concept.id || null, clips: clips.map(k => ({ key: k.key, type: k.type, in: k.in, out: k.out, dur: k.dur, vol: k.vol })), subs, sfx, musicVol }); }, 500);
   const titleIn = h('input.in', { value: p.title, style: { fontSize: '20px', fontWeight: 700, border: 0, background: 'transparent', padding: '2px 0' }, oninput: save });
   const canvas = h('canvas', { style: { width: '100%', maxHeight: '68vh', objectFit: 'contain', background: '#000', borderRadius: '14px', display: 'block' } });
   const timeEl = h('span.mono.small', '0:00 / 0:00');
@@ -139,14 +141,14 @@ async function editor(root, id) {
   playBtn.onclick = () => {
     if (player) { player.close(); player = null; playBtn.innerHTML = ''; playBtn.append(ic('play', 16), '미리보기'); still(); return; }
     if (!clips.length) { toast('영상이나 사진을 먼저 넣어 주세요'); return; }
-    player = V.createPlayer(canvas, clips, concept, subs, { logo, music: musicEl, onTime: (t, T) => (timeEl.textContent = `${fmt(t)} / ${fmt(T)}`), onEnd: () => { player = null; playBtn.innerHTML = ''; playBtn.append(ic('play', 16), '미리보기'); } });
+    player = V.createPlayer(canvas, clips, concept, subs, { logo, music: musicEl, musicVol, sfx, onTime: (t, T) => (timeEl.textContent = `${fmt(t)} / ${fmt(T)}`), onEnd: () => { player = null; playBtn.innerHTML = ''; playBtn.append(ic('play', 16), '미리보기'); } });
     player.play(); playBtn.innerHTML = ''; playBtn.append(ic('stop', 16), '멈춤');
   };
   exportBtn.onclick = async () => {
     if (!clips.length) { toast('클립이 없어요'); return; }
     if (player) player.close();
     busy(exportBtn, true, '만드는 중 (실시간으로 녹화돼요)');
-    player = V.createPlayer(canvas, clips, concept, subs, { logo, music: musicEl, record: true, onTime: (t, T) => (timeEl.textContent = `● ${fmt(t)} / ${fmt(T)}`), onEnd: async blob => {
+    player = V.createPlayer(canvas, clips, concept, subs, { logo, music: musicEl, musicVol, sfx, record: true, onTime: (t, T) => (timeEl.textContent = `● ${fmt(t)} / ${fmt(T)}`), onEnd: async blob => {
       player = null; busy(exportBtn, false);
       if (!blob) return;
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
@@ -169,16 +171,52 @@ async function editor(root, id) {
     clear(clipList);
     if (!clips.length) clipList.append(h('div.faint.small', '아직 클립이 없어요'));
     clips.forEach((k, i) => {
-      const thumb = k.type === 'image' ? h('img', { src: k.el.src }) : h('video', { src: k.el.src, muted: true, preload: 'metadata' });
+      const thumb = k.type === 'image' ? h('img', { src: k.el.src }) : h('video', { src: k.el.src.split('#')[0] + '#t=' + ((k.in || 0) + .1).toFixed(2), muted: true, preload: 'metadata' });
       Object.assign(thumb.style, { width: '48px', height: '64px', objectFit: 'cover', borderRadius: '8px', background: 'var(--bg2)', flex: 'none' });
       const num = (v, f, step = .1) => { const i2 = h('input.in', { type: 'number', step, value: v, style: { width: '72px', padding: '4px 6px' }, onchange: () => { f(+i2.value); save(); } }); return i2; };
-      clipList.append(h('div.li', { style: { gap: '8px' } }, thumb,
+      clipList.append(h('div.li', { style: { gap: '8px', flexWrap: 'wrap' } }, thumb,
         h('div.grow', h('div.small', { style: { fontWeight: 600 } }, `${i + 1}. ${k.type === 'video' ? '영상' : '사진'} · ${V.clipLen(k).toFixed(1)}초`),
           k.type === 'video' ? h('div.row', { style: { gap: '4px', marginTop: '4px' } }, h('span.tiny.faint', '시작'), num(k.in || 0, v => (k.in = Math.max(0, v))), h('span.tiny.faint', '끝'), num(+(k.out ?? k.el.duration).toFixed(1), v => (k.out = Math.min(k.el.duration, v)))) : h('div.row', { style: { gap: '4px', marginTop: '4px' } }, h('span.tiny.faint', '길이'), num(k.dur || 3, v => (k.dur = Math.max(.5, v)), .5))),
+        k.type === 'video' ? h('div.row.clip-acts',
+          h('button.btn.sm.ghost', { title: '원하는 곳에서 둘로 나눠요', onclick: () => splitUI(i) }, ic('minus', 12), '나누기'),
+          h('button.btn.sm.ghost', { title: '장면이 바뀌는 곳을 찾아 알아서 나눠요', onclick: e => autoCut(i, e.currentTarget) }, '자동 컷'),
+          h('button.btn.sm.ghost', { title: '이 클립 소리 켜기/끄기', onclick: () => { k.vol = (k.vol ?? 1) ? 0 : 1; save(); drawClips(); } }, (k.vol ?? 1) ? '소리 켬' : '소리 끔')) : null,
         h('div.stack', { style: { gap: '2px' } }, h('button.btn.sm.ghost', { 'aria-label': '위로', disabled: !i, onclick: () => { [clips[i - 1], clips[i]] = [clips[i], clips[i - 1]]; save(); drawClips(); } }, '↑'), h('button.btn.sm.ghost', { 'aria-label': '빼기', onclick: () => { clips.splice(i, 1); save(); drawClips(); still(); } }, ic('x', 12)))));
     });
     const T = V.totalDuration(clips, concept);
     timeEl.textContent = `0:00 / ${fmt(T)}`;
+  }
+  // 컷 편집: 한 클립을 원하는 곳에서 둘로
+  async function cutAt(i, times) {
+    const k = clips[i]; const a = k.in || 0, b = k.out ?? k.el.duration; const ts = [a, ...times.filter(t => t > a + .2 && t < b - .2).sort((x, y) => x - y), b];
+    if (ts.length < 3) return 0;
+    const blob = await db.getBlob(k.key); const parts = [];
+    for (let n = 0; n < ts.length - 1; n++) parts.push(await loadClip(blob, { key: k.key, type: 'video', in: +ts[n].toFixed(2), out: +ts[n + 1].toFixed(2), vol: k.vol }));
+    clips.splice(i, 1, ...parts); save(); drawClips(); return parts.length;
+  }
+  function splitUI(i) {
+    const k = clips[i]; const a = k.in || 0, b = k.out ?? k.el.duration;
+    modal('클립 나누기', close => {
+      const cv = h('canvas', { style: { width: '100%', maxHeight: '46vh', objectFit: 'contain', background: '#000', borderRadius: '12px', display: 'block' } });
+      const lab = h('span.mono.small'); const r = h('input', { type: 'range', min: a, max: b, step: .05, value: ((a + b) / 2).toFixed(2), style: { width: '100%' }, 'aria-label': '나눌 곳' });
+      const show = async () => { await V.seek(k.el, +r.value); const [W, H] = V.RATIOS[concept.ratio] || V.RATIOS['9:16']; cv.width = W / 2; cv.height = H / 2; const g = cv.getContext('2d'); g.scale(.5, .5); V.drawFrame(g, k.el, W, H, concept); lab.textContent = `${(+r.value - a).toFixed(1)}초 지점 · 앞 ${(+r.value - a).toFixed(1)}초 / 뒤 ${(b - +r.value).toFixed(1)}초`; };
+      r.oninput = debounce(show, 60); show();
+      return h('div', cv, h('div', { style: { margin: '10px 0 4px' } }, r), lab, h('div.modal-f', h('button.btn.pri', { onclick: async () => { const n = await cutAt(i, [+r.value]); close(); toast(n ? '둘로 나눴어요. 필요 없는 쪽은 빼면 돼요' : '너무 끝이라 나눌 수 없어요'); } }, '여기서 나누기')));
+    });
+  }
+  async function autoCut(i, btn) {
+    const k = clips[i]; busy(btn, true, '찾는 중');
+    try { const cuts = await V.detectCuts(k.el, k.in || 0, k.out ?? k.el.duration); const n = await cutAt(i, cuts); toast(n ? `장면 ${n}개로 나눴어요` : '장면이 바뀌는 곳을 못 찾았어요'); } catch (e) { toast('자동 컷 실패: ' + e.message); }
+    busy(btn, false);
+  }
+  function drawSfx() {
+    clear(sfxList);
+    sfx.sort((x, y) => x.t - y.t).forEach((x, i) => {
+      const t = h('input.in', { type: 'number', step: .1, min: 0, value: x.t, style: { width: '72px', padding: '5px' }, 'aria-label': '시간(초)', onchange: () => { x.t = Math.max(0, +t.value); save(); } });
+      const sel = h('select.in', { style: { padding: '5px 8px' }, 'aria-label': '효과음', onchange: () => { x.kind = sel.value; save(); V.playSfx(x.kind); } }, Object.entries(V.SFX).map(([k, n]) => h('option', { value: k, selected: k === x.kind }, n)));
+      sfxList.append(h('div.row.nowrap', { style: { gap: '4px' } }, t, h('span.tiny.faint', '초'), sel, h('button.btn.sm.ghost', { 'aria-label': '들어보기', onclick: () => V.playSfx(x.kind) }, ic('play', 12)), h('button.btn.sm.ghost', { 'aria-label': '지우기', onclick: () => { sfx.splice(i, 1); save(); drawSfx(); } }, ic('x', 12))));
+    });
+    if (!sfx.length) sfxList.append(h('div.faint.small', '효과음은 앱이 직접 만드는 소리라 저작권 걱정이 없어요'));
   }
   function drawSubs() {
     clear(subList);
@@ -271,10 +309,15 @@ async function editor(root, id) {
         h('div.card', h('div.card-h', h('h3', ic('palette'), '콘셉트')), conceptSel),
         h('div.card', h('div.card-h', h('h3', ic('film'), '클립'), h('label.btn.sm', ic('music', 14), musicEl ? '배경음 바꾸기' : '배경음', h('input', { type: 'file', accept: 'audio/*', style: { display: 'none' }, onchange: async e => { const f = e.target.files[0]; if (!f) return; await db.patch(id, { musicKey: await db.putBlob(f) }); musicEl = new Audio(URL.createObjectURL(f)); toast('배경음 넣었어요'); } }))),
           dropzone(h('span', ic('upload'), ' 영상·사진 끌어놓기 / 눌러서 고르기'), 'video/*,image/*', addFiles), h('div', { style: { height: '8px' } }), clipList),
+        h('div.card', h('div.card-h', h('h3', ic('music'), '소리'), h('button.btn.sm', { onclick: () => { let t = 0; for (const k of clips) { t += V.clipLen(k); } sfx.push({ t: sfx.length ? +(Math.min(Math.max(0, t - .5), (sfx[sfx.length - 1].t || 0) + 2)).toFixed(1) : 0, kind: 'pop', vol: .8 }); save(); drawSfx(); } }, ic('plus', 14), '효과음')),
+          h('div.row', { style: { gap: '8px', marginBottom: '8px' } }, h('span.small', '배경음 크기'), h('input', { type: 'range', min: 0, max: 1, step: .05, value: musicVol, style: { flex: 1 }, 'aria-label': '배경음 크기', oninput: e => { musicVol = +e.target.value; save(); } })),
+          h('button.btn.sm.ghost', { style: { marginBottom: '8px' }, title: '컷이 바뀌는 곳마다 효과음을 놓아요', onclick: () => { let t = 0; const add = []; clips.slice(0, -1).forEach(k => { t += V.clipLen(k); add.push({ t: +t.toFixed(1), kind: 'whoosh', vol: .6 }); }); if (!add.length) return toast('클립이 두 개 이상일 때 쓸 수 있어요'); sfx = [...sfx.filter(x => !add.some(a => Math.abs(a.t - x.t) < .2)), ...add]; save(); drawSfx(); toast(`컷 ${add.length}곳에 효과음을 놓았어요`); } }, ic('sparkles', 14), '컷마다 자동으로 놓기'),
+          sfxList,
+          h('p.faint.tiny', { style: { marginTop: '10px' } }, '무료 배경음은 여기서 받아 넣어요: ', h('a', { href: 'https://www.youtube.com/audiolibrary', target: '_blank', rel: 'noopener' }, '유튜브 오디오 보관함'), ' · ', h('a', { href: 'https://pixabay.com/music/', target: '_blank', rel: 'noopener' }, 'Pixabay Music'), ' · ', h('a', { href: 'https://gongu.copyright.or.kr/gongu/bbs/B0000011/list.do?menuNo=200020', target: '_blank', rel: 'noopener' }, '공유마당'))),
         h('div.card', h('div.card-h', h('h3', ic('type'), '자막'), h('div.row', autoSubBtn, h('button.btn.sm', { onclick: () => { const T = V.totalDuration(clips, concept) || 10; subs = V.distributeSubs(script.value, T, concept.intro ? 2.2 : 0); save(); drawSubs(); } }, '대본 → 자막'), h('button.btn.sm.ghost', { onclick: () => download(`${titleIn.value}.srt`, V.toSrt(subs), 'text/plain') }, 'SRT'))), script, h('div', { style: { height: '8px' } }), subList),
         h('div.card', h('div.card-h', h('h3', ic('image'), '썸네일'), h('button.btn.sm', { onclick: thumbs }, ic('sparkles', 14), '장면 고르기')), thumbBox),
         h('div.card', h('div.card-h', h('h3', ic('hash'), '캡션·해시태그'), h('button.btn.sm', { onclick: caption }, ic('sparkles', 14), '만들기')), capBox))));
-  drawClips(); drawSubs(); still();
+  drawClips(); drawSubs(); drawSfx(); still();
   return () => { player && player.close(); };
 }
 async function loadClip(blob, k) {
