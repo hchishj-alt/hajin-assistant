@@ -336,3 +336,17 @@ button.chip:active{transform:scale(.94)}
   .masonry{columns:2;column-gap:10px}
   .ref{margin-bottom:10px;border-radius:14px}
 }
+
+/* ── 랭킹 ── */
+.rank{display:flex;gap:12px;align-items:flex-start;padding:12px 4px;border-top:1px solid var(--line)}
+.rank:first-of-type{border-top:0}
+.rank-n{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-weight:750;font-size:14px;background:var(--bg2);color:var(--ink2);flex:none;font-variant-numeric:tabular-nums}
+.rank-n.top{background:var(--acc);color:#fff}
+.rank-t{display:block;font-weight:650;font-size:14.5px;line-height:1.45;letter-spacing:-.012em;color:var(--ink);text-decoration:none}
+.rank-t:hover{color:var(--acc);text-decoration:underline;text-underline-offset:3px}
+.rank-s{font-size:22px;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums;min-width:38px;text-align:right;color:var(--ink)}
+.rank-a{display:flex;gap:0;flex:none;margin-top:-4px}
+a.li{text-decoration:none;color:inherit}
+.btn.icon.on{color:var(--warn)}
+.btn.icon.on svg{fill:currentColor}
+@media (max-width:900px){.rank{flex-wrap:wrap}.rank-a{flex-direction:row;margin-left:42px}.rank-s{font-size:18px}}

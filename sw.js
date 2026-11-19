@@ -3,7 +3,7 @@ const VERSION = '1.0.0';
 const CACHE = 'hajin-' + VERSION;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png',
   'js/app.js', 'js/ui.js', 'js/db.js', 'js/icons.js', 'js/brain.js', 'js/store.js', 'js/fields.js', 'js/draftcard.js', 'js/query.js', 'js/voice.js', 'js/video.js', 'js/ext.js', 'js/seed.js', 'js/selftest.js', 'js/version.js', 'js/sync.js', 'js/config.js', 'js/figma-api.js', 'js/linkpreview.js', 'js/vendor-supabase.js',
-  ...['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'studio', 'figma', 'archive', 'people', 'team', 'money', 'startup', 'settings', 'health', 'menu'].map(m => `modules/${m}.js`)];
+  ...['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'studio', 'figma', 'archive', 'radar', 'people', 'team', 'money', 'startup', 'settings', 'health', 'menu'].map(m => `modules/${m}.js`)];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => { })))));
 });
@@ -21,6 +21,8 @@ self.addEventListener('fetch', e => {
   if (url.origin === location.origin) {
     e.respondWith((async () => {
       const c = await caches.open(CACHE);
+      // 매일 바뀌는 자료(data/)는 새 것 먼저, 인터넷 없으면 받아 둔 것
+      if (url.pathname.includes('/data/')) { try { const r = await fetch(e.request, { cache: 'no-store' }); if (r.ok) c.put(e.request, r.clone()); return r; } catch { return (await c.match(e.request, { ignoreSearch: true })) || Response.error(); } }
       const hit = await c.match(e.request, { ignoreSearch: true });
       if (hit) return hit;
       try { const r = await fetch(e.request); if (r.ok) c.put(e.request, r.clone()); return r; }

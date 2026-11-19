@@ -18,6 +18,7 @@ export const MODULES = [
   { id: 'people', title: '인맥 · 연락처', icon: 'users', group: '사람', short: '인맥' },
   { id: 'team', title: '팀 · 일정 조율', icon: 'grid', group: '사람', short: '팀' },
   { id: 'money', title: '비용 처리', icon: 'wallet', group: '회사', short: '비용' },
+  { id: 'radar', title: '지원사업 · 정보 랭킹', icon: 'trend', group: '회사', short: '랭킹' },
   { id: 'startup', title: '스타트업 PM', icon: 'rocket', group: '회사', short: '스타트업' },
   { id: 'settings', title: '설정', icon: 'sliders', group: '시스템' },
   { id: 'health', title: '자가 점검', icon: 'shield', group: '시스템' },
