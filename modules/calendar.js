@@ -4,6 +4,7 @@ import * as store from '../js/store.js';
 import * as brain from '../js/brain.js';
 import { FIELDS } from '../js/fields.js';
 import * as LB from '../js/labels.js';
+import * as G from '../js/gcal.js';
 const evColor = e => LB.colorOf(e.label) || e.color || colorFor((e.title || '').replace(/^◆ /, ''));
 let labF = '';
 
@@ -21,7 +22,7 @@ export default {
     });
     root.append(head('캘린더', null,
       h('button.btn.sm.ghost', { onclick: importIcs, title: '구글·애플 캘린더에서 내보낸 .ics 파일 가져오기' }, ic('upload', 14), '.ics 가져오기'),
-      h('button.btn.sm.ghost', { onclick: exportIcs }, ic('download', 14), '내보내기'),
+      h('button.btn.sm.ghost', { onclick: gcalModal, title: '구글 캘린더에서 알림 받기' }, ic('calendar', 14), '구글 캘린더'),
       h('button.btn.sm.pri', { onclick: () => edit({ date: ymd(cursor) }) }, ic('plus', 14), '일정')),
       h('div.quick', { style: { marginBottom: '14px' } }, ic('zap'), quick), body);
     await draw();
@@ -117,24 +118,32 @@ export default {
     function edit(e = {}) {
       modal(e.id ? '일정 고치기' : '새 일정', close => {
         const f = form(FIELDS.event, e, async v => { await db.put('events', { ...e, ...v }); close(); draw(); });
+        if (e.id && e.date) f.querySelector('.modal-f').prepend(h('a.btn.ghost', { href: G.addUrl(e), target: '_blank', rel: 'noopener', title: '구글 캘린더에 이 일정을 넣어요 (구글 알림이 울려요)' }, ic('calendar', 14), '구글에 추가'));
         if (e.id) f.querySelector('.modal-f').prepend(h('button.btn.danger', { type: 'button', onclick: async () => { if (await confirmBox('이 일정을 지울까요?', '지우기')) { await db.remove(e.id); close(); draw(); } } }, ic('trash', 14), '지우기'));
         return f;
       });
     }
-    async function exportIcs() {
-      const evs = await db.list('events');
-      const dt = (d, t) => d.replace(/-/g, '') + (t ? 'T' + t.replace(':', '') + '00' : '');
-      const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//hajin-assistant//KO'];
-      for (const e of evs) {
-        lines.push('BEGIN:VEVENT', 'UID:' + e.id + '@hajin', 'SUMMARY:' + e.title.replace(/[,;]/g, '\\$&'));
-        if (e.start) { lines.push('DTSTART:' + dt(e.date, e.start), 'DTEND:' + dt(e.date, e.end || store.addMins(e.start, 60))); }
-        else { lines.push('DTSTART;VALUE=DATE:' + dt(e.date), 'DTEND;VALUE=DATE:' + dt(ymd(addDays(new Date(e.date), 1)))); }
-        if (e.place) lines.push('LOCATION:' + e.place);
-        if (e.repeat) lines.push('RRULE:FREQ=' + ({ daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY', weekdays: 'WEEKLY;BYDAY=MO,TU,WE,TH,FR' })[e.repeat]);
-        lines.push('END:VEVENT');
-      }
-      lines.push('END:VCALENDAR');
-      download('hajin-calendar.ics', lines.join('\r\n'), 'text/calendar');
+    async function exportIcs() { download('hajin-calendar.ics', await G.ics(), 'text/calendar'); }
+    async function gcalModal() {
+      modal('구글 캘린더 연동', close => {
+        const box = h('div.gcal');
+        const paint = async () => {
+          const st = await G.state(); clear(box);
+          box.append(h('p.small.faint', '구글 캘린더가 내 일정을 가져가서, 폰의 구글 캘린더 알림으로 울리게 해요. 구글 로그인이나 비용은 필요 없어요.'));
+          const sw = h('button.switch' + (st.on ? '.on' : ''), { role: 'switch', 'aria-checked': String(!!st.on), 'aria-label': '구독 주소 켜기', onclick: async () => { sw.disabled = true; try { if (st.on) await G.off(); else await G.publish(true); } catch (e) { toast(e.message); } paint(); } });
+          box.append(h('div.gcal-row', h('div.grow', h('b', '자동 연동 (구독)'), h('div.faint.tiny', st.on ? `마지막으로 보낸 때 ${fmtDate(st.at, { time: true })}. 일정을 고치면 알아서 다시 보내요.` : '한 번만 연결해 두면 새 일정도 알아서 넘어가요.')), sw));
+          if (st.on) {
+            const inp = h('input.in', { readOnly: true, value: st.url, 'aria-label': '구독 주소', onfocus: e => e.target.select() });
+            box.append(h('div.gcal-url', inp, h('button.btn.sm', { onclick: async () => { try { await navigator.clipboard.writeText(st.url); toast('주소를 복사했어요'); } catch { inp.select(); } } }, ic('copy', 14), '복사')),
+              h('a.btn.pri', { href: G.subscribeUrl(st.url), target: '_blank', rel: 'noopener', style: { marginTop: '8px' } }, ic('calendar', 14), '구글 캘린더에 연결하기'),
+              h('label.gcal-row', { style: { marginTop: '10px' } }, h('span.grow.small', '마감 있는 할 일도 함께 보내기'), h('input', { type: 'checkbox', checked: st.tasks !== false, onchange: async e => { await db.kvSet('gcal', { ...st, tasks: e.target.checked }); await G.publish().catch(x => toast(x.message)); paint(); } })),
+              h('ul.gcal-note', h('li', '구글이 이 주소를 다시 읽는 간격은 구글이 정해요. 보통 몇 시간, 길면 하루예요.'), h('li', '알림 시간은 구글 캘린더에서 이 캘린더의 "일정 알림"을 한 번 정해 두면 모든 일정에 적용돼요.'), h('li', '주소를 아는 사람은 일정을 볼 수 있어요. 끄면 주소가 사라져요.')));
+          }
+          box.append(h('div.gcal-row', { style: { marginTop: '14px' } }, h('div.grow', h('b', '급한 일정은 바로 넣기'), h('div.faint.tiny', '일정을 열고 "구글에 추가"를 누르면 그 일정만 바로 들어가요.'))),
+            h('div.row', { style: { marginTop: '10px', gap: '8px', flexWrap: 'wrap' } }, h('button.btn.sm.ghost', { onclick: exportIcs }, ic('download', 14), '파일로 내보내기 (.ics)'), h('button.btn.sm.ghost', { onclick: () => { close(); importIcs(); } }, ic('upload', 14), '구글 일정 가져오기')));
+        };
+        paint(); return box;
+      });
     }
     async function importIcs() {
       const f = await pickFile('.ics,text/calendar'); if (!f) return;

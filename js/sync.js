@@ -367,3 +367,13 @@ export async function dmRead(otherId) {
   for (const d of (await db.list('dms')).filter(d => !d.mine && d.other === otherId && !d.readAt)) await db.putRaw({ ...d, readAt: now });
   try { await client.from('dms').update({ read_at: now }).eq('to_member', my).eq('from_member', otherId).is('read_at', null); } catch { }
 }
+
+// 구글 캘린더 구독용 일정 파일(.ics). 주소에 긴 무작위 값이 들어가서 주소를 아는 사람만 볼 수 있음
+export async function publishCal(text, key) {
+  if (!session || !client) return null;
+  key = key || `${session.user.id}/${crypto.randomUUID().replace(/-/g, '')}.ics`;
+  const { error } = await client.storage.from('cal').upload(key, new Blob([text], { type: 'text/calendar' }), { contentType: 'text/calendar; charset=utf-8', cacheControl: '300', upsert: true });
+  if (error) throw new Error('일정 파일을 올리지 못했어요: ' + error.message);
+  return { key, url: client.storage.from('cal').getPublicUrl(key).data.publicUrl };
+}
+export async function removeCal(key) { if (session && client) await client.storage.from('cal').remove([key]); }

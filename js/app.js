@@ -197,6 +197,7 @@ async function boot() {
   window.addEventListener('hashchange', render);
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
   db.onChange(col => { if (col === 'drafts') updateBadge(); });
+  import('./gcal.js').then(g => g.watch());
   await render();
   updateBadge();
   db.persist();

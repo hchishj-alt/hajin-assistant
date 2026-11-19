@@ -261,3 +261,17 @@ create policy dms_mark on public.dms for update to authenticated
 do $$ begin
   begin alter publication supabase_realtime add table public.dms; exception when duplicate_object then null; end;
 end $$;
+
+-- ─────────────────────────────────────────────
+-- 9) 구글 캘린더 구독용 일정 파일 (.ics). 본인 폴더에만 올리고 고칠 수 있음
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('cal', 'cal', true, 1048576, array['text/calendar'])
+  on conflict (id) do nothing;
+drop policy if exists cal_insert on storage.objects;
+create policy cal_insert on storage.objects for insert to authenticated with check (bucket_id = 'cal' and public.is_active() and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists cal_update on storage.objects;
+create policy cal_update on storage.objects for update to authenticated using (bucket_id = 'cal' and owner = auth.uid()) with check (bucket_id = 'cal' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists cal_select on storage.objects;
+create policy cal_select on storage.objects for select to authenticated using (bucket_id = 'cal' and owner = auth.uid());
+drop policy if exists cal_delete on storage.objects;
+create policy cal_delete on storage.objects for delete to authenticated using (bucket_id = 'cal' and owner = auth.uid());
