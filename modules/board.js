@@ -61,6 +61,7 @@ async function canvas(root, id) {
   const world = h('div.mm-world'); const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'mm-lines'); world.append(svg);
   const stage = h('div.mm-stage', world);
   const tools = h('div.mm-tools.hide');
+  tools.addEventListener('pointerdown', e => { if (document.activeElement?.isContentEditable) e.preventDefault(); }); // 글 고치는 중에 도구를 눌러도 편집이 안 끊기게
   const chatList = h('div.mm-chat-list'); const chatIn = h('input', { placeholder: '말하거나 적어요', 'aria-label': '대화 입력' });
   const live = h('div.mm-live.hide');
   const peersEl = h('div.mm-peers');
@@ -129,7 +130,7 @@ async function canvas(root, id) {
       if (p) paths += `<path d="${elbow(p.x + nodeW(p), p.y + 20, n.x, n.y + 20)}"/>`;
       const lc = LB.colorOf(n.label);
       const peer = [...peers.entries()].find(([, v]) => v.sel === n.id);
-      const el = h('div.mm-n' + (n.root ? '.root' : '') + (sel === n.id ? '.sel' : '') + (lc ? '.lab' : ''), { 'data-id': n.id, style: { left: n.x + 'px', top: n.y + 'px', '--lc': lc || 'transparent', outline: peer ? `2px solid ${colorFor(peer[0])}` : '' }, title: n.by ? `${n.by} · ${rel((n.updatedAt || '').slice(0, 10))}` : '' },
+      const el = h('div.mm-n' + (n.root ? '.root' : '') + (sel === n.id ? '.sel' : '') + (lc ? '.lab' : '') + (n.hint ? '.hint' : '') + (n.todo ? '.todo' : ''), { 'data-id': n.id, style: { left: n.x + 'px', top: n.y + 'px', '--lc': lc || 'transparent', outline: peer ? `2px solid ${colorFor(peer[0])}` : '' }, title: n.by ? `${n.by} · ${rel((n.updatedAt || '').slice(0, 10))}` : '' },
         lc ? h('i.mm-dot') : null, h('span.mm-t', n.text || '새 노드'),
         n.note || n.hasAudio ? h('button.mm-note', { 'aria-label': '음성 설명 보기', onclick: e => { e.stopPropagation(); showNote(n.id); } }, ic('mic', 12)) : null,
         peer ? h('span.mm-peer', { style: { background: colorFor(peer[0]) } }, peer[0]) : null);
@@ -155,6 +156,12 @@ async function canvas(root, id) {
     view.k = Math.max(.35, Math.min(1.1, Math.min(W / (x1 - x0), H / (y1 - y0))));
     view.x = (W - (x1 - x0) * view.k) / 2 - x0 * view.k; view.y = (H - (y1 - y0) * view.k) / 2 - y0 * view.k + 10; applyView();
   }
+  // 색은 글을 고치는 중에도 바로 보이게 (전체를 다시 그리지 않고 그 노드만)
+  function paintLabel(nid) {
+    const n = nodes.get(nid), el = world.querySelector(`.mm-n[data-id="${nid}"]`); if (!n || !el) return;
+    const lc = LB.colorOf(n.label); el.classList.toggle('lab', !!lc); el.style.setProperty('--lc', lc || 'transparent');
+    const dot = el.querySelector('.mm-dot'); if (lc && !dot) el.prepend(h('i.mm-dot')); if (!lc && dot) dot.remove();
+  }
   function placeTools() {
     const n = nodes.get(sel); if (!n) { tools.classList.add('hide'); return; }
     const el = world.querySelector(`.mm-n[data-id="${n.id}"]`); if (!el) return;
@@ -163,7 +170,7 @@ async function canvas(root, id) {
       n.root ? null : h('button', { title: '옆 노드 (Enter)', onclick: () => addChild(n.parent, n) }, ic('plus', 15), '옆'),
       h('button', { title: '글 고치기', 'aria-label': '글 고치기', onclick: () => edit(n.id) }, ic('edit', 15)),
       h('button', { title: '음성으로 설명 달기', 'aria-label': '음성 설명', onclick: () => recordNote(n.id) }, ic('mic', 15)),
-      h('span.mm-colors', [{ id: '', color: 'var(--line2)', name: '색 없음' }, ...LB.all()].map(l => h('button.c' + ((n.label || '') === l.id ? '.on' : ''), { title: l.name, 'aria-label': l.name, style: { background: l.color }, onclick: async () => { await save(n, { label: l.id }); draw(); } }))),
+      h('span.mm-colors', [{ id: '', color: 'var(--line2)', name: '색 없음' }, ...LB.all()].map(l => h('button.c' + ((n.label || '') === l.id ? '.on' : ''), { title: l.name, 'aria-label': l.name, style: { background: l.color }, onclick: async () => { const cur = nodes.get(n.id) || n; await save(cur, { label: l.id }); paintLabel(n.id); placeTools(); } }))),
       n.root ? null : h('button.danger', { title: '지우기 (Delete)', 'aria-label': '지우기', onclick: () => removeNode(n.id) }, ic('trash', 15)));
     tools.classList.remove('hide');
     const r = el.getBoundingClientRect(), w = wrap.getBoundingClientRect();
@@ -171,7 +178,7 @@ async function canvas(root, id) {
     tools.style.left = Math.max(8, Math.min(stage.clientWidth - tw - 8, r.left - w.left + r.width / 2 - tw / 2)) + 'px';
     tools.style.top = Math.max(8, r.top - w.top - 52) + 'px';
   }
-  function select(nid) { sel = nid; world.querySelectorAll('.mm-n').forEach(e => e.classList.toggle('sel', e.dataset.id === nid)); placeTools(); hi(); }
+  function select(nid) { sel = nid; { const hn = nodes.get(nid); if (hn?.hint) save(hn, { hint: false }).then(() => world.querySelector(`.mm-n[data-id="${nid}"]`)?.classList.remove('hint')); } world.querySelectorAll('.mm-n').forEach(e => e.classList.toggle('sel', e.dataset.id === nid)); placeTools(); hi(); }
 
   // ── 편집 ──
   function freeY(parent, x) { const ks = kids(parent.id); let y = ks.length ? Math.max(...ks.map(k => k.y)) + GAPY : parent.y; const hit = () => [...nodes.values()].some(n => Math.abs(n.x - x) < NW && Math.abs(n.y - y) < GAPY - 8); let guard = 0; while (hit() && guard++ < 200) y += GAPY; return y; }
@@ -189,7 +196,7 @@ async function canvas(root, id) {
   function edit(nid) {
     const el = world.querySelector(`.mm-n[data-id="${nid}"] .mm-t`); const n0 = nodes.get(nid); if (!el || !n0) return; const n = n0;
     el.contentEditable = 'true'; el.focus(); document.getSelection().selectAllChildren(el);
-    const done = async () => { el.contentEditable = 'false'; el.removeEventListener('blur', done); const t = el.textContent.trim().slice(0, 120); const n = nodes.get(nid) || n0; pendingDraw = false; if (!t && !n.root && !kids(nid).length) return removeNode(nid, true); if (t !== n.text) await save(n, { text: t || n.text || '새 노드' }); draw(); };
+    const done = async () => { el.contentEditable = 'false'; el.removeEventListener('blur', done); const t = el.textContent.trim().slice(0, 120); const n = nodes.get(nid) || n0; pendingDraw = false; if (!t && !n.root && !kids(nid).length && !n.label && !n.note) return removeNode(nid, true); if (t !== n.text) await save(n, { text: t || n.text || '새 노드' }); draw(); };
     el.addEventListener('blur', done);
     el.onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); el.blur(); } if (e.key === 'Escape') { el.textContent = n.text; el.blur(); } e.stopPropagation(); };
   }
@@ -244,29 +251,34 @@ async function canvas(root, id) {
   // ── 대화 (글·음성) → 기록, 켜져 있으면 노드로 ──
   async function sendChat(text = chatIn.value, origin = 'text') {
     text = String(text).trim(); if (!text) return; if (origin === 'text') chatIn.value = '';
+    { const lastM = msgs[msgs.length - 1]; if (lastM && lastM.by === myName && lastM.text === text && Date.now() - new Date(lastM.createdAt) < 8000) return; } // 같은 말이 두 번 들어오는 것 막기
     const m = await db.put('bnodes', { board: id, kind: 'msg', text, by: myName, origin, team: board.team }); if (!msgs.some(x => x.id === m.id)) msgs.push(m); room?.send({ t: 'n', item: m });
     if (auto) { const made = await toNodes(text, m.id); if (made.length) { await db.patch(m.id, { nodeIds: made.map(n => n.id) }); m.nodeIds = made.map(n => n.id); } }
     drawChat();
   }
   // 말한 문장을 알맞은 가지에 붙이기: 겹치는 낱말이 많은 노드 아래 → 없으면 방금 붙인 노드 옆 → 고른 노드 → 가운데
   async function toNodes(text, msgId) {
-    const made = [];
-    for (const raw of brain.sentences(text).slice(0, 4)) {
-      const s = raw.replace(/^(그리고|그래서|근데|그런데|일단|아|음|어|그|또|그러면|그럼|저는|제가|나는|내가)\s+/g, '').replace(/(인\s*것\s*같아요?|같아요?|라고\s*생각해요?|하면\s*좋겠어요?|어때요?\??|입니다|이에요|예요|해요|합니다)[.!?]?$/, '').trim();
-      if (s.length < 2) continue;
-      const toks = new Set(brain.tokens(s)); let best = null, bs = 0;
-      for (const n of nodes.values()) { if (n.id === lastAuto?.id) continue; let sc = 0; for (const t of brain.tokens(n.text || '')) if (toks.has(t)) sc += t.length >= 2 ? 1 : .4; if (n.root) sc *= .6; if (sc > bs) { bs = sc; best = n; } }
-      const cont = /^(그리고|또|추가로|거기에|그\s*다음|다음으로)/.test(raw);
-      let parent = bs >= 1 ? best : (lastAuto && nodes.has(lastAuto.id) && Date.now() - lastAuto.at < 25000) ? (cont ? nodes.get(nodes.get(lastAuto.id).parent) || rootNode() : nodes.get(lastAuto.id)) : (nodes.get(sel) || rootNode());
-      if (bs < 1 && !cont && lastAuto && nodes.has(lastAuto.id) && Date.now() - lastAuto.at < 25000) parent = nodes.get(nodes.get(lastAuto.id).parent) || rootNode();
-      const label = /결정|확정|하기로|으로\s*가자/.test(raw) ? 'important' : /\?|할까|어떨까|고민|문제/.test(raw) ? 'idea' : '';
-      const short = s.length > 34 ? s.slice(0, 33) + '…' : s;
-      const n = await addChildQuiet(parent, short, { note: s.length > 34 ? s : '', label, fromMsg: msgId, autoMade: true });
-      lastAuto = { id: n.id, at: Date.now() }; made.push(n);
+    const O = await import('../js/outline.js'); const made = [];
+    const norm = t => (t || '').replace(/\s+/g, '').toLowerCase();
+    const findTopic = t => { const k = norm(t); let hit = [...nodes.values()].find(n => !n.hint && norm(n.text) === k); if (hit) return hit;
+      const toks = new Set(brain.tokens(t)); let best = null, bs = 0; for (const n of nodes.values()) { if (n.hint) continue; let sc = 0; const nt = brain.tokens(n.text || ''); for (const w of nt) if (toks.has(w)) sc += 1; sc = sc / Math.max(1, Math.max(nt.length, toks.size)); if (n.root) sc *= .5; if (sc > bs) { bs = sc; best = n; } } return bs >= .6 ? best : null; };
+    const childOf = (p, t) => [...nodes.values()].find(n => n.parent === p.id && norm(n.text) === norm(t));
+    for (const g of O.structure(text)) {
+      let parent, fresh = false;
+      if (g.topic) { parent = findTopic(g.topic); if (!parent) { parent = await addChildQuiet(rootNode(), g.topic, { fromMsg: msgId, autoMade: true }); made.push(parent); fresh = true; } }
+      else parent = (lastAuto && nodes.has(lastAuto.id) && Date.now() - lastAuto.at < 25000) ? nodes.get(lastAuto.id) : (nodes.get(sel) || rootNode());
+      for (const pt of g.points) { const ex = childOf(parent, pt.text); if (ex) { if (ex.hint) await save(ex, { hint: false }); continue; } made.push(await addChildQuiet(parent, pt.text, { label: pt.label, todo: pt.todo, note: text.length > 40 ? text : '', fromMsg: msgId, autoMade: true })); }
+      // 말하지 않았어도 이 주제에서 보통 챙기는 것들을 흐리게 제안 (누르면 진짜 노드가 됨)
+      // 주제를 꺼낸 말("○○ 회의를 할 거야")이면 기본 가지를 한 번에 깔아 줌
+      for (const hn of g.set || []) if (!childOf(parent, hn)) made.push(await addChildQuiet(parent, hn, { fromMsg: msgId, autoMade: true, preset: true }));
+      if (fresh) for (const hn of g.hints) if (!childOf(parent, hn)) await addChildQuiet(parent, hn, { hint: true, fromMsg: msgId, autoMade: true });
+      lastAuto = { id: parent.id, at: Date.now() };
     }
-    if (made.length) { draw(); const el = world.querySelector(`.mm-n[data-id="${made[made.length - 1].id}"]`); el?.classList.add('pop'); }
+    if (made.length) { draw(); made.forEach(n => world.querySelector(`.mm-n[data-id="${n.id}"]`)?.classList.add('pop')); follow(made[made.length - 1]); }
     return made;
   }
+  // 새로 생긴 노드가 화면 밖이면 그쪽으로 살짝 옮겨 줌
+  function follow(n) { const el = world.querySelector(`.mm-n[data-id="${n.id}"]`); if (!el) return; const r = el.getBoundingClientRect(), s = stage.getBoundingClientRect(); const dx = r.right > s.right - 40 ? s.right - 40 - r.right : r.left < s.left + 20 ? s.left + 20 - r.left : 0, dy = r.bottom > s.bottom - 110 ? s.bottom - 110 - r.bottom : r.top < s.top + 70 ? s.top + 70 - r.top : 0; if (dx || dy) { view.x += dx; view.y += dy; applyView(); } }
   async function addChildQuiet(p, text, extra) { const x = p.x + Math.max(GAPX, nodeW(p) + 60); return save({ board: id, kind: 'node', parent: p.id, x, y: freeY(p, x), text, by: myName, team: board.team, ...extra }, {}); }
   function drawChat() {
     clear(chatList);
@@ -313,7 +325,7 @@ async function canvas(root, id) {
     const r = rootNode(); if (r) walk(r, 0); return lines.join('\n');
   }
   async function summarize() {
-    const ns = [...nodes.values()].filter(n => !n.root);
+    const ns = [...nodes.values()].filter(n => !n.root && !n.hint);
     if (!ns.length && !msgs.length) return toast('노드나 대화가 있어야 정리할 수 있어요');
     const speak = msgs.map(m => m.text).join('. ');
     const pathOf = n => { const p = []; let c = n; while (c && !c.root) { p.unshift(c.text); c = nodes.get(c.parent); } return p.join(' › '); };

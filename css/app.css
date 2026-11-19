@@ -710,3 +710,24 @@ a.buy-t:hover{text-decoration:underline}
 /* 손가락으로 누르는 기기: 작은 칩·선택 상자도 넉넉하게 */
 @media (pointer:coarse){button.chip,a.chip{min-height:36px;padding-top:6px;padding-bottom:6px}#view select{min-height:36px}}
 button.rank-t,button.rd-li{border:0;background:none;color:inherit;font-family:inherit;text-align:left;cursor:pointer;width:100%}button.rank-t{padding:0;width:auto}button.rd-li{font-size:inherit}
+/* 마인드맵: 색 라벨은 테두리로도 보이게, 제안 노드는 흐린 점선, 할 일은 네모 표시 */
+.mm-n.lab{box-shadow:inset 0 0 0 2px var(--lc),0 6px 16px -8px rgba(0,0,0,.18)}
+.mm-n.hint{opacity:.55;background:transparent;box-shadow:none;border:1.5px dashed var(--line2);font-weight:500}.mm-n.hint::after{content:"제안";font-size:10px;font-weight:700;opacity:.7;margin-left:2px}
+.mm-n.todo .mm-t::before{content:"";display:inline-block;width:11px;height:11px;border:1.6px solid currentColor;border-radius:3px;margin-right:7px;opacity:.55;vertical-align:-1px}
+/* 랭킹 비서 위젯 · 취향 학습 */
+.flip{display:inline-grid;transform:scaleY(-1)}
+.rd-learn{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px}
+.rd-learn .chip{cursor:pointer;border:0}
+.rdw-fab{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:40;display:flex;align-items:center;gap:8px;padding:12px 16px;border:0;border-radius:99px;background:var(--acc);color:#fff;font:inherit;font-weight:650;box-shadow:0 8px 24px rgba(0,0,0,.18);cursor:pointer;transition:transform .35s var(--spring)}
+.rdw-fab:hover{transform:translateY(-2px) scale(1.03)}.rdw-fab:active{transform:scale(.96)}
+.rdw{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:41;width:min(360px,calc(100vw - 24px));max-height:min(520px,70vh);display:flex;flex-direction:column;background:var(--card,var(--bg));border:1px solid var(--line);border-radius:calc(18px*var(--rd,1));box-shadow:0 16px 48px rgba(0,0,0,.2);overflow:hidden;animation:rdw-in .35s var(--spring)}
+.rdw[hidden],.rdw-fab[hidden]{display:none}
+@keyframes rdw-in{from{opacity:0;transform:translateY(14px) scale(.96)}}
+.rdw-h{display:flex;align-items:center;justify-content:space-between;padding:10px 10px 10px 14px;border-bottom:1px solid var(--line)}.rdw-h b{display:flex;gap:6px;align-items:center}
+.rdw-log{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:120px}
+.rdw-b{max-width:88%;padding:9px 12px;border-radius:14px;background:var(--bg2);font-size:calc(13.5px*var(--fs,1));line-height:1.55;white-space:pre-wrap;align-self:flex-start}
+.rdw-b.me{align-self:flex-end;background:var(--acc);color:#fff}
+.rdw-log .chips .chip,.rdw-q .chip{cursor:pointer;border:0}
+.rdw-q{padding:0 12px 8px}.rdw-f{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line)}.rdw-f .in{flex:1;min-width:0}
+@media (max-width:900px){.rdw-fab,.rdw{bottom:calc(84px + env(safe-area-inset-bottom));right:12px}}
+button.rank-t{min-height:30px}

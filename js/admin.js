@@ -4,7 +4,7 @@
 // · 팀에 공유된 항목은 누가·언제·무엇을·어떻게 바꿨는지 전부 기록 (관리자 화면에서 봄).
 import * as db from './db.js';
 
-const FREE = new Set(['tasks', 'pollvotes', 'polls', 'leadmarks', 'events', 'audit', 'drafts', '_kv', 'buys', 'boards', 'dms', 'feedback', 'accts', 'posts', 'devreqs']); // 누구나 고칠 수 있는 공유 항목
+const FREE = new Set(['tasks', 'pollvotes', 'polls', 'leadmarks', 'leadfb', 'events', 'audit', 'drafts', '_kv', 'buys', 'boards', 'dms', 'feedback', 'accts', 'posts', 'devreqs']); // 누구나 고칠 수 있는 공유 항목
 const ADMIN_ONLY_COLS = new Set(['teams', 'projects', 'reffolders', 'labelsets']);                                   // 만들기부터 관리자만
 const SKIP = new Set(['updatedAt', 'createdAt', 'dirty', 'id', 'col', 'sharedMembers', 'code', 'space']);
 const BIG = new Set(['snap', 'comments', 'versions', 'history', 'transcript', 'body', 'avail', 'summary', 'summaryDraft', 'pages']);
@@ -46,7 +46,7 @@ async function guard(prev, item) {
   }
   // 공유 → 나만 보기로 바꾸면 팀 공간에서는 빼기 (내 기록은 그대로)
   if (prev?.team && !item.team && me.loggedIn) import('./sync.js').then(s => s.unshare(prev)).catch(() => { });
-  if (!shared || !me.loggedIn || item.col === 'bnodes' || item.col === 'pollvotes' || item.col === 'leadmarks') return;
+  if (!shared || !me.loggedIn || item.col === 'bnodes' || item.col === 'pollvotes' || item.col === 'leadmarks' || item.col === 'leadfb') return;
   const changes = diff(prev, item);
   if (prev && !changes.length) return;
   const action = !prev ? '만듦' : item.deleted && !prev.deleted ? '지움' : changes.length === 1 && changes[0].k === 'done' ? (item.done ? '완료' : '완료 취소') : '고침';

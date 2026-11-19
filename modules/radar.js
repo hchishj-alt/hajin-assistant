@@ -2,13 +2,14 @@
 import { h, ic, clear, toast, head, modal, form, tile, seg, rel, todayStr, debounce } from '../js/ui.js';
 import * as db from '../js/db.js';
 import { go } from '../js/app.js';
+import * as taste from '../js/taste.js';
 
 let tab = 'rank', q = '';
 const TYPE = { grant: ['지원사업', 'target'], news: ['정보', 'book'], community: ['커뮤니티', 'users'], help: ['도움말', 'bulb'] };
 // 우리 회사(친구들끼리 시작한 작은 콘텐츠 기획·제작 외주사)에 맞는 말일수록 점수
 const FIT = [[/콘텐츠|영상|디자인|미디어|크리에이|브랜딩|모션|애니|게임|웹툰|광고|마케팅|홍보|sns|숏폼|유튜브/i, 9], [/예비\s*창업|초기\s*창업|청년|1인|소규모|소기업|스타트업|창업\s*[37]년|신생/, 8], [/지원금|사업화\s*자금|바우처|보조금|무상|최대\s*[\d,.]+\s*(억|천만|백만|만)\s*원/, 7], [/입주|공간|사무실|멘토링|컨설팅|교육|네트워킹|판로|수주|외주|프리랜서|계약|세금|부가세|종합소득|4대\s*보험/, 4], [/모집|공고|접수|신청|공모/, 3]];
 const MISFIT = [/제조|농업|농식품|수산|축산|바이오|반도체|이차전지|조선|건설|수출\s*중견|대기업|상장|원전|방산/, /부고|인사\]|포토\]|주가|증시|속보/];
-export function score(it, marks = {}, base = new Date()) {
+export function score(it, marks = {}, base = new Date(), prof = null, me = '') {
   const text = `${it.title} ${it.desc || ''}`;
   const today = base.toISOString().slice(0, 10);
   let due = it.deadline || '';
@@ -22,11 +23,15 @@ export function score(it, marks = {}, base = new Date()) {
   for (const re of MISFIT) if (re.test(text)) fit -= 12;
   // 지금 신청할 수 있는 공고인지, 이미 끝난 소식인지
   if (it.type === 'grant' && !it.manual) { if (/모집|공고|접수|신청|참가자|지원\s*대상|선착순|참여\s*기업/.test(text)) { fit += 8; why.push('모집 중'); } if (/시상|수상|성료|협약|개최했|마쳤|선정됐|선정했|발표했|마무리|성과\s*공유|수료/.test(text)) fit -= 16; }
+  // 팀이 알려 준 취향 (관심 있어요 / 필요 없어요)
+  const learn = taste.bonus(it, prof); const lk = prof?.links[it.link] || { up: 0, down: 0, by: {} };
+  if (learn.up.length) why.push('팀 관심: ' + learn.up[0]);
   fit = Math.max(0, Math.min(40, Math.round(fit * 1.25)));
+  const tst = learn.delta - lk.down * 12;
   const mk = marks[it.link] || {};
   const stars = Object.keys(mk.stars || {}).length;
-  const pri = Math.min(20, ({ grant: 10, help: 6, community: 5, news: 3 }[it.type] || 3) + stars * 5 + (it.manual ? 4 : 0));
-  return { total: urg + fit + pri, urg: Math.max(0, urg), fit, pri, dday, due, why: [...new Set(why)].slice(0, 4), stars, hidden: !!mk.hidden || urg < 0 };
+  const pri = Math.min(20, ({ grant: 10, help: 6, community: 5, news: 3 }[it.type] || 3) + stars * 5 + lk.up * 3 + (it.manual ? 4 : 0));
+  return { total: urg + fit + pri + tst, tst, urg: Math.max(0, urg), fit, pri, dday, due, why: [...new Set(why)].slice(0, 4), stars, learn, liked: lk.by[me] === 'up', ups: lk.up, hidden: !!mk.hidden || urg < 0 || lk.down >= 2 || lk.by[me] === 'down' };
 }
 
 // 늘 쓰는 곳 (주소가 바뀌지 않는 공식·대표 사이트)
@@ -58,16 +63,17 @@ export default {
     root.append(head('지원사업 · 정보 랭킹', '매일 아침 새 글을 모아서, 우리 회사 기준으로 시급성·유익성·우선순위 점수를 매겨요.',
       h('button.btn.sm.ghost', { onclick: howto }, ic('book', 14), '?'),
       h('button.btn.sm.pri', { onclick: () => add() }, ic('plus', 14), '링크 넣기')), body);
-    const feed = await loadFeed();
+    const feed = await loadFeed(); let curRank = [];
     await draw();
+    widget();
 
     async function draw() {
       clear(body);
       const [leads, markRows, grants] = await Promise.all([db.list('leads'), db.list('leadmarks'), db.list('grants')]);
       const marks = {}; markRows.forEach(m => (marks[m.link] = m));
-      const me = await db.kvGet('name', '하진');
+      const me = await db.kvGet('name', '하진'); const prof = await taste.load();
       const all = [...leads.map(l => ({ ...l, manual: true })), ...feed.items.filter(i => !leads.some(l => l.link === i.link)), ...PORTALS.map(([type, title, link, desc]) => ({ type, title, link, desc, source: '늘 쓰는 곳', portal: true, date: null }))];
-      const scored = all.map(it => ({ it, s: score(it, marks) })).filter(x => !x.s.hidden);
+      const scored = all.map(it => ({ it, s: score(it, marks, new Date(), prof, me) })).filter(x => !x.s.hidden);
       const live = scored.filter(x => !x.it.portal);
       // 같은 소식을 여러 매체가 쓴 건 하나만 (제목이 절반 넘게 겹치면 같은 글로 봄)
       const grams = t => { const n = t.replace(/[^가-힣a-zA-Z0-9]/g, ''); const g = new Set(); for (let i = 0; i < n.length - 1; i++) g.add(n.slice(i, i + 2)); return g; };
@@ -83,7 +89,9 @@ export default {
         body.append(g); return;
       }
       const pool = (tab === 'rank' ? rank : rank.filter(x => x.it.type === tab)).filter(match);
-      const top = pool.slice(0, tab === 'rank' ? 10 : 30);
+      const top = pool.slice(0, tab === 'rank' ? 10 : 30); curRank = top;
+      const learned = Object.entries(prof.w).filter(([, v]) => Math.abs(v) >= 2);
+      if (learned.length) body.append(h('div.rd-learn', h('span.faint.tiny', '팀이 알려 준 기준'), ...learned.slice(0, 10).map(([k, v]) => h('button.chip' + (v > 0 ? '.ok' : '.bad'), { title: '누르면 잊어요', onclick: async () => { await taste.forget([k]); for (const r of await taste.rows()) if (!r.word && (r.words || []).includes(k)) await db.put('leadfb', { ...r, words: r.words.filter(x => x !== k) }); draw(); } }, (v > 0 ? '+ ' : '− ') + k))));
       const left = h('div.card', h('div.card-h', h('h3', ic('trend'), tab === 'rank' ? '우리 회사 랭킹 TOP 10' : TYPE[tab][0] + ' 순위'), h('span.faint.tiny', feed.updatedAt ? `${rel(feed.updatedAt.slice(0, 10))} 모음` : '아직 자동 수집 전')));
       if (!top.length) left.append(h('div.empty', feed.updatedAt ? '조건에 맞는 글이 없어요' : '앱을 주소에 올리면 매일 아침 자동으로 채워져요. 지금은 “링크 넣기”로 직접 넣을 수 있어요.'));
       top.forEach((x, i) => left.append(row(x, i + 1, marks, me)));
@@ -114,14 +122,31 @@ export default {
       return h('div.rank', h('div.rank-n' + (n <= 3 ? '.top' : ''), n),
         h('div.grow', { style: { minWidth: 0 } },
           h('button.rank-t', { onclick: () => detail(x) }, it.title),
-          h('div.chips', { style: { margin: '4px 0 6px' } }, h('span.chip' + (it.type === 'grant' ? '.acc' : ''), TYPE[it.type]?.[0] || '글'), s.dday != null ? h('span.chip' + (s.dday <= 3 ? '.bad' : s.dday <= 7 ? '.warn' : ''), s.dday === 0 ? '오늘 마감' : `D-${s.dday}`) : null, s.stars ? h('span.chip.ok', `찜 ${s.stars}`) : null, x.more ? h('span.chip', `같은 소식 ${x.more}건`) : null, ...s.why.map(w => h('span.chip', w)), h('span.faint.tiny', [it.source, it.by && it.by + ' 넣음'].filter(Boolean).join(' · '))),
+          h('div.chips', { style: { margin: '4px 0 6px' } }, h('span.chip' + (it.type === 'grant' ? '.acc' : ''), TYPE[it.type]?.[0] || '글'), s.dday != null ? h('span.chip' + (s.dday <= 3 ? '.bad' : s.dday <= 7 ? '.warn' : ''), s.dday === 0 ? '오늘 마감' : `D-${s.dday}`) : null, s.stars ? h('span.chip.ok', `찜 ${s.stars}`) : null, s.ups ? h('span.chip.ok', `관심 ${s.ups}`) : null, x.more ? h('span.chip', `같은 소식 ${x.more}건`) : null, ...s.why.map(w => h('span.chip', w)), h('span.faint.tiny', [it.source, it.by && it.by + ' 넣음'].filter(Boolean).join(' · '))),
           h('div.row', { style: { gap: '4px' } }, bar(s.urg, 40, 'var(--bad)', '시급성'), bar(s.fit, 40, 'var(--acc)', '유익성'), bar(s.pri, 20, 'var(--ok)', '우선순위')),
-          h('div.faint.tiny', { style: { marginTop: '3px' } }, `시급성 ${s.urg} · 유익성 ${s.fit} · 우선순위 ${s.pri}`)),
+          h('div.faint.tiny', { style: { marginTop: '3px' } }, `시급성 ${s.urg} · 유익성 ${s.fit} · 우선순위 ${s.pri}${s.tst ? ` · 팀 취향 ${s.tst > 0 ? '+' : ''}${s.tst}` : ''}`)),
         h('div.rank-s', s.total),
         h('div.rank-a',
           h('button.btn.icon.ghost' + (starred ? '.on' : ''), { title: '찜 (팀 우선순위 +5)', 'aria-label': '찜', onclick: () => mark(c => { const st = { ...(c.stars || {}) }; starred ? delete st[me] : (st[me] = 1); return { stars: st }; }) }, ic('star', 16)),
           it.type === 'grant' ? h('button.btn.icon.ghost', { title: '지원사업 준비 목록에 담기', 'aria-label': '담기', onclick: async () => { await db.put('grants', { title: it.title, url: it.link, deadline: s.due || '', status: '검토', org: it.source || '', team: (await db.get('team-main')) ? 'team-main' : '' }); toast('스타트업 PM → 지원사업에 담았어요', { label: '보기', fn: () => go('startup') }); } }, ic('plus', 16)) : null,
-          h('button.btn.icon.ghost', { title: '우리랑 안 맞음 (숨기기)', 'aria-label': '숨기기', onclick: () => mark(() => ({ hidden: true })) }, ic('trash', 15))));
+          h('button.btn.icon.ghost' + (s.liked ? '.on' : ''), { title: '관심 있어요 (이런 글을 위로)', 'aria-label': '관심', onclick: async () => { await taste.markItem(it, 'up'); draw(); } }, ic('thumb', 16)),
+          h('button.btn.icon.ghost', { title: '필요 없어요 (숨기고, 이런 글을 아래로)', 'aria-label': '숨기기', onclick: async () => { const r = await taste.markItem(it, 'down'); draw(); toast('숨겼어요. 비슷한 글도 점점 내릴게요', { label: '되돌리기', fn: async () => { await taste.markItem(it, 'down'); draw(); } }); } }, h('span.flip', ic('thumb', 16)))));
+    }
+
+    // 랭킹 화면에 떠 있는 비서: 말로 피드백 ("제조 쪽은 필요 없어", "3번 왜 높아?")
+    function widget() {
+      const log = h('div.rdw-log'); const inp = h('input.in', { placeholder: '예: 제조 쪽은 필요 없어', 'aria-label': '비서에게 말하기' });
+      const bub = (t, me, chips) => { const b = h('div.rdw-b' + (me ? '.me' : ''), t); log.append(b); if (chips?.length) log.append(h('div.chips', chips.map(c => h('button.chip', { onclick: () => say(c.say) }, c.label)))); log.scrollTop = log.scrollHeight; };
+      const say = async t => { t = (t || '').trim(); if (!t) return; inp.value = ''; bub(t, true);
+        let r = await taste.talk(t, { rank: curRank });
+        if (!r) { const CH = await import('../js/chat.js'); r = CH.isTalk(t) ? await CH.reply(t, { name: (await db.kvGet('name', '')) || '' }) : { text: '여기서는 랭킹을 우리 팀에 맞게 고쳐요. “콘텐츠 더 보여줘”, “제조 쪽은 필요 없어”, “3번 필요 없어”, “1번 왜 높아?”처럼 말해 주세요.' }; r = { text: r.text, chips: (r.chips || []).filter(c => c.say) }; }
+        if (r.changed) await draw();
+        bub(r.text, false, r.chips); };
+      const panel = h('div.rdw', { hidden: true }, h('div.rdw-h', h('b', ic('sparkles', 15), '랭킹 비서'), h('button.btn.icon.ghost', { 'aria-label': '닫기', onclick: () => { panel.hidden = true; fab.hidden = false; } }, ic('minus', 16))), log,
+        h('div.chips.rdw-q', ['배운 기준 보기', '1번 왜 높아?'].map(t => h('button.chip', { onclick: () => say(t) }, t))),
+        h('form.rdw-f', { onsubmit: e => { e.preventDefault(); say(inp.value); } }, inp, h('button.btn.icon.pri', { 'aria-label': '보내기' }, ic('send', 16))));
+      const fab = h('button.rdw-fab', { 'aria-label': '랭킹 비서 열기', onclick: () => { panel.hidden = false; fab.hidden = true; if (!log.children.length) bub('어떤 글이 더 필요하고 어떤 글이 필요 없는지 알려 주세요. 팀원 모두의 말이 모여서 랭킹이 우리에게 맞게 좁혀져요.'); inp.focus(); } }, ic('sparkles', 18), '비서에게 알려주기');
+      root.append(fab, panel);
     }
 
     function add(v0 = {}) {
@@ -133,7 +158,7 @@ export default {
     }
     function howto() {
       modal('랭킹은 이렇게 매겨요', close => h('div',
-        h('div.list', [['시급성 (40점)', '마감이 가까울수록 높아요. 3일 안 40, 7일 안 33, 2주 안 26, 한 달 안 17. 마감이 없으면 새 글일수록. 마감 지난 글은 자동으로 빠져요.'], ['유익성 (40점)', '콘텐츠·영상·디자인, 예비·초기 창업, 청년·소규모, 지원금·바우처 같은 말이 있으면 높아요. 제조·농업처럼 우리와 먼 분야는 깎여요.'], ['우선순위 (20점)', '지원사업 > 도움말 > 커뮤니티 > 뉴스 순. 팀원이 찜(★)하면 한 명당 +5, 우리가 직접 넣은 링크는 +4.']].map(([t, d]) => h('div.li', { style: { alignItems: 'flex-start' } }, h('div.grow', h('div.t.small', t), h('div.faint.small', d))))),
+        h('div.list', [['시급성 (40점)', '마감이 가까울수록 높아요. 3일 안 40, 7일 안 33, 2주 안 26, 한 달 안 17. 마감이 없으면 새 글일수록. 마감 지난 글은 자동으로 빠져요.'], ['유익성 (40점)', '콘텐츠·영상·디자인, 예비·초기 창업, 청년·소규모, 지원금·바우처 같은 말이 있으면 높아요. 제조·농업처럼 우리와 먼 분야는 깎여요.'], ['우선순위 (20점)', '지원사업 > 도움말 > 커뮤니티 > 뉴스 순. 팀원이 찜(★)하면 한 명당 +5, 관심 있어요는 +3, 우리가 직접 넣은 링크는 +4.'], ['팀이 알려 준 기준', '관심 있어요·필요 없어요를 누르거나 비서에게 “제조 쪽은 필요 없어”처럼 말하면 배워요. 같은 낱말이 두 번 이상 모이거나 말로 직접 알려 주면 그 낱말이 든 글이 올라가거나 내려가요. 두 명이 필요 없다고 한 글은 모두에게서 빠져요. 점수는 −20에서 +20까지 따로 더해져요.']].map(([t, d]) => h('div.li', { style: { alignItems: 'flex-start' } }, h('div.grow', h('div.t.small', t), h('div.faint.small', d))))),
         h('p.small.muted', { style: { marginTop: '10px' } }, '글은 GitHub가 매일 아침 6시 40분에 무료로 모아요. 모으는 검색어는 저장소의 data/sources.json 에서 바꿀 수 있어요. 제목을 누르면 항상 원문으로 가요.'),
         feed.log?.length ? h('details', h('summary.small', '오늘 수집 기록'), h('pre.tiny', { style: { whiteSpace: 'pre-wrap' } }, feed.log.join('\n'))) : null,
         h('div.modal-f', h('button.btn.pri', { onclick: close }, '알겠어요'))));
