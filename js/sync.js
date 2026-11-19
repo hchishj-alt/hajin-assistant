@@ -6,7 +6,7 @@
 import * as db from './db.js';
 import { SUPABASE } from './config.js';
 
-const SHARE_COLS = new Set(['teams', 'events', 'polls', 'pollvotes', 'tasks', 'meetings', 'expenses', 'docs', 'notes', 'figmafiles', 'refs', 'reffolders', 'projects', 'leads', 'leadmarks', 'grants', 'contacts', 'audit', 'labelsets', 'buys', 'boards', 'dms', 'feedback']);
+const SHARE_COLS = new Set(['teams', 'events', 'polls', 'pollvotes', 'tasks', 'meetings', 'expenses', 'docs', 'notes', 'figmafiles', 'refs', 'reffolders', 'projects', 'leads', 'leadmarks', 'grants', 'contacts', 'audit', 'labelsets', 'buys', 'boards', 'bnodes', 'dms', 'feedback']);
 const CHUNK = 200;
 let client = null, session = null, channel = null;
 let pushT = null, pullT = null, busy = null, started = false, pendingAgain = false, wired = false;
@@ -316,4 +316,14 @@ export async function unshare(it) {
   const sp = spaceFor(it, await teamSpaces());
   if (!sp) return;
   await client.from('space_items').upsert([{ ...row({ ...it, deleted: true }), space: sp }], { onConflict: 'space,id' });
+}
+
+// 실시간 방 (DB를 거치지 않는 즉시 전달: 마인드맵 회의에서 서로의 움직임을 바로 보기)
+export function room(name, onMsg) {
+  if (!client || !session) return null;
+  try {
+    const ch = client.channel('room-' + name, { config: { broadcast: { self: false } } });
+    ch.on('broadcast', { event: 'm' }, p => { try { onMsg(p.payload); } catch { } }).subscribe();
+    return { send: payload => { try { ch.send({ type: 'broadcast', event: 'm', payload }); } catch { } }, close: () => { try { client.removeChannel(ch); } catch { } } };
+  } catch { return null; }
 }

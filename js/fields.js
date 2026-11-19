@@ -11,7 +11,7 @@ export const FIELDS = {
     { k: 'repeat', label: '반복', type: 'select', options: [['', '안 함'], ['daily', '매일'], ['weekdays', '평일'], ['weekly', '매주'], ['monthly', '매월']] },
     { k: 'remind', label: '알림(분 전)', type: 'number', default: 10 },
     { k: 'label', label: '중요도 색', type: 'label', full: true },
-    { k: 'team', label: '공유', type: 'select', options: [['', '나만 보기'], ['team-main', '팀에 공유']] },
+    { k: 'team', label: '공유', type: 'select', options: [['auto', '알아서 (내용 보고 정함)'], ['', '나만 보기'], ['team-main', '팀에 공유']], default: 'auto' },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
   ],
   task: [
@@ -22,7 +22,7 @@ export const FIELDS = {
     { k: 'est', label: '예상 시간(분)', type: 'number', default: 30 },
     { k: 'project', label: '프로젝트' },
     { k: 'who', label: '담당' },
-    { k: 'team', label: '공유', type: 'select', options: [['', '나만 보기'], ['team-main', '팀에 공유']] },
+    { k: 'team', label: '공유', type: 'select', options: [['auto', '알아서 (내용 보고 정함)'], ['', '나만 보기'], ['team-main', '팀에 공유']], default: 'auto' },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
   ],
   expense: [
@@ -33,7 +33,7 @@ export const FIELDS = {
     { k: 'pay', label: '결제 수단', type: 'select', options: ['개인카드', '법인카드', '현금', '계좌이체'] },
     { k: 'project', label: '프로젝트' },
     { k: 'status', label: '처리 상태', type: 'select', options: [['todo', '정산 전'], ['submitted', '결재 요청'], ['approved', '승인됨'], ['done', '정산 완료']], default: 'todo' },
-    { k: 'team', label: '공유', type: 'select', options: [['', '나만 보기'], ['team-main', '팀에 공유']] },
+    { k: 'team', label: '공유', type: 'select', options: [['auto', '알아서 (내용 보고 정함)'], ['', '나만 보기'], ['team-main', '팀에 공유']], default: 'auto' },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },
   ],
   contact: [
@@ -45,7 +45,7 @@ export const FIELDS = {
     { k: 'group', label: '그룹', type: 'select', options: ['팀', '학교', '협력사', '클라이언트', '투자·지원', '친구', '가족', '기타'], default: '기타' },
     { k: 'birthday', label: '생일', type: 'date' },
     { k: 'cadence', label: '연락 주기(일, 0=없음)', type: 'number', default: 0 },
-    { k: 'team', label: '공유', type: 'select', options: [['', '나만 보기'], ['team-main', '팀에 공유']] },
+    { k: 'team', label: '공유', type: 'select', options: [['auto', '알아서 (내용 보고 정함)'], ['', '나만 보기'], ['team-main', '팀에 공유']], default: 'auto' },
     { k: 'sns', label: 'SNS·포트폴리오', full: true },
     { k: 'memo', label: '메모', type: 'textarea', rows: 3 },
   ],

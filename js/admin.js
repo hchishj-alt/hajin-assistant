@@ -35,6 +35,8 @@ export function diff(prev, item) {
 
 async function guard(prev, item) {
   if (item.col === 'audit' || item.col === '_kv' || item.col === 'drafts') return;
+  if (prev && item.team === 'auto') item.team = prev.team || '';
+  if (!item.deleted) { const A = await import('./auto.js'); if (!prev) await A.fill(item, { hasTeam: !!(await db.get('team-main')), projects: (await db.list('projects')).map(p => p.name) }); else await A.learn(prev, item); }
   const shared = !!(item.team || prev?.team || item.space || prev?.space);
   const me = await who();
   if (!prev && shared && !item.by) item.by = me.name;
@@ -44,7 +46,7 @@ async function guard(prev, item) {
   }
   // 공유 → 나만 보기로 바꾸면 팀 공간에서는 빼기 (내 기록은 그대로)
   if (prev?.team && !item.team && me.loggedIn) import('./sync.js').then(s => s.unshare(prev)).catch(() => { });
-  if (!shared || !me.loggedIn) return;
+  if (!shared || !me.loggedIn || item.col === 'bnodes' || item.col === 'pollvotes' || item.col === 'leadmarks') return;
   const changes = diff(prev, item);
   if (prev && !changes.length) return;
   const action = !prev ? '만듦' : item.deleted && !prev.deleted ? '지움' : changes.length === 1 && changes[0].k === 'done' ? (item.done ? '완료' : '완료 취소') : '고침';

@@ -12,7 +12,7 @@ const fields = folders => [
   { k: 'link', label: '상품 링크', full: true }, { k: 'img', label: '이미지 링크 (자동으로 안 뜨면 이미지 주소를 붙여넣기)', full: true },
   { k: 'need', label: '필요도', type: 'select', options: [['must', '꼭 필요'], ['nice', '있으면 좋음'], ['later', '나중에']], default: 'must' }, { k: 'place', label: '보관 위치 (산 뒤)' },
   { k: 'memo', label: '메모 (옵션·색·사이즈)', type: 'textarea', rows: 2 },
-  { k: 'team', label: '공유', type: 'select', options: [['', '나만 보기'], ['team-main', '팀에 공유']] }];
+  { k: 'team', label: '공유', type: 'select', options: [['auto', '알아서 (내용 보고 정함)'], ['', '나만 보기'], ['team-main', '팀에 공유']], default: 'auto' }];
 const NEED = { must: ['꼭 필요', 'bad'], nice: ['있으면 좋음', 'warn'], later: ['나중에', ''] };
 
 const ph = () => h('div.buy-ph', ic('image', 20));
@@ -94,7 +94,7 @@ export default {
     async function edit(b) {
       const fl = await folderList(); const teamId = (await db.get('team-main')) ? 'team-main' : '';
       modal(b.id ? '상품 고치기' : '상품 추가', close => {
-        const f = form(fields(fl), { folder: F.folder && F.folder !== '_none' ? F.folder : '', team: teamId, ...b }, async v => {
+        const f = form(fields(fl), { folder: F.folder && F.folder !== '_none' ? F.folder : '', ...b }, async v => {
           if (!v.title) return toast('상품명을 적어 주세요');
           await db.put('buys', { ...b, ...v, qty: v.qty || 1, by: b.by || await db.kvGet('name', '하진') }); close(); draw();
         });

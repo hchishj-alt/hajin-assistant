@@ -16,6 +16,7 @@ export default {
     const unconfirmed = ms.filter(m => !m.summaryConfirmed).length;
     const totalMin = Math.round(ms.reduce((s, m) => s + (m.seconds || 0), 0) / 60);
     root.append(head('회의록', '녹음하면서 받아쓰고, 끝나면 요약·결정·할 일을 뽑아요.',
+      h('a.btn.sm', { href: '#/board' }, ic('share', 14), '마인드맵 회의'),
       h('button.btn.sm', { onclick: () => paste() }, ic('file', 14), '메모 붙여넣기'),
       h('a.btn.sm.pri', { href: '#/meetings/new' }, ic('mic', 14), '새 회의')),
       h('div.tiles', { style: { marginBottom: '14px' } }, tile('mic', ms.length, '회의'), tile('sparkles', unconfirmed, '요약 확인 전', unconfirmed ? 'warn' : 'ok'), tile('clock', totalMin + '분', '녹음 시간'), tile('check2', (await db.list('tasks')).filter(t => t.sourceRef && ms.some(m => m.id === t.sourceRef)).length, '회의에서 나온 할 일')));
@@ -89,7 +90,8 @@ async function newMeeting(root) {
 // 회의 분석 → 요약은 임시(확인 대기), 할 일·일정도 임시
 export async function analyze(m) {
   const people = [...(m.attendees || '').split(/[,，\s]+/).filter(Boolean), ...(await db.list('contacts')).map(c => c.name), ...(await store.teammateNames())];
-  const a = brain.analyzeNotes(m.transcript || '', { people, base: new Date(m.date || Date.now()) });
+  const FB = await import('../js/feedback.js');
+  const a = await FB.refine(brain.analyzeNotes(m.transcript || '', { people, base: new Date(m.date || Date.now()) }), m.transcript || '');
   const stars = [...(m.transcript || '').matchAll(/★\[([\d:]+) 중요\]\s*([^★]{0,120})/g)].map(x => `${x[1]} ${x[2].trim()}`);
   if (stars.length) a.summary = [...stars.map(s => '★ ' + s), ...a.summary];
   await db.patch(m.id, { keywords: a.keywords, summaryDraft: a, summaryConfirmed: false });
@@ -123,11 +125,14 @@ async function detail(root, id) {
   const sumCard = h('div.card', h('div.card-h', h('h3', ic('sparkles'), '정리', m.summaryConfirmed ? h('span.chip.ok', '확정') : h('span.chip.warn', '확인 전 · 임시')),
     h('div.row', !m.summaryConfirmed && s ? h('button.btn.sm.pri', { onclick: async () => { const d = drafts.find(x => x.kind === 'summary'); if (d) await store.approve(d); else await db.patch(id, { summary: s, summaryConfirmed: true }); updateBadge(); go('meetings/' + id); } }, ic('check', 14), '요약 확정') : null,
       s ? h('button.btn.sm', { onclick: () => editSummary() }, ic('edit', 14), '고치기') : null)),
-    s ? summaryView(s) : h('div.empty', '받아쓴 내용이 있으면 정리가 여기 보여요'));
+    s ? summaryView(s) : h('div.empty', '받아쓴 내용이 있으면 정리가 여기 보여요'),
+    s?.learnedUsed?.length ? h('div.learned-used', ic('sparkles', 12), '지난 피드백 반영:', s.learnedUsed.map(x => h('span.chip', x))) : null,
+    s ? (await import('../js/feedback.js')).widget({ kind: 'summary', ref: id, source: (m.transcript || '').slice(0, 300), shared: !!m.team, onLearn: async () => { await analyze(await db.get(id)); toast('피드백을 반영해서 다시 정리했어요'); go('meetings/' + id); } }) : null);
   const dCard = drafts.filter(d => d.kind !== 'summary').length ? h('div.card', h('div.card-h', h('h3', ic('inbox'), '이 회의에서 나온 임시 항목'), h('span.chip.warn', drafts.filter(d => d.kind !== 'summary').length)), drafts.filter(d => d.kind !== 'summary').map(d => draftCard(d, () => updateBadge()))) : null;
 
   root.append(head(m.title, [fmtDate(m.date || m.createdAt), m.attendees, m.project, m.seconds ? fmtSec(m.seconds) : ''].filter(Boolean).join(' · '),
     h('button.btn.sm.ghost', { onclick: () => modal('중요도 색', close => form([{ k: 'title', label: '회의 이름', full: true }, { k: 'label', label: '중요도 색', type: 'label', full: true }], m, async v => { await db.patch(id, v); close(); go('meetings/' + id); })) }, h('span.dot', { style: { background: LB.colorOf(m.label) || 'var(--line2)' } }), LB.find(m.label)?.name || '중요도'),
+    m.boardId ? h('a.btn.sm', { href: '#/board/' + m.boardId }, ic('share', 14), '마인드맵 열기') : null,
     h('button.btn.sm.ghost', { onclick: exportMd }, ic('download', 14), '내보내기'),
     h('button.btn.sm.ghost', { onclick: copyShare }, ic('copy', 14), '공유용 복사'),
     (await db.get('team-main')) ? h('button.btn.sm' + (m.team ? '.pri' : '.ghost'), { title: '팀원도 이 회의록을 봐요 (녹음 원본은 기기에만)', onclick: async () => { if (m.team) await (await import('../js/sync.js')).unshare(m).catch(() => { }); await db.patch(id, { team: m.team ? '' : 'team-main', by: m.by || (await db.kvGet('name', '')) }); toast(m.team ? '나만 보기로 바꿨어요' : '팀에 공유했어요'); go('meetings/' + id); } }, ic('users', 14), m.team ? '팀 공유 중' : '팀에 공유') : null,

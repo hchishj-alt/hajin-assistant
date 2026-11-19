@@ -3,6 +3,7 @@ import * as db from '../js/db.js';
 import * as store from '../js/store.js';
 import * as brain from '../js/brain.js';
 import { answer } from '../js/query.js';
+import * as FB from '../js/feedback.js';
 import { draftCard } from '../js/draftcard.js';
 import { describe } from '../js/fields.js';
 import { createRecorder, hasSpeech, waveEl, fmtSec } from '../js/voice.js';
@@ -73,14 +74,14 @@ export default {
       const nSent = brain.sentences(text).length;
       const long = text.length > 220 || (origin === 'voice' && text.length > 90) || (text.length > 100 && nSent >= 3 && !text.includes('\n')) || text.split('\n').length > 6;
       if (long) {
-        const a = brain.analyzeNotes(text, { people });
+        const a = await FB.refine(brain.analyzeNotes(text, { people }), text);
         const note = await db.put('notes', { type: 'memo', title: (a.summary[0] || text).slice(0, 50), body: text, tags: a.keywords.slice(0, 6), origin });
         const ids = [];
         ids.push((await store.draft('summary', { title: `“${note.title}” 요약`, ...a }, { sourceRef: note.id, source: text, confidence: 0.7, origin })).id);
         for (const t of a.actions) ids.push((await store.draft('task', { title: t.title, due: t.due || '', who: t.who || '', priority: 'normal', project: '', memo: t.src }, { source: t.src, sourceRef: note.id, confidence: 0.7, origin })).id);
         for (const d of a.dates) ids.push((await store.draft('event', { title: d.title || '일정', date: d.date, start: d.time || '', end: d.end || '', memo: d.src }, { source: d.src, sourceRef: note.id, confidence: 0.6, origin })).id);
         for (const i of a.ideas) ids.push((await store.draft('idea', { title: i.slice(0, 60), body: i, tags: brain.keywords(i, 4) }, { source: i, sourceRef: note.id, confidence: 0.55, origin })).id);
-        const msg = await db.put('chat', { role: 'bot', text: `메모로 저장하고 정리했어요. 문장 ${a.stats.sentences}개 → 요약 ${a.summary.length}줄, 할 일 ${a.actions.length}개, 일정 ${a.dates.length}개, 아이디어 ${a.ideas.length}개. 확인해 주세요.`, draftIds: ids });
+        const msg = await db.put('chat', { role: 'bot', q: text, text: `메모로 저장하고 정리했어요. 문장 ${a.stats.sentences}개 → 요약 ${a.summary.length}줄, 할 일 ${a.actions.length}개, 일정 ${a.dates.length}개, 아이디어 ${a.ideas.length}개. 확인해 주세요.`, draftIds: ids });
         await drawMsg(msg, new Map((await store.drafts()).map(d => [d.id, d])));
         updateBadge();
         return;
@@ -93,12 +94,12 @@ export default {
         ids.push((await store.draft(p.kind, p.data, { source: p.src || text, confidence: p.confidence, origin })).id);
       }
       for (const a of replies) {
-        const msg = await db.put('chat', { role: 'bot', text: a.text, items: a.items.slice(0, 12) });
+        const msg = await db.put('chat', { role: 'bot', q: text, text: a.text, items: a.items.slice(0, 12) });
         await drawMsg(msg, new Map());
       }
       if (ids.length) {
         const labels = parsed.filter(p => p.kind !== 'query').map(p => p.label);
-        const msg = await db.put('chat', { role: 'bot', text: `${[...new Set(labels)].join(' · ')} ${ids.length}개를 임시로 만들었어요. 맞으면 확정해 주세요.`, draftIds: ids });
+        const msg = await db.put('chat', { role: 'bot', q: text, text: `${[...new Set(labels)].join(' · ')} ${ids.length}개를 임시로 만들었어요. 맞으면 확정해 주세요.`, draftIds: ids });
         await drawMsg(msg, new Map((await store.drafts()).map(d => [d.id, d])));
         updateBadge();
       }
@@ -114,6 +115,7 @@ export default {
         if (d.status === 'pending') box.append(draftCard(d, () => updateBadge()));
         else box.append(h('div.draft' + (d.status === 'approved' ? '.done' : '.gone'), h('div.k', ic(store.KINDS[d.kind]?.icon || 'file')), h('div.grow', h('div.small', { style: { fontWeight: 650 } }, d.data.title || d.data.name), h('div.faint.tiny', d.status === 'approved' ? '확정됨' : '버림'))));
       }
+      if (m.q) box.append(FB.widget({ kind: 'chat', ref: m.id, source: m.q }));
       const b = botBubble(box, (m.draftIds?.length || m.items?.length) ? 'wide' : '');
       if (!animate) b.style.animation = 'none';
       list.append(b);
