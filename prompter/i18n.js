@@ -73,6 +73,9 @@ const D = {
   '읽는 시간(초)': ['Read time (seconds)', '読む時間(秒)', '朗读时长(秒)', 'Tiempo de lectura (segundos)'],
   '무료는 대본 {n}개까지 · 지금 {n}개 (예시는 빼고)': ['Free: up to {0} scripts · now {1} (sample not counted)', '無料は台本{0}件まで · いま{1}件 (例は除く)', '免费版最多 {0} 个台词 · 当前 {1} 个 (不含示例)', 'Gratis: hasta {0} guiones · ahora {1} (sin contar el ejemplo)'],
   '다른 앱으로 나가서 녹화를 멈췄어요. 거기까지 테이크로 남겼어요.': ['Recording stopped because you left the app. What you shot so far was saved as a take.', '他のアプリに移ったので録画を止めました。そこまでをテイクとして残しました。', '因切换到其他应用已停止录制，已录部分保存为镜头。', 'Grabación detenida al salir de la app. Lo grabado se guardó como toma.'],
+  '베타': ['Beta', 'ベータ', '测试版', 'Beta'],
+  '출시 베타 · 지금은 프로 기능도 모두 무료': ['Launch beta · All Pro features free for now', 'ローンチベータ · 今はPro機能もすべて無料', '上线测试 · 目前 Pro 功能全部免费', 'Beta de lanzamiento · Todo Pro gratis por ahora'],
+  '출시 베타 기간이라 카드 결제가 열릴 때까지 프로 기능을 모두 무료로 써요. 결제가 열리면 무료 범위로 돌아가요.': ['During the launch beta, all Pro features are free until card payment opens. After that, you go back to the free plan.', 'ローンチベータ期間中は、カード決済が始まるまでPro機能をすべて無料で使えます。始まったら無料の範囲に戻ります。', '上线测试期间，在开通银行卡支付前 Pro 功能全部免费。开通后恢复为免费版范围。', 'Durante la beta, todo Pro es gratis hasta que se abra el pago con tarjeta. Después vuelves al plan gratis.'],
   // 브랜드·소개
   '프롬프리에딧': ['PROMPRI EDIT', 'プロンプリエディット', 'PROMPRI EDIT', 'PROMPRI EDIT'],
   '프롬프리에딧 소개': ['About PROMPRI EDIT', 'PROMPRI EDITについて', '关于 PROMPRI EDIT', 'Acerca de PROMPRI EDIT'],

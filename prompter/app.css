@@ -399,3 +399,6 @@ html[lang=ko] .onlyfx{display:none}
 .legal{gap:4px}
 #toast.show:has(.undo){pointer-events:auto;display:flex;white-space:nowrap;align-items:center;gap:12px;padding:6px 6px 6px 16px}
 #toast .undo{white-space:nowrap;flex:none;border:0;background:var(--acc);color:#fff;font:inherit;font-weight:800;border-radius:10px;min-height:36px;padding:0 12px;cursor:pointer}
+.betaline{display:inline-flex;align-items:center;gap:6px;margin:10px auto 0;padding:6px 12px;border-radius:999px;background:var(--accbg);color:var(--acc);font-size:13px;font-weight:750}
+.hero .betaline{display:flex;width:max-content;max-width:100%}
+.notice.beta{background:var(--accbg);color:var(--acc)}
