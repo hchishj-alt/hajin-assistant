@@ -395,3 +395,5 @@ html[lang=ko] .onlyfx{display:none}
 .keep small{display:flex;align-items:center;gap:6px;color:var(--sub);font-weight:650}
 .keep .code{font-size:18px}
 .seo{padding:24px 4px;color:var(--sub)}
+.legal a,.hfoot .mailto,.hfoot .linkbtn,.tip .mailto{display:inline-flex;align-items:center;min-height:40px;padding:0 6px}
+.legal{gap:4px}

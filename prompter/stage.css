@@ -173,3 +173,7 @@
 }
 #st2 .s-seg button{white-space:nowrap}
 @media (max-width:560px){#st2 #ttl:has(select) ~ .s-seg .s-long{display:none}}
+#st2 #msg.err{display:flex;flex-direction:column;gap:6px;max-width:min(340px,86%);padding:14px 16px;border-radius:14px;background:rgba(20,20,24,.92);font-size:13px}
+#st2 #msg.err b{font-size:15px}
+#st2 #msg.err .dim{opacity:.6}
+#st2 #msg.err button{margin-top:4px;align-self:flex-start;min-height:40px;padding:0 16px;border-radius:999px;border:0;background:#ff4f7b;color:#fff;font:inherit;font-weight:800;cursor:pointer}
