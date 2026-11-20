@@ -70,6 +70,15 @@ export function run() {
     const keep = [['오늘', 'nav'], ['구매', 'nav'], ['점심 9000원', 'nav'], ['내일 3시 회의', 'nav'], ['프롬프트 스튜디오에 견적 틀 저장', 'nav'], ['일정 보여줘', 'nav']].filter(([t]) => B.interpret(t, {}).some(x => x.kind === 'nav'));
     results.push({ group: '화면 이동', name: '평범한 말을 이동으로 잘못 읽지 않음', ok: !keep.length, detail: keep.length ? '틀림: ' + keep.map(x => x[0]).join(' / ') : '6/6' });
   }
+  { // 곧 울릴 알림, 비워 둘 시간, 제목 군말
+    const base = new Date(2026, 10, 20, 14, 0), cx = { base, people: ['김하진', '최민서', '안서연'], projects: ['가을 팝업', '루미에'] }; const one = t => B.interpret(t, cx)[0] || { data: {} };
+    const a = one('10분 뒤에 알려줘'), b2 = one('30분 뒤에 전화하라고 알려줘'), c = one('1시간 반 뒤 회의 준비 알림'), d = one('10분 뒤 미팅');
+    results.push({ group: '알림 말', name: '"10분 뒤에 알려줘"는 그때 울리는 일정으로', ok: a.kind === 'event' && a.data.start === '14:10' && a.data.remind === 0 && a.data.title === '알림' && b2.data.start === '14:30' && b2.data.title === '전화' && c.data.start === '15:30' && c.data.title === '회의 준비' && d.kind === 'event' && d.data.title === '미팅' && d.data.start === '14:10', detail: [a, b2, c, d].map(x => `${x.kind} ${x.data.start} ${x.data.title}`).join(' / ') });
+    const e = one('수요일 오전은 비워둬'), f = one('책상 비워둬');
+    results.push({ group: '알림 말', name: '"수요일 오전은 비워둬"는 그 시간을 잡아 두는 일정, "책상 비워둬"는 아님', ok: e.kind === 'event' && e.data.date === '2026-11-25' && e.data.start === '09:00' && e.data.end === '12:00' && f.kind !== 'event', detail: `${e.kind} ${e.data.date} ${e.data.start}~${e.data.end} / ${f.kind}` });
+    const g = one('영수증 정리 금요일에 하자'), h2 = one('사무실 월세 80만원 매달 5일'), i = one('세금계산서 발행 루미에 550만원'), j = one('내일 아침 9시에 깨워줘'), k = one('오늘 뭐 했는지 정리');
+    results.push({ group: '알림 말', name: '제목 군말 다듬기, 세금계산서 발행은 받을 돈, "뭐 했는지 정리"는 묻는 말', ok: g.data.title === '영수증 정리' && h2.data.title === '사무실 월세' && i.kind === 'income' && /루미에/.test(i.data.title) && j.data.title === '일어나기' && k.kind === 'query', detail: [g.data.title, h2.data.title, i.kind + ' ' + i.data.title, j.data.title, k.kind].join(' / ') });
+  }
   { // 프롬프트 스튜디오
     const body = '우리 팀: {{팀 소개}}\n팀원: {{팀}}\n\n{{고객사}}에 낼 제안서 목차를 잡아 줘.\n예산: {{예산}}';
     const vs = PS.vars(body), f1 = PS.fill(body, { '팀': '김하진(PM), 최민서(아트디렉터)', '고객사': '아모레' });
