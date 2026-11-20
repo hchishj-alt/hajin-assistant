@@ -20,7 +20,7 @@ export default {
     root.append(head('프롬프트 스튜디오', 'AI에게 일 시키는 말을 모아 두고, 빈칸만 채워 바로 써요. 팀이 같이 써요.',
       h('button.btn.sm.ghost.ps-tap', { type: 'button', onclick: () => about() }, ic('users', 14), '우리 팀 소개'),
       h('button.btn.sm.pri.ps-tap', { type: 'button', onclick: () => { F.tab = 'make'; draw(); } }, ic('plus', 14), '새 프롬프트')), body);
-    const m = await db.kvGet('me:member', null); me.name = (m && m.name) || await db.kvGet('name', ''); me.role = (m && m.role) || ''; me.keys = P.roleKeys(me.role);
+    const m = await db.kvGet('me:member', null); me.name = (m && m.name) || await db.kvGet('name', ''); me.role = await P.myRole(); me.keys = P.roleKeys(me.role);
     hasTeam = !!(await db.get('team-main')); aiOn = await (await import('../js/ai.js')).enabled().catch(() => false);
     if (!F.role && me.keys.length) F.role = me.keys[0];
     await draw();

@@ -18,12 +18,15 @@ export function roleKeys(role) {
 // ── 빈칸 ──
 const VAR = /\{\{\s*([^{}\n]{1,30}?)\s*\}\}/g;
 export function vars(body) { const out = []; for (const m of String(body || '').matchAll(VAR)) if (!out.includes(m[1])) out.push(m[1]); return out; }
+// 내 역할: 로그인한 멤버면 서버에 적힌 역할, 아니면 이 기기에서 직접 고른 역할(kv me:role)
+export const MY_ROLES = ['PM·기획', '아트·디자인', '경영·정산'];
+export async function myRole() { const m = await db.kvGet('me:member', null); return (m && m.role) || await db.kvGet('me:role', '') || ''; }
 // 앱이 알아서 채울 수 있는 빈칸
 export const AUTO = ['오늘', '내 이름', '내 역할', '팀', '팀 소개', '프로젝트', '오늘 일정', '남은 할 일'];
 export async function autoValues(now = new Date()) {
   const pad = n => String(n).padStart(2, '0'), today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   const me = await db.kvGet('me:member', null), roster = await db.kvGet('sync:roster', []), name = (me && me.name) || await db.kvGet('name', '');
-  const out = { '오늘': `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${'일월화수목금토'[now.getDay()]}요일`, '내 이름': name || '', '내 역할': (me && me.role) || '' };
+  const out = { '오늘': `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${'일월화수목금토'[now.getDay()]}요일`, '내 이름': name || '', '내 역할': await myRole() };
   out['팀'] = roster.filter(r => r.name).map(r => r.role ? `${r.name}(${r.role})` : r.name).join(', ');
   out['팀 소개'] = await db.kvGet('prompts:about', '');
   const cur = await db.kvGet('chat:project', null); out['프로젝트'] = (cur && (cur.name || cur.project)) || '';

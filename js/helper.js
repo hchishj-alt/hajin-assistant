@@ -3,7 +3,7 @@
 //  · 메뉴: 내 역할에서 주로 쓰는 것 + 실제로 자주 연 것만 앞에 두고, 나머지는 "더보기"로 접음 (없애지 않음. 직접 고정·해제 가능)
 import { h, ic, modal } from './ui.js';
 import * as db from './db.js';
-import { roleKeys } from './prompts.js';
+import { roleKeys, myRole, MY_ROLES } from './prompts.js';
 
 // 화면마다: say = 그 화면에서 바로 통하는 말(앱 규칙만으로도 답함), about = AI에게 알려 줄 화면 설명
 export const SCREENS = {
@@ -31,8 +31,8 @@ export const SCREENS = {
 const BY_ROLE = { pm: ['누가 바빠?', '프로젝트 진행 상황'], art: ['오늘 마감', '이번 주 마감'], biz: ['이번 달 지출', '받을 돈 얼마야?'] };
 
 export async function who() {
-  const m = await db.kvGet('me:member', null); const role = (m && m.role) || '';
-  return { name: (m && m.name) || await db.kvGet('name', '') || '', role, keys: roleKeys(role) };
+  const m = await db.kvGet('me:member', null); const role = await myRole();
+  return { name: (m && m.name) || await db.kvGet('name', '') || '', role, keys: roleKeys(role), local: !(m && m.role) };   /* local = 이 기기에서 직접 고른(고를 수 있는) 역할 */
 }
 // 그 화면에서 권할 말: 화면 것 먼저, 그다음 내 역할 것, 팀원 이름이 있으면 "○○ 할 일"도. 겹치는 건 빼고 6개까지
 export async function suggestFor(id, me) {
@@ -81,11 +81,24 @@ export async function shortcuts(me) {
   for (const k of me.keys) for (const q of (QUICK[k] || [])) { if (seen.has(q.label)) continue; seen.add(q.label); out.push(q); }
   return out.slice(0, me.keys.length > 1 ? 6 : 4);
 }
+// 로그인하지 않았거나 멤버에 역할이 안 적혀 있으면 이 기기에서 직접 고름 (여러 개 가능). 고르면 바로가기·메뉴·프롬프트가 그 역할에 맞춰짐
+export function rolePicker(me, done, { later = false } = {}) {
+  const picked = new Set(MY_ROLES.filter(r => (me.role || '').includes(r)));
+  const chip = r => { const b = h('button.chip' + (picked.has(r) ? '.on' : ''), { type: 'button', 'aria-pressed': String(picked.has(r)), onclick: () => { picked.has(r) ? picked.delete(r) : picked.add(r); b.classList.toggle('on', picked.has(r)); b.setAttribute('aria-pressed', String(picked.has(r))); } }, r); return b; };
+  return h('div.role-row.pick', { 'aria-label': '내 역할 고르기' }, h('span.role-tag', '내 역할은?'), MY_ROLES.map(chip),
+    h('button.chip.go', { type: 'button', onclick: async () => { await db.kvSet('me:role', [...picked].join(', ')); await db.kvSet('me:roleskip', !picked.size); await done(); } }, ic('check', 14), '완료'),
+    later ? h('button.chip.ghost', { type: 'button', onclick: async () => { await db.kvSet('me:roleskip', true); await done(); } }, '나중에') : null);
+}
 export async function shortcutRow() {
-  const me = await who(); const qs = await shortcuts(me); if (!qs.length) return null;
-  const { go } = await import('./app.js');
-  return h('div.role-row', { 'aria-label': '내 역할 바로가기' }, h('span.role-tag', me.role.length > 8 ? me.role.split(/[·,\/]/)[0] : me.role),
+  const me = await who(); const { go, refresh, buildNav } = await import('./app.js');
+  const redo = async () => { await buildNav(); refresh(); };
+  if (!me.role) return (await db.kvGet('me:roleskip', false)) ? null : rolePicker(me, redo, { later: true });   /* 역할을 모르면 한 번 물어봄. "나중에"를 누르면 메뉴 → 고르기에서 다시 고를 수 있음 */
+  const qs = await shortcuts(me); if (!qs.length) return null;
+  const short = me.role.length > 8 ? me.role.split(/[·,\/]/)[0] : me.role;
+  const row = h('div.role-row', { 'aria-label': '내 역할 바로가기' },
+    me.local ? h('button.role-tag', { type: 'button', 'aria-label': `내 역할 ${me.role} 바꾸기`, onclick: () => row.replaceWith(rolePicker(me, redo)) }, short) : h('span.role-tag', short),
     qs.map(q => h('button.chip', { type: 'button', onclick: () => (q.say ? openSheet('today', q.say) : go(q.to)) }, ic(q.icon, 14), q.label)));
+  return row;
 }
 
 // 다른 화면에서 프롬프트 스튜디오로 넘기기: 그 화면의 내용을 들고 가서 빈칸에 넣어 줌

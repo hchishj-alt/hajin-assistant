@@ -1,7 +1,7 @@
 import { h, ic, head, clear, toast } from '../js/ui.js';
 import * as db from '../js/db.js';
 import { MODULES, openPalette, buildNav } from '../js/app.js';
-import { pinned, setPin } from '../js/helper.js';
+import { pinned, setPin, who, rolePicker } from '../js/helper.js';
 // 메뉴: 내 역할에서 주로 쓰는 것과 자주 연 것만 먼저. 나머지는 "더보기"에 접어 둠. "고르기"로 직접 넣고 뺄 수 있음
 export default {
   async render(root) {
@@ -19,6 +19,7 @@ export default {
         : h('a', { href: '#/' + m.id }, ic(m.icon, 26), m.short || m.title);
       clear(body); editBtn.lastChild.textContent = edit ? '다 골랐어요' : '고르기'; editBtn.classList.toggle('pri', edit); editBtn.classList.toggle('ghost', !edit);
       if (edit) body.append(h('p.small.muted', { style: { margin: '0 2px 10px' } }, '누르면 "자주 쓰는 것"에 넣거나 뺄 수 있어요. 빼도 "더보기"에 그대로 있어요.'));
+      if (edit) { const me = await who(); if (me.local) body.append(rolePicker(me, async () => { await buildNav(); toast('역할에 맞춰 메뉴를 다시 골랐어요'); draw(); })); }   /* 로그인 안 한 기기에서는 역할을 여기서 고름 */
       body.append(h('div.faint.small.menu-h', '자주 쓰는 것'), h('div.menu-grid', top.map(m => cell(m, true))));
       if (!rest.length) return;
       const open = edit || more;

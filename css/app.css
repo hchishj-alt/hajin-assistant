@@ -1042,6 +1042,10 @@ a.as-row.as-link{color:inherit;text-decoration:none}
 .role-row{display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;margin:-4px 0 14px;padding:2px}
 .role-row::-webkit-scrollbar{display:none}
 .role-row .chip{flex:none;min-height:44px;padding:8px 14px;font-size:calc(13px*var(--fs,1));background:var(--card);gap:6px}
+.role-row.pick .chip.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.role-row .chip.go{background:var(--acc-soft);color:var(--acc);border-color:transparent;font-weight:700}
+.role-row .chip.ghost{background:transparent;color:var(--muted)}
+button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;font-family:inherit}
 .role-tag{flex:none;font-size:calc(11.5px*var(--fs,1));font-weight:700;color:var(--acc);background:var(--acc-soft);border-radius:99px;padding:4px 10px;white-space:nowrap}
 .ps-tips{margin-bottom:14px}
 @media (max-width:900px){.only-wide{display:none!important}}   /* 폰에서는 아래 탭이 같은 일을 하는 단추를 숨김 */
