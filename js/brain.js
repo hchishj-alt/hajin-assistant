@@ -431,6 +431,9 @@ function splitList(p, base, ctx) {
   // "인건비 민서 80만원 서연 80만원", "소품 대여 5만원 보증금 10만원": 쉼표 없이 이어 쓴 금액들
   if (!/,/.test(p) && (p.match(new RegExp(MONEY_SRC, 'g')) || []).filter(z => /\d/.test(z) && /원/.test(z)).length >= 2 && !/\d\s*(장|개|부|매|권|세트|박스|롤|통|ea)(?![가-힣])|업체|거래처|견적|단가|인쇄|제작|예산|총|합계|합쳐|부가세|[+\-*x×]/i.test(p))
     p = p.replace(new RegExp('(' + MONEY_SRC + ')\\s+(?=[가-힣A-Za-z]{2,8}\\s+\\d[\\d,.]*\\s*(?:만\\s*)?(?:\\d+\\s*천\\s*)?원)', 'g'), (m0, a) => (/\d/.test(a) && /원$/.test(a.trim()) ? a.trim() + ', ' : m0));
+  // "회의록: 로고 B안 확정, 포스터 민서 금요일까지": 회의에서 나온 것을 쉼표로 늘어놓은 것은 하나씩 따로
+  { const mh = p.match(/^\s*(?:회의록|회의\s*결과|회의\s*정리|회의\s*내용|결정\s*사항|정한\s*것)\s*[:：]\s*(.+)$/s);
+    if (mh) { const ms = mh[1].split(/\s*,\s+|\s+\/\s+|\s*;\s*/).map(x => x.trim()).filter(x => x.length >= 2); if (ms.length >= 2 && ms.length <= 8) return ms.map(x => x.replace(/([가-힣A-Za-z0-9])\s+(확정|결정)$/, (m0, c, v) => { const k = c.charCodeAt(0); const j = k >= 0xAC00 && k <= 0xD7A3 ? (k - 0xAC00) % 28 : 0; return c + (j && j !== 8 ? '으로 ' : '로 ') + v; })); } }
   const segs = p.split(/\s*,\s+|\s+\/\s+/).map(x => x.trim()).filter(Boolean); if (segs.length < 2 || segs.length > 6) return [p];
   const lead = x => /^(나|저|내가|제가)(는|은)?\s+\S/.test(x) || (() => { const m = x.match(/^([가-힣]{2,3}?)(이는|는|은|이가|가|이)\s+\S/); return !!m && (known(m[1], ctx) || isName(m[1])); })();
   if (segs.every(lead)) { // 마지막에만 붙은 마감("…, 서연이는 견적서 금요일까지")은 앞사람 것에도
@@ -475,9 +478,12 @@ function splitChain(p, base, ctx) {
     else if (/^[가-힣]{2,}(하고|있고)$/.test(tk) && !nm(tk.replace(/(하고|있고)$/, '')) && !/^(광고|참고|보고|경고)/.test(tk.slice(-4))) tail = tk.replace(/(하고|있고)$/, '');
     else continue;
     let left = [...toks.slice(0, k), tail].filter(Boolean).join(' '); const right = toks.slice(k + 1).join(' ');
+    if (tk === '하고' && /[가-힣A-Za-z0-9](으로|로)$/.test(toks[k - 1]) && /(은|는)(\s|$)/.test(left) && /(하기로|가기로|맡기로|까지)/.test(right)) return [left.replace(/^(오늘|어제|방금|아까)?\s*(회의|미팅|통화|회의\s*결과)(에서|때|결과)?\s+/, '') + ' 확정', ...splitChain(right, base, ctx)];   // "회의에서 로고는 B안으로 하고 포스터는 …"의 앞은 정한 것
     const lw = parseWhen(left, base), rw = parseWhen(right, base); let rest = left; for (const hh of lw.hits) rest = rest.replace(hh, ' ');
     const to = /^([가-힣]{2,4}?)(이)?(한테|에게)(는|도)?$/.exec(toks[k + 1]);
     if (to && nm(to[1]) && /[가-힣](한테|에게)(\s|$)/.test(left)) { if (/(달라고|라고)$/.test(left)) left += ' 해줘'; return [left, ...splitChain(right.replace(/^(\S+?(?:한테|에게))(는|도)(?=\s)/, '$1'), base, ctx)]; }
+    { const dl = right.match(/(?:^|\s)((?:\S+\s+)?\S+까지)(?=\s|$)/);   // "회의실 예약하고 금요일까지 자료 준비": 둘 다 그때까지 할 일
+      if (!lw.hits.length && tail && tk.endsWith('하고') && left.replace(/\s/g, '').length >= 3 && dl && parseWhen(dl[1], base).date && !rw.time && parseMoney(p) == null && !/[?？]/.test(p)) return ['할일: ' + left + ' ' + parseWhen(dl[1], base).hits.join(' ') + '까지', '할일: ' + right]; }
     if (lw.hits.length && rest.replace(/[\s에은는]/g, '').length >= 2 && rw.hits.some(h => !isTimeHit(h)) && right.replace(/\s/g, '').length >= 4 && parseMoney(p) == null) return [left, ...splitChain(right, base, ctx)];
   }
   return [p];
@@ -522,10 +528,13 @@ function bulletBlock(input, base, ctx) {
 // 회의록 붙여넣기: 첫 줄에 '○○ 회의록'(쌍점 없어도 됨), 아래에 줄마다 한 가지
 // "민서: 굿즈 후보 3개 다음주 금요일까지" → 민서 할 일, "다음 회의 12월 1일 오후 2시" → 일정, 나머지 줄은 결정사항
 export function minutes(input, ctx = {}) {
+  { const one = String(input || '').trim(); const mh = !/\n/.test(one) && one.match(/^(회의록|회의\s*(?:결과|정리|내용|메모|요약)|미팅\s*(?:결과|정리|내용|메모|요약))\s*[:：]\s*(.+)$/);   // "회의록: A 확정, B 민서 금요일까지" 한 줄도 줄마다 읽음
+    if (mh) { const ms = mh[2].split(/\s*,\s+|\s+\/\s+|\s*;\s*/).map(x => x.trim()).filter(x => x.length >= 2); if (ms.length >= 2 && ms.length <= 12) input = [mh[1], ...ms].join('\n'); } }
   const ls = String(input || '').split(/\n+/).map(x => x.trim()).filter(Boolean); if (ls.length < 3) return null;
   const head = ls[0]; if (head.length > 40 || !/(회의록|회의\s*(내용|정리|메모|결과|요약)|미팅\s*(내용|정리|메모|결과|요약|노트))/.test(head)) return null;
   const base = ctx.base || new Date(); const people = ctx.people || []; const mine = [].concat(ctx.me || []).filter(Boolean);
-  const title = head.replace(/[:：]\s*$/, '').replace(/^[#\[\]\s]+|[\]\s]+$/g, '').trim(); const hw = parseWhen(head, base);
+  let title = head.replace(/[:：]\s*$/, '').replace(/^[#\[\]\s]+|[\]\s]+$/g, '').trim(); const hw = parseWhen(head, base);
+  if (/^(회의록|회의\s*(내용|정리|메모|결과|요약)|미팅\s*(내용|정리|메모|결과|요약|노트))$/.test(title)) title = `${base.getMonth() + 1}월 ${base.getDate()}일 회의`;   // 머리말이 그냥 "회의록"이면 날짜로 이름을 붙임
   const project = projectGuess(head, ctx.projects || [], ctx.project || '').name || ctx.project || '';
   const B = /^(?:[-*•·▪◦✓☐□]|\d{1,2}[.)]|\(\d{1,2}\)|[①-⑳])\s*/; const MUST = /(해야|하기로|줘야|필요|부탁|까지|하기$|보내기|만들기|확인$|정리$|작성$|준비$|섭외$|발주$|예약$)/;
   const items = [], notes = [], att = new Set();
@@ -756,7 +765,7 @@ function interpretOne(s, base, ctx) {
     if (!sentQuote && (((/(업체|거래처|인쇄소|제작소|공방)/.test(t) || (/견적/.test(t) && (biz || vknown || phone || urls.length))) && (vsig || /(추가|등록|저장|정리)/.test(t)) && !/(받기|받아|요청|보내|문의하|연락하|알아보)/.test(t)) || (vknown && vsig && !/(결제|샀|구매했|썼|냈|입금)/.test(t)))) return 'vendor';
     if (urls.length && /(사야|살\s*거|살\s*것|구매\s*(목록|예정|할)|장바구니|주문해야|사자|사 ?줘)/.test(t)) return 'buy';
     if ((/(사야|살\s*거|살\s*것|구매해야|사\s*와야|사\s*놔야|사\s*둬야)/.test(t) || /[가-힣]\s*(에서|서)\s*사기\s*$/.test(t)) && !w.date && !dl) return 'buy';
-    if (phone || email) { if (money != null || RATE.test(t) || vknown) return 'vendor'; if ((dl || OBLIG.test(t)) && ACTION.test(t.replace(/담당|까지/g, ''))) return 'task'; return 'contact'; }
+    if (phone || email) { if (money != null || RATE.test(t) || vknown) return 'vendor'; if ((dl || OBLIG.test(t)) && ACTION.test(t.replace(/담당|까지/g, ''))) return 'task'; if (phone && /(전화|연락|문의|예약|확인)\s*(하기|해야\s*\S*|할\s*것|드리기|해\s*보기|하자)(\s|$)/.test(t)) return 'task';   /* "세무사 상담 예약 전화하기 02-…": 번호가 있어도 할 일 */ return 'contact'; }
     if (money != null) {
       const out = /(외주비|외주|페이|인건비|알바|사례비|대관|렌탈|대여|모델료|출연료|수수료|월세|구독|광고비|원천세|급여|월급)/.test(t);
       if ((dl || OBLIG.test(t) || /(요청|하기|할\s*것)\s*$/.test(t)) && /(입금|발행|정산|지급|송금|보내|이체|결제|납부|청구)/.test(t) && !/(입금\s*(됨|됐|완료|확인)|받음|받았)/.test(t)) return 'task';
@@ -962,6 +971,7 @@ export function polish(r, ctx = {}) {
     let t = d.title.replace(/^[-*•·▪◦]\s+/, '').replace(/(?<=\S)\s+(까지|부터|에|으로|로|은|는|이랑|랑)(?=\s|$)/g, ' ');
     if (/\d\s*일|\d{1,2}[/.]\d{1,2}/.test(src)) t = t.replace(/(^|\s)\(?[월화수목금토일]요일\)?(이랑|랑|에)?(?=\s|$)/g, ' '); // 날짜를 말했으면 요일은 제목에서 뺌
     if (r.kind === 'event' || r.kind === 'income') t = t.replace(/^(\S{1,12}?)(은|는)(?=\s|$)/, (m0, a, j) => (new RegExp('^\\s*' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + j + '\\s+(\\d|오늘|내일|모레|다음|이번|팝업|[월화수목금토일]요일)').test(src) ? a : m0)); // "PT는 12월 9일 …" → "PT"
+    if (r.kind === 'task') t = t.replace(/^(.{2,}?)(은|는)\s+(하기|맡기|담당하기|담당)$/, '$1').replace(/^([가-힣A-Za-z0-9]{2,10})(은|는)\s+([가-힣]{1,4}기)$/, '$1 $3');   // "포스터는 … 민서가 하기로 했어" → "포스터"
     t = t.replace(/\s+/g, ' ').trim(); if (t) d.title = t;
   }
   if (r.kind === 'event' && d.title) { const t2 = d.title.replace(/^(나|내가|저|제가|나는|저는)\s+/, '').replace(/(^|\s)(오전|오후|밤|새벽)에?(?=\s|$)/g, ' ').replace(/(?<!(?:이랑|랑|하고|와|과)\s)(?<=^|\s)(아침|저녁)에?(?=\s|$)(?!\s*(?:약속|식사|먹|모임|회식))/g, ' ').replace(/\s+/g, ' ').trim();   /* "민서랑 저녁", "저녁 약속"의 저녁은 때가 아니라 밥이라 남김 */ if (t2 && t2 !== d.title) { if (d.place === d.title) d.place = t2; d.title = t2; } }
