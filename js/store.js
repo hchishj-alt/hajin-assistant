@@ -134,6 +134,20 @@ export async function openTasks() { const mine = await mineFilter(); return (awa
 // ── 팀 ──
 // 팀 공간에서 받은 할 일 중 내 것(담당 없음·나)만 내 목록에. 나머지는 할 일 → 팀 보기에서.
 const given = n => (n || '').replace(/\s/g, '').replace(/(님|씨)$/, '');
+/* 관리자가 멤버 이름을 고치면 그 이름으로 적힌 담당·올린 사람·참석자도 같이 옮김. 안 그러면 그 사람의 "내 할 일"에서 빠지고, 자기가 올린 것도 못 고치게 됨 */
+export async function renameMember(old, to) {
+  old = given(old); to = given(to); if (!old || !to || old === to) return 0;
+  const short = n => (n.length === 3 ? n.slice(1) : n), so = short(old), sn = short(to); let n = 0;
+  const swap = v => { v = String(v || '').trim(); return v === old ? to : v === so && so !== old ? sn : null; };
+  for (const it of await db.allItems()) {
+    if (it.deleted || ['_kv', 'audit', 'dms', 'drafts'].includes(it.col)) continue;
+    const patch = {};
+    for (const k of ['who', 'by']) { const v = typeof it[k] === 'string' ? swap(it[k]) : null; if (v) patch[k] = v; }
+    if (typeof it.attendees === 'string' && it.attendees) { const parts = it.attendees.split(/\s*,\s*/), nx = parts.map(x => swap(x) || x); if (nx.join() !== parts.join()) patch.attendees = nx.join(', '); }
+    if (Object.keys(patch).length) { try { await db.patch(it.id, patch); n++; } catch { } }
+  }
+  return n;
+}
 export const sameName = (a, b) => { a = given(a); b = given(b); if (!a || !b) return false; return a === b || (a.length === 3 && a.slice(1) === b) || (b.length === 3 && b.slice(1) === a); };
 export async function myNames() {
   const m = await db.kvGet('me:member', null);

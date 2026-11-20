@@ -17,7 +17,7 @@ export async function who() {
   const m = await db.kvGet('me:member', null);
   const loggedIn = !!m;
   const guest = !!(m && m.kind === 'guest');
-  cache = { at: Date.now(), name: await db.kvGet('name', '하진'), loggedIn, admin: !loggedIn || (!!m.is_admin && !guest), guest, projects: guest ? (m.projects || []) : [], until: (m && m.until) || '' };
+  cache = { at: Date.now(), name: await db.kvGet('name', '하진'), was: await db.kvGet('me:was', []), loggedIn, admin: !loggedIn || (!!m.is_admin && !guest), guest, projects: guest ? (m.projects || []) : [], until: (m && m.until) || '' };
   return cache;
 }
 export const isAdmin = async () => (await who()).admin;
@@ -42,14 +42,14 @@ async function guard(prev, item) {
   const me = await who();
   /* 단기 작업자: 맡은 프로젝트가 하나면 새로 적는 것에 그 프로젝트를 붙이고, 맡은 프로젝트 것만 팀에 공유. 그 밖은 나만 보는 기록 */
   if (me.guest && !item.deleted && GUEST_COLS.has(item.col)) {
-    if (!prev && !item.project && me.projects.length === 1) item.project = me.projects[0];
+    if (!prev && !item.project && me.projects.length === 1 && item.scope !== 'personal' && item.team !== '') item.project = me.projects[0];   /* 개인 일로 읽힌 것(병원, 약속 …)이나 '나만 보기'로 적은 것은 팀 프로젝트에 붙이지 않음 */
     if (item.project && me.projects.includes(item.project)) { if (!prev && (await db.get('team-main'))) item.team = 'team-main'; } else if (!prev?.team) item.team = '';
   } else if (me.guest && !prev && item.team) item.team = '';
   const shared = !!(item.team || prev?.team || item.space || prev?.space);
   if (!prev && shared && !item.by) item.by = me.name;
   if (me.loggedIn && !me.admin) {
     if (ADMIN_ONLY_COLS.has(item.col) && (shared || !prev)) throw new Error('폴더·팀 관리는 관리자만 할 수 있어요');
-    if (shared && prev && !FREE.has(item.col) && prev.by && prev.by !== me.name) throw new Error(`${prev.by} 님이 올린 항목이에요. 고치기·지우기는 올린 사람과 관리자만 할 수 있어요`);
+    if (shared && prev && !FREE.has(item.col) && prev.by && prev.by !== me.name && !(me.was || []).includes(prev.by)) throw new Error(`${prev.by} 님이 올린 항목이에요. 고치기·지우기는 올린 사람과 관리자만 할 수 있어요`);
   }
   // 공유 → 나만 보기로 바꾸면 팀 공간에서는 빼기 (내 기록은 그대로)
   if (prev?.team && !item.team && me.loggedIn) import('./sync.js').then(s => s.unshare(prev)).catch(() => { });

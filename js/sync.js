@@ -60,7 +60,7 @@ export async function start() {
     wired = true;
     db.onChange((col, item) => { if (item?.dirty && session) schedulePush(); });
     window.addEventListener('online', () => syncNow());
-    document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && syncNow());
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { refreshAll(); syncNow(); } });
     setInterval(() => syncNow(), 5 * 60 * 1000);
   }
   syncNow();
@@ -102,6 +102,7 @@ export async function loginWithCode(code) {
   const { data: me, error: e2 } = await c.rpc('claim_member', { p_code: code });
   if (e2) { await c.auth.signOut(); throw new Error(koErr(e2.message)); }
   const info = Array.isArray(me) ? me[0] : me;
+  { const before = await db.kvGet('me:member', null); if (!before || before.id !== info.id) await db.kvSetRaw('me:was', []); }
   await db.kvSetRaw('me:member', info); await db.kvSetRaw('me:ended', false); await loadGuest();
   await teamKey().catch(() => { });
   const curName = await db.kvGet('name', '하진');
@@ -268,13 +269,29 @@ export async function loadGuest() { const m = await db.kvGet('me:member', null);
 export const guestCanShare = (it, g = GUEST) => !g || (GUEST_COLS.has(it.col) && !!it.project && g.projects.includes(it.project));
 /* 기간이 끝난 단기 작업자 기기에서는 받아 둔 팀 기록을 지움 (내가 따로 적은 내 기록은 그대로) */
 async function dropTeamCopies() { for (const it of await db.allItems()) if (SHARE_COLS.has(it.col) && (it.team || it.space) && it.col !== '_kv') await db.purge(it.id); await db.kvSetRaw('sync:roster', []); }
+/* 볼 수 있는 범위가 바뀌는 사람(단기 작업자)은 서버가 "이제 안 보여요"를 따로 알려 주지 않음. 그래서 가끔 통째로 다시 받아, 서버에 안 보이는 남의 팀 기록을 이 기기에서 치움.
+   내가 쓴 것, 아직 못 올린 것, 서버가 거절한 것은 지우지 않음 */
+let fullNext = false, guestFullAt = 0; const GUEST_FULL_MS = 10 * 60 * 1000;
+export const refreshAll = () => { guestFullAt = 0; };
+async function dropUnseen(spaceId, seen) {
+  const tmap = await teamSpaces(), myName = await db.kvGet('name', ''), was = await db.kvGet('me:was', []);   /* 올린 사람(by)에는 이 이름이 적힘 */ let n = 0;
+  for (const it of await db.allItems()) {
+    if (it.col === '_kv' || !SHARE_COLS.has(it.col) || it.dirty || it.syncDenied || seen.has(it.id)) continue;
+    if ((it.col === 'teams' ? it.space : (it.team && tmap[it.team])) !== spaceId) continue;
+    if (it.by && (it.by === myName || was.includes(it.by)) && it.col !== 'audit') continue;
+    await db.purge(it.id); n++;
+  }
+  return n;
+}
+/* 서버가 거절해서 못 올린 것: 다시 쓸 수 있게 되면(코드가 다시 살아남, 맡은 프로젝트가 늘어남) 한 번 더 올려 봄 */
+async function retryDenied() { for (const it of await db.allItems()) if (it.syncDenied) { const { syncDenied, ...x } = it; await db.putRaw({ ...x, dirty: true }); } }
 export function spaceFor(it, tmap) {
   if (!SHARE_COLS.has(it.col)) return null;
   if (GUEST && !guestCanShare(it)) return null;
   if (it.col === 'teams') return it.space || null;
   return (it.team && tmap[it.team]) || null;
 }
-const row = it => { const { dirty, sharedMembers, ...data } = it; return { id: it.id, col: it.col, data, deleted: !!it.deleted, updated_at: it.updatedAt || new Date().toISOString() }; };
+const row = it => { const { dirty, sharedMembers, syncDenied, ...data } = it; return { id: it.id, col: it.col, data, deleted: !!it.deleted, updated_at: it.updatedAt || new Date().toISOString() }; };
 
 async function push() {
   const dirty = await db.dirtyItems();
@@ -321,15 +338,20 @@ async function apply(r, space) {
   return true;
 }
 
-async function pullTable(table, filterCol, filterVal, curKey, space) {
-  let cursor = await db.kvGet(curKey, '1970-01-01T00:00:00Z'), n = 0;
+const EPOCH = '1970-01-01T00:00:00Z';
+async function pullTable(table, filterCol, filterVal, curKey, space, seen = null) {
+  const saved = await db.kvGet(curKey, EPOCH); let n = 0;
+  /* 첫 장은 지난번 자리보다 5초 앞에서부터: 두 기기가 거의 동시에 올리면 서버에 늦게 적힌 줄이 시각은 더 이를 수 있어서, 그런 줄을 놓치지 않게 겹쳐 읽음(같은 줄은 apply가 건너뜀).
+     seen을 주면 처음부터 통째로 다시 받으며 서버에 있는 id를 모음 */
+  let cursor = seen ? EPOCH : saved; const t = Date.parse(saved);
+  if (!seen && saved !== EPOCH && !isNaN(t)) cursor = new Date(t - 5000).toISOString();
   for (; ;) {
     let q = client.from(table).select('id,col,data,deleted,updated_at,server_at').gt('server_at', cursor).order('server_at', { ascending: true }).limit(500);
     if (filterCol) q = q.eq(filterCol, filterVal);
     const { data, error } = await q;
     if (error) throw error;
-    for (const r of data) if (await apply(r, space)) n++;
-    if (data.length) { cursor = data[data.length - 1].server_at; await db.kvSetRaw(curKey, cursor); }
+    for (const r of data) { if (seen && !r.deleted) seen.add(r.id); if (await apply(r, space)) n++; }
+    if (data.length) { cursor = data[data.length - 1].server_at; if (!(Date.parse(cursor) < Date.parse(saved))) await db.kvSetRaw(curKey, cursor); }
     if (data.length < 500) break;
   }
   return n;
@@ -347,23 +369,26 @@ async function pull() {
       const next = all.filter(x => x.active && !x.ended).map(x => ({ id: x.id, name: x.name, role: x.role, gmail: x.gmail, user: x.user_id, color: x.color || '', avatar: x.avatar || '', ...(x.kind === 'guest' ? { kind: 'guest', projects: x.projects || [] } : {}), ...(x.until ? { until: x.until } : {}) }));
       const meM = await db.kvGet('me:member', null);
       /* 로그인했는데 명단이 비어서 오면: 코드가 멈췄거나 쓸 수 있는 기간이 끝난 것 */
-      const ended = !!meM && !all.length; if (ended !== !!(await db.kvGet('me:ended', false))) { await db.kvSetRaw('me:ended', ended); n++; if (ended && meM.kind === 'guest') await dropTeamCopies().catch(() => { }); }
+      const ended = !!meM && !all.length; if (ended !== !!(await db.kvGet('me:ended', false))) { await db.kvSetRaw('me:ended', ended); n++; if (ended && meM.kind === 'guest') await dropTeamCopies().catch(() => { }); if (!ended) { fullNext = true; await retryDenied().catch(() => { }); } }
       if (!ended) {
         const before = JSON.stringify(await db.kvGet('sync:roster', [])); await db.kvSetRaw('sync:roster', next);
         const mine = meM && all.find(x => x.id === meM.id);
         if (mine) { const want = { name: mine.name, role: mine.role, is_admin: !!mine.is_admin, kind: mine.kind || 'member', until: mine.until || null, projects: mine.projects || [] }, had = { name: meM.name, role: meM.role, is_admin: !!meM.is_admin, kind: meM.kind || 'member', until: meM.until || null, projects: meM.projects || [] };
-          if (JSON.stringify(want) !== JSON.stringify(had)) { await db.kvSetRaw('me:member', { ...meM, ...want }); if (mine.name !== meM.name) await db.kvSet('name', mine.name.length === 3 ? mine.name.slice(1) : mine.name); await loadGuest(); try { (await import('./admin.js')).clearCache(); } catch { } n++; } }
+          if (JSON.stringify(want) !== JSON.stringify(had)) { await db.kvSetRaw('me:member', { ...meM, ...want }); if (want.kind !== had.kind || JSON.stringify(want.projects) !== JSON.stringify(had.projects)) { fullNext = true; await retryDenied().catch(() => { }); }   /* 볼 수 있는 범위가 바뀜 → 통째로 다시 맞춤 */ if (mine.name !== meM.name) { await db.kvSetRaw('me:was', [...new Set([...(await db.kvGet('me:was', [])), await db.kvGet('name', ''), meM.name].filter(Boolean))].slice(-8));   /* 예전 이름으로 올린 것도 내 것으로 알아보게 */ await db.kvSet('name', mine.name.length === 3 ? mine.name.slice(1) : mine.name); } await loadGuest(); try { (await import('./admin.js')).clearCache(); } catch { } n++; } }
         if (before !== JSON.stringify(next)) n++;   /* 이름·역할·색·사진이 바뀌면 화면을 다시 그림. 이름과 역할은 관리자가 정한 것을 따름 */
       } } } catch { }
   for (const s of Object.values(spaces)) {
     if (!s.members.some(m => m.user === session.user.id)) continue;
-    n += await pullTable('space_items', 'space', s.id, 'sync:cur:space:' + s.id, s.id);
+    const full = fullNext || (!!GUEST && Date.now() - guestFullAt > GUEST_FULL_MS), seen = full ? new Set() : null;
+    n += await pullTable('space_items', 'space', s.id, 'sync:cur:space:' + s.id, s.id, seen);
+    if (seen && GUEST) n += await dropUnseen(s.id, seen);
     // 팀 기록에 공간 멤버·코드 붙이기 (기기 표시용, 올리지 않음)
     for (const t of (await db.list('teams')).filter(t => t.space === s.id)) {
       const same = JSON.stringify(t.sharedMembers || []) === JSON.stringify(s.members) && t.code === s.code;
       if (!same) { await db.putRaw({ ...t, sharedMembers: s.members, code: s.code }); n++; }
     }
   }
+  if (GUEST) guestFullAt = Date.now(); fullNext = false;
   return n;
 }
 
@@ -454,7 +479,7 @@ export async function dmSend(toId, body, meta = {}) {
   const row = { id: crypto.randomUUID(), from_member: my, to_member: toId, body: String(body).slice(0, 4000), meta }; // 보낸 시각은 서버가 찍음
   const { error } = await client.from('dms').insert(row);
   if (error) throw new Error(koErr(error.message));
-  await dmStore([row]);
+  await dmStore([{ ...row, created_at: new Date().toISOString() }]);   /* 서버 시각을 받기 전까지는 이 기기 시각으로: 안 그러면 방금 보낸 말이 시각 없이 대화 맨 위로 올라감 */
   return row;
 }
 export async function dmRead(otherId) {
