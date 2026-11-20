@@ -43,6 +43,7 @@
 | 곳으로 읽는 낱말 | js/brain.js `PLACE_RE`(끝 글자)와 `NOTPLACE`(편집·번역처럼 끝 글자만 같은 낱말). 새로 잘못 읽는 낱말이 나오면 `NOTPLACE`에 더함 |
 | 피그마 플러그인 | figma-plugin/ |
 | 유료 프롬프트 스튜디오(팀 앱과 따로, /studio/) | studio/, supabase/studio.sql. 유료 틀 본문은 저장소에 넣지 않음(서버에만). 작업 지시서는 docs/studio-codex/README.md |
+| 촬영용 대본 프롬프터(팀 앱과 따로, /prompter/, 카드 구독 구조) | prompter/, supabase/prompter.sql, supabase/functions/prompter-billing/. 작업 지시서는 docs/prompter-codex/README.md |
 
 ## 새 화면을 추가할 때
 1. `modules/<id>.js`를 만든다.
