@@ -97,6 +97,24 @@ export async function tryAct(text, { people = [] } = {}) {
   const names = [...new Set([...people, ...(await teammateNames())].filter(Boolean))];
   const who = s => names.find(n => s === n || s === n.slice(1) || s.replace(/(이|님|씨)$/, '') === n || s.replace(/(이|님|씨)$/, '') === n.slice(1));
   let m;
+  // "견적서 확정해줘", "그거 확정", "전부 확정해줘", "방금 거 버려줘" → 대기함의 임시 항목을 말로 확정·버리기
+  if ((m = t.match(/^(.*?)\s*(확정|승인|버려|버리기|버림)\s*(해|하자|할게|해\s*줘|해\s*주세요|해\s*둬|줘|주세요)?$/)) && !/(?:^|\s)(왜|안|못|언제|어디)\s*$/.test(m[1]) && !/(됐|됨|됐어|했)/.test(t.slice(-3))) {
+    const drop = /^버/.test(m[2]); const pend = (await db.list('drafts')).filter(d => d.status === 'pending' && d.kind !== 'summary').sort((x, y) => (y.createdAt || '').localeCompare(x.createdAt || ''));
+    const subj = m[1].replace(/(을|를|은|는|이|가|도|좀)$/, '').trim(); const key = x => String(x || '').replace(/\s/g, '');
+    const asked = !!m[3] && /줘|주세요|둬/.test(m[3]);   /* "해줘"처럼 시키는 말일 때만 못 찾았다고 답하고, 아니면 새로 적는 말일 수 있으니 넘김 */
+    if (!pend.length) return asked ? { text: `대기함에 ${drop ? '버릴' : '확정할'} 임시 항목이 없어요.` } : null;
+    let hit;
+    if (/^(전부|다|모두|싹|전체|모든\s*거|대기함)\s*(다|전부)?$/.test(subj)) hit = pend;
+    else if (!subj || /^(그거|이거|저거|그것|이것|방금\s*(거|것|건)?|아까\s*(거|것|건)?|위에\s*(거|것))$/.test(subj)) { const l = await db.kvGet('chat:last', null); hit = pend.filter(d => l && (l.ids || []).includes(d.id)); if (!hit.length) hit = pend.slice(0, 1); }
+    else { const ws = toks(subj).map(key); hit = pend.filter(d => key(d.data.title || d.data.name).includes(key(subj))); if (!hit.length && ws.length) hit = pend.filter(d => ws.every(w => key(d.data.title || d.data.name).includes(w))); }
+    if (!hit.length && !asked) return null;
+    if (!hit.length) return { text: `대기함에서 “${subj}”${/[가-힣]$/.test(subj) && (subj.charCodeAt(subj.length - 1) - 0xac00) % 28 ? '이' : '가'} 들어간 임시 항목을 못 찾았어요. 지금 대기함에는 ${pend.slice(0, 3).map(d => '“' + (d.data.title || d.data.name) + '”').join(', ')}${pend.length > 3 ? ` 외 ${pend.length - 3}개` : ''}가 있어요.` };
+    if (hit.length > 1 && hit.length < pend.length && !/^(전부|다|모두|싹)/.test(subj) && subj && !/^(그거|이거|방금|아까)/.test(subj)) return { text: `“${subj}”에 맞는 임시 항목이 ${hit.length}개예요. 어느 걸 ${drop ? '버릴까요' : '확정할까요'}?`, chips: hit.slice(0, 4).map(d => ({ label: (d.data.title || d.data.name || '').slice(0, 16), say: `${d.data.title || d.data.name} ${drop ? '버려줘' : '확정해줘'}` })) };
+    const done = [];
+    for (const d of hit) { if (drop) { await reject(d); done.push(`“${d.data.title || d.data.name}”`); continue; }
+      const saved = await approve(d); let at = ''; try { if (saved) at = (await (await import('./where.js')).placeOf(d.kind, saved)).where; } catch { } done.push(`“${d.data.title || d.data.name}”${at ? ' (' + at + ')' : ''}`); }
+    return { text: drop ? `${done.join(', ')} 버렸어요.` : `${done.join(', ')} 확정했어요.${hit.length === 1 ? '' : ` 모두 ${hit.length}개예요.`}`, refresh: hit.map(d => d.id) };
+  }
 
   // 새 프로젝트
   if ((m = t.match(/^(?:새\s*)?프로젝트\s*(?:추가|생성|등록)?\s*[:：]?\s*(.{2,30}?)\s*(?:추가|생성|등록|만들어|시작)?(?:해\s*줘|해줘|줘|할게|해|하자)?$/)) && /(새|추가|생성|등록|만들|시작|[:：])/.test(t) && !/(회의|일정|마감|까지)/.test(t)) {
