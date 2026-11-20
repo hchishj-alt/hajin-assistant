@@ -4,7 +4,7 @@ import { ic, esc, $, el, chars, fmt, paras, toast, buzz, sheet } from './ui.js';
 import * as plan from './plan.js';
 import { mountStage, autoSec } from './stage.js';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.1.1';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -244,7 +244,7 @@ function takeSheet(s, t, n, onChange, { fresh } = {}) {
 async function shootView(id) {
   const s = await scripts.get(id);
   if (!s) { location.replace('#/'); return; }
-  const T = { id: s.id, title: s.title, body: (s.body || '').trim() || '대본이 비어 있어요. 나가서 대본을 써 주세요.', sec: secOf(s) };
+  const T = { id: s.id, title: s.title || (s.body || '').trim().split('\n')[0] || '새 대본', body: (s.body || '').trim() || '대본이 비어 있어요. 나가서 대본을 써 주세요.', sec: secOf(s) };
   const st = mountStage({
     script: T,
     limits: () => ({ ...plan.limits(), hq: plan.limits().hq }),
