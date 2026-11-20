@@ -126,6 +126,15 @@ export async function listMembers() {
   if (error) throw new Error(koErr(error.message));
   return (data || []).map(x => (typeof x === 'string' ? JSON.parse(x) : x));
 }
+/* 프로젝트 이름이 바뀌면 단기 작업자에게 맡긴 프로젝트 이름도 같이 바꿈(관리자로 로그인한 기기에서만). 돌려주는 값: 바꾼 사람 이름, 못 바꿨으면 { todo: [이름] } */
+export async function renameGuestProject(old, to) {
+  const ros = (await db.kvGet('sync:roster', [])).filter(r => r.kind === 'guest' && (!r.projects || r.projects.includes(old)));   /* 예전 명단에는 맡은 프로젝트가 안 적혀 있어서, 없으면 서버에 물어봄 */
+  if (!session || !(await isAdmin())) return ros.some(r => r.projects) ? { todo: ros.filter(r => r.projects).map(r => r.name) } : [];
+  if (!ros.length) return [];
+  const done = []; const all = await listMembers();
+  for (const m of all) if (m.kind === 'guest' && (m.projects || []).includes(old)) { try { await saveMember({ ...m, projects: m.projects.map(x => (x === old ? to : x)) }); done.push(m.name); } catch { } }
+  const left = ros.filter(r => r.projects).map(r => r.name).filter(n => !done.includes(n)); return left.length ? { todo: left, done } : done;
+}
 export async function saveMember(m) {
   const base = { p_id: m.id || null, p_code: m.code, p_name: m.name, p_role: m.role || '', p_gmail: m.gmail || '', p_is_admin: !!m.is_admin, p_active: m.active !== false };
   const guest = m.kind === 'guest';
@@ -335,7 +344,7 @@ async function pull() {
   for (const m of mem) { const s = spaces[m.space] ||= { id: m.space, name: m.spaces?.name, code: m.spaces?.code, members: [] }; s.members.push({ user: m.user_id, name: m.name || '팀원' }); }
   await db.kvSetRaw('sync:spaces', Object.values(spaces));
   try { const { data: ros, error: rerr } = await client.rpc('list_members'); if (ros && !rerr) { const all = ros.map(x => (typeof x === 'string' ? JSON.parse(x) : x));
-      const next = all.filter(x => x.active && !x.ended).map(x => ({ id: x.id, name: x.name, role: x.role, gmail: x.gmail, user: x.user_id, color: x.color || '', avatar: x.avatar || '', ...(x.kind === 'guest' ? { kind: 'guest' } : {}), ...(x.until ? { until: x.until } : {}) }));
+      const next = all.filter(x => x.active && !x.ended).map(x => ({ id: x.id, name: x.name, role: x.role, gmail: x.gmail, user: x.user_id, color: x.color || '', avatar: x.avatar || '', ...(x.kind === 'guest' ? { kind: 'guest', projects: x.projects || [] } : {}), ...(x.until ? { until: x.until } : {}) }));
       const meM = await db.kvGet('me:member', null);
       /* 로그인했는데 명단이 비어서 오면: 코드가 멈췄거나 쓸 수 있는 기간이 끝난 것 */
       const ended = !!meM && !all.length; if (ended !== !!(await db.kvGet('me:ended', false))) { await db.kvSetRaw('me:ended', ended); n++; if (ended && meM.kind === 'guest') await dropTeamCopies().catch(() => { }); }

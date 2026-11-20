@@ -1,5 +1,5 @@
 // 마인드맵 회의: 여러 명이 실시간으로 노드를 그리고, 말하면 노드로 쌓이고, 끝나면 AI가 정리해 회의록으로 보관
-import { h, ic, clear, toast, head, modal, form, tile, todayStr, fmtDate, confirmBox, colorFor, busy, rel } from '../js/ui.js';
+import { h, ic, clear, toast, head, modal, form, tile, todayStr, fmtDate, confirmBox, colorFor, busy, rel, clock } from '../js/ui.js';
 import * as db from '../js/db.js';
 import * as brain from '../js/brain.js';
 import * as store from '../js/store.js';
@@ -287,7 +287,7 @@ async function canvas(root, id) {
     clear(chatList);
     if (!msgs.length) chatList.append(h('p.faint.small', { style: { padding: '10px' } }, '마이크를 켜고 말하거나 아래에 적으면 여기에 쌓여요. “대화 → 노드”를 켜면 알아서 가지에 붙어요.'));
     for (const m of msgs.slice(-80)) chatList.append(h('div.mm-msg' + (m.by === myName ? '.mine' : ''), h('span.av', { style: { background: colorFor(m.by || '?') } }, (m.by || '?').slice(0, 1)),
-      h('div.grow', h('div.tiny.faint', `${m.by || ''} · ${(m.createdAt || '').slice(11, 16)}${m.origin === 'voice' ? ' · 음성' : ''}`), h('div.small', m.text)),
+      h('div.grow', h('div.tiny.faint', `${m.by || ''} · ${clock(m.createdAt)}${m.origin === 'voice' ? ' · 음성' : ''}`), h('div.small', m.text)),
       m.nodeIds?.length ? h('span.chip.ok', { title: '노드로 그려짐' }, ic('check', 10)) : h('button.btn.sm.icon.ghost', { title: '노드로 만들기', 'aria-label': '노드로 만들기', onclick: async () => { const made = await toNodes(m.text, m.id); if (made.length) { await db.patch(m.id, { nodeIds: made.map(n => n.id) }); m.nodeIds = made.map(n => n.id); drawChat(); } } }, ic('plus', 14))));
     chatList.scrollTop = chatList.scrollHeight;
   }

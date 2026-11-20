@@ -4,7 +4,7 @@ import * as db from '../js/db.js';
 import * as store from '../js/store.js';
 import * as brain from '../js/brain.js';
 import { taskRow, sortTasks } from './tasks.js';
-import { go, updateBadge } from '../js/app.js';
+import { go, updateBadge, isGuest } from '../js/app.js';
 import { draftCard } from '../js/draftcard.js';
 import * as F from '../js/follow.js';
 import * as Install from '../js/install.js';
@@ -13,6 +13,7 @@ export default {
   async render(root) {
     const now = new Date();
     const today = todayStr();
+    const weekEnd = db.dayOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() + (7 - (now.getDay() || 7))));   /* 이번 주 일요일 */
     const hour = now.getHours();
     const hi = hour < 6 ? '늦은 밤이에요' : hour < 12 ? '좋은 아침이에요' : hour < 18 ? '좋은 오후예요' : '오늘도 수고했어요';
     const askName = await db.kvGet('askName', false);
@@ -59,7 +60,7 @@ export default {
       tile('calendar', events.length, '오늘 일정', '', '#/calendar'),
       tile('check2', todays.length, overdue ? `할 일 · 밀림 ${overdue}` : '오늘 할 일', overdue ? 'bad' : '', '#/tasks'),
       tile('inbox', drafts.length, '확인 대기', drafts.length ? 'warn' : 'ok', '#/inbox'),
-      tile('wallet', shortWon(monthSpend), budget ? `이번 달 · 예산 ${Math.round(monthSpend / budget * 100)}%` : '이번 달 지출', budget && monthSpend > budget ? 'bad' : '', '#/money'));
+      isGuest() ? tile('clock', open.filter(t => t.due && t.due >= today && t.due <= weekEnd).length, '이번 주 마감', '', '#/tasks') : tile('wallet', shortWon(monthSpend), budget ? `이번 달 · 예산 ${Math.round(monthSpend / budget * 100)}%` : '이번 달 지출', budget && monthSpend > budget ? 'bad' : '', '#/money'));
 
     // 오늘 타임라인 (일정 + 빈 시간)
     const slots = await store.freeSlots(today);

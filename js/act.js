@@ -1,8 +1,8 @@
-// 말로 "이미 있는 것"을 고치기: 완료 처리, 일정 옮기기, 마감 바꾸기, 취소, 넘기기, 담당 정하기, 새 프로젝트
+// 말로 "이미 있는 것"을 고치기: 완료 처리, 일정 옮기기, 마감 바꾸기, 취소, 넘기기, 담당 정하기, 새 프로젝트, 프로젝트 지우기·이름·상태
 // 하나로 분명히 짚이면 바로 하고 "되돌리기"를 붙임. 여럿이면 어느 건지 되물음. 지우기는 항상 한 번 확인
 import * as db from './db.js';
 import * as brain from './brain.js';
-import { handoff, teammateNames, approve, reject, occursOn } from './store.js';
+import { handoff, teammateNames, approve, reject, occursOn, renameProject } from './store.js';
 
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
 const WHENTOK = /^(오늘|내일|모레|글피|어제|이번\s*주|다음\s*주|다다음\s*주|이번주|다음주|담주|주말|평일|오전|오후|아침|점심|저녁|밤|새벽|정오|자정|반|[월화수목금토일]요일|[월화수목금토일]욜|\d{1,2}월|\d{1,2}일|\d{1,2}\/\d{1,2}|\d{1,2}시(\s*반)?|\d{1,2}분|\d{1,2}:\d{2}|\d+일\s*(뒤|후)|\d+주\s*(뒤|후)|한\s*시간|\d+시간)(에|까지|부터|쯤|경)?$/;
@@ -50,6 +50,8 @@ const undo = prev => ({ label: '되돌리기', act: { op: 'restore', prev } });
 export async function run(a) {
   const it = a.id ? await db.get(a.id) : null;
   if (a.op === 'unproj') { for (const id of a.ids || []) { const x = await db.get(id); if (!x) continue; if (x.col === 'drafts') await db.patch(id, { data: { ...x.data, project: '' } }); else await db.patch(id, { project: '' }); } return { text: '프로젝트에서 뺐어요.', refresh: a.ids || [] }; }
+  if (a.op === 'projRename') { const r = await renameProject(a.id, a.to); if (!r.old) return { text: '그 사이에 없어졌어요.' }; const g = r.guests || []; const todo = Array.isArray(g) ? [] : (g.todo || []);
+    return { text: `“${r.old}” 프로젝트 이름을 “${a.to}”${euro(a.to)} 바꿨어요.${r.n ? ` 묶여 있던 ${r.n}개도 새 이름으로 옮겼어요.` : ''}${todo.length ? ` 단기 작업자 ${todo.join(', ')} 님에게 맡긴 프로젝트는 관리자 › 멤버에서 다시 골라 주세요.` : ''}`, chips: a.back ? [] : [{ label: '되돌리기', act: { op: 'projRename', id: a.id, to: r.old, back: true } }] }; }
   if (a.op === 'restore') { await db.put(a.prev.col, { ...a.prev, deleted: false }); return { text: `“${a.prev.title || a.prev.name}” 원래대로 돌려놨어요.` }; }
   if (!it || it.deleted) return { text: '그 사이에 없어졌어요.' };
   const prev = { ...it };
@@ -74,6 +76,7 @@ export async function run(a) {
     await db.patch(it.id, p); const clash = (await db.list('events')).filter(x => x.id !== it.id && x.date === p.date && x.start && (p.start || it.start) && x.start === (p.start || it.start));
     return { text: `“${it.title}”${eul(it.title)} ${fmtD(p.date)}${p.start || it.start ? ' ' + (p.start || it.start) : ''}로 옮겼어요.${clash.length ? ` 그런데 그 시간에 “${clash[0].title}”도 있어요.` : ''}${it.who ? ` ${it.who}에게도 알려 주세요.` : ''}`, chips: [undo(prev)] };
   }
+  if (a.op === 'projStatus') { await db.patch(it.id, { status: a.v }); return { text: `“${it.name}” 프로젝트를 ${a.v}${euro(a.v)} 바꿨어요.`, chips: [undo(prev)] }; }
   if (a.op === 'remove') { await db.remove(it.id); return { text: `“${it.title || it.name}” 지웠어요.`, chips: [undo(prev)] }; }
   if (a.op === 'got') { await db.patch(it.id, { status: 'got', gotAt: today(), ...(it.date && it.date !== today() ? { date: today(), planned: it.date } : {}) }); const left = (await db.list('incomes')).filter(x => x.status !== 'got'); return { text: `“${it.title}” ${Number(it.amount || 0).toLocaleString()}원 받은 것으로 바꿨어요.${left.length ? ` 아직 받을 돈은 ${left.reduce((s, x) => s + (Number(x.amount) || 0), 0).toLocaleString()}원(${left.length}건)이에요.` : ' 이제 받을 돈이 없어요.'}`, chips: [undo(prev)] }; }
   if (a.op === 'handoff') { await handoff(it, a.to, a.note || ''); return { text: `“${it.title}”${eul(it.title)} ${a.to} 님에게 넘겼어요.${a.note ? ` 메모: ${a.note}` : ''} 넘긴 기록은 할 일을 열면 보여요.`, chips: [undo(prev)] }; }
@@ -96,6 +99,36 @@ async function runDraft(a, d, prev) {
 }
 
 // 말에서 고치기 명령을 알아봄. 해당 없으면 null (→ 평소처럼 새로 만들기·대화로 넘어감)
+// 프로젝트를 말로: 지우기(항상 확인)·이름 바꾸기·상태 바꾸기. 만들기는 tryAct에 있음. 프로젝트 이야기가 아니면 null
+const pkey = s => String(s || '').replace(/\s/g, '').toLowerCase();
+async function findProj(q) { const ps = await db.list('projects'); const k = pkey(String(q || '').replace(/\s*프로젝트$/, '').replace(/^(그|이|저)\s+/, '')); if (!k) return []; const ex = ps.filter(p => pkey(p.name) === k); if (ex.length) return ex; return ps.filter(p => pkey(p.name).includes(k) || brain.projAliases(p.name).some(a => pkey(a) === k)); }
+const PSTAT = [[/^(완료|끝|끝남|종료|마감|마무리)$/, '완료'], [/^(보류|홀드|중단|멈춤|대기)$/, '보류'], [/^(진행|진행\s*중|재개|다시\s*진행)$/, '진행'], [/^(준비|준비\s*중)$/, '준비']];
+export async function tryProject(text) {
+  const t = String(text || '').trim().replace(/[.!~]+$/, ''); if (!/프로젝트/.test(t) || t.length < 6 || t.length > 70 || /\n/.test(t) || /[?？]$/.test(t)) return null; let m;
+  const none = q => ({ text: `“${q}” 프로젝트를 못 찾았어요.`, chips: [{ label: '프로젝트 열기', go: 'plan/projects' }] });
+  const which = (ps, verb, say) => ({ text: `어느 프로젝트를 ${verb}?`, chips: [...ps.slice(0, 4).map(p => ({ label: p.name.slice(0, 18), say: say(p) })), { label: '아니에요', skip: true }] });
+  // 이름·상태 바꾸기: "루미에 프로젝트 이름 루미에 팝업으로 바꿔줘", "프로젝트 루미에를 보류로 바꿔줘"
+  const CH = '(?:바꿔|바꾸|변경|고쳐|수정)\\S*(?:\\s*(?:줘|주세요|줄래))?', MID = '(?:\\s*(?:의\\s*)?(?:이름|명|상태)\\s*(?:을|를|은|는)?|(?:을|를|은|는))';
+  m = t.match(new RegExp(`^(.{1,30}?)\\s*프로젝트${MID}?\\s+(.{1,30}?)\\s*(?:으로|로)\\s*(?:이름\\s*)?${CH}$`)) || t.match(new RegExp(`^프로젝트\\s+(.{1,30}?)${MID}\\s+(.{1,30}?)\\s*(?:으로|로)\\s*(?:이름\\s*)?${CH}$`));
+  if (m) { const ps = await findProj(m[1]); const to = m[2].replace(/\s*프로젝트$/, '').trim(); const st = PSTAT.find(([re]) => re.test(to));
+    if (!ps.length) return none(m[1].trim()); if (ps.length > 1) return which(ps, '바꿀까요', p => `${p.name} 프로젝트 ${st ? '' : '이름 '}${to}${euro(to)} 바꿔줘`);
+    if (st) return run({ op: 'projStatus', id: ps[0].id, v: st[1] });
+    if (!to) return null; if ((await db.list('projects')).some(p => p.id !== ps[0].id && pkey(p.name) === pkey(to))) return { text: `“${to}” 프로젝트는 이미 있어요. 다른 이름으로 해 주세요.` };
+    return run({ op: 'projRename', id: ps[0].id, to }); }
+  // 상태: "루미에 프로젝트 끝났어", "루미에 프로젝트 보류해줘"
+  if ((m = t.match(/^(.{1,30}?)\s*프로젝트\s*(?:는|은|가|이|를|을|도)?\s*(?:이제\s*|다\s*)?(끝났|끝남|끝냈|완료|종료|마무리|보류|홀드|중단|재개|다시\s*진행)\S*(?:\s*(?:해\s*줘|해줘|줘|주세요|됐어|됐대|했어|됨))?$/))) {
+    const ps = await findProj(m[1]); const v = /^(보류|홀드|중단)/.test(m[2]) ? '보류' : /^(재개|다시)/.test(m[2]) ? '진행' : '완료';
+    if (!ps.length) return none(m[1].trim()); if (ps.length > 1) return which(ps, '바꿀까요', p => `${p.name} 프로젝트 ${v}${euro(v)} 바꿔줘`);
+    if (ps[0].status === v) return { text: `“${ps[0].name}” 프로젝트는 이미 ${v}${v === '진행' ? '이에요' : '예요'}.` };
+    return run({ op: 'projStatus', id: ps[0].id, v }); }
+  // 지우기 (항상 확인): "루미에 프로젝트 지워줘", "프로젝트 루미에 삭제"
+  if ((m = t.match(/^(.{1,30}?)\s*프로젝트\s*(?:는|은|를|을|도)?\s*(?:이제\s*|그냥\s*)?(?:지워|지우|삭제|없애|없앨)\S*(?:\s*(?:줘|주세요|해줘|해 줘|줄래))?$/)) || (m = t.match(/^프로젝트\s+(.{1,30}?)\s*(?:는|은|를|을)?\s*(?:지워|지우|삭제|없애|없앨)\S*(?:\s*(?:줘|주세요|해줘|해 줘|줄래))?$/))) {
+    const ps = await findProj(m[1]); if (!ps.length) return none(m[1].trim()); if (ps.length > 1) return which(ps, '지울까요', p => `${p.name} 프로젝트 지워줘`);
+    const p = ps[0]; let n = 0; for (const it of await db.allItems()) if (!it.deleted && it.col !== '_kv' && it.id !== p.id && (it.project === p.name || (it.col === 'drafts' && it.data && it.data.project === p.name))) n++;
+    return { text: `“${p.name}” 프로젝트를 지울까요?${n ? ` 이 이름으로 묶어 둔 ${n}개는 지워지지 않고 그대로 남아요.` : ''}`, chips: [{ label: '지우기', act: { op: 'remove', id: p.id } }, { label: '끝난 걸로만', act: { op: 'projStatus', id: p.id, v: '완료' } }, { label: '그냥 두기', skip: true }] }; }
+  return null;
+}
+
 export async function tryAct(text, { people = [] } = {}) {
   let t = text.trim().replace(/[.!~]+$/, ''); if (t.length < 4 || t.length > 90 || /\n/.test(t)) return null;
   const names = [...new Set([...people, ...(await teammateNames())].filter(Boolean))];

@@ -43,6 +43,9 @@ const req = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 export const now = () => new Date().toISOString();
 // 저장된 시각(UTC로 적힌 글)이 이 기기 시간으로 며칠인지. 그냥 앞 10글자를 자르면 자정부터 아침 9시(한국) 사이에 하루가 어긋남
+/* 저장된 시각(UTC 글자)을 이 기기 시:분으로. 글자를 잘라 쓰면(.slice(11, 16)) 한국에서 9시간 어긋남. whenShort: 오늘 것은 시:분, 지난 것은 월/일 */
+export const clockOf = x => { if (!x) return ''; const d = x instanceof Date ? x : new Date(x); return isNaN(d) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+export const whenShort = (x, now = new Date()) => { if (!x) return ''; const d = x instanceof Date ? x : new Date(x); if (isNaN(d)) return ''; return dayOf(d) === dayOf(now) ? clockOf(d) : `${d.getMonth() + 1}/${d.getDate()}`; };
 export const dayOf = x => { if (!x) return ''; if (typeof x === 'string' && x.length <= 10) return x; const d = x instanceof Date ? x : new Date(x); if (isNaN(d)) return String(x).slice(0, 10); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 function emit(col, item) { listeners.forEach(fn => { try { fn(col, item); } catch (e) { console.error(e); } }); }

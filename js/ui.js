@@ -161,6 +161,8 @@ export const pad = n => String(n).padStart(2, '0');
 export const ymd = d => { d = new Date(d); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 export const hm = d => { d = new Date(d); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 export const todayStr = () => ymd(new Date());
+/* 저장된 시각을 이 기기 시간으로 (규칙은 db.js의 clockOf·whenShort) */
+export { clockOf as clock, whenShort } from './db.js';
 export const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 export const startOfWeek = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 const WD = ['일', '월', '화', '수', '목', '금', '토'];

@@ -1,5 +1,5 @@
 // 메신저: 팀원과 1:1. 비서가 가운데에서 전하고, 받은 내용을 판단해 일정·할 일로 바꿔 줌
-import { h, ic, clear, toast, head, colorFor, fmtDate, facePic } from '../js/ui.js';
+import { h, ic, clear, toast, head, colorFor, fmtDate, facePic, clock, whenShort } from '../js/ui.js';
 import * as db from '../js/db.js';
 import * as store from '../js/store.js';
 import * as DM from '../js/dm.js';
@@ -27,8 +27,8 @@ export default {
       const rows = roster.map(r => { const ms = all.filter(d => d.other === r.id); return { r, last: ms[ms.length - 1], unread: ms.filter(d => !d.mine && !d.readAt).length }; }).sort((a, b) => (b.last?.createdAt || '').localeCompare(a.last?.createdAt || ''));
       for (const { r, last, unread } of rows) listEl.append(h('button.talk-p' + (open === r.id ? '.on' : ''), { onclick: () => { open = r.id; go('talk/' + r.id); } },
         facePic(r.name, h('span.avatar', { style: { background: colorFor(r.name), width: '38px', height: '38px' } }, r.name.slice(-2, -1) || r.name[0])),
-        h('span.grow', h('b', r.name), h('span.faint.tiny', last ? `${last.mine ? '나: ' : ''}${last.body}` : (r.user ? '아직 대화가 없어요' : '아직 로그인 전이에요'))),
-        unread ? h('span.badge', unread) : last ? h('span.faint.tiny', (last.createdAt || '').slice(11, 16)) : null));
+        h('span.grow', h('b', r.name, r.kind === 'guest' ? h('span.chip.tiny.guest-chip', '단기') : null), h('span.faint.tiny', last ? `${last.mine ? '나: ' : ''}${last.body}` : (r.user ? '아직 대화가 없어요' : '아직 로그인 전이에요'))),
+        unread ? h('span.badge', unread) : last ? h('span.faint.tiny', whenShort(last.createdAt)) : null));
       clear(pane);
       const other = roster.find(r => r.id === open);
       if (!other) { pane.append(h('div.empty', ic('msg', 26), h('p', '왼쪽에서 대화할 사람을 골라요.'))); return; }
@@ -40,7 +40,7 @@ export default {
       let day = '';
       for (const d of ms) {
         const ds = db.dayOf(d.createdAt || ''); if (ds !== day) { day = ds; log.append(h('div.talk-day', fmtDate(ds))); }
-        const b = h('div.talk-b' + (d.mine ? '.mine' : ''), h('div.talk-t', d.body), h('span.talk-tm', new Date(d.createdAt).toTimeString().slice(0, 5)));
+        const b = h('div.talk-b' + (d.mine ? '.mine' : ''), h('div.talk-t', d.body), h('span.talk-tm', clock(d.createdAt)));
         log.append(b);
         if (!d.mine && !d.handled) log.append(await assist(d, other));
       }

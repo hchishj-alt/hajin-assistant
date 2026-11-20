@@ -98,6 +98,18 @@ export async function projects() {
   const ps = await db.list('projects');
   return ps.map(p => p.name).filter(Boolean);
 }
+// 프로젝트 이름을 바꾸면 그 이름으로 묶어 둔 할 일·일정·문서·임시 항목도 같이 따라감 (안 그러면 프로젝트에서 빠진 것처럼 보임)
+export async function renameProject(id, to) {
+  const p = await db.get(id); to = String(to || '').trim().slice(0, 40); if (!p || p.col !== 'projects' || !to || p.name === to) return { n: 0, old: p ? p.name : '', guests: [] };
+  const old = p.name; let n = 0;
+  for (const it of await db.allItems()) { if (it.deleted || it.id === id || it.col === '_kv') continue;
+    if (it.col === 'drafts') { if (it.data && it.data.project === old) { await db.patch(it.id, { data: { ...it.data, project: to } }); n++; } }
+    else if (it.project === old) { await db.patch(it.id, { project: to }); n++; } }
+  await db.patch(id, { name: to });
+  const cur = await db.kvGet('chat:project', null); if (cur && cur.name === old) await db.kvSet('chat:project', { ...cur, name: to });
+  let guests = []; try { guests = await (await import('./sync.js')).renameGuestProject(old, to); } catch { }
+  return { n, old, guests };
+}
 export async function eventsOn(date) {
   const evs = await db.list('events');
   return evs.filter(e => occursOn(e, date)).sort((a, b) => (a.start || '').localeCompare(b.start || ''));

@@ -4,7 +4,7 @@ import * as B from './brain.js';
 import { isWhere } from './where.js';
 import * as PS from './prompts.js';
 import * as DM from './dm.js';
-import { dayOf } from './db.js';
+import { dayOf, clockOf, whenShort } from './db.js';
 import * as V from './video.js';
 import * as SY from './sync.js';
 export const BASE = new Date(2026, 10, 19, 10, 0, 0);
@@ -77,6 +77,10 @@ export function run() {
       const late = new Date(2026, 10, 21, 0, 30).toISOString(), noon = new Date(2026, 10, 21, 12, 0).toISOString();
       const ok = dayOf(late) === '2026-11-21' && dayOf(noon) === '2026-11-21' && dayOf('2026-11-21') === '2026-11-21' && dayOf('') === '' && dayOf(new Date(2026, 0, 1, 0, 5)) === '2026-01-01';
       results.push({ group: '날짜', name: '저장된 시각을 이 기기 날짜로 읽음 (자정~아침에 하루 어긋나지 않음)', ok, detail: ok ? '5/5' : `${dayOf(late)} / ${dayOf(noon)}` }); }
+    { // 쪽지·회의 말풍선의 시:분도 이 기기 시간으로 (UTC 글자의 11~16번째 글자를 자르면 9시간 어긋남)
+      const t = new Date(2026, 10, 21, 0, 30), old = new Date(2026, 10, 18, 23, 50), now = new Date(2026, 10, 21, 9, 0);
+      const got = [clockOf(t.toISOString()), whenShort(t.toISOString(), now), whenShort(old.toISOString(), now), clockOf(''), clockOf('x'), whenShort(null)];
+      results.push({ group: '날짜', name: '저장된 시각의 시:분도 이 기기 시간으로 (오늘 것은 시:분, 지난 것은 월/일)', ok: got.join('|') === '00:30|00:30|11/18|||', detail: got.join(' | ') }); }
   }
   { // 곧 울릴 알림, 비워 둘 시간, 제목 군말
     const base = new Date(2026, 10, 20, 14, 0), cx = { base, people: ['김하진', '최민서', '안서연'], projects: ['가을 팝업', '루미에'] }; const one = t => B.interpret(t, cx)[0] || { data: {} };

@@ -49,4 +49,6 @@ function scanBody(file, body) {
 function walk(file, n) { if (!n) return; if (isFn(n) && n.body.type === 'BlockStatement') scanBody(file, n.body.body); if (n.type === 'Program') scanBody(file, n.body); kids(n).forEach(c => walk(file, c)); }
 const root = process.argv[2] || path.join(__dirname, '..');
 for (const dir of ['js', 'modules']) for (const f of fs.readdirSync(path.join(root, dir)).sort()) { if (!f.endsWith('.js') || /^vendor-/.test(f)) continue; const p = path.join(root, dir, f); let ast; try { ast = acorn.parse(fs.readFileSync(p, 'utf8'), { ecmaVersion: 'latest', sourceType: 'module', locations: true }); } catch (e) { console.log('parse fail', p, e.message); continue; } walk(dir + '/' + f, ast); }
+/* 저장된 시각(…At)의 글자를 잘라 날짜·시간으로 쓰는 곳: UTC 글자라 한국에서 어긋남. db.dayOf / db.clockOf / ui.whenShort를 써야 함 */
+for (const dir of ['js', 'modules']) for (const f of fs.readdirSync(path.join(root, dir)).sort()) { if (!f.endsWith('.js') || /^vendor-/.test(f)) continue; fs.readFileSync(path.join(root, dir, f), 'utf8').split('\n').forEach((ln, k) => { if (/At\b[^;\n]{0,24}\.slice\(\s*11\s*,\s*16\s*\)/.test(ln)) { total++; console.log(`BUG  ${dir}/${f}:${k + 1} 저장된 시각의 글자를 잘라 시:분으로 씀 (clockOf를 쓰세요)`); } }); }
 console.log(total ? `순서 문제 ${total}곳` : '순서 문제 없음'); process.exit(total ? 1 : 0);

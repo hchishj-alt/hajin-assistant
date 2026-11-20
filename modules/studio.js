@@ -401,7 +401,7 @@ async function editor(root, id) {
   root.append(
     h('div.row.between', { style: { marginBottom: '8px' } }, h('a.btn.sm.ghost', { href: '#/studio' }, ic('left', 14), '스튜디오'), h('div.row', h('button.btn.sm.ghost.danger', { onclick: async () => { if (await confirmBox('이 편집을 지울까요?', '지우기')) { await db.remove(id); go('studio'); } } }, ic('trash', 14)))),
     titleIn,
-    h('div.grid', { style: { gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.1fr)', gap: '16px', alignItems: 'start', marginTop: '10px' }, class: 'editor-grid' },
+    h('div.grid', { style: { gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.1fr)', gap: '16px', alignItems: 'start', marginTop: '10px' }, class: 'editor-grid editor-main' },
       h('div.stack', { style: { position: 'sticky', top: '12px' }, class: 'editor-stage' }, canvas, bar, h('div.row.between', h('div.row', playBtn, exportBtn, cancelBtn), timeEl), exportHint),
       h('div.stack.editor-side',
         h('div.card', h('div.card-h', h('h3', ic('palette'), '콘셉트'), applyBtn), h('div.grid.g2', conceptSel, ratioSel), conceptInfo),

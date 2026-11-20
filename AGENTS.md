@@ -92,3 +92,12 @@
 - 파트(역할)는 기본 네 가지(`prompts.TEAM_ROLES`) + 관리자가 만든 것(`team-main.parts`, 팀이 없는 기기는 `team:parts`). 새 파트는 기본 네 가지 중 닮은 쪽(`keys`)을 따라 화면이 맞춰져요. 역할 목록이 필요하면 `TEAM_ROLES` 말고 `teamRoles()`를 쓰세요.
 - 서버 트리거에서 `by` 칸은 꼭 `"by"`로 쓰세요. 이 언어의 예약어라 따옴표 없이 쓰면 고칠 때마다 오류가 나요 (v1.39.0 전까지 팀 기록 고치기가 서버에서 전부 막혀 있었음).
 - 서버 설치문은 로컬 Postgres에서 먼저 돌려 볼 수 있어요: `/mnt/project-files/hajin-assistant-dev/server-test/` (Supabase 흉내 틀 `stub.sql`, 사람 넷으로 권한을 보는 `t2.sql`).
+
+## 프로젝트 이름·시간 표시·화면 크기 (v1.40.0)
+- 프로젝트 이름을 바꿀 때는 꼭 `store.renameProject(id, 새이름)`을 쓰세요. 그 이름으로 묶어 둔 할 일·일정·문서·임시 항목과 단기 작업자에게 맡긴 프로젝트 이름(`sync.renameGuestProject`, 관리자 기기에서만)이 같이 따라가요. `db.put('projects', …)`으로 이름만 바꾸면 묶인 것이 프로젝트에서 빠져 보여요.
+- 말로 프로젝트 지우기·이름 바꾸기·상태 바꾸기는 `act.tryProject`. 지우기는 항상 한 번 물어봐요. 만들기는 `tryAct`에 있어요.
+- 저장된 시각(`createdAt` 등)에서 시:분을 보여 줄 때는 `db.clockOf(시각)`(ui에서는 `clock`), 목록에서는 `whenShort`. `.slice(11, 16)`은 UTC라 한국에서 9시간 어긋나요 (`tests/order.cjs`가 잡음).
+- 폰을 눕힌 화면(높이 500 이하)은 탭 줄을 한 줄로 낮춰요. 떠 있는 것(`#toast`, `.rdw`, `#jobq`, `.cartbar`)의 바닥 높이도 그 미디어 쿼리에 같이 있으니, 떠 있는 것을 새로 만들면 거기에도 넣으세요. 가로 화면의 노치 옆 여백은 `#view`·`#tabbar`의 `env(safe-area-inset-left/right)`.
+- 눕힌 폰의 영상 편집실은 두 칸(`.editor-main`: 왼쪽 영상은 붙어 있고 오른쪽에서 편집). 콘셉트 창도 `.editor-grid`를 쓰니 편집실만 바꿀 때는 `.editor-main`으로 고르세요.
+- 창(모달)의 제목 줄·단추 줄은 창 안쪽 여백까지 덮어요(`.modal:not(.ai-modal)>.modal-h`, `.modal-f`). 창 여백을 바꾸면 이 값(22px, `--mpb`)도 같이 바꾸세요. 스위치(`.switch`)는 보이는 크기 28px, 누르는 자리는 `::before`로 44px.
+- 모든 화면을 여러 크기로 열어 보는 점검: `/mnt/project-files/hajin-assistant-dev/flows/sweep.js` (오류·옆 넘침·화면 밖·탭 줄에 가림), 뜨는 창은 `modals.js`·`mcheck.js`, 편집실 가로 화면은 `video/vshot.js`.

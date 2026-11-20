@@ -1140,3 +1140,40 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 .guest-strip>svg{flex:none;margin-top:2px;color:var(--acc)}.guest-strip b{display:block}.guest-strip span{color:var(--muted)}
 .guest-strip.soon,.guest-strip.end{background:color-mix(in srgb,#e3a008 12%,var(--card));border-color:color-mix(in srgb,#e3a008 35%,transparent)}.guest-strip.soon>svg,.guest-strip.end>svg{color:#b45309}
 .part-row .chips{margin-top:4px}
+
+/* ── v1.40.0: 폰을 눕혔을 때, 노치 옆 여백, 큰 모니터 ── */
+.guest-chip{margin-left:6px;vertical-align:1px;background:color-mix(in srgb,#e3a008 16%,var(--card));border-color:color-mix(in srgb,#e3a008 40%,var(--line))}
+/* 노치·둥근 모서리가 옆에 오는 가로 화면에서 글이 가려지지 않게 */
+@media (max-width:900px){
+  #view{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+  #tabbar{padding-left:max(4px,env(safe-area-inset-left));padding-right:max(4px,env(safe-area-inset-right))}
+}
+/* 폰을 눕히면 세로 자리가 귀함: 탭 줄을 한 줄로 낮추고 머리 여백을 줄임 */
+@media (min-width:560px) and (max-width:900px) and (max-height:500px) and (orientation:landscape){
+  #view{padding-top:calc(10px + env(safe-area-inset-top));padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+  #tabbar{padding-top:2px;padding-bottom:calc(2px + env(safe-area-inset-bottom))}
+  #tabbar a{flex-direction:row;gap:6px;min-height:44px;padding:0 12px;font-size:calc(12px*var(--fs,1))}
+  #tabbar a.center .tabic{width:38px;height:38px;margin-top:0;border-radius:calc(13px*var(--rd,1))}
+  .page-head{margin-bottom:10px}
+  h1{font-size:calc(19px*var(--fs,1))}
+  html{scroll-padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  .cartbar,.rdw-fab,.rdw,#jobq,#toast{bottom:calc(60px + env(safe-area-inset-bottom))}
+}
+/* 창을 내리면 제목 줄 위(창 안쪽 여백)로 내용이 비쳐 보이던 것: 제목 줄이 그 여백까지 덮음 */
+.modal:not(.ai-modal)>.modal-h{top:-22px;margin-top:-28px;padding:28px 0 6px}
+/* 아래 단추 줄도 같음: 창 아래쪽 여백까지 덮음 (폰은 홈 막대 자리까지) */
+.modal{--mpb:22px}
+@media (max-width:900px){.modal{--mpb:calc(22px + env(safe-area-inset-bottom))}}
+.modal:not(.ai-modal) .modal-f{bottom:calc(-1*var(--mpb));margin-bottom:calc(-1*var(--mpb));padding-bottom:calc(4px + var(--mpb))}
+/* 켜고 끄는 단추는 보이는 크기(28px)는 그대로 두고 누르는 자리만 44px로 넓힘 */
+.switch::before{content:"";position:absolute;inset:-8px -2px}
+/* 눕힌 폰에서 영상 편집: 영상은 왼쪽에 붙여 두고 오른쪽에서 편집 (세로로 쌓으면 영상과 단추가 한 화면에 안 들어옴) */
+@media (min-width:560px) and (max-width:900px) and (max-height:500px) and (orientation:landscape){
+  #view .editor-main{grid-template-columns:minmax(200px,36%) minmax(0,1fr)!important;gap:12px!important}
+  #view .editor-main>.editor-stage{position:sticky!important;top:calc(8px + env(safe-area-inset-top));gap:6px}
+  #view .editor-main .editor-canvas{max-height:calc(100dvh - 158px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+  #view .editor-main>.editor-stage .btn{padding-left:10px;padding-right:10px}
+}
+/* 큰 모니터: 내용을 왼쪽에 몰지 않고 가운데에 */
+@media (min-width:1500px){#view{max-width:1320px;margin-inline:auto}}
+
