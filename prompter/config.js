@@ -2,7 +2,7 @@
 export const SB = { url: 'https://wuvqtfvvouweqxbydlqa.supabase.co', key: 'sb_publishable_dpHWxB26toO96sIiv4XlqA_lBmzrGGp' };
 
 // 요금: 카드 월 자동결제 하나. 바꾸면 supabase/functions/prompter-billing 의 PRICE도 같이 바꾼다.
-export const PRICE = { month: 990, days: 31 };
+export const PRICE = { month: 990, list: 9900, days: 31, event: '오픈 이벤트가' }; // list: 원래 가격(줄 긋기), 할인율은 자동
 
 // 무료로 쓸 수 있는 범위. 여기만 고치면 앱 전체 잠금이 바뀐다.
 export const FREE = {

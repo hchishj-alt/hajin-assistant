@@ -1,6 +1,9 @@
 // 구독: 상태, 잠금(needPro), 구독 관리 화면(#/plan), 관리 화면(#/admin)
 // 구독 중 = 서버 pr_customers.paid_until > now(). 이 기기는 마지막 상태를 기억해 두고 열 때마다 새로 받는다.
 import { SB, PRICE, FREE } from './config.js';
+// 이벤트 가격 표시: ~~9,900원~~ 90% 월 990원
+const off = () => PRICE.list > PRICE.month ? Math.round((1 - PRICE.month / PRICE.list) * 100) : 0;
+const priceTag = () => off() ? `<span class="ptag"><span class="ev">${PRICE.event || '이벤트가'}</span><s>${won(PRICE.list)}</s><b class="off">${off()}% 할인</b><b>월 ${won(PRICE.month)}</b></span>` : `월 ${won(PRICE.month)}`;
 import { cardReady, startCard, finishRedirect } from './billing.js';
 import { ic, esc, $, el, toast, sheet, copy, buzz } from './ui.js';
 
@@ -75,7 +78,7 @@ export function needPro(kind) {
   const [a, b] = WHY[kind] || ['프로 기능이에요', ''];
   const box = el(`<div><div class="upic">${ic('star', 26)}</div><h2 style="text-align:center;margin-bottom:4px">${a}<br>프로가 필요해요</h2><p class="muted c">${b}</p>
     ${perkTable()}
-    <button class="btn acc wide" data-card>${ic('card', 18)}카드로 구독 · 월 ${won(PRICE.month)}</button>
+    <div class="pline">${priceTag()}</div><button class="btn acc wide" data-card>${ic('card', 18)}카드로 구독 · 월 ${won(PRICE.month)}</button>
     <button class="ghost wide" data-gift style="margin-top:8px">${ic('gift', 18)}기프트 키가 있어요</button></div>`);
   const sh = sheet(box);
   $('[data-card]', box).onclick = () => { sh.close(); subscribe(); };
@@ -112,12 +115,12 @@ export async function planView(view) {
     ${failed ? `<div class="notice">${ic('card', 18)}<span>카드 결제가 안 됐어요. 카드를 바꿔 주세요.</span></div>` : ''}
     <div class="hero ${pro ? 'on' : ''}">
       <div class="row" style="justify-content:space-between"><span class="badge">${ic('star', 14)}${badge}</span>${pro && !forever ? `<span class="until">${ymd(me.paid_until)}까지</span>` : ''}</div>
-      <div class="price">${pro ? (forever ? '평생 무료' : card?.status === 'active' ? `다음 결제 ${md(card.next_at)}` : '구독 중') : `월 ${won(PRICE.month)}`}</div>
+      <div class="price">${pro ? (forever ? '평생 무료' : card?.status === 'active' ? `다음 결제 ${md(card.next_at)}` : '구독 중') : priceTag()}</div>
       <p class="hs">${pro ? (card ? `${esc(card.label || '카드')} · ${card.status === 'active' ? `매달 ${won(card.amount)} 자동결제` : card.status === 'canceled' ? '해지됨 · 남은 기간만 써요' : '결제 실패'}` : forever ? '기프트 키로 열렸어요' : '기프트 키로 열렸어요') : '대본 무제한 · 길게 찍기 · 1080p · 목소리 따라가기'}</p>
     </div>
     ${perkTable()}
     <div class="acts">
-      ${!pro || (card && card.status !== 'active' && !forever) ? `<button class="btn acc wide" id="sub">${ic('card', 18)}카드로 구독 · 월 ${won(PRICE.month)}</button>${cardReady() ? '' : '<p class="tip c">카드 결제는 준비 중이에요. 지금은 기프트 키로 열 수 있어요.</p>'}` : ''}
+      ${!pro || (card && card.status !== 'active' && !forever) ? `<button class="btn acc wide" id="sub">${ic('card', 18)}카드로 구독 · 월 ${won(PRICE.month)}${off() ? ` (${off()}% 할인)` : ''}</button>${cardReady() ? '' : '<p class="tip c">카드 결제는 준비 중이에요. 지금은 기프트 키로 열 수 있어요.</p>'}` : ''}
       ${card && card.status === 'active' ? `<div class="row"><button class="ghost grow" id="chg">${ic('card', 18)}카드 바꾸기</button><button class="ghost grow" id="cancel">해지하기</button></div>` : ''}
     </div>
 

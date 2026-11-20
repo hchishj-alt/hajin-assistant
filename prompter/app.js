@@ -4,7 +4,7 @@ import { ic, esc, $, el, chars, fmt, paras, toast, buzz, sheet } from './ui.js';
 import * as plan from './plan.js';
 import { mountStage, autoSec } from './stage.js';
 
-export const VERSION = '1.1.1';
+export const VERSION = '1.2.0';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -41,7 +41,7 @@ let cleanup = null;
 async function route() {
   try { await cleanup?.(); } catch {}
   cleanup = null;
-  const [, a, b] = (location.hash || '#/').split('/');
+  const [, a, b, c] = (location.hash || '#/').split('/');
   view.classList.remove('in');
   view.innerHTML = '';
   if (a === 'new') {
@@ -52,7 +52,7 @@ async function route() {
   if (a === 'plan') { await plan.planView(view); requestAnimationFrame(() => view.classList.add('in')); return; }
   if (a === 'admin') { await plan.adminView(view); requestAnimationFrame(() => view.classList.add('in')); return; }
   if (a === 's' && b) cleanup = await editView(b);
-  else if (a === 'shoot' && b) cleanup = await shootView(b);
+  else if (a === 'shoot' && b) cleanup = await shootView(b, +c || 0);
   else cleanup = await listView();
   requestAnimationFrame(() => view.classList.add('in'));
 }
@@ -144,19 +144,49 @@ async function editView(id) {
       <div class="seg sm" id="stt">${Object.entries(STATUS).map(([k, [n]]) => `<button data-s="${k}" aria-pressed="${(s.status || 'draft') === k}">${n}</button>`).join('')}</div>
     </div>
     <div class="emeta"><div class="meta" id="em"></div><button class="ghost sm" id="paste">${ic('paste', 16)}붙여넣기</button></div>
-    <textarea class="editor" id="ed" placeholder="여기에 대본을 쓰거나 붙여 넣어요.&#10;&#10;[[인사]]처럼 대괄호 두 개로 감싼 줄은 촬영 화면에서 작은 구간 표시로 보여요." spellcheck="false">${esc(s.body)}</textarea>
+    <div id="scn"></div>
+    <button class="addscn" id="addS">${ic('plus', 18)}씬 추가</button>
     <div class="secrow"><span class="lab">${ic('timer', 16)}읽는 시간</span><input class="inp" id="sec" type="number" min="5" max="3600" inputmode="numeric" value="${secOf(s)}"><span class="muted">초</span><button class="ghost sm" id="auto">글자 수로 맞추기</button></div>
     <p class="tip">대사는 이 시간에 맞춰 올라가요. 촬영 화면에서 속도(%)로 더 조절할 수 있어요.</p>
     <div id="tk"></div>
     <div class="bar"><a class="btn acc wide" href="#/shoot/${s.id}">${ic('cam')}이 대본으로 찍기</a></div>`;
-  const ed = $('#ed'), ti = $('#ti'), em = $('#em'), sec = $('#sec');
+  const ti = $('#ti'), em = $('#em'), sec = $('#sec'), scn = $('#scn');
+  let SC = toScenes(s.body), lastTa = null;
+  const ed = { get value() { return fromScenes(SC); } }; // 아래 코드가 쓰는 '전체 대본'
   let autoS = !s.sec; // 직접 정하기 전까지는 글자 수를 따라감
   const meta = () => { em.innerHTML = `<span>${ic('text', 14)}${chars(ed.value)}자</span><span>${ic('para', 14)}문단 ${paras(ed.value)}</span>`; };
-  const grow = () => { ed.style.height = 'auto'; ed.style.height = Math.max(ed.scrollHeight, window.innerHeight * .46) + 'px'; };
+  const growOne = ta => { ta.style.height = 'auto'; ta.style.height = Math.max(ta.scrollHeight, SC.length > 1 ? 120 : window.innerHeight * .42) + 'px'; };
+  const grow = () => scn.querySelectorAll('textarea').forEach(growOne);
+  const drawScenes = (focus = -1) => {
+    const multi = SC.length > 1;
+    scn.className = multi ? 'scenes multi' : 'scenes';
+    scn.innerHTML = SC.map((c, i) => `<div class="scene" style="animation-delay:${i * 30}ms">
+      ${multi ? `<div class="shead"><b class="snum">${i + 1}</b><input class="sname" data-n="${i}" value="${esc(c.name)}" placeholder="씬 ${i + 1}" maxlength="30">
+        <span class="smeta">${chars(c.text)}자</span>
+        <button class="mini" data-up="${i}" aria-label="위로" ${i ? '' : 'disabled'}>${ic('top', 16)}</button>
+        <button class="mini" data-rm="${i}" aria-label="씬 지우기">${ic('trash', 16)}</button></div>` : ''}
+      <textarea class="editor" data-t="${i}" spellcheck="false" placeholder="${multi ? '이 씬에서 할 말' : '여기에 대본을 쓰거나 붙여 넣어요.&#10;&#10;여러 번 나눠 찍으려면 아래 [씬 추가]를 눌러요.'}">${esc(c.text)}</textarea></div>`).join('');
+    scn.querySelectorAll('textarea').forEach(ta => {
+      ta.oninput = () => { SC[+ta.dataset.t].text = ta.value; growOne(ta); const m = ta.parentNode.querySelector('.smeta'); if (m) m.textContent = chars(ta.value) + '자'; changed(); };
+      ta.onfocus = () => lastTa = ta;
+    });
+    scn.querySelectorAll('.sname').forEach(n => n.oninput = () => { SC[+n.dataset.n].name = n.value; changed(); });
+    scn.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const i = +b.dataset.up; [SC[i - 1], SC[i]] = [SC[i], SC[i - 1]]; changed(); drawScenes(); buzz(8); });
+    scn.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
+      const i = +b.dataset.rm, gone = SC.splice(i, 1)[0];
+      if (SC.length === 1 && /^씬 \d+$/.test(SC[0].name)) SC[0].name = '';
+      changed(); drawScenes();
+      if (gone.text.trim()) toast('씬을 지웠어요');
+    });
+    requestAnimationFrame(grow);
+    if (focus >= 0) setTimeout(() => scn.querySelectorAll(focus === -2 ? '.sname' : 'textarea')[focus]?.focus(), 250);
+  };
+  const changed = () => { if (autoS) { s.sec = 0; sec.value = autoSec(ed.value); } meta(); later(); };
+  $('#addS').onclick = () => { SC.push({ name: '', text: '' }); changed(); drawScenes(SC.length - 1); buzz(8); };
+  drawScenes();
   let t; let dirty = false;
-  const save = async () => { clearTimeout(t); if (!dirty) return; dirty = false; s.title = ti.value.trim(); s.body = ed.value; s.updatedAt = Date.now(); await scripts.put(s); };
+  const save = async () => { clearTimeout(t); if (!dirty) return; dirty = false; s.title = ti.value.trim(); s.body = fromScenes(SC); s.updatedAt = Date.now(); await scripts.put(s); };
   const later = () => { dirty = true; clearTimeout(t); t = setTimeout(save, 400); };
-  ed.oninput = () => { meta(); grow(); if (autoS) { s.sec = 0; sec.value = autoSec(ed.value); } later(); };
   ti.oninput = later;
   sec.onchange = () => { s.sec = Math.max(5, Math.min(3600, +sec.value || 30)); sec.value = s.sec; autoS = false; later(); };
   $('#auto').onclick = () => { s.sec = 0; autoS = true; sec.value = autoSec(ed.value); later(); toast(`${sec.value}초로 맞췄어요`); };
@@ -170,16 +200,17 @@ async function editView(id) {
     box.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { s.project = b.dataset.p; $('#pj span').textContent = projects.get(s.project)?.name || '프로젝트 없음'; later(); sh.close(); toast('옮겼어요'); });
     $('[data-new]', box).onclick = async () => { sh.close(); const n = await ask('새 프로젝트', '', { ok: '만들기' }); if (!n) return; const p = projects.add(n); projs.push(p); s.project = p.id; $('#pj span').textContent = p.name; later(); };
   };
-  meta(); requestAnimationFrame(grow);
-  if (!s.body) setTimeout(() => ed.focus(), 300);
+  meta();
+  if (!s.body) setTimeout(() => scn.querySelector('textarea')?.focus(), 300);
   $('#paste').onclick = async () => {
     try {
       const txt = await navigator.clipboard.readText();
       if (!txt.trim()) return toast('복사한 글이 없어요');
-      const at = ed.selectionStart ?? ed.value.length;
-      ed.value = ed.value.slice(0, at) + txt + ed.value.slice(ed.selectionEnd ?? at);
-      ed.oninput(); toast(`${chars(txt)}자를 붙였어요`);
-    } catch { ed.focus(); toast('글 칸을 길게 눌러 붙여 넣어 주세요'); }
+      const ta = lastTa || scn.querySelector('textarea:last-of-type') || scn.querySelectorAll('textarea')[SC.length - 1];
+      const at = ta.selectionStart ?? ta.value.length;
+      ta.value = ta.value.slice(0, at) + txt + ta.value.slice(ta.selectionEnd ?? at);
+      ta.oninput(); toast(`${chars(txt)}자를 붙였어요`);
+    } catch { (lastTa || scn.querySelector('textarea'))?.focus(); toast('글 칸을 길게 눌러 붙여 넣어 주세요'); }
   };
   $('#del').onclick = () => {
     const box = el(`<div><h2>이 대본을 지울까요?</h2><p style="color:var(--sub);margin:0 0 14px">찍은 테이크도 같이 지워져요. 되돌릴 수 없어요.</p>
@@ -196,27 +227,85 @@ async function editView(id) {
 async function renderTakes(s, box) {
   const list = await takes.of(s.id);
   const urls = [];
-  box.innerHTML = list.length ? `<div class="sec">${ic('film', 16)}찍은 테이크 ${list.length}</div><div class="takes"></div>` : '';
-  const grid = $('.takes', box);
-  list.forEach((t, i) => {
+  const P = splitParts(s.body), multi = P.length > 1;
+  const card = (t, n, i, star) => {
     const u = URL.createObjectURL(t.blob); urls.push(u);
-    const c = el(`<div class="take" style="animation-delay:${i * 40}ms"><video src="${u}#t=0.1" playsinline muted preload="metadata"></video>
-      <div class="tb"><span>#${list.length - i} · ${fmt(t.dur)}</span><span class="row"><button class="mini" data-s aria-label="저장">${ic('share', 18)}</button><button class="mini" data-d aria-label="지우기">${ic('trash', 18)}</button></span></div></div>`);
-    $('video', c).onclick = () => takeSheet(s, t, list.length - i, () => renderTakes(s, box));
-    $('[data-s]', c).onclick = () => saveTake(s, t, list.length - i);
+    const c = el(`<div class="take${star ? ' pick' : ''}" style="animation-delay:${i * 40}ms"><video src="${u}#t=0.1" playsinline muted preload="metadata"></video>
+      ${star != null ? `<button class="star" data-k aria-pressed="${!!star}" aria-label="이 테이크 쓰기">${ic('star', 16)}</button>` : ''}
+      <div class="tb"><span>${t.joined ? '이어 붙임' : '#' + n} · ${fmt(t.dur)}</span><span class="row"><button class="mini" data-s aria-label="저장">${ic('share', 18)}</button><button class="mini" data-d aria-label="지우기">${ic('trash', 18)}</button></span></div></div>`);
+    $('video', c).onclick = () => takeSheet(s, t, n, () => renderTakes(s, box));
+    $('[data-s]', c).onclick = () => saveTake(s, t, n);
     $('[data-d]', c).onclick = async () => { await takes.remove(t.id); toast('테이크를 지웠어요'); renderTakes(s, box); };
-    grid.append(c);
-  });
+    const k = $('[data-k]', c); if (k) k.onclick = async () => { s.picks = { ...(s.picks || {}), [t.part]: t.id }; await scripts.put(s); buzz(8); renderTakes(s, box); };
+    return c;
+  };
+  box.innerHTML = '';
+  if (!multi) {
+    const own = list.filter(t => !t.joined);
+    if (own.length) {
+      box.append(el(`<div class="sec">${ic('film', 16)}찍은 테이크 ${own.length}</div>`));
+      const g = el('<div class="takes"></div>'); own.forEach((t, i) => g.append(card(t, own.length - i, i, null))); box.append(g);
+    }
+  } else {
+    // 씬마다 고른 테이크(★, 없으면 가장 최근)
+    const pick = {};
+    for (const p of P) { const mine = list.filter(t => t.part === p.name && !t.joined); pick[p.name] = mine.find(t => t.id === s.picks?.[p.name]) || mine[0] || null; }
+    const ready = P.filter(p => pick[p.name]), miss = P.filter(p => !pick[p.name]);
+    const total = ready.reduce((a, p) => a + (pick[p.name].dur || 0), 0);
+    const jb = el(`<div class="joinbox"><div><b>이어서 한 번에 저장</b><span>${ready.length}/${P.length}씬 · ${fmt(total)}${miss.length ? ` · 아직 안 찍은 씬: ${miss.map(p => esc(p.name)).join(', ')}` : ''}</span></div>
+      <button class="btn acc" ${ready.length < 2 ? 'disabled' : ''}>${ic('film', 18)}이어 붙이기</button></div>`);
+    $('button', jb).onclick = () => joinSheet(s, ready.map(p => pick[p.name]), miss, () => renderTakes(s, box));
+    box.append(jb);
+    const joined = list.filter(t => t.joined);
+    if (joined.length) {
+      box.append(el(`<div class="sec">${ic('film', 16)}이어 붙인 영상 ${joined.length}</div>`));
+      const g = el('<div class="takes"></div>'); joined.forEach((t, i) => g.append(card(t, joined.length - i, i, null))); box.append(g);
+    }
+    P.forEach((p, pi) => {
+      const mine = list.filter(t => t.part === p.name && !t.joined);
+      const h = el(`<div class="sec scs"><span>${ic('film', 16)}${esc(p.name)} <em>${mine.length ? mine.length + '개' : ''}</em></span><a class="ghost sm" href="#/shoot/${s.id}/${pi + 1}">${ic('cam', 15)}이 씬 찍기</a></div>`);
+      box.append(h);
+      if (!mine.length) { box.append(el('<p class="tip">아직 안 찍었어요</p>')); return; }
+      const g = el('<div class="takes"></div>'); mine.forEach((t, i) => g.append(card(t, mine.length - i, i, pick[p.name] === t))); box.append(g);
+    });
+    const rest = list.filter(t => !t.joined && !P.some(p => p.name === t.part));
+    if (rest.length) {
+      box.append(el(`<div class="sec">${ic('film', 16)}통째로 찍은 테이크 ${rest.length}</div>`));
+      const g = el('<div class="takes"></div>'); rest.forEach((t, i) => g.append(card(t, rest.length - i, i, null))); box.append(g);
+    }
+  }
   setTimeout(() => urls.forEach(u => URL.revokeObjectURL(u)), 60000);
 }
 
-function fileName(s, n, mime) {
+function joinSheet(s, list, miss, onDone) {
+  const box = el(`<div><h2>${list.length}개 씬을 이어 붙여요</h2>
+    <p class="tip" style="margin:0 0 12px">${list.map(t => esc(t.part)).join(' → ')}${miss.length ? `<br>${miss.map(p => esc(p.name)).join(', ')}은(는) 아직 없어서 빼고 붙여요.` : ''}<br>영상 길이(${fmt(list.reduce((a, t) => a + (t.dur || 0), 0))})만큼 걸려요. 그동안 화면을 켜 두세요.</p>
+    <div class="jprog"><i></i></div><p class="jpct">0%</p>
+    <div class="row"><button class="ghost grow" data-x>그만두기</button><button class="btn acc grow" data-go>${ic('film', 18)}시작</button></div></div>`);
+  let busy = false;
+  const sh = sheet(box, { onClose: () => {} });
+  $('[data-x]', box).onclick = () => { if (!busy) sh.close(); };
+  $('[data-go]', box).onclick = async () => {
+    if (busy) return; busy = true; $('[data-go]', box).disabled = true; $('[data-x]', box).disabled = true;
+    let wl = null; try { wl = await navigator.wakeLock?.request('screen'); } catch {}
+    try {
+      const r = await joinTakes(list, f => { $('.jprog i', box).style.width = (f * 100).toFixed(1) + '%'; $('.jpct', box).textContent = Math.round(f * 100) + '%'; });
+      const t = { id: uid(), scriptId: s.id, createdAt: Date.now(), dur: r.dur, mime: r.mime, blob: r.blob, joined: true };
+      try { await takes.put(t); } catch { toast('저장 공간이 부족해요. 지금 바로 저장해 주세요'); }
+      sh.close(); onDone?.();
+      setTimeout(() => takeSheet(s, t, 1, onDone, { fresh: true, joined: true }), 400);
+    } catch (e) { busy = false; $('[data-go]', box).disabled = false; $('[data-x]', box).disabled = false; toast('이어 붙이지 못했어요 · ' + (e?.message || e)); }
+    try { wl?.release(); } catch {}
+  };
+}
+
+function fileName(s, n, mime, t) {
   const ext = /mp4/.test(mime) ? 'mp4' : 'webm';
   const base = (s.title || (s.body || '').trim().split('\n')[0] || '대본').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 24);
-  return `${base}_테이크${n}.${ext}`;
+  return `${base}${t?.joined ? '_전체' : (t?.part ? '_' + t.part.replace(/\s+/g, '') : '') + '_테이크' + n}.${ext}`;
 }
 async function saveTake(s, t, n) {
-  const name = fileName(s, n, t.mime);
+  const name = fileName(s, n, t.mime, t);
   const file = new File([t.blob], name, { type: t.mime.split(';')[0] });
   try {
     if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
@@ -226,13 +315,13 @@ async function saveTake(s, t, n) {
   toast('내려받기를 시작했어요');
 }
 
-function takeSheet(s, t, n, onChange, { fresh } = {}) {
+function takeSheet(s, t, n, onChange, { fresh, joined } = {}) {
   const u = URL.createObjectURL(t.blob);
-  const box = el(`<div><h2>${fresh ? '찍었어요' : '테이크 ' + n}</h2>
+  const box = el(`<div><h2>${joined ? '이어 붙였어요' : fresh ? '찍었어요' : t.joined ? '이어 붙인 영상' : (t.part ? esc(t.part) + ' · ' : '') + '테이크 ' + n}</h2>
     <video class="tview" src="${u}" playsinline controls ${fresh ? 'autoplay' : ''}></video>
-    <div class="tinfo"><span>${ic('clock', 14)}${fmt(t.dur)}</span><span>${ic('film', 14)}테이크 ${n}</span><span>${(t.blob.size / 1048576).toFixed(1)}MB</span></div>
+    <div class="tinfo"><span>${ic('clock', 14)}${fmt(t.dur)}</span><span>${ic('film', 14)}${t.joined ? '이어 붙임' : (t.part ? esc(t.part) + ' ' : '') + '테이크 ' + n}</span><span>${(t.blob.size / 1048576).toFixed(1)}MB</span></div>
     <div class="row"><button class="ghost grow" data-d>${ic('trash', 18)}지우기</button><button class="btn acc grow" data-s>${ic('share', 18)}사진첩에 저장</button></div>
-    ${fresh ? `<button class="ghost wide" data-r style="margin-top:8px">${ic('cam', 18)}다시 찍기</button>` : ''}</div>`);
+    ${fresh && !joined ? `<button class="ghost wide" data-r style="margin-top:8px">${ic('cam', 18)}다시 찍기</button>` : ''}</div>`);
   const sh = sheet(box, { onClose: () => setTimeout(() => URL.revokeObjectURL(u), 500) });
   $('[data-s]', box).onclick = () => saveTake(s, t, n);
   $('[data-d]', box).onclick = async () => { await takes.remove(t.id); sh.close(); toast('테이크를 지웠어요'); onChange?.(); };
@@ -241,24 +330,112 @@ function takeSheet(s, t, n, onChange, { fresh } = {}) {
 }
 
 /* ---------- 촬영 (스튜디오 엔진: stage.js) ---------- */
-async function shootView(id) {
+async function shootView(id, k = 0) {
   const s = await scripts.get(id);
   if (!s) { location.replace('#/'); return; }
-  const T = { id: s.id, title: s.title || (s.body || '').trim().split('\n')[0] || '새 대본', body: (s.body || '').trim() || '대본이 비어 있어요. 나가서 대본을 써 주세요.', sec: secOf(s) };
+  const title = s.title || (s.body || '').trim().split('\n')[0] || '새 대본';
+  const P = splitParts(s.body); // [[이름]]으로 나뉜 파트. 2개 이상일 때만 파트 촬영
+  const names = P.length > 1 ? ['전체', ...P.map(p => p.name)] : null;
+  if (!names || k >= names.length) k = 0;
+  const scriptFor = i => {
+    if (!i) return { id: s.id, title, body: (s.body || '').trim() || '대본이 비어 있어요. 나가서 대본을 써 주세요.', sec: secOf(s) };
+    const p = P[i - 1];
+    // 파트 읽는 시간 = 전체 시간을 글자 수 비율로 나눈 것
+    const all = Math.max(1, autoSec(s.body)), sec = Math.max(5, Math.round(secOf(s) * autoSec(p.text) / all));
+    return { id: s.id, title, body: p.text, sec };
+  };
   const st = mountStage({
-    script: T,
+    script: scriptFor(k), parts: names, part: k,
+    onPart: i => { k = i; st.setScript(scriptFor(i), i); history.replaceState(null, '', `#/shoot/${s.id}${i ? '/' + i : ''}`); buzz(8); },
     limits: () => ({ ...plan.limits(), hq: plan.limits().hq }),
-    needPro: k => plan.needPro(k),
-    onExit: () => { history.length > 1 ? history.back() : location.replace('#/s/' + s.id); },
+    needPro: kind => plan.needPro(kind),
+    onExit: () => { location.replace('#/s/' + s.id); },
     onTake: async ({ blob, mime, dur }) => {
       const t = { id: uid(), scriptId: s.id, createdAt: Date.now(), dur, mime, blob };
+      if (k) t.part = names[k];
       try { await takes.put(t); } catch { toast('저장 공간이 부족해요. 지금 바로 저장해 주세요'); }
-      if (s.status !== 'done') { s.status = 'done'; s.updatedAt = Date.now(); await scripts.put(s); }
-      const n = (await takes.of(s.id)).length;
-      takeSheet(s, t, n, null, { fresh: true });
+      const list = await takes.of(s.id);
+      const done = !names || !k || P.every(p => list.some(x => x.part === p.name));
+      if (done && s.status !== 'done') { s.status = 'done'; s.updatedAt = Date.now(); await scripts.put(s); }
+      const sh = takeSheet(s, t, list.filter(x => x.part === t.part && !x.joined).length, null, { fresh: true });
+      // 다음 씬으로 바로 넘어가기
+      if (k && k < names.length - 1) {
+        const nb = el(`<button class="btn acc wide" style="margin-top:8px">${ic('play', 18)}다음 씬 · ${esc(names[k + 1])}</button>`);
+        nb.onclick = () => { sh.close(); onPartGo(k + 1); };
+        sh.el.lastElementChild.append(nb);
+      }
     },
   });
+  const onPartGo = i => { k = i; st.setScript(scriptFor(i), i); history.replaceState(null, '', `#/shoot/${s.id}/${i}`); };
   return () => { st.destroy(); document.querySelectorAll('#sheet-root > *').forEach(n => n.remove()); };
+}
+
+/* ---------- 씬 ---------- */
+// 대본은 한 줄 글로 저장하고, 씬은 [[이름]] 줄로 나눈다(예전 스튜디오와 같은 방식). 화면에서는 씬마다 칸이 따로.
+function toScenes(body) {
+  const seg = String(body || '').split(/^[ \t]*\[\[(.+?)\]\][ \t]*$/m);
+  const out = [];
+  if (seg[0].trim() || seg.length === 1) out.push({ name: '', text: seg[0].replace(/^\n+|\s+$/g, '') });
+  for (let i = 1; i < seg.length; i += 2) out.push({ name: seg[i].trim(), text: (seg[i + 1] || '').replace(/^\n+|\s+$/g, '') });
+  if (out.length > 1 && !out[0].name) out[0].name = '';
+  return out.length ? out : [{ name: '', text: '' }];
+}
+function fromScenes(sc) {
+  if (sc.length === 1 && !sc[0].name.trim()) return sc[0].text;
+  return sc.map((c, i) => `[[${c.name.trim() || '씬 ' + (i + 1)}]]\n${c.text}`).join('\n\n');
+}
+// 촬영용: 글이 있는 씬만. 이름 없는 첫 씬은 '씬 1'.
+export function splitParts(body) {
+  const seg = String(body || '').split(/^[ \t]*\[\[(.+?)\]\][ \t]*$/m);
+  const out = [];
+  if (seg[0].trim()) out.push({ name: '씬 1', text: seg[0].trim() });
+  for (let i = 1; i < seg.length; i += 2) {
+    const name = seg[i].trim(), text = (seg[i + 1] || '').trim();
+    if (!text) continue;
+    out.push({ name, text: `[[${name}]]\n${text}` });
+  }
+  return out;
+}
+
+/* ---------- 이어 붙이기 ---------- */
+// 고른 테이크들을 차례로 틀면서 캔버스+소리로 다시 녹화한다. 서버·라이브러리 없이 폰 안에서. 영상 길이만큼 걸린다.
+async function joinTakes(list, onP) {
+  const v = document.createElement('video'); v.playsInline = true; v.preload = 'auto';
+  v.style.cssText = 'position:fixed;left:-9999px;width:2px;height:2px'; document.body.append(v);
+  const meta = t => new Promise((ok, no) => { const u = URL.createObjectURL(t.blob); v.onloadedmetadata = () => ok(u); v.onerror = () => no(new Error('영상을 열지 못했어요')); v.src = u; });
+  const firstU = await meta(list[0]);
+  const W = v.videoWidth || 720, H = v.videoHeight || 1280;
+  URL.revokeObjectURL(firstU);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  const ac = new (window.AudioContext || window.webkitAudioContext)(); await ac.resume();
+  const dest = ac.createMediaStreamDestination(); ac.createMediaElementSource(v).connect(dest);
+  const out = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+  const mt = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m)) || '';
+  const rec = new MediaRecorder(out, { mimeType: mt || undefined, videoBitsPerSecond: H >= 1080 || W >= 1920 ? 12e6 : 6e6, audioBitsPerSecond: 192e3 });
+  const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const stopped = new Promise(ok => rec.onstop = ok);
+  const total = list.reduce((a, t) => a + (t.dur || 0), 0) || 1; let done = 0, raf = 0;
+  const drawF = () => {
+    const vw = v.videoWidth, vh = v.videoHeight;
+    if (vw) { const r = Math.min(W / vw, H / vh), dw = vw * r, dh = vh * r; g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.drawImage(v, (W - dw) / 2, (H - dh) / 2, dw, dh); }
+    onP?.(Math.min(1, (done + (v.currentTime || 0)) / total));
+    raf = requestAnimationFrame(drawF);
+  };
+  rec.start(1000); drawF();
+  try {
+    for (const t of list) {
+      const u = await meta(t);
+      await new Promise((ok, no) => { v.onended = ok; v.onerror = () => no(new Error('재생이 멈췄어요')); v.currentTime = 0; v.play().catch(no); });
+      done += t.dur || v.duration || 0; URL.revokeObjectURL(u);
+    }
+  } finally {
+    await new Promise(r => setTimeout(r, 120));
+    cancelAnimationFrame(raf); rec.stop(); await stopped;
+    out.getTracks().forEach(x => x.stop()); ac.close(); v.remove();
+  }
+  const blob = new Blob(chunks, { type: (mt || 'video/webm').split(';')[0] });
+  return { blob, mime: blob.type, dur: total };
 }
 
 /* ---------- 예전 스튜디오(eternia-exhibition/studio) 대본 옮기기 ---------- */
