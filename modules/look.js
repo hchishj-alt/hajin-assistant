@@ -55,7 +55,7 @@ export default {
         sec('메인 화면', 'home',
           h('p.small.muted', { style: { marginBottom: '6px' } }, '오늘 화면에 보일 카드를 켜고 끄고, 중요한 순서대로 위로 올려요.'),
           order.map((id, i) => { const off = (cur.homeOff || []).includes(id); const mv = d => async () => { const o = [...order]; const j = i + d; if (j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; await set({ home: o }); };
-            return h('div.li', { style: { opacity: off ? .5 : 1 } }, h('span.faint.tiny.mono', { style: { width: '14px' } }, i + 1), h('div.grow.small', { style: { fontWeight: 620 } }, T.HOME[id]),
+            return h('div.li', { style: { opacity: off ? .5 : 1 } }, h('span.faint.tiny.mono', { style: { minWidth: '18px' } }, i + 1), h('div.grow.small', { style: { fontWeight: 620 } }, T.HOME[id]),
               h('button.btn.sm.icon', { 'aria-label': '위로', disabled: i === 0, onclick: mv(-1) }, ic('up', 14)), h('button.btn.sm.icon', { 'aria-label': '아래로', disabled: i === order.length - 1, onclick: mv(1) }, ic('down', 14)),
               h('button.btn.sm' + (off ? '' : '.pri'), { 'aria-pressed': !off, onclick: () => set({ homeOff: off ? cur.homeOff.filter(x => x !== id) : [...(cur.homeOff || []), id] }) }, off ? '꺼짐' : '켜짐')); })),
         sec('메뉴', 'menu',

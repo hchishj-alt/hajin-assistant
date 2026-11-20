@@ -1059,3 +1059,39 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 .cal-fbtn{display:none;margin:0 0 10px;min-height:44px}
 @media (max-width:900px){.cal-fbtn{display:inline-flex}.cal-filters:not(.open){display:none}}
 @media (pointer:coarse),(max-width:900px){#view .draft select{min-height:40px}}
+
+/* v1.35.1 폰에서 이름표가 낱말 가운데서 끊기던 것: 탭 줄(seg)은 줄바꿈 없이 옆으로 밀어 보고, 두 줄이 되는 이름표는 줄 길이를 맞춤 */
+.seg{max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.seg::-webkit-scrollbar{display:none}
+.seg button{white-space:nowrap;flex:0 0 auto}
+.look-row .seg{grid-template-columns:repeat(auto-fit,minmax(96px,1fr))}
+.tile .tl,h1,h2,h3,.empty p,.page-head p{text-wrap:balance}
+.btn,.chip{word-break:keep-all}
+/* 폰 채팅: 글씨와 여백을 줄여 한 화면에 더 많이 보이게 */
+@media (max-width:600px){
+  .chat{gap:8px}
+  .bubble{font-size:calc(14px*var(--fs,1));line-height:1.45;padding:8px 12px;max-width:88%}
+}
+/* 목록 줄의 짧은 이름표·숫자는 눌려도 끊기지 않게 */
+.li>b.small,.li>.tiny,.li>.mono,.li>.chip,.li>code,.badge{white-space:nowrap;flex-shrink:0}
+/* 폰 채팅의 결과 카드: 바로 위 말풍선과 겹치는 원래 문장과 까닭 설명은 접고, 글씨와 여백을 줄임 (대기함에서는 그대로 보임) */
+@media (max-width:600px){
+  .chat .draft{padding:8px 10px;gap:8px;margin-top:6px}
+  .chat .draft .k{width:26px;height:26px}
+  .chat .draft .t{font-size:calc(14.5px*var(--fs,1));line-height:1.35}
+  .chat .draft .src,.chat .draft .why>span{display:none}
+  .chat .draft .why{margin-top:2px}
+  .chat .draft .btn.sm{padding-left:10px;padding-right:10px}
+}
+/* 고치기 창이 폰에서 옆으로 밀리던 것: 날짜·시각 칸이 창보다 넓어지지 않게 하고 창은 옆으로 스크롤하지 않음 */
+.modal{overflow-x:hidden}
+.modal .in,.modal input,.modal select,.modal textarea{max-width:100%;min-width:0;box-sizing:border-box}
+.modal input[type=date],.modal input[type=time],.modal input[type=datetime-local],.modal input[type=month]{-webkit-appearance:none;appearance:none;width:100%;min-width:0}
+.modal .row>*{min-width:0}
+/* 비서 입력: 여러 줄을 써도 다섯 줄까지만 커지고, 입력 영역은 불투명하게, 미리보기는 한 줄로, 쓰는 동안 권하는 말은 숨김 */
+.composer textarea{max-height:calc(1.5em*5 + 16px)}
+.composer>.chips:last-child{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-height:0}
+.composer>.chips:last-child::-webkit-scrollbar{display:none}
+.composer>.chips:last-child .chip{flex:none;white-space:nowrap}
+.composer:has(textarea:not(:placeholder-shown)) .suggest{display:none}
+@media (max-width:900px){.chatpage .composer{background:var(--bg);box-shadow:0 -8px 12px -8px rgba(0,0,0,.08)}}

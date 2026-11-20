@@ -18,7 +18,7 @@ export default {
       const avg = qOkrs.length ? qOkrs.reduce((s, o) => s + okrProgress(o), 0) / qOkrs.length : 0;
       const nextG = grants.filter(g => g.deadline && g.deadline >= todayStr() && !['선정', '탈락'].includes(g.status)).sort((a, b) => a.deadline.localeCompare(b.deadline))[0];
       body.append(h('div.tiles', { style: { marginBottom: '14px' } },
-        tile('target', Math.round(avg * 100) + '%', `${q} 목표 달성`, avg >= .7 ? 'ok' : ''),
+        tile('target', Math.round(avg * 100) + '%', `${String(q).replace(/^\d{4}\s*/, '')} 목표 달성`, avg >= .7 ? 'ok' : ''),
         tile('flag', ms.filter(m => m.status !== '완료').length, '남은 마일스톤'),
         tile('clock', nextG ? 'D-' + dday(nextG.deadline) : '–', nextG ? nextG.title.slice(0, 12) : '다가오는 마감 없음', nextG && dday(nextG.deadline) <= 7 ? 'bad' : ''),
         tile('trend', kpis.length, '추적 지표')));

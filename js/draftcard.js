@@ -26,7 +26,7 @@ export function draftCard(d, onDone) {
     d.kind === 'summary' ? summaryView(d.data) : h('div.faint.small', describe(d.kind, d.data)),
     d.kind === 'event' && (d.data.place || d.data.area) ? placeRow(d.data) : null,
     why,
-    d.source && d.kind !== 'summary' ? h('div.faint.tiny', { style: { marginTop: '4px' } }, '“' + d.source.slice(0, 120) + (d.source.length > 120 ? '…' : '') + '”') : null,
+    d.source && d.kind !== 'summary' ? h('div.faint.tiny.src', { style: { marginTop: '4px' } }, '“' + d.source.slice(0, 120) + (d.source.length > 120 ? '…' : '') + '”') : null,
     h('div.row', { style: { marginTop: '8px', gap: '6px' } },
       h('button.btn.sm.pri', { onclick: async () => { const cur = await fresh(); if (!cur) return; finish('approved', false, await store.approve(cur)); } }, ic('check', 14), '확정'),
       d.kind !== 'summary' ? h('button.btn.sm', { onclick: () => edit() }, ic('edit', 14), '고치기') : null,
