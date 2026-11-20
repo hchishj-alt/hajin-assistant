@@ -313,3 +313,71 @@ export async function caption({ title = '', subs = '', concept = '', tags = '' }
     return { hook: String(j.hook), body: String(j.body || ''), hashtags: (Array.isArray(j.hashtags) ? j.hashtags : []).map(x => '#' + String(x).replace(/^#+/, '').replace(/\s/g, '')).filter(x => x.length > 1).slice(0, 14) };
   } catch (e) { console.warn('ai', e); return null; }
 }
+
+// 받은 메시지에 보낼 답장 초안 2~3개. facts = 앱이 캘린더·할 일에서 확인한 사실. 실패하면 null → 부르는 쪽이 앱 규칙 답장을 그대로 둠
+export async function replies(text, { from = '', facts = '', name = '', today = '' } = {}) {
+  if (!(await enabled()) || !(text || '').trim()) return null;
+  try {
+    const j = await ask(`${name || '사용자'}가 ${from || '동료'}에게서 메신저로 아래 말을 받았어. ${name || '사용자'}가 그대로 보낼 답장을 한국어로 2~3개 써 줘.
+- 서로 다른 답으로(되는 쪽, 안 되거나 미루는 쪽, 되묻는 쪽 가운데 맞는 것). 각 40자 안쪽, 친한 동료에게 하는 편한 존댓말.
+- [앱이 확인한 사실]에 일정이 겹친다고 나오면 된다고 답하지 말고 다른 시간을 제안해. 사실에 없는 시간·약속·금액은 지어내지 마.
+- 받은 말이 인사나 고마움이면 가볍게 받는 답만.
+오늘: ${today}
+[앱이 확인한 사실]
+${facts || '(없음)'}
+[받은 말]
+${String(text).slice(0, 600)}
+JSON으로만: {"replies":["...","..."]}`, { json: true, fast: true, ms: 9000, temp: 0.5 });
+    const a = (Array.isArray(j && j.replies) ? j.replies : []).map(x => String(x).replace(/^["“]|["”]$/g, '').trim()).filter(x => x && x.length <= 90);
+    return a.length ? [...new Set(a)].slice(0, 3) : null;
+  } catch (e) { console.warn('ai', e); return null; }
+}
+
+// 지원사업·소식 글이 왜 그 순위인지 쉬운 말로. facts = 앱이 계산한 점수 설명(이 숫자만 근거로 씀)
+export async function whyRank({ title = '', desc = '', facts = '', n = 0 } = {}) {
+  if (!(await enabled()) || !title) return null;
+  try {
+    const out = await ask(`작은 콘텐츠 기획 팀이 보는 지원사업·소식 순위에서 ${n}번 글이 왜 그 자리인지 설명해 줘.
+- 한국어 해요체 2~3문장. 먼저 이 글이 무엇인지 한 문장, 그다음 우리 팀에게 왜 높거나 낮은지.
+- 점수와 마감은 [앱이 계산한 것]에 있는 것만 써. 글에 없는 지원 금액·자격·기한은 지어내지 말고, 모르면 "원문에서 확인해 보세요"라고 해.
+[글] ${String(title).slice(0, 120)}
+${String(desc || '').slice(0, 900) || '(본문 없음, 제목만 있음)'}
+[앱이 계산한 것] ${facts}`, { fast: true, ms: 9000, temp: 0.3 });
+    const t = String(out || '').replace(/\*\*/g, '').trim();
+    return t.length >= 10 && t.length <= 400 ? t : null;
+  } catch (e) { console.warn('ai', e); return null; }
+}
+
+// 순위 목록을 보고 묻는 말에 답하기 ("이 중에 우리가 낼 만한 건?"). list = "1 | 제목 | 종류 | 마감 | 점수" 줄들
+export async function rankTalk(q, list, learned = '') {
+  if (!(await enabled()) || !(q || '').trim() || !list) return null;
+  try {
+    const j = await ask(`작은 콘텐츠 기획 팀(굿즈·영상·행사 기획 외주)이 보는 지원사업·소식 순위 화면이야. 아래 목록만 보고 사용자의 말에 한국어 해요체로 답해 줘.
+- 2~4문장. 글을 가리킬 때는 "3번 ○○"처럼 번호와 짧은 제목으로.
+- 목록에 없는 금액·자격·기한은 지어내지 마. 자세한 조건은 원문을 보라고 해.
+- 순위를 바꾸고 싶어 하는 말이면(더 보고 싶다, 필요 없다) say에 답을 쓰고 next에 "○○ 더 보여줘"나 "○○ 필요 없어" 같은 말을 넣어.
+[팀이 알려 준 기준] ${learned || '아직 없음'}
+[순위 목록: 번호 | 제목 | 종류 | 마감 | 점수]
+${list}
+[사용자 말]
+${String(q).slice(0, 300)}
+JSON으로만: {"say":"...","next":["다음에 누를 만한 말, 0~2개"]}`, { json: true, fast: true, ms: 10000, temp: 0.3 });
+    if (!j || !j.say) return null;
+    return { text: String(j.say).replace(/\*\*/g, '').trim().slice(0, 500), next: (Array.isArray(j.next) ? j.next : []).map(String).filter(x => x && x.length <= 30).slice(0, 2) };
+  } catch (e) { console.warn('ai', e); return null; }
+}
+
+// 자료(링크·레퍼런스)에 붙일 태그. 실패하면 null → 앱이 뽑은 낱말을 그대로 둠
+export async function tags(text, n = 4) {
+  if (!(await enabled()) || (text || '').trim().length < 6) return null;
+  try {
+    const j = await ask(`디자인·콘텐츠 기획 팀의 자료실에 넣을 자료야. 나중에 찾을 때 쓸 태그를 한국어로 ${n}개 붙여 줘.
+- 무엇에 관한 자료인지(주제), 어디에 쓸지(용도: 굿즈, 포스터, 영상, 브랜딩, 전시 같은), 분위기나 스타일이 드러나면 그것도.
+- 각 2~8자, 띄어쓰기 없이, "자료", "링크", "사이트" 같은 뻔한 말은 빼.
+${String(text).slice(0, 1500)}
+JSON으로만: {"tags":["..."]}`, { json: true, fast: true, ms: 9000 });
+    const a = (Array.isArray(j && j.tags) ? j.tags : []).map(x => String(x).replace(/^#+/, '').replace(/\s/g, '')).filter(x => x.length >= 2 && x.length <= 12 && !/^(자료|링크|사이트|참고|참고자료|레퍼런스|기타)$/.test(x));
+    return a.length ? [...new Set(a)].slice(0, n) : null;
+  } catch (e) { console.warn('ai', e); return null; }
+}
+

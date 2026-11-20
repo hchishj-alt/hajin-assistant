@@ -56,9 +56,12 @@ export default {
       async function assist(d, other) {
         const j = await DM.judge(d.body, other.name);
         const done = async () => { await db.putRaw({ ...(await db.get(d.id)), handled: true }); draw(false); };
+        const chipsOf = list => list.map(r => h('button.chip', { title: '이 말로 답장', onclick: async () => { await send(r); done(); } }, ic('send', 12), r));
+        const rp = h('span', { style: { display: 'contents' } }, chipsOf(j.replies));
+        DM.aiReplies(d.id, d.body, other.name, j.note).then(rs => { if (rs && rs.length) rp.replaceChildren(...chipsOf(rs)); }).catch(() => { });
         return h('div.talk-ai', h('div.talk-ai-h', ic('sparkles', 12), '비서', j.note ? h('span', j.note) : null),
           h('div.chips', j.actions.map(a => h('button.chip.acc', { onclick: async () => { await store.draft(a.kind, a.data, { source: d.body, origin: 'dm', confidence: .75 }); updateBadge(); toast(`${store.KINDS[a.kind]?.label || ''} 임시 항목을 만들었어요`, { label: '확인 대기함', fn: () => go('inbox') }); done(); } }, ic('plus', 12), a.label)),
-            j.replies.map(r => h('button.chip', { title: '이 말로 답장', onclick: async () => { await send(r); done(); } }, ic('send', 12), r)),
+            rp,
             h('button.chip', { onclick: done }, '넘기기')));
       }
     }

@@ -42,6 +42,15 @@ export async function judge(text, fromName = '') {
   return out;
 }
 
+// AI가 쓴 답장 초안. 키가 없거나 실패하면 null. 같은 메시지는 화면을 다시 그려도 한 번만 물음
+const RC = new Map();
+export function aiReplies(id, text, fromName = '', note = '') {
+  const k = id || text; if (RC.has(k)) return RC.get(k);
+  const p = (async () => { try { const AI = await import('./ai.js'); if (!(await AI.enabled())) return null; const d = new Date(), pad = n => String(n).padStart(2, '0');
+    return await AI.replies(text, { from: fromName, facts: note, name: (await db.kvGet('name', '')) || '', today: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} (${'일월화수목금토'[d.getDay()]})` }); } catch { return null; } })();
+  RC.set(k, p); if (RC.size > 60) RC.delete(RC.keys().next().value); return p;
+}
+
 // 비서 채팅에서 "민서한테 ~라고 전해줘" 같은 말 알아듣기 → { to, body } 또는 null
 export function parseSend(text, roster = []) {
   const t = text.trim();

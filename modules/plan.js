@@ -96,7 +96,7 @@ async function refsView(refs, redraw) {
   const wrap = h('div');
   wrap.append(h('div.row', { style: { marginBottom: '12px' } },
     dropzone(h('span', ic('image'), ' 이미지 끌어놓기 · 눌러서 고르기 · 붙여넣기(Ctrl+V)'), 'image/*', async files => { for (const f of files) await addImg(f); redraw(); }),
-    h('button.btn', { onclick: () => modal('링크 레퍼런스', close => form(FIELDS.reference, { project: projF }, async v => { await db.put('refs', { ...v, tags: brain.keywords(v.title + ' ' + v.memo, 4) }); close(); redraw(); })) }, ic('link', 14), '링크 추가')));
+    h('button.btn', { onclick: () => modal('링크 레퍼런스', close => form(FIELDS.reference, { project: projF }, async v => { const it = await db.put('refs', { ...v, tags: brain.keywords(v.title + ' ' + v.memo, 4) }); close(); redraw(); import('../js/ai.js').then(AI => AI.tags(`${v.title || ''}\n${v.memo || ''}\n${v.url || ''}`)).then(t => t && db.patch(it.id, { tags: t })).then(() => redraw()).catch(() => { }); })) }, ic('link', 14), '링크 추가')));
   wrap.firstChild.firstChild.style.flex = '1';
   const onPaste = async e => { const f = [...(e.clipboardData?.files || [])].filter(x => x.type.startsWith('image/')); if (f.length) { for (const x of f) await addImg(x); redraw(); } };
   document.addEventListener('paste', onPaste, { once: true });

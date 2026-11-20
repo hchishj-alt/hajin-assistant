@@ -56,8 +56,9 @@ export default {
     let recorder = null, timer = 0;
 
     // 이 기기에 AI가 연결됐는지 한눈에 (연결은 기기마다 따로라서, 폰에서는 안 돼 있을 수 있음)
-    import('../js/ai.js').then(async AI => { clear(aiBar); if (await AI.enabled()) aiBar.append(h('span.chip.ok', { title: '말 읽기·질문 답하기·요약을 Gemini가 해요' }, ic('sparkles', 12), 'AI 연결됨'));
-      else aiBar.append(h('button.chip.warn', { style: { minHeight: '36px' }, onclick: () => go('settings') }, ic('sparkles', 12), (await AI.keyed()) ? 'AI가 꺼져 있어요 · 켜기' : '이 기기는 AI 미연결 (앱 규칙으로만 읽는 중) · 연결하기')); }).catch(() => { });
+    const drawAiBar = () => import('../js/ai.js').then(async AI => { clear(aiBar); if (await AI.enabled()) aiBar.append(h('span.chip.ok', { title: '말 읽기·질문 답하기·요약을 Gemini가 해요' }, ic('sparkles', 12), 'AI 연결됨'));
+      else aiBar.append(h('button.chip.warn', { style: { minHeight: '36px' }, onclick: async () => { if (await AI.keyed()) { await db.kvSet('ai:on', true); toast('AI를 켰어요'); drawAiBar(); } else (await import('../js/keyshare.js')).guide(drawAiBar); } }, ic('sparkles', 12), (await AI.keyed()) ? 'AI가 꺼져 있어요 · 켜기' : '이 기기는 AI 미연결 (앱 규칙으로만 읽는 중) · 연결하기')); }).catch(() => { });
+    drawAiBar();
     // 기존 대화
     const msgs = (await db.list('chat')).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-60);
     if (!msgs.length) list.append(botBubble(h('div', h('p', '안녕하세요 하진님. 이렇게 말해 보세요.'), h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, ['"다음 주 화요일 2시 홍대 촬영"', '"어도비 구독 3만7천원 결제"', '"홍길동 010-1234-5678 디자이너"', '"오늘 일정 보여줘"', '회의나 생각을 길게 말하면 요약·키워드·할 일로 정리해요'].map(x => h('li.small', x))))));
@@ -270,6 +271,7 @@ export default {
         row.append(...m.chips.map(c => h('button.chip' + (c.make === 'task' ? '.acc' : ''), { onclick: async () => {
           if (c.say) return send(c.say);
           if (c.skip) return done('넘겼어요');
+          if (c.aiGuide) return import('../js/keyshare.js').then(K => K.guide(drawAiBar));
           if (c.go) return go(c.go);
           if (c.proj !== undefined) { await setProj(c.proj); return done(c.proj ? `지금 프로젝트: ${c.proj}` : '프로젝트 없이'); }
           if (c.act) { const ACT = await import('../js/act.js'); const r = await ACT.run(c.act); await done(c.label); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', text: r.text, chips: r.chips }), new Map()); } updateBadge(); return; }
@@ -282,8 +284,11 @@ export default {
       else if (m.chipDone) box.append(h('div.faint.tiny', { style: { marginTop: '6px' } }, m.chipDone));
       if (m.dm) { const DM = await import('../js/dm.js'); const j = await DM.judge(m.dm.body, m.dm.name);
         if (j.note) box.append(h('div.small.muted', { style: { marginTop: '4px' } }, j.note));
+        const chipsOf = list => list.map(r => h('button.chip', { onclick: async e => { const b = e.currentTarget; try { await (await import('../js/sync.js')).dmSend(m.dm.from, r); b.replaceWith(h('span.chip.ok', ic('check', 12), '답장함')); } catch (er) { toast(er.message); } } }, ic('send', 12), r));
+        const rp = h('span', { style: { display: 'contents' } }, chipsOf(j.replies));
+        DM.aiReplies(m.id, m.dm.body, m.dm.name, j.note).then(rs => { if (rs && rs.length) rp.replaceChildren(...chipsOf(rs)); }).catch(() => { });
         box.append(h('div.chips', { style: { marginTop: '8px' } }, j.actions.map(a => h('button.chip.acc', { onclick: async () => { await store.draft(a.kind, a.data, { source: m.dm.body, origin: 'dm', confidence: .75 }); updateBadge(); toast('임시 항목을 만들었어요', { label: '확인 대기함', fn: () => go('inbox') }); } }, ic('plus', 12), a.label)),
-          j.replies.map(r => h('button.chip', { onclick: async e => { const b = e.currentTarget; try { await (await import('../js/sync.js')).dmSend(m.dm.from, r); b.replaceWith(h('span.chip.ok', ic('check', 12), '답장함')); } catch (er) { toast(er.message); } } }, ic('send', 12), r)),
+          rp,
           h('a.chip', { href: '#/talk/' + m.dm.from }, '대화 열기'))); }
       if (m.q) box.append(FB.widget({ kind: 'chat', ref: m.id, source: m.q }));
       const b = botBubble(box, (m.draftIds?.length || m.items?.length) ? 'wide' : '');

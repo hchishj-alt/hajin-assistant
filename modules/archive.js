@@ -142,6 +142,7 @@ export default {
             let p; try { p = await LP.preview(u); } catch { p = { url: u, title: u, kind: 'web' }; }
             const item = await db.put('refs', { ...p, project: v.project, sub: v.sub, memo: v.memo, by, team, tags: brain.keywords(`${p.title} ${p.desc || ''} ${v.memo || ''}`, 4), uses: LP.usesOf(`${p.title} ${p.desc || ''} ${v.memo || ''}`) });
             if (p.thumb) LP.analyzeColors(p.thumb).then(c => db.patch(item.id, c)).then(() => draw()).catch(() => { });
+            import('../js/ai.js').then(AI => AI.tags(`${p.title || ''}\n${p.desc || ''}\n${v.memo || ''}\n${u}`)).then(t => t && db.patch(item.id, { tags: t })).then(() => draw()).catch(() => { });
           }, () => draw());
           toast(`${urls.length}개를 대기열에 넣었어요. 불러오는 동안 다른 걸 해도 돼요`); close();
           await db.kvSet('refs:pageimgs', pg.checked);

@@ -139,6 +139,8 @@ export default {
       const bub = (t, me, chips) => { const b = h('div.rdw-b' + (me ? '.me' : ''), t); log.append(b); if (chips?.length) log.append(h('div.chips', chips.map(c => h('button.chip', { onclick: () => say(c.say) }, c.label)))); log.scrollTop = log.scrollHeight; };
       const say = async t => { t = (t || '').trim(); if (!t) return; inp.value = ''; bub(t, true);
         let r = await taste.talk(t, { rank: curRank });
+        if (!r && curRank.length) { try { const AI = await import('../js/ai.js'); const prof = await taste.load(); const lw = Object.entries(prof.w || {}).filter(([, v]) => Math.abs(v) >= 2).map(([k, v]) => `${k}(${v > 0 ? '더 보기' : '줄이기'})`).join(', ');
+          const a = await AI.rankTalk(t, curRank.slice(0, 25).map((x, i) => `${i + 1} | ${String(x.it.title).slice(0, 60)} | ${(TYPE[x.it.type] || [x.it.type || ''])[0]} | ${x.s.dday != null ? 'D-' + x.s.dday : '마감 모름'} | ${x.s.total}점`).join('\n'), lw); if (a) r = { text: a.text, chips: a.next.map(n => ({ label: n, say: n })) }; } catch { } }
         if (!r) { const CH = await import('../js/chat.js'); r = CH.isTalk(t) ? await CH.reply(t, { name: (await db.kvGet('name', '')) || '' }) : { text: '여기서는 랭킹을 우리 팀에 맞게 고쳐요. “콘텐츠 더 보여줘”, “제조 쪽은 필요 없어”, “3번 필요 없어”, “1번 왜 높아?”처럼 말해 주세요.' }; r = { text: r.text, chips: (r.chips || []).filter(c => c.say) }; }
         if (r.changed) await draw();
         bub(r.text, false, r.chips); };

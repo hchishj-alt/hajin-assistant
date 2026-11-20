@@ -79,3 +79,28 @@ export async function takeFromHash() {
   }, 400);
   return true;
 }
+
+// 이 기기에 AI 연결하기: 폰 하나로 끝낼 수 있게 두 단계로 안내 (키 복사 → 붙여넣고 연결). PC가 옆에 있으면 QR로도.
+export function guide(onDone) {
+  const inp = h('input.in', { type: 'password', placeholder: '여기에 키 붙여넣기', autocomplete: 'off', 'aria-label': 'Gemini API 키' });
+  const out = h('p.small', { style: { minHeight: '1.4em' } });
+  const looksKey = k => /^[\w-]{30,80}$/.test(k);
+  const connect = async k => {
+    k = String(k || '').trim(); if (!looksKey(k)) { out.textContent = '키처럼 보이지 않아요. AI Studio에서 키 옆의 복사를 누른 뒤 다시 해 주세요.'; inp.focus(); return; }
+    out.textContent = '연결을 시험하는 중…'; await save(k);
+    try { const AI = await import('./ai.js'); await AI.ask('“연결됐어요”라고만 답해.', { ms: 15000 }); out.textContent = '연결됐어요. 이제 이 기기에서도 AI가 답해요.'; toast('AI가 연결됐어요'); onDone && onDone(); setTimeout(() => close(), 900); }
+    catch (e) { out.textContent = `키는 넣었는데 시험이 안 됐어요: ${e.message}`; onDone && onDone(); }
+  };
+  const close = modal('이 기기에 AI 연결하기', h('div.stack',
+    h('p.small.muted', '연결은 기기마다 한 번만 하면 돼요. 폰 하나로 1분이면 끝나요.'),
+    h('a.btn', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener', style: { minHeight: '44px', justifyContent: 'center' } }, '① Google AI Studio 열기'),
+    h('p.faint.tiny', '구글에 로그인하면 전에 만든 키가 보여요. 키를 눌러 “복사”를 누르고 이 화면으로 돌아오세요. 키가 없으면 “API 키 만들기”를 누르면 돼요(무료, 카드 등록 없음).'),
+    h('button.btn.pri', { style: { minHeight: '44px' }, onclick: async () => { let k = ''; try { k = await navigator.clipboard.readText(); } catch { } if (looksKey(String(k).trim())) connect(k); else { out.textContent = '복사한 키를 못 읽었어요. 아래 칸을 길게 눌러 붙여넣고 “연결”을 눌러 주세요.'; inp.focus(); } } }, '② 복사한 키 붙여넣고 연결'),
+    h('div.row', { style: { gap: '6px' } }, h('div.grow', inp), h('button.btn.sm', { style: { minHeight: '44px' }, onclick: () => connect(inp.value) }, '연결')),
+    out,
+    h('p.faint.tiny', 'PC가 옆에 있으면 PC 앱의 설정 → 외부 AI 연결 → “폰·아이패드로 키 보내기”를 누르고 아래 버튼으로 QR을 비춰도 돼요. 키는 이 기기에만 저장돼요.'),
+    h('button.btn.sm', { style: { minHeight: '44px' }, onclick: () => { close(); scan(() => { toast('AI가 연결됐어요'); onDone && onDone(); }); } }, 'QR로 키 받기')));
+  setTimeout(() => { try { inp.blur(); } catch { } }, 80);   /* 폰에서 자판이 먼저 올라와 버튼을 가리지 않게 */
+  return close;
+}
+
