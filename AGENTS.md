@@ -37,7 +37,7 @@
 | 앱 개선 요청 | modules/dev.js, js/codex.js |
 | 프롬프트 스튜디오 | modules/prompts.js, js/prompts.js |
 | 어디서나 비서(비서 창), 메뉴 줄이기 | js/helper.js, modules/menu.js |
-| 내 역할(바로가기·메뉴·프롬프트가 역할에 맞춰짐) | js/prompts.js `myRole`·`roleKeys`, js/helper.js `who`·`rolePicker` |
+| 내 역할(바로가기·메뉴·프롬프트가 역할에 맞춰짐). 역할은 네 가지로 고정: PM·리더(pm), 아트·디자인(art), 콘텐츠 제작(make), 경영·운영(biz). 관리자가 멤버를 넣을 때 하나를 고름 | js/prompts.js `TEAM_ROLES`·`myRole`·`roleKeys`, js/helper.js `who`·`rolePicker`·`QUICK`·`CORE`·`BY_ROLE`, js/chat.js(쓰는 법), modules/admin.js(멤버 폼) |
 | 비서가 말을 읽는 순서 | modules/assistant.js: 되묻던 것의 답(`answerAsk`, 딴 말인지는 `looksNew`) → 방금 만든 것 고치기(js/follow.js) → 메신저 전달(js/dm.js) → 회의록 붙여넣기(js/brain.js `minutes`) → 잡담(js/chat.js) → 고치기(js/act.js) → 읽기(js/brain.js) → 묻는 말 답(js/query.js, js/ask.js) |
 | 한 말을 여러 건으로 나누기 | js/brain.js `interpret`: 때 말 다듬기(한글 금액 `korMoney`, 기념일·"다음 주 내내"·"평일") → `splitCommands`(줄, 그리고, 번호, 화살표) → `splitChain`("~하고 ~까지", "오전에 … 오후에 …") → `splitList`(쉼표로 늘어놓은 것, 금액 여러 개, "할 일: A, B") → `splitPeople`("대본은 민서가 쓰고 편집은 서연이") → 조각마다 `interpretOne` |
 | 곳으로 읽는 낱말 | js/brain.js `PLACE_RE`(끝 글자)와 `NOTPLACE`(편집·번역처럼 끝 글자만 같은 낱말). 새로 잘못 읽는 낱말이 나오면 `NOTPLACE`에 더함 |

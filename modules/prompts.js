@@ -145,7 +145,7 @@ export default {
       const rev = () => { const r = P.review(out.value); clear(revBox).append(ring(r.score / 100, { size: 44, label: String(r.score) }), h('div.grow', h('b', r.word), r.missing.length ? h('div.small.muted', '빠진 것: ' + r.missing.map(i => i.label).join(', ')) : h('div.small.muted', '여섯 가지가 다 들어 있어요.'))); };
       const build = () => { if (!touched) out.value = P.compose(v); rev(); };
       const f = (k, label, ph, long) => h('label.ps-f', h('span', label), h(long ? 'textarea.in' : 'input.in', { rows: long ? 3 : undefined, placeholder: ph, 'aria-label': label, value: long ? undefined : (v[k] || undefined), oninput: e => { v[k] = e.target.value; touched = false; build(); } }));
-      const roleHint = me.keys.includes('art') && !me.keys.includes('pm') ? '브랜드 경험이 많은 아트디렉터' : me.keys.includes('biz') && !me.keys.includes('pm') ? '작은 회사의 꼼꼼한 경영 담당' : '콘텐츠 기획사의 경험 많은 PM';
+      const roleHint = me.keys.includes('art') && !me.keys.includes('pm') ? '브랜드 경험이 많은 아트디렉터' : me.keys.includes('biz') && !me.keys.includes('pm') ? '작은 회사의 꼼꼼한 경영 담당' : me.keys.includes('make') && !me.keys.includes('pm') ? '촬영과 편집을 오래 한 콘텐츠 프로듀서' : '콘텐츠 기획사의 경험 많은 PM';
       const askBox = h('input', { type: 'checkbox', checked: true, onchange: e => { v.ask = e.target.checked; touched = false; build(); } });
       out.addEventListener('input', () => { touched = true; rev(); });
       const paste = h('button.btn.sm.ghost', { type: 'button', onclick: () => importOne() }, ic('copy', 14), '쓰던 프롬프트 붙여 넣기');

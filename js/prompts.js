@@ -2,7 +2,7 @@
 // 화면(modules/prompts.js)과 따로 둬서 시험할 수 있게 함. AI 없이도 다 돌아감.
 import * as db from './db.js';
 
-export const ROLES = { pm: 'PM·기획', art: '아트·디자인', biz: '경영·돈', all: '공통' };
+export const ROLES = { pm: 'PM·리더', art: '아트·디자인', biz: '경영·운영', all: '공통' };
 export const CATS = ['기획', '글쓰기', '디자인·이미지', '회의·정리', '돈·계약', '조사', '일정', '기타'];
 export const TOOLS = ['Claude', '앱 AI', '이미지 생성', '기타'];
 
@@ -10,7 +10,8 @@ export const TOOLS = ['Claude', '앱 AI', '이미지 생성', '기타'];
 export function roleKeys(role) {
   const r = String(role || ''), out = [];
   if (/PM|피엠|리더|기획|매니저|팀장|대표/i.test(r)) out.push('pm');
-  if (/아트|디자인|디렉|UX|UI|영상|촬영|일러/i.test(r)) out.push('art');
+  if (/아트|디자인|디렉|UX|UI|일러/i.test(r)) out.push('art');
+  if (/콘텐츠|제작|영상|촬영|편집|SNS|마케팅|에디터/i.test(r)) out.push('make');
   if (/경영|회계|정산|재무|서기|총무|운영|세무/i.test(r)) out.push('biz');
   return out;
 }
@@ -19,7 +20,9 @@ export function roleKeys(role) {
 const VAR = /\{\{\s*([^{}\n]{1,30}?)\s*\}\}/g;
 export function vars(body) { const out = []; for (const m of String(body || '').matchAll(VAR)) if (!out.includes(m[1])) out.push(m[1]); return out; }
 // 내 역할: 로그인한 멤버면 서버에 적힌 역할, 아니면 이 기기에서 직접 고른 역할(kv me:role)
-export const MY_ROLES = ['PM·기획', '아트·디자인', '경영·정산'];
+// 팀 역할은 이 네 가지로 고정. 관리자가 멤버를 넣을 때 하나를 고르고, 바로가기·앞에 두는 메뉴·권하는 말이 역할을 따라감 (helper.js QUICK·CORE·BY_ROLE)
+export const TEAM_ROLES = [{ key: 'pm', name: 'PM·리더', about: '일정, 팀, 회의, 진행 상황' }, { key: 'art', name: '아트·디자인', about: '시안, 레퍼런스, 피그마' }, { key: 'make', name: '콘텐츠 제작', about: '촬영, 편집, SNS 게시' }, { key: 'biz', name: '경영·운영', about: '비용, 구매, 업체, 정산' }];
+export const MY_ROLES = TEAM_ROLES.map(r => r.name);
 export async function myRole() { const m = await db.kvGet('me:member', null); return (m && m.role) || await db.kvGet('me:role', '') || ''; }
 // 앱이 알아서 채울 수 있는 빈칸
 export const AUTO = ['오늘', '내 이름', '내 역할', '팀', '팀 소개', '프로젝트', '오늘 일정', '남은 할 일'];

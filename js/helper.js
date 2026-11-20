@@ -3,7 +3,7 @@
 //  · 메뉴: 내 역할에서 주로 쓰는 것 + 실제로 자주 연 것만 앞에 두고, 나머지는 "더보기"로 접음 (없애지 않음. 직접 고정·해제 가능)
 import { h, ic, modal } from './ui.js';
 import * as db from './db.js';
-import { roleKeys, myRole, MY_ROLES } from './prompts.js';
+import { roleKeys, myRole, MY_ROLES, TEAM_ROLES } from './prompts.js';
 
 // 화면마다: say = 그 화면에서 바로 통하는 말(앱 규칙만으로도 답함), about = AI에게 알려 줄 화면 설명
 export const SCREENS = {
@@ -28,7 +28,7 @@ export const SCREENS = {
   startup: { say: ['프로젝트 진행 상황', '이번 주 마감'], about: '사업 계획과 지표를 정리하는 화면' },
   _: { say: ['뭐부터 할까?', '오늘 일정', '밀린 할 일'], about: '' },
 };
-const BY_ROLE = { pm: ['누가 바빠?', '프로젝트 진행 상황'], art: ['오늘 마감', '이번 주 마감'], biz: ['이번 달 지출', '받을 돈 얼마야?'] };
+const BY_ROLE = { pm: ['누가 바빠?', '프로젝트 진행 상황'], art: ['오늘 마감', '이번 주 마감'], make: ['오늘 일정', '이번 주 마감'], biz: ['이번 달 지출', '받을 돈 얼마야?'] };
 
 export async function who() {
   const m = await db.kvGet('me:member', null); const role = await myRole();
@@ -74,6 +74,7 @@ export function start() {
 const QUICK = {
   pm: [{ icon: 'users', label: '누가 바빠?', say: '누가 바빠?' }, { icon: 'trend', label: '진행 상황', say: '프로젝트 진행 상황' }, { icon: 'type', label: '회의 정리 프롬프트', to: 'prompts/find/회의' }, { icon: 'bulb', label: '기획 보드', to: 'plan' }],
   art: [{ icon: 'check2', label: '이번 주 마감', say: '이번 주 마감' }, { icon: 'image', label: '레퍼런스', to: 'archive' }, { icon: 'type', label: '피드백 정리 프롬프트', to: 'prompts/find/피드백' }, { icon: 'film', label: 'SNS 만들기', to: 'studio' }],
+  make: [{ icon: 'calendar', label: '오늘 일정', say: '오늘 일정' }, { icon: 'film', label: 'SNS 만들기', to: 'studio' }, { icon: 'bulb', label: '기획 보드', to: 'plan' }, { icon: 'image', label: '레퍼런스', to: 'archive' }],
   biz: [{ icon: 'wallet', label: '이번 달 지출', say: '이번 달 지출' }, { icon: 'trend', label: '받을 돈', say: '받을 돈 얼마야?' }, { icon: 'type', label: '견적 프롬프트', to: 'prompts/find/견적' }, { icon: 'cart', label: '구매 목록', to: 'shop' }],
 };
 export async function shortcuts(me) {
@@ -83,7 +84,7 @@ export async function shortcuts(me) {
 }
 // 로그인하지 않았거나 멤버에 역할이 안 적혀 있으면 이 기기에서 직접 고름 (여러 개 가능). 고르면 바로가기·메뉴·프롬프트가 그 역할에 맞춰짐
 export function rolePicker(me, done, { later = false } = {}) {
-  const picked = new Set(MY_ROLES.filter(r => (me.role || '').includes(r)));
+  const had = roleKeys(me.role || ''); const picked = new Set(TEAM_ROLES.filter(r => had.includes(r.key)).map(r => r.name));
   const chip = r => { const b = h('button.chip' + (picked.has(r) ? '.on' : ''), { type: 'button', 'aria-pressed': String(picked.has(r)), onclick: () => { picked.has(r) ? picked.delete(r) : picked.add(r); b.classList.toggle('on', picked.has(r)); b.setAttribute('aria-pressed', String(picked.has(r))); } }, r); return b; };
   return h('div.role-row.pick', { 'aria-label': '내 역할 고르기' }, h('span.role-tag', '내 역할은?'), MY_ROLES.map(chip),
     h('button.chip.go', { type: 'button', onclick: async () => { await db.kvSet('me:role', [...picked].join(', ')); await db.kvSet('me:roleskip', !picked.size); await done(); } }, ic('check', 14), '완료'),
@@ -108,7 +109,7 @@ export async function toStudio(id, values = {}) {
 }
 
 // ── 메뉴 줄이기 ──
-const CORE = { all: ['plan', 'meetings', 'talk', 'prompts', 'team', 'settings'], pm: ['board', 'people'], art: ['archive', 'studio', 'figma'], biz: ['money', 'shop', 'vendors', 'radar'], none: ['money', 'archive', 'people'] };
+const CORE = { all: ['plan', 'meetings', 'talk', 'prompts', 'team', 'settings'], pm: ['board', 'people', 'radar'], art: ['archive', 'figma', 'studio'], make: ['studio', 'archive'], biz: ['money', 'shop', 'vendors', 'radar'], none: ['money', 'archive', 'people'] };
 // 앞에 둘 메뉴: 역할 기본 + 최근 3주 안에 3번 넘게 연 것, 그리고 직접 고정한 것(끄면 뺌)
 export async function pinned(now = Date.now()) {
   const me = await who(); const use = await db.kvGet('nav:use', {}); const pin = await db.kvGet('nav:pin', {});

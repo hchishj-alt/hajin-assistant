@@ -3,6 +3,8 @@ import { h, ic, clear, toast, head, modal, form, tile, seg, rel, fmtDate, confir
 import * as db from '../js/db.js';
 import * as A from '../js/admin.js';
 import { go } from '../js/app.js';
+import { TEAM_ROLES } from '../js/prompts.js';
+const ROLE_NAMES = TEAM_ROLES.map(r => r.name);
 
 let tab = 'log';
 const F = { by: '', col: '', q: '' };
@@ -135,11 +137,12 @@ export default {
       const sync = await import('../js/sync.js');
       if (!(await sync.me())) { box.append(h('div.card', h('div.empty', ic('users', 28), h('p', '멤버 코드로 로그인하면 여기서 멤버를 추가하고 코드를 관리할 수 있어요.'), h('a.btn.pri', { href: '#/settings' }, '설정에서 로그인')))); return; }
       let ms = []; try { ms = await sync.listMembers(); } catch (e) { box.append(h('p.faint.small', '멤버 목록을 못 불러왔어요: ' + e.message)); return; }
-      const edit = (m = { active: true }) => modal(m.id ? '멤버 고치기' : '멤버 추가', close => form([{ k: 'name', label: '이름' }, { k: 'code', label: '멤버 코드 (5자 이내)', default: m.code || sync.newCode() }, { k: 'email', label: '지메일 (선택)', default: m.gmail || '' }, { k: 'is_admin', label: '권한', type: 'select', options: [['', '멤버'], ['1', '관리자']], default: m.is_admin ? '1' : '' }, { k: 'active', label: '상태', type: 'select', options: [['1', '사용 중'], ['', '정지']], default: m.active === false ? '' : '1' }], { ...m, is_admin: m.is_admin ? '1' : '', active: m.active === false ? '' : '1', email: m.gmail || '', code: m.code || sync.newCode() }, async v => {
-        try { await sync.saveMember({ id: m.id, name: v.name, code: String(v.code || '').toUpperCase().slice(0, 5), gmail: v.email || '', role: m.role || '', is_admin: !!v.is_admin, active: !!v.active }); close(); toast('저장했어요'); go('admin/member'); } catch (e) { toast(e.message); }
+      const edit = (m = { active: true }) => modal(m.id ? '멤버 고치기' : '멤버 추가', close => form([{ k: 'name', label: '이름' }, { k: 'code', label: '멤버 코드 (5자 이내)', default: m.code || sync.newCode() }, { k: 'role', label: '역할 (화면 구성이 역할을 따라가요)', type: 'select', options: [...(m.role && !ROLE_NAMES.includes(m.role) ? [[m.role, m.role + ' (지금 값)']] : []), ...(m.role ? [] : [['', '고르기']]), ...TEAM_ROLES.map(r => [r.name, `${r.name} · ${r.about}`])], default: m.role || '' }, { k: 'email', label: '지메일 (선택)', default: m.gmail || '' }, { k: 'is_admin', label: '권한', type: 'select', options: [['', '멤버'], ['1', '관리자']], default: m.is_admin ? '1' : '' }, { k: 'active', label: '상태', type: 'select', options: [['1', '사용 중'], ['', '정지']], default: m.active === false ? '' : '1' }], { ...m, is_admin: m.is_admin ? '1' : '', active: m.active === false ? '' : '1', email: m.gmail || '', code: m.code || sync.newCode() }, async v => {
+        if (!v.role) { toast('역할을 골라 주세요'); return; }
+        try { await sync.saveMember({ id: m.id, name: v.name, code: String(v.code || '').toUpperCase().slice(0, 5), gmail: v.email || '', role: v.role, is_admin: !!v.is_admin, active: !!v.active }); close(); toast('저장했어요'); go('admin/member'); } catch (e) { toast(e.message); }
       }));
       box.append(h('div.card', h('div.card-h', h('h3', ic('users'), `멤버 ${ms.length}`), h('div.row', h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '멤버 추가'))),
-        ms.map(m => h('div.li', h('span.av', { style: { background: colorFor(m.name) } }, m.name.slice(-2, -1) || m.name[0]), h('div.grow', h('div.t', m.name, m.is_admin ? h('span.chip', { style: { marginLeft: '6px' } }, '관리자') : null, m.active === false ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '정지') : null), h('div.faint.small', [m.gmail, m.joined ? '로그인함' : '아직 로그인 안 함'].filter(Boolean).join(' · '))),
+        ms.map(m => h('div.li', h('span.av', { style: { background: colorFor(m.name) } }, m.name.slice(-2, -1) || m.name[0]), h('div.grow', h('div.t', m.name, m.is_admin ? h('span.chip', { style: { marginLeft: '6px' } }, '관리자') : null, m.active === false ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '정지') : null), h('div.faint.small', [m.role || '역할 없음', m.gmail, m.joined ? '로그인함' : '아직 로그인 안 함'].filter(Boolean).join(' · '))),
           h('code.code', m.code || '•••••'), h('button.btn.sm', { 'aria-label': '코드 복사', onclick: () => { navigator.clipboard?.writeText(m.code || ''); toast('코드를 복사했어요'); } }, ic('copy', 14)), h('button.btn.sm', { 'aria-label': '고치기', onclick: () => edit(m) }, ic('edit', 14))))));
     }
   },
