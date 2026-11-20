@@ -42,7 +42,7 @@
 | 한 말을 여러 건으로 나누기 | js/brain.js `interpret`: 때 말 다듬기(한글 금액 `korMoney`, 기념일·"다음 주 내내"·"평일") → `splitCommands`(줄, 그리고, 번호, 화살표) → `splitChain`("~하고 ~까지", "오전에 … 오후에 …") → `splitList`(쉼표로 늘어놓은 것, 금액 여러 개, "할 일: A, B") → `splitPeople`("대본은 민서가 쓰고 편집은 서연이") → 조각마다 `interpretOne` |
 | 곳으로 읽는 낱말 | js/brain.js `PLACE_RE`(끝 글자)와 `NOTPLACE`(편집·번역처럼 끝 글자만 같은 낱말). 새로 잘못 읽는 낱말이 나오면 `NOTPLACE`에 더함 |
 | 피그마 플러그인 | figma-plugin/ |
-| 유료 프롬프트 스튜디오(팀 앱과 따로, /studio/) | studio/, supabase/studio.sql. 유료 틀 본문은 저장소에 넣지 않음(서버에만) |
+| 유료 프롬프트 스튜디오(팀 앱과 따로, /studio/) | studio/, supabase/studio.sql. 유료 틀 본문은 저장소에 넣지 않음(서버에만). 작업 지시서는 docs/studio-codex/README.md |
 
 ## 새 화면을 추가할 때
 1. `modules/<id>.js`를 만든다.
