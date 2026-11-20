@@ -40,7 +40,7 @@ export async function search(prompt, { ms = 60000 } = {}) {
   const key = await hdb.kvGet(KEY, ''); if (!key) throw new Error('AI 키가 없어요');
   const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.5 } });
   let last = '';
-  for (const m of ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest']) {
+  for (const m of ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest']) {
     let r; try { r = await call(m, key, body, ms); } catch { last = '응답이 너무 늦어요'; continue; }
     if (!r.ok) { last = r.status === 429 ? '무료 사용량을 넘었어요' : 'AI 검색 실패 (' + r.status + ')'; if ([401, 403].includes(r.status)) break; continue; }
     const j = await r.json(); const c = j.candidates?.[0] || {};

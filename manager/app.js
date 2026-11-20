@@ -8,15 +8,16 @@ import { inspect, imgB64 } from './video.js';
 import { seed } from './demo.js';
 import * as SG from './strategy.js';
 import * as EX from './explore.js';
+import * as W from './web.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.2.1';
+export const VERSION = '1.3.0';
 
 const view = document.getElementById('view');
-const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users'], ['deals', '협찬', 'briefcase']];
+const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
 const $plat = { get: () => localStorage.getItem('mgr:plat') || 'ig', set: v => localStorage.setItem('mgr:plat', v) };
 
 async function state() {
-  const D = { profile: {}, posts: [], snaps: [], people: {}, handled: {}, deals: [], drafts: [], about: {}, ads: [], strategy: null, explore: null, routine: {} };
+  const D = { profile: {}, posts: [], snaps: [], people: {}, handled: {}, deals: [], drafts: [], about: {}, ads: [], strategy: null, explore: null, routine: {}, refs: null };
   const v = Object.fromEntries(await Promise.all(Object.entries(D).map(async ([k, d]) => [k, (await S.get(k, d)) ?? d])));
   v.about = { ig: v.profile.ig?.username, tt: v.profile.tt?.username, ...v.about };
   return v;
@@ -51,7 +52,7 @@ SCREENS.today = async (root, st, An) => {
   const cards = A.brief(st, An);
   const hello = h('p.hello', greet(st));
   const line = h('div.mline', h('div.ava', ic('sparkles', 18)), h('div.mtext', hello));
-  root.append(head('매니저', null, [demoBadge(), h('button.iconbtn', { 'aria-label': '숫자 채우기', onclick: () => go('#/data'), html: icon('upload', 20) }), h('button.iconbtn', { 'aria-label': '설정', onclick: () => go('#/settings'), html: icon('gear', 20) })]), line);
+  root.append(head('매니저', null, [demoBadge(), h('button.iconbtn', { 'aria-label': '협찬', onclick: () => go('#/deals'), html: icon('briefcase', 20) }), h('button.iconbtn', { 'aria-label': '숫자 채우기', onclick: () => go('#/data'), html: icon('upload', 20) }), h('button.iconbtn', { 'aria-label': '설정', onclick: () => go('#/settings'), html: icon('gear', 20) })]), line);
   // 매니저 한마디 (AI, 하루 한 번 저장)
   (async () => {
     const day = A.today(), cache = await S.get('dailyline', null);
@@ -64,7 +65,8 @@ SCREENS.today = async (root, st, An) => {
   for (const p of ['ig', 'tt']) {
     const a = An.plats[p], pr = st.profile[p]; if (!pr?.username && !a.n) continue;
     const d7 = a.growth.d7;
-    tiles.append(h('button.tile.big', { onclick: () => { $plat.set(p); go('#/stats'); } }, h('div.tl', ic(p, 15), (pr?.username ? '@' + pr.username : A.PLAT[p])), h('div.tv', A.fmt(a.growth.now ?? pr?.followers)), h('div.ts', h('span' + (d7 > 0 ? '.up' : d7 < 0 ? '.down' : ''), d7 == null ? '팔로워' : `7일 ${d7 >= 0 ? '+' : ''}${d7}`), ' · 반응률 ' + A.pct(a.er))));
+    const noNum = (a.growth.now ?? pr?.followers) == null;
+    tiles.append(h('button.tile.big', { onclick: () => { if (noNum) return quickCount(p); $plat.set(p); go('#/stats'); } }, h('div.tl', ic(p, 15), (pr?.username ? '@' + pr.username : A.PLAT[p])), h('div.tv', A.fmt(a.growth.now ?? pr?.followers)), noNum ? h('div.ts', h('span.acc', p === 'ig' ? '눌러서 숫자 넣기' : '읽는 중…')) : h('div.ts', h('span' + (d7 > 0 ? '.up' : d7 < 0 ? '.down' : ''), d7 == null ? '팔로워' : `7일 ${d7 >= 0 ? '+' : ''}${d7}`), pr?.live ? ' · 자동' : '', a.er != null ? ' · 반응률 ' + A.pct(a.er) : '')));
   }
   if (tiles.children.length) root.append(tiles);
   // 오늘 미션 (매니저가 짠 계획에서)
@@ -174,6 +176,69 @@ function itemSheet(it) {
     it.caption ? h('div', h('pre', it.caption), h('button.ghost.sm', { onclick: () => copy(it.caption) }, ic('copy', 14), '캡션 복사')) : h('p.fhint', '올리기 전날 매니저가 캡션을 미리 써 둬요.'),
     it.verdict ? h('p', h('b', '결과 '), `${it.verdict} (평소의 ${(it.lift || 1).toFixed(1)}배)`) : null,
     h('div.row.gap.wrap', ['찍음', '올림', '건너뜀', '예정'].filter(x => x !== it.status).map(x => h('button.ghost.sm', { onclick: async () => { await SG.setItem(it.id, { status: x }); close(); route(); } }, x === '예정' ? '되돌리기' : x === '찍음' ? '찍었어요' : x === '올림' ? '올렸어요' : '건너뛰기')), h('button.btn.sm', { onclick: () => { close(); go('#/coach/video'); } }, ic('film', 14), '영상 봐 주기'))));
+}
+
+// 팔로워 숫자 바로 넣기 (인스타는 로그인 벽이라 앱이 공개로 못 읽음)
+function quickCount(p) {
+  const f = h('input', { type: 'number', inputmode: 'numeric', placeholder: '예: 412' }), g = h('input', { type: 'number', inputmode: 'numeric', placeholder: '예: 380' });
+  const close = sheet(`${A.PLAT[p]} 숫자 넣기`, h('div.form', h('p.muted', p === 'ig' ? '인스타는 로그인해야 보이는 곳이라 앱이 혼자 못 읽어요. 지금 숫자만 적어 주면 그날부터 추이를 재요. 자동으로 받으려면 숫자 채우기 › 인스타 자동 연결.' : '틱톡은 앱이 공개 프로필에서 자동으로 읽어요. 안 될 때만 적어 주세요.'), h('div.two', field('팔로워', f), field('팔로잉', g)),
+    h('button.btn.wide', { onclick: async () => { if (!f.value) return toast('팔로워 수를 적어 주세요'); await S.update('profile', {}, pr => { pr[p] = { ...(pr[p] || {}), followers: +f.value, following: g.value ? +g.value : pr[p]?.following }; return pr; }); await S.snap(p, +f.value, g.value ? +g.value : null); close(); toast('넣었어요'); route(); } }, '저장'),
+    p === 'ig' ? h('button.ghost.wide', { onclick: () => { close(); go('#/data'); } }, '캡처로 넣기 · 자동 연결') : null));
+}
+// 틱톡 공개 프로필 자동 읽기: 팔로워·팔로잉·좋아요·영상별 조회수
+async function syncTT(force) {
+  if (S.getMode() !== 'real') return false;
+  const pr = await S.get('profile', {}); const u = pr.tt?.username; if (!u) return false;
+  if (!force && Date.now() - (pr.tt.syncAt || 0) < 3 * 3600e3) return false;
+  const r = await W.tiktokProfile(u);
+  await S.update('profile', {}, p => { p.tt = { ...(p.tt || {}), followers: r.followers ?? p.tt?.followers, following: r.following ?? p.tt?.following, likes: r.likes, syncAt: Date.now(), live: true }; return p; });
+  if (r.followers != null) await S.snap('tt', r.followers, r.following);
+  if (r.videos.length) await S.addPosts(r.videos.map(v => ({ plat: 'tt', kind: 'video', ext: v.id, url: `https://www.tiktok.com/@${u}/video/${v.id}`, at: v.at || new Date().toISOString(), views: v.views ?? undefined, caption: v.caption || undefined, src: 'web' })));
+  return true;
+}
+
+// ── 영상 (매니저가 모아 온 참고 영상 + 내 영상) ──
+SCREENS.videos = async (root, st, An, [tab = 'refs']) => {
+  root.append(head('영상', '지금 내 분야에서 터진 영상을 매니저가 모아 와요', demoBadge()), seg([['refs', '참고 영상', 'play'], ['mine', '내 영상', 'film']], tab, v => go('#/videos/' + v)));
+  if (tab === 'mine') {
+    const tt = st.posts.filter(p => p.plat === 'tt' && p.ext && /^\d+$/.test(p.ext)).sort((a, b) => (b.views || 0) - (a.views || 0));
+    const med = tt.length ? [...tt].map(p => p.views || 0).sort((a, b) => a - b)[tt.length >> 1] : 0;
+    if (!tt.length) { root.append(empty('film', '내 틱톡 영상을 아직 못 읽었어요', '설정에 틱톡 아이디가 있으면 앱을 열 때 자동으로 읽어요.', h('button.btn', { onclick: async e => { const b = e.currentTarget; busy(b, true, '읽는 중'); try { await syncTT(true); route(); } catch (er) { toast(er.message); busy(b, false); } } }, '지금 읽기'))); return; }
+    root.append(h('div.card.note', ic('chart', 18), h('p', `틱톡 ${tt.length}개 · 조회수 중앙값 ${A.fmt(med)}. 위에 있는 게 잘된 영상이에요. 잘된 것의 첫 장면·소리·길이를 다음 영상에 그대로 가져가요.`)));
+    root.append(h('div.vgrid', tt.map(p => h('div.vcard', h('div.vframe.tt', { 'data-id': p.ext, onclick: e => { const fr = e.currentTarget; if (fr.querySelector('iframe')) return; fr.replaceChildren(h('iframe', { src: `https://www.tiktok.com/player/v1/${p.ext}?music_info=1&description=0&rel=0`, allow: 'autoplay; fullscreen', loading: 'lazy' })); } }, h('div.vph', ic('play', 28), h('b', A.fmt(p.views) + '회'))), h('p.vt', p.caption || '(캡션 없음)'), h('div.row.sb', h('small.muted', new Date(p.at).toLocaleDateString('ko-KR', { year: '2-digit', month: 'numeric', day: 'numeric' })), h('span.chip' + ((p.views || 0) > med * 1.5 ? '.hotchip' : ''), (p.views || 0) > med * 1.5 ? '잘됨' : (p.views || 0) < med * 0.6 ? '아쉬움' : '보통'))))));
+    return;
+  }
+  const refs = st.refs;
+  const reload = h('button.ghost.sm', { onclick: async e => { const b = e.currentTarget; busy(b, true, '모으는 중'); try { await EX.gatherRefs(st, st.explore); route(); } catch (er) { toast('못 모았어요: ' + er.message); busy(b, false); } } }, ic('refresh', 14), '새로 모으기');
+  if (!refs?.items?.length) { const can = EX.queries(st, st.explore).length; root.append(empty('play', can ? '영상 모으는 중…' : '아직 모은 영상이 없어요', can ? '내 분야 검색어로 지금 찾고 있어요.' : '설정에 분위기·키워드를 적거나 캡션에 해시태그가 있으면 그걸로 찾아요.', reload)); if (can && !SCREENS.videos._tried) { SCREENS.videos._tried = true; EX.gatherRefs(st, st.explore).then(r => r?.items?.length && route()).catch(() => { }); } return; }
+  root.append(h('div.row.sb', h('div.row.gap0.wrap', refs.qs.map(q => h('span.chip', '#' + q))), reload));
+  const notes = refs.notes || {};
+  const grid = h('div.vgrid');
+  const items = refs.items.filter(v => !v.hide).slice(0, 30);
+  for (const v of items) {
+    const note = h('p.vn', notes[v.id] ? notes[v.id] : '');
+    grid.append(h('div.vcard', h('div.vframe', { onclick: e => { const fr = e.currentTarget; if (fr.querySelector('iframe')) return; fr.replaceChildren(h('iframe', { src: `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&playsinline=1&rel=0`, allow: 'autoplay; encrypted-media; fullscreen', allowfullscreen: true })); } }, h('img', { src: `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`, alt: '', loading: 'lazy' }), h('div.vph', ic('play', 28), h('b', A.fmt(v.views) + '회'))),
+      h('p.vt', v.title), note,
+      h('div.row.gap0', h('button.btn.sm', { onclick: async () => { await copyToPlan(v, notes[v.id]); } }, ic('plus', 14), '찍기'), h('button.ghost.sm', { 'aria-label': '안 맞아요', onclick: async e => { await S.update('refs', null, r => { const x = r.items.find(i => i.id === v.id); if (x) x.hide = true; return r; }); e.currentTarget.closest('.vcard').classList.add('gone'); } }, '별로'))));
+  }
+  root.append(grid, h('p.fhint', '유튜브 쇼츠에서 내 분야 검색어로 조회수 높은 순이에요. 인스타 릴스·틱톡은 바깥에서 검색이 막혀 있어서 같은 흐름을 쇼츠로 봐요.'));
+  // 따라 할 점 (AI, 하루 한 번 몰아서)
+  if (!Object.keys(notes).length && await AI.hasKey()) {
+    try {
+      const r = await AI.gem([`크리에이터 ${st.about.name || '하진'}(분야: ${st.explore?.niche || st.about.vibe || '뷰티·일상'})의 매니저로서, 아래 쇼츠마다 "왜 터졌는지 + 하진이 따라 찍을 때 가져갈 한 가지"를 25자 안쪽 한 줄로. JSON만: {"영상id":"한 줄"}\n` + items.slice(0, 16).map(v => `${v.id}: ${v.title} (조회 ${v.views})`).join('\n')], { json: true, temp: 0.5 });
+      await S.update('refs', null, x => { x.notes = r; return x; });
+      grid.querySelectorAll('.vcard').forEach((c, i) => { const v = items[i]; if (v && r[v.id]) c.querySelector('.vn').textContent = r[v.id]; });
+    } catch { }
+  }
+};
+async function copyToPlan(v, note) {
+  const sg = await S.get('strategy', null); if (!sg?.cur) return toast('전략이 아직 없어요');
+  const today = SG.kdate(); let d = today;
+  for (let k = 0; k < 7; k++) { const x = SG.addDays(today, k); if (!sg.cur.items.some(i => i.date === x && i.plat === 'tt' && i.status !== '건너뜀')) { d = x; break; } }
+  sg.cur.items.push({ id: S.uid(), date: d, time: '21:00', plat: 'tt', kind: 'video', pillar: '따라 찍기', idea: v.title.replace(/#\S+/g, '').trim().slice(0, 40) + ' (내 식으로)', hook: note || '원본 첫 장면 구도를 그대로', why: `참고 영상 조회 ${A.fmt(v.views)}회`, ref: v.id, status: '예정' });
+  sg.cur.items.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  (sg.log ||= []).push({ at: Date.now(), text: `참고 영상 "${v.title.slice(0, 20)}"을 ${SG.dayLabel(d)} 계획에 넣었어요.` });
+  await S.set('strategy', sg); toast(`${SG.dayLabel(d)} 계획에 넣었어요`);
 }
 
 // ── 분석 ──
@@ -517,7 +582,7 @@ SCREENS.settings = async (root, st) => {
     const clean = v => v.trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?(instagram|tiktok)\.com\/@?/, '').replace(/\/.*$/, '').toLowerCase();
     await S.set('about', { ...ab, name: f.name.value.trim(), ig: clean(f.ig.value), tt: clean(f.tt.value), goal: f.goal.value.trim(), goalAt: f.goal.value.trim() !== (ab.goal || '') ? Date.now() : ab.goalAt, vibe: f.vibe.value.trim() });
     await S.update('profile', {}, p => { if (clean(f.ig.value)) p.ig = { ...(p.ig || {}), username: clean(f.ig.value) }; if (clean(f.tt.value)) p.tt = { ...(p.tt || {}), username: clean(f.tt.value) }; return p; });
-    toast('저장했어요');
+    toast('저장했어요'); syncTT(true).then(ok => ok && toast('틱톡 숫자를 읽어 왔어요')).catch(e => toast(e.message));
   } }, '저장')));
   // AI
   const keyed = await AI.hasKey();
@@ -537,7 +602,7 @@ SCREENS.settings = async (root, st) => {
 let bgAt = 0;
 async function background(force) {
   if (!force && Date.now() - bgAt < 10 * 60e3) return; bgAt = Date.now();
-  try { const st = await state(); const ex = await EX.daily(st).catch(e => { console.warn(e); return null; }); const ch = await SG.tick(); if ((ch || ex?.at > Date.now() - 60e3) && /^(today|plan)?$/.test(location.hash.replace(/^#\/?/, '').split('/')[0])) route(); } catch (e) { console.warn(e); }
+  try { try { if (await syncTT(force)) route(); } catch (e) { console.warn('tiktok', e); } const st = await state(); const ex = await EX.daily(st).catch(e => { console.warn(e); return null; }); const ch = await SG.tick(); if ((ch || ex?.at > Date.now() - 60e3) && /^(today|plan)?$/.test(location.hash.replace(/^#\/?/, '').split('/')[0])) route(); } catch (e) { console.warn(e); }
 }
 // ── 시작 ──
 async function boot() {
