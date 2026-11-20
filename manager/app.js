@@ -9,7 +9,7 @@ import { seed } from './demo.js';
 import * as SG from './strategy.js';
 import * as EX from './explore.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.2.0';
+export const VERSION = '1.2.1';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users'], ['deals', '협찬', 'briefcase']];
@@ -138,7 +138,7 @@ SCREENS.plan = async (root, st, An) => {
   root.append(head('전략', '매니저가 짜고, 결과 보고 계속 고쳐요', [demoBadge(), h('button.iconbtn', { 'aria-label': '분석', onclick: () => go('#/stats'), html: icon('chart', 20) })]));
   if (!sg?.cur) { root.append(h('div.card.center', h('span.spin'), ' 이번 주 전략을 짜는 중…')); SG.tick().then(route); return; }
   const c = sg.cur; const done = c.items.filter(i => i.status === '올림').length;
-  root.append(h('div.card.focus', h('div.row.sb', h('small.muted', `${SG.dayLabel(c.week)} 시작 주 · ${c.by === 'ai' ? '매니저 AI' : '숫자 규칙'}가 짬`), h('span.chip', `${done}/${c.items.length} 올림`)), h('p.big2', c.focus || '이번 주 전략'), c.experiment ? h('p.muted', '이번 주 실험: ', h('b', c.experiment.hypo), ' → ', c.experiment.metric, '로 확인') : null));
+  root.append(h('div.card.focus', h('div.row.sb', h('small.muted', `${SG.dayLabel(c.week)} 시작 주 · ${c.by === 'ai' ? '매니저 AI가 짬' : '숫자 규칙으로 짬'}`), h('span.chip', `${done}/${c.items.length} 올림`)), h('p.big2', c.focus || '이번 주 전략'), c.experiment ? h('p.muted', '이번 주 실험: ', h('b', c.experiment.hypo), ' → ', c.experiment.metric, '로 확인') : null));
   // 주간 계획
   const byDay = {}; c.items.forEach(i => (byDay[i.date] ||= []).push(i));
   const wk = h('div.week');
@@ -553,6 +553,11 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') background(); });
   // 인스타가 연결돼 있으면 열 때마다 새 숫자 (30분 간격)
   if (S.getMode() === 'real' && (await IG.tokenInfo()) && Date.now() - (await S.get('g:iglast', 0)) > 30 * 60e3) { try { await IG.sync(); if (/today|stats|^$/.test(location.hash.replace(/^#\/?/, '') || 'today')) route(); } catch (e) { if (e.code === 190) toast('인스타 연결이 끊겼어요. 숫자 채우기에서 다시 연결해 주세요', 5000); } }
-  if ('serviceWorker' in navigator && location.hostname !== 'localhost') navigator.serviceWorker.register('./sw.js').catch(() => { });
+  // 새 판이 나오면 알아서 받아서 한 번 새로 고침 (처음 설치 때는 안 함)
+  if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
+    const had = !!navigator.serviceWorker.controller; let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !reloaded) { reloaded = true; location.reload(); } });
+    navigator.serviceWorker.register('./sw.js').then(reg => document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => { }); })).catch(() => { });
+  }
 }
 boot();
