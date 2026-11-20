@@ -7,7 +7,7 @@ export default {
   async render(root) {
     const body = h('div'); let edit = false;
     const editBtn = h('button.btn.sm.ghost.ps-tap', { type: 'button', onclick: () => { edit = !edit; draw(); } }, ic('edit', 14), '고르기');
-    root.append(head('메뉴', null, editBtn, h('button.btn.sm.ps-tap', { type: 'button', onclick: openPalette }, ic('search', 14), '검색')), body);
+    root.append(head('메뉴', null, h('button.btn.sm.ghost.ps-tap', { type: 'button', onclick: async () => (await import('../js/helper.js')).openSheet('menu', '뭐 할 수 있어?') }, ic('bulb', 14), '쓰는 법'), editBtn, h('button.btn.sm.ps-tap', { type: 'button', onclick: openPalette }, ic('search', 14), '검색')), body);
     await draw();
     async function draw() {
       const adm = await (await import('../js/admin.js')).isAdmin(); const hid = (await db.kvGet('look', null))?.hidden || [];

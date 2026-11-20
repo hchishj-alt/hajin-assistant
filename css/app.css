@@ -847,6 +847,7 @@ html{scroll-padding-bottom:calc(96px + env(safe-area-inset-bottom))}
 }
 @media (pointer:coarse),(max-width:900px){
   .btn.sm{min-height:40px}.btn.icon,.btn.sm.icon{min-width:42px;min-height:42px}
+  .page-head .btn.sm{min-height:44px}
   .seg button{min-height:38px}
   button.chip,a.chip{min-height:34px}
   .labels .lab{min-height:38px}
