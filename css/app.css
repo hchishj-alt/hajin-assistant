@@ -1127,3 +1127,11 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
   .week .blk b{display:none}
   .week .blk{font-size:calc(10.5px*var(--fs,1));padding:2px 3px;line-height:1.2;word-break:break-all;overflow:hidden;letter-spacing:-.02em}
 }
+/* 영상 편집실 (v1.38.0): 화면은 영상 비율 그대로, 폰에서는 미리보기 단추가 같이 보이게 낮춤 */
+.editor-canvas{display:block;max-width:100%;max-height:68vh;width:auto;height:auto;margin:0 auto;background:#000;border-radius:14px}
+.editor-stage .row{flex-wrap:wrap;row-gap:8px}
+.clip-move{gap:2px;flex:none}.clip-move .btn{min-width:40px;min-height:40px;padding:0;justify-content:center}
+@media (max-width:900px){.editor-canvas{max-height:52vh}}
+@media (max-width:900px) and (max-height:520px){.editor-canvas{max-height:70vh}}
+@media (pointer:coarse),(max-width:900px){.clip-move .btn{min-width:44px;min-height:44px}#view .editor-grid .in{min-height:42px}#view .editor-grid .btn.sm{min-width:42px}#view .editor-title{min-height:42px}}
+@media (max-width:520px){.sub-row{flex-wrap:wrap!important}.sub-row .sub-text{order:-1;flex:1 0 100%}}

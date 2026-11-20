@@ -118,74 +118,137 @@ export function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + 
 export function totalDuration(clips, c) {
   return clips.reduce((s, k) => s + clipLen(k), 0) + (c.intro ? 0 : 0);
 }
-export const clipLen = k => k.type === 'image' ? (k.dur || 3) : Math.max(.3, (k.out ?? k.el.duration ?? 0) - (k.in || 0));
+// 클립 길이(초). 이 기기에서 못 여는 영상은 길이를 모르므로 0 (그런 클립은 건너뜀)
+export const clipLen = k => { if (k.bad) return 0; if (k.type === 'image') return k.dur || 3; const d = (k.out ?? k.el.duration ?? 0) - (k.in || 0); return Number.isFinite(d) ? Math.max(.3, d) : 0; };
 
-export function createPlayer(canvas, clips, concept, subs, { logo = null, music = null, musicVol = .35, sfx = [], onTime, onEnd, record = false } = {}) {
+// 만들 파일 형식: 아이폰·인스타·카톡에서 바로 열리는 mp4(H.264+AAC)를 먼저, 안 되면 webm.
+// 크롬의 그냥 'video/mp4'는 속이 VP9이라 아이폰에서 안 열리므로 맨 뒤.
+// 사파리와 아이폰·아이패드의 모든 브라우저(속이 같은 엔진)는 그냥 'video/mp4'가 H.264+AAC라서 그대로 어디서나 열림.
+const APPLE = typeof navigator !== 'undefined' && /AppleWebKit/.test(navigator.userAgent || '') && !/Chrome\/|Chromium\/|Edg\/|Android/.test(navigator.userAgent || '');
+export function recType() {
+  if (typeof MediaRecorder === 'undefined') return null;
+  const AAC = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2'], WEBM = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  const C = APPLE ? [...AAC, 'video/mp4', ...WEBM] : [...AAC, 'video/mp4;codecs=avc1.42E01E,opus', 'video/mp4;codecs=avc1,opus', ...WEBM, 'video/mp4'];
+  return C.find(t => { try { return MediaRecorder.isTypeSupported(t); } catch { return false; } }) ?? '';
+}
+// 만든 파일이 어디서나 열리는 형식인지 (mp4 + H.264 + AAC)
+export const plays = type => /mp4/.test(type || '') && !/opus/.test(type || '') && (/avc1/.test(type || '') || APPLE);
+
+// 소리 길: 영상·음악 요소는 평생 한 번만 소리 길에 꽂을 수 있어서(두 번째부터는 오류) 한 번 꽂은 것을 계속 다시 씀.
+// 예전에는 미리보기를 한 번 하고 나면 영상 만들기에 클립 소리가 안 들어갔음.
+let AC = null; const SRC = new WeakMap();
+function audioCtx() { if (!AC || AC.state === 'closed') AC = new (window.AudioContext || window.webkitAudioContext)(); return AC; }
+function srcOf(el) { let n = SRC.get(el); if (!n || n.context !== audioCtx()) { n = audioCtx().createMediaElementSource(el); SRC.set(el, n); } return n; }
+
+export function createPlayer(canvas, clips, concept, subs, { logo = null, music = null, musicVol = .35, sfx = [], onTime, onEnd, onError, record = false } = {}) {
   const [W, H] = RATIOS[concept.ratio] || RATIOS['9:16'];
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
-  let ac = null, dest = null, raf = 0, stopped = false, idx = 0, clipStart = 0, t0 = 0, rec = null, chunks = [];
+  clips = clips.filter(k => clipLen(k) > 0);
+  let ac = null, dest = null, raf = 0, stopped = false, paused = false, pauseAt = 0, idx = -1, base = 0, clipT0 = 0, ready = false, rec = null, chunks = [], wake = null, errs = 0, lastT = -1, lastMove = 0;
   const total = totalDuration(clips, concept);
-  const nodes = new Map();
+  const gains = new Map(), made = [], bufs = [];
   function audioSetup() {
-    ac = new (window.AudioContext || window.webkitAudioContext)();
+    ac = audioCtx();
     dest = ac.createMediaStreamDestination();
-    for (const k of clips) if (k.type === 'video' && !nodes.has(k.el)) { try { const n = ac.createMediaElementSource(k.el); const g = ac.createGain(); g.gain.value = k.vol ?? 1; n.connect(g); g.connect(dest); if (!record) g.connect(ac.destination); nodes.set(k.el, n); } catch { } }
-    if (music) { try { const n = ac.createMediaElementSource(music); const g = ac.createGain(); g.gain.value = musicVol; n.connect(g); g.connect(dest); if (!record) g.connect(ac.destination); } catch { } }
+    const wire = (el, vol) => { try { const g = ac.createGain(); g.gain.value = vol; srcOf(el).connect(g); g.connect(dest); if (!record) g.connect(ac.destination); made.push(g); return g; } catch { return null; } };
+    for (const k of clips) if (k.type === 'video' && !gains.has(k.el)) gains.set(k.el, wire(k.el, k.vol ?? 1));
+    if (music) wire(music, musicVol);
   }
+  const cues = sfx.filter(x => (x.t || 0) < total).sort((a, b) => (a.t || 0) - (b.t || 0)); let sfxAt = 0;
+  const fire = x => { try { const b = ac.createBufferSource(); b.buffer = sfxBuffer(ac, x.kind); const g = ac.createGain(); g.gain.value = x.vol ?? .8; b.connect(g); g.connect(dest); if (!record) g.connect(ac.destination); b.start(); bufs.push(b); made.push(g); } catch { } };
+  const waitSeek = (v, t) => new Promise(res => { let done = false; const end = () => { if (done) return; done = true; v.removeEventListener('seeked', end); res(); }; v.addEventListener('seeked', end); try { v.currentTime = t; } catch { end(); } setTimeout(end, 4000); });
   async function startClip(i) {
+    const prev = clips[idx], nx = clips[i];
+    const joined = !!(prev && nx && prev.type === 'video' && nx.type === 'video' && prev.el === nx.el && !prev.el.ended && Math.abs(prev.el.currentTime - (nx.in || 0)) < .12);
+    if (prev && prev.type === 'video' && !joined) prev.el.pause();
+    if (i > 0 && clips[i - 1]) base += clipLen(clips[i - 1]);
     idx = i; const k = clips[i]; if (!k) return finish();
-    clipStart = elapsed();
-    if (k.type === 'video') { k.el.currentTime = k.in || 0; k.el.muted = false; try { await k.el.play(); } catch { } }
+    ready = false; lastT = -1; lastMove = performance.now();
+    if (k.type === 'video') {
+      if (!joined) await waitSeek(k.el, k.in || 0); if (stopped) return;
+      k.el.muted = false; const g = gains.get(k.el); if (g) g.gain.value = k.vol ?? 1;
+      if (!paused) { try { await k.el.play(); } catch { } }
+    }
+    clipT0 = performance.now(); ready = true;
   }
-  const elapsed = () => (performance.now() - t0) / 1000;
   function frame() {
-    if (stopped) return;
-    const T = elapsed();
+    if (stopped || paused) return;
+    raf = requestAnimationFrame(frame);
     const k = clips[idx];
-    if (!k) return finish();
-    const local = T - clipStart;
+    if (!k || !ready) return;   /* 다음 클립 자리를 찾는 동안은 앞 장면을 그대로 둠 */
     const len = clipLen(k);
-    if (local >= len || (k.type === 'video' && (k.el.ended || k.el.currentTime >= (k.out ?? Infinity)))) { if (k.type === 'video') k.el.pause(); startClip(idx + 1); raf = requestAnimationFrame(frame); return; }
-    const m = motionAt(concept, k, local, len, idx);
-    drawFrame(ctx, k.el, W, H, concept, { ...m, t: Math.floor(T * 24) });
-    transitionAt(ctx, W, H, concept, local, idx);
-    drawOverlay(ctx, W, H, concept, { T, total, idx, n: clips.length });
-    const s = subs.find(x => T >= x.start && T < x.end);
-    if (s) drawSubtitle(ctx, s.text, W, H, concept, 1, T - s.start);
-    if (concept.intro && T < 2.2) drawTitleCard(ctx, concept.intro, W, H, concept, T < 1.8 ? 1 : 1 - (T - 1.8) / .4);
-    if (concept.outro && T > total - 2) drawTitleCard(ctx, concept.outro, W, H, concept, Math.min(1, (T - (total - 2)) / .4), concept.hashtags?.split(/\s+/).slice(0, 3).join(' '));
-    drawLogo(ctx, logo, W, H, concept.logoPos);
+    /* 영상 클립은 벽시계가 아니라 영상이 실제로 간 만큼 셈 (폰이 버벅여도 끝이 잘리거나 자막이 밀리지 않음) */
+    const local = k.type === 'video' ? Math.max(0, k.el.currentTime - (k.in || 0)) : (performance.now() - clipT0) / 1000;
+    const now = performance.now();
+    if (k.type === 'video') { if (local !== lastT) { lastT = local; lastMove = now; } else if (now - lastMove > 6000) { ready = false; startClip(idx + 1); return; } }   /* 6초 넘게 멈춘 영상은 건너뜀 (영영 안 끝나는 것 막기) */
+    if (local >= len - .01 || (k.type === 'video' && k.el.ended)) { ready = false; startClip(idx + 1); return; }
+    const T = base + Math.min(local, len);
+    try {
+      const m = motionAt(concept, k, local, len, idx);
+      drawFrame(ctx, k.el, W, H, concept, { ...m, t: Math.floor(T * 24) });
+      transitionAt(ctx, W, H, concept, local, idx);
+      drawOverlay(ctx, W, H, concept, { T, total, idx, n: clips.length });
+      const s = subs.find(x => T >= x.start && T < x.end);
+      if (s) drawSubtitle(ctx, s.text, W, H, concept, 1, T - s.start);
+      if (concept.intro && T < 2.2) drawTitleCard(ctx, concept.intro, W, H, concept, T < 1.8 ? 1 : 1 - (T - 1.8) / .4);
+      if (concept.outro && T > total - 2) drawTitleCard(ctx, concept.outro, W, H, concept, Math.min(1, (T - (total - 2)) / .4), concept.hashtags?.split(/\s+/).slice(0, 3).join(' '));
+      drawLogo(ctx, logo, W, H, concept.logoPos);
+      errs = 0;
+      while (sfxAt < cues.length && (cues[sfxAt].t || 0) <= T) fire(cues[sfxAt++]);
+    } catch (e) { if (++errs > 60) { console.error(e); onError && onError(e); return finish(true); } }   /* 한두 장면 못 그린 것은 넘기고, 계속 못 그리면 멈춤 */
     onTime && onTime(T, total);
+  }
+  function pause() {
+    if (paused || stopped) return; paused = true; pauseAt = performance.now(); cancelAnimationFrame(raf);
+    const k = clips[idx]; if (k && k.type === 'video') k.el.pause(); music && music.pause();
+    try { ac && ac.suspend(); } catch { } try { if (rec && rec.state === 'recording') rec.pause(); } catch { }
+  }
+  function resume() {
+    if (!paused || stopped) return; paused = false; const gap = performance.now() - pauseAt; clipT0 += gap; lastMove += gap;
+    try { ac && ac.resume(); } catch { } try { if (rec && rec.state === 'paused') rec.resume(); } catch { }
+    const k = clips[idx]; if (k && k.type === 'video' && ready) k.el.play().catch(() => { }); if (music) music.play().catch(() => { });
     raf = requestAnimationFrame(frame);
   }
-  function finish() {
-    if (stopped) return; stopped = true; cancelAnimationFrame(raf);
+  /* 다른 앱이나 탭으로 가면 화면을 못 그리므로 그동안 멈췄다가 돌아오면 이어서 (안 그러면 그 구간이 멈춘 화면으로 찍힘) */
+  const onVis = () => (document.visibilityState === 'hidden' ? pause() : resume());
+  function finish(failed) {
+    if (stopped) return; stopped = true; cancelAnimationFrame(raf); document.removeEventListener('visibilitychange', onVis);
     clips.forEach(k => k.type === 'video' && k.el.pause()); music && music.pause();
-    if (rec && rec.state !== 'inactive') rec.stop(); else onEnd && onEnd(null);
+    bufs.forEach(b => { try { b.stop(); } catch { } }); made.forEach(g => { try { g.disconnect(); } catch { } });
+    try { wake && wake.release(); } catch { }
+    try { if (ac && ac.state === 'suspended') ac.resume(); } catch { }
+    if (rec && rec.state !== 'inactive') { if (failed === true) { rec.onstop = () => onEnd && onEnd(null); } rec.stop(); } else onEnd && onEnd(null);
   }
   return {
     W, H, total,
     async play() {
+      if (!clips.length) { stopped = true; onEnd && onEnd(null); return; }
       audioSetup();
+      for (const el of new Set([...clips.filter(k => k.type === 'video').map(k => k.el), ...(music ? [music] : [])])) { try { const pr = el.play(); if (pr && pr.catch) pr.catch(() => { }); el.pause(); } catch { } }
       try { await ac.resume(); } catch { }
       if (record) {
+        const type = recType();
+        if (type == null) { stopped = true; onError && onError(new Error('이 브라우저는 영상 만들기를 지원하지 않아요')); onEnd && onEnd(null); return; }
         const stream = canvas.captureStream(30);
         dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
-        const type = ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
-        rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8_000_000 });
+        rec = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), videoBitsPerSecond: W * H >= 1920 * 1080 ? 8_000_000 : 6_000_000, audioBitsPerSecond: 128_000 });
         rec.ondataavailable = e => e.data.size && chunks.push(e.data);
-        rec.onstop = () => onEnd && onEnd(new Blob(chunks, { type: rec.mimeType || 'video/webm' }));
-        rec.start(500);
+        rec.onstop = () => onEnd && onEnd(new Blob(chunks, { type: rec.mimeType || type || 'video/webm' }), { type: type || rec.mimeType || '' });
+        rec.onerror = e => { console.error(e.error || e); onError && onError(e.error || new Error('녹화 중 오류')); };
+        rec.start(1000);
+        try { navigator.wakeLock && navigator.wakeLock.request('screen').then(l => { if (stopped) l.release(); else wake = l; }).catch(() => { }); } catch { }   /* 만드는 동안 화면이 꺼지지 않게 */
       }
+      document.addEventListener('visibilitychange', onVis);
       if (music) { music.currentTime = 0; music.loop = true; try { await music.play(); } catch { } }
-      t0 = performance.now(); stopped = false;
-      for (const x of sfx) { try { const b = ac.createBufferSource(); b.buffer = sfxBuffer(ac, x.kind); const g = ac.createGain(); g.gain.value = x.vol ?? .8; b.connect(g); g.connect(dest); if (!record) g.connect(ac.destination); b.start(ac.currentTime + Math.max(0, x.t || 0)); } catch { } }
-      await startClip(0);
+      stopped = false;
+      base = 0; await startClip(0);
       raf = requestAnimationFrame(frame);
     },
-    stop: finish,
-    close() { finish(); try { ac && ac.close(); } catch { } },
+    stop: () => finish(),
+    cancel: () => finish(true),   /* 만들던 것을 버리고 멈춤 */
+    pause, resume,
+    close() { finish(true); },
   };
 }
 

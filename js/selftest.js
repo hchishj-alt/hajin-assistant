@@ -5,6 +5,7 @@ import { isWhere } from './where.js';
 import * as PS from './prompts.js';
 import * as DM from './dm.js';
 import { dayOf } from './db.js';
+import * as V from './video.js';
 export const BASE = new Date(2026, 10, 19, 10, 0, 0);
 
 export const CASES = [
@@ -138,6 +139,13 @@ export function run() {
     results.push({ group: '프롬프트 스튜디오', name: '점검: 짧은 말은 낮게, 잘 짠 말은 높게', ok: weak.score < 40 && weak.missing.some(i => i.id === 'format') && good.score >= 80, detail: `${weak.score}점 / ${good.score}점` });
     const c = PS.compose({ role: '콘텐츠 기획사의 PM', goal: '팝업 제안서 목차를 잡아 줘', format: '표로', ask: true });
     results.push({ group: '프롬프트 스튜디오', name: '칸을 채우면 한 편으로 조립', ok: c.startsWith('너는 콘텐츠 기획사의 PM야.') && c.includes('해 줄 일: 팝업 제안서 목차를 잡아 줘') && c.includes('형식: 표로') && /먼저 질문/.test(c), detail: c.replace(/\n+/g, ' / ') });
+  }
+  { /* 영상 편집실: 못 여는 클립은 길이 0(건너뜀), 컷 길이 맞추기, 어디서나 열리는 형식 가리기 */
+    const vid = (d, o = {}) => ({ type: 'video', el: { duration: d }, ...o });
+    const clips = [vid(12), vid(8, { in: 2, out: 5 }), { type: 'image', dur: 3 }, { type: 'video', bad: true, el: { duration: NaN } }, vid(NaN), vid(Infinity)];
+    const T = V.totalDuration(clips, {});
+    const cut = [vid(10), { type: 'image', dur: 3 }, vid(1)]; const r = V.applyConcept(cut, { edit: { cut: 2, sfxCut: 'pop' } });
+    results.push({ group: '영상 편집실', name: '못 여는 클립은 0초로 세고, 컷 길이를 맞추고, 아이폰·인스타에서 열리는 형식만 "어디서나"로 봄', ok: T === 18 && V.clipLen(clips[3]) === 0 && V.clipLen(clips[4]) === 0 && V.clipLen(clips[5]) === 0 && r.trimmed === 2 && cut[0].in === 4 && cut[0].out === 6 && cut[1].dur === 2 && r.sfx.length === 2 && V.plays('video/mp4;codecs=avc1.42E01E,mp4a.40.2') && !V.plays('video/mp4;codecs=avc1,opus') && !V.plays('video/webm;codecs=vp9,opus') && V.recType() === null, detail: `전체 ${T}초 / 컷 ${cut[0].in}~${cut[0].out} / 효과음 ${r.sfx.length}` });
     const cls = [['견적서 항목 뽑아줘', '돈·계약'], ['회의록 정리해줘', '회의·정리'], ['포스터 무드 세 가지', '디자인·이미지'], ['고객 메일 답장 써줘', '글쓰기'], ['팝업 제안서 목차', '기획'], ['경쟁사 사례 조사', '조사']].filter(([t, want]) => PS.classify(t) !== want);
     results.push({ group: '프롬프트 스튜디오', name: '분야 알아서 나누기', ok: !cls.length, detail: cls.length ? '틀림: ' + cls.map(x => x[0]).join(' / ') : '6/6' });
     const rk = [PS.roleKeys('리더·PM·UX/UI').join(), PS.roleKeys('아트디렉터').join(), PS.roleKeys('경영').join()];

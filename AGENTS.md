@@ -75,3 +75,11 @@
 ## 날짜
 
 - 저장된 시각(`createdAt`·`updatedAt`·`doneAt`)은 UTC 글자다. 날짜로 쓸 때는 `.slice(0, 10)`이나 `toISOString().slice(0, 10)`을 쓰지 말고 `db.dayOf(시각)`을 쓴다. 자르면 한국 시간 자정~아침 9시에 하루가 어긋난다.
+
+## 영상 편집실 (v1.38.0)
+- 영상 만들기는 화면을 실제 속도로 찍는 방식(`js/video.js` `createPlayer`). 클립 시간은 벽시계가 아니라 영상이 실제로 간 만큼(`el.currentTime`)으로 세요. 벽시계로 세면 폰이 버벅일 때 끝이 잘려요.
+- 영상·음악 요소는 소리 길에 한 번만 꽂을 수 있어요. 꼭 `srcOf(el)`을 거치세요 (직접 `createMediaElementSource`를 부르면 두 번째 재생부터 소리가 빠져요).
+- 같은 파일에서 나눈 클립은 영상 요소 하나를 같이 써요(`loadClip`의 `cache`). 그 요소를 옮기는 일(작은 그림, 나누기, 자동 컷, 썸네일)은 `inTurn`으로 차례를 지키고, 미리보기가 돌고 있으면 먼저 `stopPreview()`.
+- 이 기기에서 못 여는 파일(아이폰 고효율 영상, HEIC)은 넣을 때 알려 주고 빼요. 다른 기기에서 넣은 클립은 `ghosts`에 두었다가 저장할 때 제자리에 다시 끼워요. 지우지 마세요.
+- 만드는 형식은 `recType()`이 골라요: 크롬은 H.264 mp4를 먼저(그냥 `video/mp4`는 속이 VP9이라 맨 뒤), 애플 엔진은 그냥 `video/mp4`도 괜찮음. 어디서나 열리는지는 `plays(type)`.
+- 실제 영상으로 하는 시험: `/mnt/project-files/hajin-assistant-dev/video/` (`vid1.js`, `vid2.js`, 영상은 ffmpeg로 만들어 씀). 시험 크롬은 HEVC를 못 열고 mp4 소리가 Opus로 나와요. 실제 아이폰 사파리에서의 내보내기는 기기로만 확인할 수 있어요.
