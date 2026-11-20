@@ -4,6 +4,7 @@ import * as SC from './scope.js';
 import * as store from './store.js';
 import * as brain from './brain.js';
 
+const eun = s => { const c = String(s || '').trim().slice(-1).charCodeAt(0); return c >= 0xAC00 && c <= 0xD7A3 ? ((c - 0xAC00) % 28 ? '은' : '는') : '은'; };   /* 받침 있으면 은, 없으면 는 */
 const pad = n => String(n).padStart(2, '0');
 const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const addD = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
@@ -57,9 +58,9 @@ export async function answer(q, base = new Date()) {
       const ts = (await db.list('tasks')).filter(t => t.due && !t.done && kws.every(k => `${t.title} ${t.project || ''} ${t.who || ''}`.includes(k))).sort((x, y) => x.due.localeCompare(y.due));
       if ((/마감/.test(q) || (/(언제까지|까지\s*(야|예요|에요|지|죠|인가|일까))/.test(q) && !evs.length)) && ts.length) return { text: `“${ts[0].title}” 마감은 ${fmtK(ts[0].due)}${ts[0].time ? ' ' + ts[0].time : ''}이에요.${ts[0].who ? ` 담당은 ${ts[0].who}예요.` : ''}`, items: ts.slice(0, 6).map(t => ({ icon: 'check2', title: t.title, sub: '마감 ' + t.due.slice(5).replace('-', '/') + (t.time ? ' ' + t.time : ''), route: 'tasks' })) };
       { const e = evs.find(x => x.date >= today) || evs[0];
-        if (e && /(어디|장소)/.test(q)) return { text: e.place || e.area ? `“${e.title}”은 ${[e.area, e.place].filter(Boolean).join(' ')}에서 해요. ${fmtK(e.date)}${e.start ? ' ' + e.start : ''}이에요.` : `“${e.title}”에는 장소를 안 적어 뒀어요. ${fmtK(e.date)}${e.start ? ' ' + e.start : ''}이에요.`, items: [{ icon: 'calendar', title: e.title, sub: [e.date.slice(5).replace('-', '/'), e.start, e.place].filter(Boolean).join(' · '), route: 'calendar/' + e.date }] };
-        if (e && /(누구랑|누가)/.test(q)) return { text: e.who ? `“${e.title}”은 ${e.who}와(과) 같이 해요.` : `“${e.title}”에는 같이 하는 사람을 안 적어 뒀어요.`, items: [{ icon: 'calendar', title: e.title, sub: [e.date.slice(5).replace('-', '/'), e.start, e.who].filter(Boolean).join(' · '), route: 'calendar/' + e.date }] };
-        if (e && /몇\s*시/.test(q)) return { text: e.start ? `“${e.title}”은 ${fmtK(e.date)} ${e.start}${e.end ? '–' + e.end : ''}이에요.` : `“${e.title}”은 ${fmtK(e.date)}인데 시간은 안 정해져 있어요.`, items: [{ icon: 'calendar', title: e.title, sub: [e.date.slice(5).replace('-', '/'), e.start, e.place].filter(Boolean).join(' · '), route: 'calendar/' + e.date }] }; }
+        if (e && /(어디|장소)/.test(q)) return { text: e.place || e.area ? `“${e.title}”${eun(e.title)} ${[e.area, e.place].filter(Boolean).join(' ')}에서 해요. ${fmtK(e.date)}${e.start ? ' ' + e.start : ''}이에요.` : `“${e.title}”에는 장소를 안 적어 뒀어요. ${fmtK(e.date)}${e.start ? ' ' + e.start : ''}이에요.`, items: [{ icon: 'calendar', title: e.title, sub: [e.date.slice(5).replace('-', '/'), e.start, e.place].filter(Boolean).join(' · '), route: 'calendar/' + e.date }] };
+        if (e && /(누구랑|누가)/.test(q)) return { text: e.who ? `“${e.title}”${eun(e.title)} ${e.who}와(과) 같이 해요.` : `“${e.title}”에는 같이 하는 사람을 안 적어 뒀어요.`, items: [{ icon: 'calendar', title: e.title, sub: [e.date.slice(5).replace('-', '/'), e.start, e.who].filter(Boolean).join(' · '), route: 'calendar/' + e.date }] };
+        if (e && /몇\s*시/.test(q)) return { text: e.start ? `“${e.title}”${eun(e.title)} ${fmtK(e.date)} ${e.start}${e.end ? '–' + e.end : ''}이에요.` : `“${e.title}”${eun(e.title)} ${fmtK(e.date)}인데 시간은 안 정해져 있어요.`, items: [{ icon: 'calendar', title: e.title, sub: [e.date.slice(5).replace('-', '/'), e.start, e.place].filter(Boolean).join(' · '), route: 'calendar/' + e.date }] }; }
       if (evs.length || ts.length) { const e = evs.find(x => x.date >= today) || evs[0]; return { text: e ? `“${e.title}” 일정은 ${fmtK(e.date)}${e.start ? ' ' + e.start : ''}${e.date < today ? '이었어요' : '이에요'}.` : `그 말이 들어간 할 일 ${ts.length}개가 있어요.`, items: [...evs.slice(0, 8).map(x => ({ icon: 'calendar', title: x.title, sub: [x.date.slice(5).replace('-', '/'), x.start, x.place].filter(Boolean).join(' · '), route: 'calendar/' + x.date })), ...ts.slice(0, 5).map(t => ({ icon: 'check2', title: t.title, sub: '마감 ' + t.due.slice(5).replace('-', '/'), route: 'tasks' }))] }; }
       return { text: `‘${kws.join(' ')}’ 일정을 못 찾았어요. 캘린더에 아직 없는 것 같아요.`, items: [] };
     }

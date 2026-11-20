@@ -37,7 +37,7 @@ export default {
       const mine = (await db.list('prompts')), logs = await db.list('promptlogs'), fav = await db.kvGet('prompts:fav', []);
       const uses = {}; for (const l of logs) uses[l.pid] = (uses[l.pid] || 0) + 1;
       clear(body);
-      const myUses = logs.filter(l => l.by === me.name).length;
+      const myUses = logs.filter(l => P.samePerson(l.by, me.name)).length;
       body.append(h('div.tiles', { style: { marginBottom: '14px' } }, tile('book', mine.length, '모아 둔 프롬프트'), tile('zap', logs.length, '팀이 쓴 횟수'), tile('user', myUses, '내가 쓴 횟수')),
         h('div', { style: { marginBottom: '12px' } }, seg([['lib', '보관함'], ['make', '만들기'], ['style', '작업 방식']], F.tab, v => { F.tab = v; draw(); })));
       if (F.tab === 'make') return body.append(maker());
@@ -175,7 +175,7 @@ export default {
     /* 작업 방식 */
     async function styleView(logs, prompts) {
       const roster = await db.kvGet('sync:roster', []); const names = [...new Set([me.name, ...roster.map(r => r.name)].filter(Boolean))];
-      const rows = P.style(logs, prompts, names); const roleOf = n => (roster.find(r => r.name === n) || {}).role || (n === me.name ? me.role : '');
+      const rows = P.style(logs, prompts, names); const roleOf = n => (roster.find(r => r.name === n) || {}).role || (P.samePerson(n, me.name) ? me.role : '');
       const wrap = h('div');
       if (!logs.length) wrap.append(h('div.card.ps-first', ic('trend', 22), h('div.grow', h('b', '쓰는 만큼 서로의 방식이 보여요'), h('p.small.muted', '스튜디오에서 프롬프트를 복사하거나 돌리면 누가 어떤 일에 어떻게 시키는지 쌓여요. Claude 안에서 나눈 대화는 앱이 볼 수 없으니, 잘 통한 말은 "붙여 넣기"로 모아 주세요.'))));
       if (logs.length >= 3) { const tipBox = h('div.ps-tips.hide');
@@ -192,7 +192,7 @@ export default {
       wrap.append(h('div.ps-people', rows.map(r => {
         const max = Math.max(1, ...r.cats.map(c => c[1]));
         return h('div.card.ps-person',
-          h('div.row.nowrap', { style: { gap: '10px' } }, h('span.avatar', { style: { background: colorFor(r.name) } }, r.name[0]), h('div.grow', h('b', r.name + (r.name === me.name ? ' (나)' : '')), h('div.faint.tiny', roleOf(r.name) || '역할 없음')), r.last ? h('span.faint.tiny', rel(r.last)) : null),
+          h('div.row.nowrap', { style: { gap: '10px' } }, h('span.avatar', { style: { background: colorFor(r.name) } }, r.name[0]), h('div.grow', h('b', r.name + (P.samePerson(r.name, me.name) ? ' (나)' : '')), h('div.faint.tiny', roleOf(r.name) || '역할 없음')), r.last ? h('span.faint.tiny', rel(r.last)) : null),
           h('div.ps-nums', h('div', h('b', r.uses), h('small', '쓴 횟수')), h('div', h('b', r.week), h('small', '이번 주')), h('div', h('b', r.made), h('small', '만든 것')), h('div', h('b', r.avg || '-'), h('small', '평균 글자'))),
           r.cats.length ? h('div.ps-bars', r.cats.map(([c, n]) => h('div.ps-barrow', h('span', c), h('i', h('em', { style: { width: Math.round(n / max * 100) + '%' } })), h('b', n)))) : h('p.small.faint', '아직 쓴 기록이 없어요.'),
           r.habits.length ? h('div.chips', { style: { marginTop: '8px' } }, r.habits.map(x => h('span.chip', x))) : r.uses && r.uses < 3 ? h('p.tiny.faint', '세 번 넘게 쓰면 시키는 버릇이 보여요.') : null,

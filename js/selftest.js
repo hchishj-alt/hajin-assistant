@@ -92,6 +92,8 @@ export function run() {
     results.push({ group: '약속과 할 일', name: '정한 것은 "결정" 메모로, "○○한테 ~달라고 해줘"는 그 사람 할 일로', ok: n1.kind === 'note' && n1.data.title === '결정: 포스터 시안 B안' && (n1.data.tags || []).includes('결정') && n2.kind === 'task' && n2.data.title === '견적서 보내기' && /서연/.test(n2.data.who || ''), detail: `${n1.kind} ${n1.data.title} / ${n2.kind} ${n2.data.title} (${n2.data.who})` });
     { const q1 = one('이번 달 수입'), q2 = one('이번 달 얼마 벌었어?'), q3 = one('다음 회의는 다음 주 수요일 오후 2시');
       results.push({ group: '약속과 할 일', name: '"이번 달 수입"·"얼마 벌었어?"는 묻는 말, "다음 회의는 …" 제목에서 "는"을 뗌', ok: q1.kind === 'query' && q2.kind === 'query' && q3.kind === 'event' && q3.data.title === '다음 회의', detail: `${q1.kind} / ${q2.kind} / ${q3.data.title}` }); }
+    { const q4 = one('이번 주에 끝낸 일'), q5 = one('금요일까지 끝낼 일 정리하기');
+      results.push({ group: '약속과 할 일', name: '"이번 주에 끝낸 일"은 묻는 말 (할 일로 적지 않음)', ok: q4.kind === 'query' && q5.kind === 'task', detail: `${q4.kind} / ${q5.kind}` }); }
     { const ro = [{ id: 'a', name: '최민서' }, { id: 'b', name: '안서연' }]; const s1 = DM.parseSend('서연이한테 견적서 보내달라고 해줘', ro), s2 = DM.parseSend('서연이한테 정산 끝났냐고 물어봐줘', ro);
       results.push({ group: '메신저', name: '"서연이한테 ~달라고 해줘"는 부탁하는 말로, "~냐고 물어봐줘"는 묻는 말로 전함', ok: !!s1 && s1.to.name === '안서연' && s1.body === '견적서 보내 주세요' && !!s2 && s2.body === '정산 끝났어?', detail: `${s1 && s1.body} / ${s2 && s2.body}` }); }
   }

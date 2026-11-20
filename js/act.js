@@ -7,6 +7,7 @@ import { handoff, teammateNames, approve, reject, occursOn } from './store.js';
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
 const WHENTOK = /^(오늘|내일|모레|글피|어제|이번\s*주|다음\s*주|다다음\s*주|이번주|다음주|담주|주말|평일|오전|오후|아침|점심|저녁|밤|새벽|정오|자정|반|[월화수목금토일]요일|[월화수목금토일]욜|\d{1,2}월|\d{1,2}일|\d{1,2}\/\d{1,2}|\d{1,2}시(\s*반)?|\d{1,2}분|\d{1,2}:\d{2}|\d+일\s*(뒤|후)|\d+주\s*(뒤|후)|한\s*시간|\d+시간)(에|까지|부터|쯤|경)?$/;
 const STOP = /^(일정|약속|할일|할\s*일|일|거|것|그|저|이|좀|그거|건|마감|담당|업무|작업)$/;
+const euro = s => { const c = String(s || '').trim().slice(-1).charCodeAt(0); const j = c >= 0xAC00 && c <= 0xD7A3 ? (c - 0xAC00) % 28 : 0; return j && j !== 8 ? '으로' : '로'; };   /* 받침 있으면 으로 (ㄹ받침은 로) */
 const eul = s => { const c = String(s || '').trim().slice(-1).charCodeAt(0); return c >= 0xAC00 && c <= 0xD7A3 ? ((c - 0xAC00) % 28 ? '을' : '를') : '을'; };   /* 받침 있으면 을, 없으면 를 */
 const josa = s => s.replace(/(은|는|이|가|을|를|의|도|만|에|에서|이랑|랑|하고|으로|로)$/, m => (s.length - m.length >= 2 ? '' : m));
 const toks = s => s.split(/[\s,·]+/).map(x => josa(x.trim())).filter(x => x && !STOP.test(x) && !WHENTOK.test(x));
@@ -78,6 +79,7 @@ export async function run(a) {
   if (a.op === 'handoff') { await handoff(it, a.to, a.note || ''); return { text: `“${it.title}”${eul(it.title)} ${a.to} 님에게 넘겼어요.${a.note ? ` 메모: ${a.note}` : ''} 넘긴 기록은 할 일을 열면 보여요.`, chips: [undo(prev)] }; }
   if (a.op === 'assign') { await db.patch(it.id, { who: a.to }); return { text: `“${it.title}” 담당을 ${a.to} 님으로 했어요.`, chips: [undo(prev)] }; }
   if (a.op === 'prio') { await db.patch(it.id, { priority: a.v }); return { text: `“${it.title}”${eul(it.title)} ${a.v === 'high' ? '중요로' : '보통으로'} 표시했어요.`, chips: [undo(prev)] }; }
+  if (a.op === 'place') { await db.patch(it.id, { place: a.v }); return { text: `“${it.title}” 장소를 ${a.v}${euro(a.v)} 바꿨어요.`, chips: [undo(prev)] }; }
   return null;
 }
 
@@ -89,6 +91,7 @@ async function runDraft(a, d, prev) {
   if (a.op === 'move' || a.op === 'moveOnce') { const f = d.kind === 'task' ? { due: a.date || cur.due || today(), ...(a.time ? { time: a.time } : {}) } : { date: a.date || cur.date || today(), ...(a.time ? { start: a.time } : {}) }; await save(f); return { text: `“${ttl}”${eul(ttl)} ${fmtD(f.due || f.date)}${a.time ? ' ' + a.time : ''}로 바꿨어요. 아직 확인 전이에요.`, chips: [undo(prev)], refresh: [d.id] }; }
   if (a.op === 'assign' || a.op === 'handoff') { await save({ who: a.to }); return { text: `“${ttl}” 담당을 ${a.to} 님으로 했어요. 아직 확인 전이에요.`, chips: [undo(prev)], refresh: [d.id] }; }
   if (a.op === 'prio') { await save({ priority: a.v }); return { text: `“${ttl}”${eul(ttl)} 중요로 표시했어요.`, chips: [undo(prev)], refresh: [d.id] }; }
+  if (a.op === 'place') { await save({ place: a.v }); return { text: `“${ttl}” 장소를 ${a.v}${euro(a.v)} 바꿨어요. 아직 확인 전이에요.`, chips: [undo(prev)], refresh: [d.id] }; }
   return { text: '확인 전인 항목이라 대기함에서 고쳐 주세요.' };
 }
 
@@ -139,6 +142,9 @@ export async function tryAct(text, { people = [] } = {}) {
     if (r.one) return run({ ...act, id: r.one.it.id }); if (r.many) return ask(r.many, act, '옮길 게');
     if (!/^(방금|아까|그거|이거)/.test(subj)) return { text: `“${subj}”에 맞는 일정이나 할 일을 못 찾았어요. 이름을 조금 더 정확히 말해 주세요.` };
   }
+  // 장소 바꾸기: "주간 회의 장소 성수로 바꿔줘"
+  if ((m = t.match(/^(.+?)\s*(?:의\s*)?(?:장소|위치)(?:는|은|를|을)?\s+(.+?)\s*(?:으로|로)\s*(?:바꿔|변경|옮겨|수정|고쳐|해)\S*(?:\s*(?:줘|주세요))?$/))) { const r = await find(m[1], ['event']); const act = { op: 'place', v: m[2].trim() };
+    if (r.one) return run({ ...act, id: r.one.it.id }); if (r.many) return ask(r.many, act, '장소를 바꿀 게'); }
   // 넘기기: "포스터 시안 민서한테 넘겨줘 (메모)"
   { const m2 = t.match(/^(\S{1,6}?)(?:이)?\s*(?:한테|에게|께)\s+(.+?)\s*(?:을|를|은|는)?\s*(?:넘겨|넘길|넘김|인계|토스)\S*(?:\s*(?:줘|주세요))?$/); if (m2 && who(m2[1]) && !/(한테|에게|께)/.test(m2[2])) t = `${m2[2]} ${m2[1]}한테 넘겨줘`; }   /* "민서한테 로고 시안 넘겨줘"처럼 사람을 먼저 말해도 */
   if ((m = t.match(/^(.+?)\s+(\S+?)\s*(?:한테|에게|께)\s*(?:넘겨|넘길|넘김|인계|토스)\S*\s*(.*)$/))) {

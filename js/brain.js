@@ -609,6 +609,7 @@ function interpretOne(s, base, ctx) {
   // "오늘 뭐 했는지 정리": 적어 둘 일이 아니라 한 일을 묻는 말
   // "오로라 계약금 아직 안 들어왔어": 적어 둘 말이 아니라 받을 돈 상태를 보는 말
   if (t.length <= 40 && money == null && /(아직|여태|계속)?\s*(안|못)\s*(들어왔|들어옴|받았|받음|입금\s*됐|입금됨)\S*\s*[.!?]*$/.test(t) && /(계약금|선금|착수금|잔금|중도금|대금|입금|돈|비용|정산|페이)/.test(t)) return [{ kind: 'query', data: { q: t, when: w }, label: '찾아보기', confidence: 0.85 }];
+  if (t.length <= 24 && money == null && /^((오늘|어제|이번\s*주|지난\s*주|이번\s*달|지난\s*달)(에)?\s*)?(\S{2,4}(이|가)\s*)?(끝낸|완료한|끝난|마친|다\s*한)\s*(일|것|거|할\s*일)(\s*(뭐\S*|보여\s*줘|알려\s*줘|정리해\s*줘|있어\??))?\s*[?？]?$/.test(t)) return [{ kind: 'query', data: { q: t, when: w }, label: '찾아보기', confidence: 0.85 }];   /* "이번 주에 끝낸 일" */
   if (t.length <= 30 && /(뭐|뭘|무엇을?|무슨\s*일)\s*했는지\s*(좀\s*)?(정리|알려|보여|말해|요약)/.test(t)) return [{ kind: 'query', data: { q: t, when: w }, label: '찾아보기', confidence: 0.85 }];
   // 명시 접두어: "일정:", "할일:", "지출:" ...
   if (/^(업체|거래처)\s*[:：]/.test(t)) return [build('vendor')];

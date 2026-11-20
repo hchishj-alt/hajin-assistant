@@ -38,6 +38,7 @@ export async function autoValues(now = new Date()) {
   return out;
 }
 // 사람이 채우는 빈칸 중에 앱 기록으로 미리 적어 줄 수 있는 것 (고칠 수 있게 칸에 넣어 줌): { 빈칸 이름: 값 }
+const payer = e => e.paidBy || ((String(e.memo || '').match(/([가-힣]{2,4})\s*(?:님)?\s*결제/) || [])[1]) || '';   /* "굿즈 샘플비 15만원 서연이가 냄" → 메모 "안서연 결제" */
 export async function seeds(now = new Date()) {
   const pad = n => String(n).padStart(2, '0'), ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, md = s => `${+s.slice(5, 7)}/${+s.slice(8, 10)}`;
   const today = ymd(now), mon = new Date(now); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7)); const from = ymd(mon), month = today.slice(0, 7);
@@ -49,10 +50,10 @@ export async function seeds(now = new Date()) {
     const done = tasks.filter(t => t.done && (t.doneAt || t.updatedAt || '').slice(0, 10) >= from).slice(0, 20);
     if (done.length) out['한 일'] = done.map(t => t.title + (t.project ? ` (${t.project})` : '')).join(', ');
     const open = tasks.filter(t => !t.done).sort((a, b) => (a.due || '9').localeCompare(b.due || '9')).slice(0, 20);
-    if (open.length) out['해야 할 일 목록'] = open.map(t => '- ' + t.title + (t.due ? ` (${md(t.due)}까지)` : '')).join('\n');
+    if (open.length) out['해야 할 일 목록'] = open.map(t => '- ' + t.title + ((t.due || t.who) ? ` (${[t.due ? md(t.due) + '까지' : '', t.who || ''].filter(Boolean).join(', ')})` : '')).join('\n');
     const late = open.filter(t => t.due && t.due < today).slice(0, 5); if (late.length) out['막힌 것'] = '마감이 지난 일: ' + late.map(t => t.title).join(', ');
     const ex = (await db.list('expenses')).filter(e => !e.deleted && (e.date || '').startsWith(month)).sort((a, b) => (a.date || '').localeCompare(b.date || '')).slice(0, 60);
-    if (ex.length) out['지출 내역'] = ex.map(e => `${md(e.date)} ${e.title} ${Number(e.amount || 0).toLocaleString()}원${e.category ? ' (' + e.category + ')' : ''}${e.by || e.who ? ' · ' + (e.by || e.who) : ''}`).join('\n');
+    if (ex.length) out['지출 내역'] = ex.map(e => `${md(e.date)} ${e.title} ${Number(e.amount || 0).toLocaleString()}원${e.category ? ' (' + e.category + ')' : ''}${payer(e) ? ' · 낸 사람 ' + payer(e) : ''}`).join('\n');
     const due = (await db.list('incomes')).filter(i => !i.deleted && i.status !== 'got' && Number(i.amount) > 0).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'))[0];   /* 가장 오래 기다린 받을 돈 */
     if (due) { out['어떤 일'] = due.title || ''; out['금액'] = Number(due.amount).toLocaleString() + '원'; if (due.from) out['받는 사람'] = due.from; if (due.date) out['지급 약속일'] = `${+due.date.slice(0, 4)}년 ${+due.date.slice(5, 7)}월 ${+due.date.slice(8, 10)}일`; }
   } catch { }
@@ -126,10 +127,14 @@ export function titleOf(text) {
 
 // ── 팀원별 작업 방식 ──
 // logs: [{ by, pid, title, cat, tool, len, sig: {goal,context,...}, at }], prompts: 저장된 프롬프트
+export const samePerson = (a, b) => !!a && !!b && (a === b || (a.length === 3 && a.slice(1) === b) || (b.length === 3 && b.slice(1) === a));
 export function style(logs = [], prompts = [], names = []) {
-  const people = [...new Set([...names, ...logs.map(l => l.by), ...prompts.map(p => p.by)].filter(Boolean))];
+  // "하진"과 "김하진"은 같은 사람으로 묶음 (로그인 전에 이름만 적고 쓴 기록)
+  const raw = [...new Set([...names, ...logs.map(l => l.by), ...prompts.map(p => p.by)].filter(Boolean))];
+  const canon = n => (n && n.length === 2 && raw.find(x => x.length === 3 && x.slice(1) === n)) || n;
+  const people = [...new Set(raw.map(canon))];
   return people.map(name => {
-    const L = logs.filter(l => l.by === name), made = prompts.filter(p => p.by === name);
+    const L = logs.filter(l => canon(l.by) === name), made = prompts.filter(p => canon(p.by) === name);
     const count = (arr, key) => { const m = {}; for (const x of arr) { const k = typeof key === 'function' ? key(x) : x[key]; if (k) m[k] = (m[k] || 0) + 1; } return Object.entries(m).sort((a, b) => b[1] - a[1]); };
     const cats = count(L, 'cat'), tools = count(L, 'tool'), top = count(L, l => l.title).slice(0, 3);
     const n = L.length, pct = id => n ? Math.round(L.filter(l => l.sig && l.sig[id]).length / n * 100) : 0;
@@ -186,13 +191,14 @@ export const BUILTIN = [
 
 {{프로젝트 이름}}의 마감은 {{마감일}}이야. 마감에서 거꾸로 일정을 짜 줘.
 
-해야 할 일: {{해야 할 일 목록}}
+해야 할 일:
+{{해야 할 일 목록}}
 
 - 표로: 날짜 | 할 일 | 담당 | 끝났다고 볼 기준
 - 고객 확인이 필요한 날은 따로 표시하고, 답이 늦을 때를 대비한 여유를 하루 이상 둬
 - 주말은 비워 둬
 - 일정이 빠듯해서 위험한 구간을 맨 위에 먼저 알려 줘`),
-  T('pm-mail', 'pm', '글쓰기', '고객에게 보낼 메일', `{{받는 사람}}에게 보낼 메일을 써 줘.
+  T('pm-mail', 'pm', '글쓰기', '고객에게 보낼 메일', `{{메일 받을 사람}}에게 보낼 메일을 써 줘.
 
 상황: {{상황}}
 부탁할 것: {{부탁할 것}}

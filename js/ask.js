@@ -3,6 +3,7 @@ import * as db from './db.js';
 import * as store from './store.js';
 import * as brain from './brain.js';
 
+const eun = s => { const c = String(s || '').trim().slice(-1).charCodeAt(0); return c >= 0xAC00 && c <= 0xD7A3 ? ((c - 0xAC00) % 28 ? '은' : '는') : '은'; };   /* 받침 있으면 은, 없으면 는 */
 const pad = n => String(n).padStart(2, '0');
 const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const md = s => s ? s.slice(5).replace('-', '/') : '';
@@ -26,6 +27,20 @@ export async function smart(q, base = new Date(), r = null) {
   const mineQ = /(^|\s)(나|내|제|저)(는|가|의)?\s|내\s*(할\s*일|일정)|나\s*뭐/.test(q + ' ') && !person;
   const vendors = await db.list('vendors');
   const projects = (await db.list('projects')).map(p => p.name).filter(Boolean);
+  // "이번 주에 끝낸 일": 그 기간에 끝낸 할 일
+  if (/(끝낸|완료한|끝난|마친|다\s*한)\s*(일|것|거|할\s*일)/.test(q) && !/(해야|까지|\d+\s*시)/.test(q)) {
+    const mon = new Date(base); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7)); const [a0, b0, label] = r || [ymd(mon), today, '이번 주'];
+    let ds = tasks.filter(t => t.done && (t.doneAt || t.updatedAt || '').slice(0, 10) >= a0 && (t.doneAt || t.updatedAt || '').slice(0, 10) <= b0); if (person) ds = ds.filter(t => store.sameName(t.who, person));
+    ds.sort((x, y) => (y.doneAt || '').localeCompare(x.doneAt || ''));
+    const at = /^(오늘|어제|그제)$/.test(label) ? label : label + '에';
+    return { text: ds.length ? `${at} ${person ? person + ' 님이 ' : ''}끝낸 일은 ${ds.length}개예요.` : `${at} 끝낸 것으로 표시된 일이 아직 없어요.`, items: ds.slice(0, 15).map(t => ({ icon: 'check2', title: t.title, sub: [md((t.doneAt || t.updatedAt || '').slice(0, 10)), t.who, t.project].filter(Boolean).join(' · '), go: 'tasks' })), chips: ds.length ? [{ label: '주간 보고로 쓰기', go: 'prompts/use/builtin:pm-weekly' }] : [] };
+  }
+  // "로고 시안 누가 해?": 그 할 일의 담당
+  if (/(누가|누구)\s*(해|하|맡|담당)/.test(q) || /담당(자)?\s*(이|가)?\s*(누구|누가)/.test(q)) {
+    const qk = key(q.replace(/(누가|누구|담당자?|해\??|하지\??|하고\s*있\S*|맡았\S*|맡아\S*|야\??|이야\??|[?？])/g, ' '));
+    const hit = qk.length >= 2 ? [...open, ...pTasks, ...tasks.filter(t => t.done)].filter(t => t.title && (key(t.title).includes(qk) || qk.includes(key(t.title)))).sort((x, y) => (x.done ? 1 : 0) - (y.done ? 1 : 0) || key(x.title).length - key(y.title).length)[0] : null;
+    if (hit) return { text: hit.who ? `“${hit.title}”${eun(hit.title)} ${hit.who} 님 담당이에요.${hit.due ? ` 마감은 ${md(hit.due)}이에요.` : ''}${hit._pend ? ' (아직 확인 전인 항목이에요)' : ''}${hit.done ? ' 이미 끝난 일이에요.' : ''}` : `“${hit.title}”${eun(hit.title)} ${hit.done ? '담당 없이 끝난 일이에요.' : '아직 담당이 안 정해져 있어요.'}${hit.due ? ` 마감은 ${md(hit.due)}이에요.` : ''}`, items: [{ icon: 'check2', title: hit.title, sub: [hit.due ? '마감 ' + md(hit.due) : '', hit.who].filter(Boolean).join(' · '), go: 'tasks' }] };
+  }
 
   // 업체: 번호·링크, 분야별 목록, 품목 가격, 어디가 제일 싼지
   if (vendors.length) {
@@ -37,7 +52,7 @@ export async function smart(q, base = new Date(), r = null) {
       let hits = all.filter(p => words.every(w => key(p.item).includes(key(w)))); if (!hits.length) hits = all.filter(p => words.some(w => key(p.item).includes(key(w))));
       if (v) hits = hits.filter(p => p.v.id === v.id);
       if (hits.length) { hits.sort((a, b) => (a.n || 9e12) - (b.n || 9e12)); const best = hits[0]; const same = hits.filter(p => key(p.item) === key(best.item));
-        return { text: same.length > 1 ? `“${best.item}”은 ${best.v.name}가 ${won(best.n)}으로 가장 싸요. ${same.length}곳을 비교했어요.${same[1].n > best.n ? ` 다음은 ${same[1].v.name} ${won(same[1].n)}이에요.` : ''}` : `“${best.item}”은 ${best.v.name}에서 ${best.n ? won(best.n) : best.price}이에요.${best.at ? ` (${md(best.at)} 기준)` : ''}`, items: hits.slice(0, 8).map(p => ({ icon: 'receipt', title: `${p.v.name} · ${p.item}`, sub: [p.n ? won(p.n) : p.price, p.note, p.at && md(p.at) + ' 기준'].filter(Boolean).join(' · '), route: 'vendors', tel: p.v.phone })) }; }
+        return { text: same.length > 1 ? `“${best.item}”${eun(best.item)} ${best.v.name}가 ${won(best.n)}으로 가장 싸요. ${same.length}곳을 비교했어요.${same[1].n > best.n ? ` 다음은 ${same[1].v.name} ${won(same[1].n)}이에요.` : ''}` : `“${best.item}”${eun(best.item)} ${best.v.name}에서 ${best.n ? won(best.n) : best.price}이에요.${best.at ? ` (${md(best.at)} 기준)` : ''}`, items: hits.slice(0, 8).map(p => ({ icon: 'receipt', title: `${p.v.name} · ${p.item}`, sub: [p.n ? won(p.n) : p.price, p.note, p.at && md(p.at) + ' 기준'].filter(Boolean).join(' · '), route: 'vendors', tel: p.v.phone })) }; }
     }
     if (/업체|거래처/.test(q) && /(어디|뭐|알려|보여|목록|리스트|있어|있나|누구)/.test(q)) { const cats = [...new Set(vendors.map(x => x.cat || '기타'))]; const c = cats.find(x => x.split(/[·\s]/).some(w => w.length >= 2 && q.includes(w))); const list = vendors.filter(x => !c || (x.cat || '기타') === c);
       return { text: `${c ? c + ' ' : ''}업체 ${list.length}곳이에요.`, items: list.slice(0, 12).map(x => ({ icon: 'briefcase', title: x.name, sub: [x.cat, x.phone, (x.prices || []).length ? `가격 ${x.prices.length}개` : ''].filter(Boolean).join(' · '), route: 'vendors', tel: x.phone })) }; }
@@ -115,7 +130,7 @@ export async function smart(q, base = new Date(), r = null) {
     return { text: `“${proj}”에 지금까지 ${won(sum)} 썼어요 (${xs.length}건).${c.got || c.due ? ` 받은 돈 ${won(c.got)}, 받을 돈 ${won(c.due)}이라 지금 계산으로는 ${won(c.left)} 남아요.` : ''}`, items: xs.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 10).map(e => ({ icon: 'receipt', title: e.title, sub: `${won(e.amount)} · ${md(e.date)}`, route: 'money' })) }; }
   if (proj && (/(어디까지|진행|상황|현황|얼마나|남았|어때|어떻게|됐|끝났|정리|할\s*일|마감|일정)/.test(q) || key(q) === key(proj))) { const ts = [...tasks, ...pTasks].filter(t => t.project === proj || key(t.title).includes(key(proj))), done = ts.filter(t => t.done).length, left = ts.filter(t => !t.done), late = left.filter(t => t.due && t.due < today); const next = left.filter(t => t.due && t.due >= today).sort((a, b) => a.due.localeCompare(b.due))[0];
     const evs = (await db.list('events')).filter(e => (e.project === proj || key(e.title).includes(key(proj))) && e.date >= today).sort((a, b) => a.date.localeCompare(b.date));
-    return { text: ts.length ? `“${proj}”은 할 일 ${ts.length}개 중 ${done}개 끝났어요 (${Math.round(done / ts.length * 100)}%).${late.length ? ` 밀린 게 ${late.length}개 있어요.` : ''}${next ? ` 다음 마감은 ${md(next.due)} “${next.title}”${next.who ? `(${next.who})` : ''}이에요.` : ''}` : `“${proj}”에 묶인 할 일이 아직 없어요.`, items: [...late, ...left.filter(t => !late.includes(t)).sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))].slice(0, 10).map(t => taskItem(t, today)).concat(evs.slice(0, 3).map(evItem)) }; }
+    return { text: ts.length ? `“${proj}”${eun(proj)} 할 일 ${ts.length}개 중 ${done}개 끝났어요 (${Math.round(done / ts.length * 100)}%).${late.length ? ` 밀린 게 ${late.length}개 있어요.` : ''}${next ? ` 다음 마감은 ${md(next.due)} “${next.title}”${next.who ? `(${next.who})` : ''}이에요.` : ''}` : `“${proj}”에 묶인 할 일이 아직 없어요.`, items: [...late, ...left.filter(t => !late.includes(t)).sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))].slice(0, 10).map(t => taskItem(t, today)).concat(evs.slice(0, 3).map(evItem)) }; }
 
   // 사람: 뭐 하고 있는지, 할 일, 일정
   if (person && !/(번호|전화|연락처|이메일|메일)/.test(q) && /(뭐\s*하|뭐하|뭐\s*해|뭐해|뭐\s*남|하고\s*있|할\s*일|할일|할\s*거|맡은|담당|일정|스케줄|약속|바빠|바쁜|언제\s*돼|시간\s*돼|있어|있나|뭐야|상황|마감)/.test(q)) {
