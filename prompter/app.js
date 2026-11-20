@@ -7,7 +7,7 @@ import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
 import { CONTACT } from './config.js';
 import { legalView, legalLinks, bizLine } from './legal.js';
 
-export const VERSION = '1.5.5';
+export const VERSION = '1.5.6';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -427,7 +427,7 @@ async function joinTakes(list, onP) {
   const dest = ac.createMediaStreamDestination(); ac.createMediaElementSource(v).connect(dest);
   const out = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
   const mt = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m)) || '';
-  const rec = new MediaRecorder(out, { mimeType: mt || undefined, videoBitsPerSecond: H >= 1080 || W >= 1920 ? 12e6 : 6e6, audioBitsPerSecond: 192e3 });
+  const rec = new MediaRecorder(out, { mimeType: mt || undefined, videoBitsPerSecond: H >= 1080 || W >= 1920 ? 8e6 : 4e6, audioBitsPerSecond: 160e3 });
   const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
   const stopped = new Promise(ok => rec.onstop = ok);
   const total = list.reduce((a, t) => a + (t.dur || 0), 0) || 1; let done = 0, raf = 0;
@@ -437,6 +437,13 @@ async function joinTakes(list, onP) {
     onP?.(Math.min(1, (done + (v.currentTime || 0)) / total));
     raf = requestAnimationFrame(drawF);
   };
+  // 붙이는 동안 화면이 꺼지지 않게, 다른 앱으로 나가면 잠깐 멈췄다가 돌아오면 이어서
+  let wl = null; try { wl = await navigator.wakeLock?.request('screen'); } catch {}
+  const onVis = () => {
+    if (document.hidden) { try { v.pause(); rec.state === 'recording' && rec.pause(); } catch {} }
+    else { try { rec.state === 'paused' && rec.resume(); v.ended || v.play().catch(() => {}); navigator.wakeLock?.request('screen').then(w => wl = w).catch(() => {}); } catch {} }
+  };
+  document.addEventListener('visibilitychange', onVis);
   rec.start(1000); drawF();
   try {
     for (const t of list) {
@@ -448,6 +455,7 @@ async function joinTakes(list, onP) {
     await new Promise(r => setTimeout(r, 120));
     cancelAnimationFrame(raf); rec.stop(); await stopped;
     out.getTracks().forEach(x => x.stop()); ac.close(); v.remove();
+    document.removeEventListener('visibilitychange', onVis); try { wl?.release(); } catch {}
   }
   const blob = new Blob(chunks, { type: (mt || 'video/webm').split(';')[0] });
   return { blob, mime: blob.type, dur: total };
