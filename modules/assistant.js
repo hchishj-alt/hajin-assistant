@@ -39,7 +39,12 @@ export default {
       more: ['누구랑, 어디서 하는지도 알려 주면 채워 둘게요.', ['없어']],
       who: ['누구랑 가요?', ['혼자', '팀이랑']],
     };
-    const staticCard = d => h('div.draft' + (d.status === 'approved' ? '.done' : '.gone'), { 'data-did': d.id }, h('div.k', ic(store.KINDS[d.kind]?.icon || 'file')), h('div.grow', h('div.small', { style: { fontWeight: 650 } }, d.data.title || d.data.name), h('div.faint.tiny', d.status === 'approved' ? '확정됨' : '버림')));
+    // 확정된 카드는 어디로 갔는지 보여 주고, 누르면 그 화면으로 감 (rec: 저장된 기록)
+    const staticCard = (d, rec, at) => { const k = store.KINDS[d.kind] || {}; const ok = d.status === 'approved'; const gone = ok && rec && rec.deleted; const src = rec && !rec.deleted ? rec : d.data;
+      const sub = !ok ? '버림' : gone ? '확정했다가 지움' : ['확정됨', at ? at.where : '', describe(d.kind, src)].filter(Boolean).join(' · '); const route = ok && !gone ? (at ? at.route : k.route) : '';
+      return h('div.draft' + (ok && !gone ? '.done' : '.gone') + (route ? '.click' : ''), { 'data-did': d.id, ...(route ? { role: 'button', tabindex: 0, title: '눌러서 저장된 곳 보기', onclick: () => go(route), onkeydown: e => { if (e.key === 'Enter') go(route); } } : {}) },
+        h('div.k', ic(k.icon || 'file')), h('div.grow', h('div.small', { style: { fontWeight: 650 } }, src.title || src.name || d.data.title || d.data.name), h('div.faint.tiny', sub)), route ? h('span.faint', { style: { flex: 'none', alignSelf: 'center' } }, ic('right', 16)) : null); };
+    const staticCardOf = async d => { const rec = d.status === 'approved' && d.resultId ? await db.get(d.resultId) : null; let at = null; if (rec && !rec.deleted) { try { at = await (await import('../js/where.js')).placeOf(d.kind, rec); } catch { } } return staticCard(d, rec, at); };
     // 되묻는 중에 온 말이 답이 아니라 새로 적는 말인지 (예: "몇 시예요?"에 "점심 9000원")
     const looksNew = (text, k, ctx) => { const ps = brain.interpret(text, ctx); if (!ps.length) return false; if (ps.length > 1) return true; const p = ps[0];
       if (['expense', 'income', 'contact', 'vendor', 'query', 'reference', 'buy', 'nav', 'timelog'].includes(p.kind)) return true;
@@ -54,6 +59,9 @@ export default {
     if (!msgs.length) list.append(botBubble(h('div', h('p', '안녕하세요 하진님. 이렇게 말해 보세요.'), h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, ['"다음 주 화요일 2시 홍대 촬영"', '"어도비 구독 3만7천원 결제"', '"홍길동 010-1234-5678 디자이너"', '"오늘 일정 보여줘"', '회의나 생각을 길게 말하면 요약·키워드·할 일로 정리해요'].map(x => h('li.small', x))))));
     const pending = new Map((await store.drafts()).map(d => [d.id, d]));
     for (const m of msgs) await drawMsg(m, pending, false);
+    // 답을 못 받고 지나간 말(오류·끊김)이 있으면 한 번 알려 주고 다시 읽을 수 있게 함
+    { const dayAgo = Date.now() - 864e5; const lost = msgs.filter((m, i) => { if (m.role !== 'me' || m.ok || m.err || m.noted || !(Date.parse(m.createdAt || 0) > dayAgo)) return false; const nx = msgs[i + 1]; return nx ? nx.role === 'me' : Date.now() - Date.parse(m.createdAt) > 120000; });
+      if (lost.length) { for (const m of lost) await db.patch(m.id, { noted: true }); await drawMsg(await db.put('chat', { role: 'bot', text: `아까 답을 못 드린 말이 ${lost.length}개 있어요. 누르면 지금 다시 읽을게요.`, chips: lost.slice(-3).map(m => ({ label: m.text.length > 26 ? m.text.slice(0, 26) + '…' : m.text, say: m.text })) }), pending, false); } }
     scrollDown();
 
     ta.addEventListener('input', () => { autoGrow(); livePreview(); });
@@ -90,7 +98,8 @@ export default {
       const me = await db.put('chat', { role: 'me', text });
       list.append(meBubble(text));
       scrollDown();
-      try { await handle(text, origin); } catch (e) { store.logError(e, 'assistant'); list.append(botBubble('처리하다 문제가 생겼어요: ' + e.message)); }
+      try { await handle(text, origin); await db.patch(me.id, { ok: true }); }
+      catch (e) { store.logError(e, 'assistant'); try { await db.patch(me.id, { err: true }); await drawMsg(await db.put('chat', { role: 'bot', text: '이 말을 처리하다 문제가 생겼어요. 한 번 더 읽어 볼게요, 아래를 눌러 주세요. (' + e.message + ')', chips: [{ label: '다시 읽기', say: text }] }), new Map()); } catch { list.append(botBubble('처리하다 문제가 생겼어요: ' + e.message)); } }
       scrollDown();
     }
 
@@ -103,7 +112,7 @@ export default {
       const A = ASK[k === 'date' && week ? 'day' : k];
       await drawMsg(await db.put('chat', { role: 'bot', text: `${lead}${lead ? ' ' : ''}“${d.data.title}” ${week ? week + ' ' : ''}${A[0]}`, chips: A[1].map(x => ({ label: x, say: x })), draftIds: carded ? [] : [d.id] }), new Map([[d.id, await db.get(d.id)]]));
     }
-    async function refreshCards(ids) { for (const id of ids || []) { const els = list.querySelectorAll(`.draft[data-did="${id}"]`); if (!els.length) continue; const d = await db.get(id); if (!d) continue; els.forEach(el => el.replaceWith(d.status === 'pending' ? draftCard(d, () => updateBadge()) : staticCard(d))); } }
+    async function refreshCards(ids) { for (const id of ids || []) { const els = list.querySelectorAll(`.draft[data-did="${id}"]`); if (!els.length) continue; const d = await db.get(id); if (!d) continue; const done = d.status === 'pending' ? null : await staticCardOf(d); els.forEach((el, i) => el.replaceWith(d.status === 'pending' ? draftCard(d, () => updateBadge()) : (i ? done.cloneNode(true) : done))); } }
     async function answerAsk(pend, text) {
       const d = await db.get(pend.id); if (!d || d.status !== 'pending') { await db.kvSet('chat:ask', null); return false; }
       const k = pend.need[0]; const w = brain.parseWhen(text); const skip = /^(없어|없음|몰라|아직|미정|모름|나중에|건너|패스|스킵|그냥|됐어|아니|혼자)/.test(text.trim()); const data = { ...d.data }; let lead = '';
@@ -129,6 +138,7 @@ export default {
       // 프로젝트 이름(또는 그 안의 낱말)을 말하면 '지금 프로젝트'가 그쪽으로 바뀜
       const project = await curProj();
       const F = await import('../js/follow.js');
+      { const W = await import('../js/where.js'); if (W.isWhere(text)) { const r = await W.find(text); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, items: r.items, draftIds: r.draftIds, chips: r.chips }), new Map((await store.drafts()).map(d => [d.id, d]))); updateBadge(); return; } }
       { const pend = await db.kvGet('chat:ask', null); if (pend) { if (looksNew(text, pend.need[0], { projects, people, vendors: vendorNames, project })) await db.kvSet('chat:ask', null); else if (await answerAsk(pend, text)) return; } }
       // 방금 만든 것을 말로 고치기·취소하기
       { const r = await F.tryFollow(text, { people }); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: r.chips }), new Map()); updateBadge(); return; } }
@@ -231,7 +241,7 @@ export default {
         const d = pending.get(id) || (await db.get(id));
         if (!d) continue;
         if (d.status === 'pending') box.append(draftCard(d, () => updateBadge()));
-        else box.append(staticCard(d));
+        else box.append(await staticCardOf(d));
       }
       if (m.list?.length) box.append(h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px', lineHeight: 1.8 } }, m.list.map(x => h('li', x))));
       if (m.chips?.length && !m.chipDone) { const row = h('div.chips', { style: { marginTop: '8px' } }); const done = async label => { await db.patch(m.id, { chipDone: label }); row.replaceWith(h('span.faint.tiny', label)); };
@@ -244,7 +254,8 @@ export default {
           if (c.follow) { const F = await import('../js/follow.js'); const r = await F.run(c.follow); await done(c.label); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', text: r.text }), new Map()); } updateBadge(); return; }
           if (c.undoAlias) { const CH = await import('../js/chat.js'); const a = await CH.aliases(); delete a[c.undoAlias]; await db.kvSet('chat:alias', a); return done('기억을 지웠어요'); }
           if (c.make === 'event') { const d = await store.draft('event', { title: m.q.trim().slice(0, 60), date: todayStr(), start: '', end: '', place: '' }, { source: m.q, confidence: .6, origin: 'chat' }); await (await import('../js/follow.js')).remember([d.id]); await done('일정으로 받을게요'); return askNext(d, missing(d.data, m.q)); }
-          if (c.make) { const d = await store.draft(c.make, c.make === 'task' ? { title: brain.cleanTask(m.q) || m.q, due: '', priority: 'normal' } : c.make === 'note' ? { title: m.q.slice(0, 50), body: m.q, type: 'memo' } : { title: m.q }, { source: m.q, confidence: .6, origin: 'chat' }); await (await import('../js/follow.js')).remember([d.id]); updateBadge(); await done(`${store.KINDS[c.make]?.label || ''} 임시 항목을 만들었어요`); box.append(draftCard(d, () => updateBadge())); }
+          if (c.make) { const d = await store.draft(c.make, c.make === 'task' ? { title: brain.cleanTask(m.q) || m.q, due: '', priority: 'normal' } : c.make === 'note' ? { title: m.q.slice(0, 50), body: m.q, type: 'memo' } : { title: m.q }, { source: m.q, confidence: .6, origin: 'chat' }); await (await import('../js/follow.js')).remember([d.id]); await store.approve(d); const nd = await db.get(d.id); updateBadge(); await done(`${store.KINDS[c.make]?.label || ''}${c.make === 'task' ? '에' : '로'} 넣었어요`); box.append(await staticCardOf(nd));
+            toast(`${store.KINDS[c.make]?.label || ''}${c.make === 'task' ? '에' : '로'} 넣었어요`, { label: '되돌리기', fn: async () => { const cur = await db.get(d.id); if (cur && cur.status === 'approved') { await store.unapprove(cur); await refreshCards([d.id]); updateBadge(); } } }); }
         } }, c.label))); box.append(row); }
       else if (m.chipDone) box.append(h('div.faint.tiny', { style: { marginTop: '6px' } }, m.chipDone));
       if (m.dm) { const DM = await import('../js/dm.js'); const j = await DM.judge(m.dm.body, m.dm.name);

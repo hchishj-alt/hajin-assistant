@@ -1,6 +1,7 @@
 // 자가 점검 시나리오 — 앱 안(자가 점검 메뉴)과 개발용 node 테스트가 같이 씀.
 // 기준일: 2026-11-19 (목) 오전 10시
 import * as B from './brain.js';
+import { isWhere } from './where.js';
 export const BASE = new Date(2026, 10, 19, 10, 0, 0);
 
 export const CASES = [
@@ -55,6 +56,10 @@ export function run() {
     results.push({ group: '회의록 붙여넣기', name: '담당·마감·프로젝트', ok: !!m && m.project === '아모레 쿠션 팝업' && it[0] === 'task:굿즈 후보 3개:민서:2026-11-27' && it[1] === 'task:견적서:서연:2026-11-24' && it[2] === 'task:예약 페이지 와이어프레임::2026-11-30' && m.items[3]?.kind === 'event' && m.notes.length === 1, detail: it.join(' / ') });
     const g = s2 => B.projectGuess(s2, P).name;
     results.push({ group: '프로젝트 묶기', name: '이름 일부만 말해도', ok: g('루미에 포스터') === '루미에 팝업' && g('제일기획 PT') === '제일 성수 팝업' && g('제일 급한 일') === '' && g('아모레 견적서') === '' && B.projectGuess('아모레 견적서', P, '아모레 프리오픈').name === '아모레 프리오픈', detail: [g('루미에 포스터'), g('제일기획 PT'), g('제일 급한 일') || '(없음)', g('아모레 견적서') || '(둘이라 안 정함)'].join(' / ') }); }
+    { const yes = ['할일로 쓴거 왜 할일에 없는지?', '방금 적은 일정 어디 갔어', '아까 말한 거 왜 안 보여', '캘린더에 왜 안 떠', '확정했는데 할 일에 없어', '저장 됐어?', '메모 사라졌어'];
+      const no = ['오늘 할 일 없어?', '금요일 약속 안 돼', '내일 일정 없지?', '할 일 없어서 심심해', '아까 말한 견적서 금요일까지 보내야 해', '영수증 못 찾겠어서 재발급 받아야 해', '저장해줘'];
+      const bad = [...yes.filter(x => !isWhere(x)), ...no.filter(x => isWhere(x))];
+      results.push({ group: '어디 갔는지 묻기', name: '“왜 할 일에 없어?”를 알아듣고, 평범한 말과 헷갈리지 않음', ok: !bad.length, detail: bad.length ? '틀림: ' + bad.join(' / ') : `${yes.length + no.length}문장` }); }
   const refs = B.recommendRefs('게임 UI 파스텔 미니멀 인벤토리 화면');
   results.push({ group: '레퍼런스', name: '게임 UI 추천', ok: refs.links.length >= 3 && refs.moods.includes('pastel'), detail: refs.links.map(l => l.site).join(', ') });
   const sim = B.similar('협찬 초대장', [{ id: 1, text: '이터니아 협찬사 초대장 디자인' }, { id: 2, text: '점심 메뉴' }]);

@@ -24,16 +24,19 @@ export function draftCard(d, onDone) {
     d.kind === 'event' && (d.data.place || d.data.area) ? placeRow(d.data) : null,
     d.source && d.kind !== 'summary' ? h('div.faint.tiny', { style: { marginTop: '4px' } }, '“' + d.source.slice(0, 120) + (d.source.length > 120 ? '…' : '') + '”') : null,
     h('div.row', { style: { marginTop: '8px', gap: '6px' } },
-      h('button.btn.sm.pri', { onclick: async () => { const cur = await fresh(); if (!cur) return; await store.approve(cur); finish('approved'); } }, ic('check', 14), '확정'),
+      h('button.btn.sm.pri', { onclick: async () => { const cur = await fresh(); if (!cur) return; finish('approved', false, await store.approve(cur)); } }, ic('check', 14), '확정'),
       d.kind !== 'summary' ? h('button.btn.sm', { onclick: () => edit() }, ic('edit', 14), '고치기') : null,
       d.kind !== 'summary' ? kindMenu() : null,
       h('button.btn.sm.ghost', { onclick: async () => { const cur = await fresh(); if (!cur) return; await store.reject(cur); finish('rejected'); toast('버렸어요', { label: '되살리기', fn: async () => { await db.patch(cur.id, { status: 'pending' }); const nd = await db.get(cur.id); el.replaceWith(draftCard(nd, onDone)); onDone && onDone('pending'); } }); } }, '버리기')));
   el.append(h('div.k', ic(k.icon)), body);
 
-  function finish(st, quiet) {
+  function finish(st, quiet, saved) {
     el.classList.add(st === 'approved' ? 'done' : 'gone');
     el.querySelectorAll('button, select').forEach(b => (b.disabled = true));
-    if (st === 'approved' && !quiet) toast(`${k.label} 확정했어요`);
+    // 확정하면 어디에 들어갔는지 알려 주고, 바로 가 볼 수 있게 함
+    if (st === 'approved' && saved && saved.col) { const kk = Object.values(store.KINDS).find(x => x.col === saved.col && x === k) || Object.values(store.KINDS).find(x => x.col === saved.col) || k;
+      import('./where.js').then(W => W.placeOf(d.kind, saved)).then(at => { body.append(h('a.small', { href: '#/' + at.route, style: { display: 'inline-block', marginTop: '6px', fontWeight: 650 } }, `${at.where}에 넣었어요 · 보기`)); if (!quiet) toast(`${at.where}에 넣었어요`, { label: '보기', fn: () => { location.hash = '#/' + at.route; } }); }).catch(() => { if (!quiet) toast(`${kk.label} 확정했어요`); }); }
+    else if (st === 'approved' && !quiet) toast(`${k.label} 확정했어요`);
     onDone && onDone(st, el);
   }
   function edit() {
@@ -41,8 +44,8 @@ export function draftCard(d, onDone) {
     modal(`${k.label} 고치기`, close => form(fields, d.data, async vals => {
       const cur = await fresh(); if (!cur) { close(); return; }
       const merged = { ...cur.data, ...vals };
-      await store.approve(cur, merged);
-      close(); finish('approved');
+      const saved = await store.approve(cur, merged);
+      close(); finish('approved', false, saved);
     }, { submitLabel: '고쳐서 확정' }));
   }
   function kindMenu() {

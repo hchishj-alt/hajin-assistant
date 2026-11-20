@@ -232,6 +232,7 @@ async function boot() {
   updateBadge();
   db.persist();
   setupSW();
+  store.repairTitles().catch(() => { }); // 예전 버전이 잘못 만든 제목(“만들어기”)을 한 번 고침
   setInterval(tickReminders, 60 * 1000); tickReminders();
   // 동기화 (설정에서 로그인했을 때만). 다른 기기·팀원이 바꾼 게 오면 입력 중이 아닐 때 화면 새로 그림
   import('./sync.js').then(s => { let was = ''; s.onState(async st => { if (st.status === was) return; was = st.status; (await import('./admin.js')).clearCache(); await buildNav(); document.body.classList.toggle('not-admin', !(await (await import('./admin.js')).isAdmin())); }); return s.start(); }).catch(e => store.logError(e, 'sync'));

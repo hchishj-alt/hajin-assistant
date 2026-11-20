@@ -260,6 +260,8 @@ kbd{font-family:inherit;font-size:calc(11px*var(--fs,1));border:calc(var(--bw,1p
 .draft .k{width:30px;height:30px;border-radius:calc(9px*var(--rd,1));display:grid;place-items:center;background:var(--acc-soft);color:var(--acc);flex:none}
 .draft.done{border-style:solid;border-color:var(--ok);background:var(--ok-soft)}
 .draft.gone{opacity:.45}
+.draft.click{cursor:pointer}
+.draft.click:active{transform:scale(.985)}
 .conf{display:inline-flex;gap:2px;vertical-align:middle}
 .conf i{width:4px;height:10px;border-radius:calc(2px*var(--rd,1));background:var(--line2)}
 .conf i.on{background:var(--acc)}

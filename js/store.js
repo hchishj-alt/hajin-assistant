@@ -72,6 +72,15 @@ export async function changeKind(d, kind) {
   if (re?.data?.title) re.data.title = String(re.data.title).replace(/^\s*(일정|약속|할\s*일|투두|메모|아이디어|지출|연락처)\s*[:：]\s*/, '');
   return db.patch(d.id, { kind, data: re?.data || d.data });
 }
+// 예전 버전이 "만들어야 해"를 "만들어기"로 읽어 저장한 제목을 한 번만 바로잡음 (원래 문장에 "…어야/아야"가 있을 때만)
+export async function repairTitles() {
+  if (await db.kvGet('fix:eogi', false)) return 0; let n = 0;
+  for (const d of await db.list('drafts')) { const t = (d.data && d.data.title) || ''; const m = d.kind === 'task' && t.match(/^(.*[가-힣])([어아])기$/); if (!m) continue;
+    if (!String(d.source || '').includes(m[1].slice(-1) + m[2] + '야')) continue; const fixed = m[1] + '기';
+    await db.patch(d.id, { data: { ...d.data, title: fixed } }); n++;
+    if (d.resultId) { const rec = await db.get(d.resultId); if (rec && rec.title === t) await db.patch(rec.id, { title: fixed }); } }
+  await db.kvSet('fix:eogi', true); return n;
+}
 export async function saveLearned() { await db.kvSet('brain:learned', brain.getLearned()); }
 export async function loadLearned() { brain.setLearned(await db.kvGet('brain:learned', null)); }
 
