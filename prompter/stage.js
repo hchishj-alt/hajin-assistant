@@ -357,7 +357,8 @@ export function mountStage({ script: T, limits, needPro, onTake, onSec, onExit, 
   const onResize = () => { fit(); draw(); const o = innerHeight > innerWidth; if (o != ori) { ori = o; if (stream && !recd) camOn(); } };
   addEventListener('resize', onResize);
   let wl = null; const wake = () => { try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => wl = w).catch(() => {}); } catch {} };
-  const onVis = () => { if (!document.hidden) wake(); };
+  // 전화가 오거나 다른 앱으로 나가면 녹화를 끊고 거기까지 테이크로 남김(멈춘 화면이 녹화되지 않게)
+  const onVis = () => { if (!document.hidden) return wake(); if (recd || playing || counting) { const was = !!recd; stop(); draw(); if (was) setTimeout(() => say('다른 앱으로 나가서 녹화를 멈췄어요. 거기까지 테이크로 남겼어요.'), 300); } };
   wake(); document.addEventListener('visibilitychange', onVis);
   document.fonts && document.fonts.ready.then(() => { if (alive) { fit(); draw(); } });
 
