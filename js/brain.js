@@ -392,7 +392,7 @@ const NAV_RE = new RegExp('^(' + Object.keys(NAV).sort((a, b) => b.length - a.le
 const NAV_SHY = /^(오늘|홈|비서|메뉴|구매|업체|랭킹|지원사업)$/;   // 이름만으로는 다른 뜻일 수 있어서 "열어 줘" 같은 말이 붙어야 이동
 export function navTo(to) { const k = String(to || '').replace(/\s+/g, ' ').trim(); const hit = Object.keys(NAV).find(x => x.replace(/ /g, '').toLowerCase() === k.replace(/ /g, '').toLowerCase()); return hit ? NAV[hit] : 'today'; }
 export function interpret(input, ctx = {}) {
-  input = String(input == null ? '' : input).replace(/[ \t]{3,}/g, '  '); input = korMoney(input); input = input.replace(/([월화수목금토일]요일)(?:하고|이랑|랑|과|와)\s*(?=[월화수목금토일]요일)/g, '$1 ');
+  input = String(input == null ? '' : input).replace(/[ \t]{3,}/g, '  '); input = korMoney(input); input = input.replace(/([월화수목금토일]요일)(?:하고|이랑|랑|과|와|\s*,)\s*(?=[월화수목금토일]요일)/g, '$1 ');
   { const b0 = ctx.base || new Date(); const nm = (b0.getMonth() + 1) % 12 + 1, tm = b0.getMonth() + 1;   // 때를 가리키는 말 가운데 날짜 읽기가 모르는 것들을 아는 꼴로
     input = input.replace(/다음\s*달\s*(?=(첫|둘|셋|넷|다섯|마지막)\s*째?\s*주)/g, nm + '월 ').replace(/이번\s*달\s*(?=(첫|둘|셋|넷|다섯|마지막)\s*째?\s*주)/g, tm + '월 ').replace(/(달|월)\s*말일/g, '$1 말'); if (!/\d\s*월|\d{1,2}[/.]\d{1,2}|\d\s*일(?![가-힣])/.test(input)) { const HD = [['크리스마스\\s*이브|성탄절\\s*전날', '12월 24일'], ['크리스마스|성탄절', '12월 25일'], ['새해\\s*첫날|신정', '1월 1일'], ['삼일절', '3월 1일'], ['어린이날', '5월 5일'], ['현충일', '6월 6일'], ['광복절', '8월 15일'], ['개천절', '10월 3일'], ['한글날', '10월 9일']];
       // 때로 쓴 것만 날짜로 ("크리스마스에 …", "크리스마스 이브 7시 …"). "크리스마스 파티"·"크리스마스 선물"은 그대로
@@ -411,7 +411,7 @@ export function interpret(input, ctx = {}) {
     const pre = (p.match(/^\s*(할\s*일|할일|투두|todo)\s*[:：]\s*/i) || [''])[0];
     const days = pre ? null : weekdayList(p);
     if (days) { // "릴스 화목 저녁 7시 업로드" → 요일마다 하나씩. 이어진 날의 휴가는 한 줄로
-      const mk = d => interpretOne(p.replace(days.raw, ` ${days.week || (days.repeat ? '매주' : '')} ${d}요일 `).replace(/\s+/g, ' '), base, ctx)[0];
+      const mk = d => interpretOne(p.replace(days.raw, ` ${days.week || (days.repeat && !days.span ? '매주' : '')} ${d}요일 `).replace(/\s+/g, ' '), base, ctx)[0];
       if (days.span) { const r = mk(days.list[0]); if (r && r.data && r.data.date) { const e = new Date(r.data.date + 'T00:00'); e.setDate(e.getDate() + days.list.length - 1); r.data.endDate = ymd(e); } if (r) out.push({ ...r, src: p.trim() }); }
       else for (const d of days.list) { const r = mk(d); if (r) out.push({ ...r, src: p.trim() }); }
       continue;
@@ -529,7 +529,7 @@ export function weekdayList(p) {
   const wk = '(이번\\s*주|이번주|금주|다음\\s*주|다음주|담주|다담주|다다음\\s*주|매주|격주)';
   let m = p.match(new RegExp(`(?:^|\\s)(?:${wk}\\s*)?([월화수목금토일]{2,5})(?=\\s|마다|에\\s|$)`)); let list = null, raw = '';
   if (m && new Set(m[2]).size === m[2].length && !DAYWORD.has(m[2]) && [...m[2]].every((c, i, a) => !i || KDAY[c] === 0 || KDAY[c] > KDAY[a[i - 1]] || a[i - 1] === '일')) { list = [...m[2]]; raw = m[0]; }
-  if (!list && (m = p.match(new RegExp(`(?:^|\\s)(?:${wk}\\s*)?((?:[월화수목금토일](?:요일|욜)?(?:\\s*[,·]\\s*|\\s+)){1,4}[월화수목금토일](?:요일|욜)?)(?=\\s|마다|에\\s|$)`)))) { const ds = m[2].match(/[월화수목금토일](?=요일|욜|\s|,|·|$)/g) || []; if (ds.length >= 2 && new Set(ds).size === ds.length && (/요일|욜/.test(m[2]) || m[1])) { list = ds; raw = m[0]; } }
+  if (!list && (m = p.match(new RegExp(`(?:^|\\s)(?:${wk}\\s*)?((?:[월화수목금토일](?:요일|욜)?(?:\\s*[,·]\\s*|\\s+)){1,4}[월화수목금토일](?:요일|욜)?)(?=\\s|마다|에\\s|$)`)))) { const ds = m[2].replace(/요일|욜/g, ' ').match(/[월화수목금토일]/g) || []; if (ds.length >= 2 && new Set(ds).size === ds.length && (/요일|욜/.test(m[2]) || m[1] || ds.length >= 3)) { list = ds; raw = m[0]; } }
   if (!list) return null;
   const week = (m[1] || '').replace(/\s/g, ''); const fixed = /(매주|격주|고정|마다|매번)/.test(p);
   const consec = list.every((c, i) => !i || KDAY[c] === (KDAY[list[i - 1]] + 1) % 7);
@@ -741,6 +741,7 @@ function interpretOne(s, base, ctx) {
     if (t.length <= 30 && !w.time) {
       if (/^(주간|이번\s*주|금주|지난\s*주)\s*(점검|보고|리포트|결산|회고)(\s*(해\s*줘|보여\s*줘|뽑아\s*줘))?$/.test(t)) return true;
       const m = t.match(/^(.*?)\s*(할\s*일|할일|마감|일정|스케줄|지출|지출\s*내역|수입|매출|받을\s*돈|들어온\s*돈|진행\s*상황|진행상황|진행\s*현황|현황|회의\s*내용|휴가자?|빈\s*시간|작업\s*시간|대기함|확인할\s*것)\s*(은|는|좀)?$/);
+      if (m && m[2] === '휴가' && /(^|\s)(오늘|내일|모레)(\s|$)/.test(m[1])) return false; // "내일 휴가", "민서 내일 휴가"는 묻는 말이 아니라 쉬는 날
       if (m) { const rest = m[1].trim().split(/\s+/).filter(Boolean); const bare = x => x.replace(/(이|의|님)$/, '');
         const okW = x => /^(오늘|내일|모레|어제|이번|다음|지난|주|달|이번주|다음주|지난주|이번달|금주|담주|팀|팀원|개인|내|우리|전체|남은|밀린|끝난|나|저|프로젝트|프로젝트별)$/.test(x) || known(bare(x), ctx) || isName(bare(x));
         if (rest.length <= 4 && (rest.every(okW) || (rest.length && (g => !!(g.name || g.many))(projectGuess(m[1], ctx.projects || [])) && !w.date))) return true; }
@@ -822,7 +823,7 @@ function interpretOne(s, base, ctx) {
     if ((w.date || w.time) && LEAVE.test(t) && !ACTION.test(t.replace(/까지/g, ''))) return 'event';
     if (/(된대|안\s*된대|가능하대|만\s*가능|가능함|불가능)\s*$/.test(t) && !OBLIG.test(t)) return 'note';
     if (w.endDate && !OBLIG.test(t)) return 'event';
-    if (/(매일|날마다|매주|격주|매달|매월|평일마다)/.test(t) && !dl && (w.time || /(매달|매월)\s*\d{1,2}\s*일/.test(t)) && money == null) return 'event';
+    if (/(매일|날마다|매주|격주|매달|매월|평일마다)/.test(t) && !dl && (w.time || /(매달|매월)\s*\d{1,2}\s*일/.test(t) || /(매주|격주)\s*[월화수목금토일](요일|욜)/.test(t)) && money == null) return 'event'; // "매주 화요일 요가"처럼 시간이 없어도 되풀이 일정
     if (w.time && /(설명회|간담회|세미나|미팅|회의|상담|행사|교육|워크숍|발표|면접|방문|관람)/.test(T)) return 'event';
     if (/(지원사업|공모전|공모|정부지원|창업지원|예비창업|초기창업|액셀러레이터|TIPS|팁스)/i.test(t) && dl && ACTION.test(t.replace(/까지|마감/g, ''))) return 'task';
     if (/(지원사업|공모전|공모|정부지원|창업지원|예비창업|초기창업|액셀러레이터|TIPS|팁스)/i.test(t) || (/(IR|투자\s*유치|데모데이)/.test(t) && !ACTION.test(t))) return 'grant';
