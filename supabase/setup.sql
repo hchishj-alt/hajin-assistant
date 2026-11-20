@@ -579,6 +579,7 @@ begin
   select user_id into u from public.members where id = new.to_member and active;
   if u is null then return new; end if;
   select name into nm from public.members where id = new.from_member;
+  delete from public.alarms where user_id = u and id like 'dm|%' and until < now() - interval '1 day';
   insert into public.alarms (user_id, id, at, until, title, body, url)
   values (u, 'dm|' || new.id::text, now(), now() + interval '12 hours',
           coalesce(nm, '팀원') || ' 님의 메시지', left(new.body, 120), '#/talk/' || new.from_member::text)
