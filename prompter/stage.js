@@ -23,7 +23,7 @@ const HTML = `
   <header id="top">
     <button class="s-pill" id="backB" aria-label="나가기">‹ 나가기</button>
     <span id="ttl"></span>
-    <div class="s-seg" role="group" aria-label="화면 비율"><button id="mL" aria-pressed="false">가로 16:9</button><button id="mP" aria-pressed="true">세로 9:16</button></div>
+    <div class="s-seg" role="group" aria-label="화면 비율"><button id="mL" aria-pressed="false"><span class="s-long">가로 </span>16:9</button><button id="mP" aria-pressed="true"><span class="s-long">세로 </span>9:16</button></div>
     <button class="s-pill" id="setBtn" aria-haspopup="dialog">설정</button>
   </header>
   <main id="stage">
@@ -96,7 +96,7 @@ const HTML = `
  * mountStage({ script:{id,title,body,sec}, limits:()=>({recSec,voice,hq}), needPro(kind), onTake({blob,mime,dur,name}), onSec(sec), onExit() })
  * 돌려주는 함수를 부르면 카메라·타이머·이벤트를 모두 정리한다.
  */
-export function mountStage({ script: T, limits, needPro, onTake, onSec, onExit }) {
+export function mountStage({ script: T, limits, needPro, onTake, onSec, onExit, parts: scenes = null, part = 0, onPart }) {
   const root = document.createElement('div'); root.id = 'st2'; root.innerHTML = HTML; document.body.append(root);
   const $ = id => root.querySelector('#' + id);
   let S = loadS();
@@ -125,7 +125,13 @@ export function mountStage({ script: T, limits, needPro, onTake, onSec, onExit }
         return `<span class="w" data-i="${i}">${esc(tok)}</span>`;
       }).join('');
     }).join('');
-    $('ttl').textContent = T.title || (T.body || '').trim().split('\n')[0] || '대본';
+    const ttl = $('ttl'), name = T.title || (T.body || '').trim().split('\n')[0] || '대본';
+    if (scenes && scenes.length > 1) {
+      // 씬 고르기: 제목 자리를 누르면 폰 기본 고르기 창이 뜬다
+      ttl.innerHTML = `<span class="s-pn">${esc(scenes[part])}</span><span class="s-pt">${esc(name)}</span><select aria-label="찍을 씬">${scenes.map((n, i) => `<option value="${i}"${i == part ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+      const sel = ttl.querySelector('select');
+      sel.onchange = () => { if (recd) { sel.value = part; say('녹화가 끝난 뒤에 씬을 바꿀 수 있어요'); return; } onPart?.(+sel.value); };
+    } else ttl.textContent = name;
   }
   const spans = () => scriptEl.querySelectorAll('.w');
 
@@ -346,6 +352,8 @@ export function mountStage({ script: T, limits, needPro, onTake, onSec, onExit }
 
   return {
     setSec(sec) { T.sec = sec; draw(); },
+    // 씬 바꾸기: 카메라는 그대로 두고 대사만 갈아 끼운다
+    setScript(t, i) { stop(); Object.assign(T, t); if (!T.sec) T.sec = autoSec(T.body); part = i; renderScript(); elapsed = 0; vpos = 0; if (S.voice) vTarget = 0; fit(); apply(); draw(); },
     destroy() {
       alive = false; stop(); voiceOff(); camOff(true);
       try { wl?.release(); } catch {}

@@ -223,3 +223,43 @@ em.pro{font-style:normal;font-size:10.5px;font-weight:800;color:#fff;background:
 .plist button{display:flex;align-items:center;gap:10px;min-height:50px;border:0;border-radius:14px;background:var(--bg);padding:0 14px;font-weight:650;text-align:left;transition:transform .25s var(--spring)}
 .plist button[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--acc);color:var(--acc)}
 .plist button:active{transform:scale(.97)}
+
+/* 씬 */
+.scenes.multi{display:flex;flex-direction:column;gap:12px}
+.scene{animation:pop .4s var(--spring) both}
+.scenes.multi .scene{background:var(--card);border-radius:var(--rd);box-shadow:0 1px 0 var(--line);overflow:hidden}
+.scenes.multi .editor{box-shadow:none;border-radius:0;padding-top:4px;min-height:0}
+.scenes.multi .scene:focus-within{box-shadow:0 0 0 2px var(--acc)}
+.shead{display:flex;align-items:center;gap:6px;padding:10px 6px 0 12px}
+.snum{flex:none;width:24px;height:24px;border-radius:8px;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:12.5px;font-weight:800}
+.sname{flex:1;min-width:0;border:0;background:transparent;font-size:16px;font-weight:800;outline:none;padding:4px 2px}
+.sname::placeholder{color:var(--sub);opacity:.7}
+.smeta{font-size:12px;color:var(--sub);font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.shead .mini{width:32px;height:32px}
+.shead .mini:disabled{opacity:.25}
+.addscn{width:100%;margin-top:10px;border:1.5px dashed var(--line);background:transparent;border-radius:var(--rd);padding:13px;font-weight:750;font-size:15px;color:var(--sub);display:flex;align-items:center;justify-content:center;gap:6px;transition:transform .3s var(--spring)}
+.addscn:active{transform:scale(.97)}
+.joinbox{display:flex;align-items:center;gap:12px;justify-content:space-between;background:var(--card);border-radius:var(--rd);padding:14px 14px 14px 16px;margin:22px 0 4px;box-shadow:0 1px 0 var(--line)}
+.joinbox div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.joinbox b{font-size:15px}
+.joinbox span{font-size:12.5px;color:var(--sub);font-weight:600}
+.joinbox .btn{flex:none}
+.joinbox .btn:disabled{opacity:.4}
+.sec.scs{justify-content:space-between}
+.sec.scs span{display:flex;align-items:center;gap:6px}
+.sec.scs em{font-style:normal;color:var(--sub);font-weight:700}
+.take{position:relative}
+.take .star{position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;border:0;background:rgba(0,0,0,.45);color:#fff;display:grid;place-items:center;transition:transform .3s var(--spring)}
+.take .star[aria-pressed="true"]{background:#ffd23f;color:#111}
+.take .star[aria-pressed="true"] svg{fill:currentColor}
+.take.pick{box-shadow:0 0 0 2.5px #ffd23f}
+.jprog{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:6px 0}
+.jprog i{display:block;height:100%;width:0;background:var(--acc);border-radius:99px;transition:width .3s}
+.jpct{text-align:center;font-weight:800;font-variant-numeric:tabular-nums;margin:4px 0 12px}
+
+/* 이벤트 가격 */
+.ptag{display:inline-flex;align-items:baseline;gap:6px;flex-wrap:wrap;justify-content:center}
+.ptag .ev{font-size:11.5px;font-weight:800;color:#fff;background:var(--acc);border-radius:6px;padding:2px 6px;align-self:center}
+.ptag s{color:var(--sub);font-weight:600;font-size:.72em}
+.ptag .off{color:var(--acc);font-weight:900}
+.pline{text-align:center;font-size:20px;font-weight:800;margin:4px 0 10px}
