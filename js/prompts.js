@@ -9,7 +9,7 @@ export const TOOLS = ['Claude', '앱 AI', '이미지 생성', '기타'];
 // 멤버의 역할 글("리더·PM·UX/UI", "아트디렉터", "경영")에서 어느 쪽 일인지 읽음. 여러 개일 수 있음.
 // 관리자가 새로 만든 파트(예: "3D", "개발")는 그 파트가 닮았다고 고른 쪽을 따름 (setParts).
 let PARTS = [];   /* [{ name, about, keys: ['art', …] }] 팀 기록(team-main.parts)에서 옴 */
-export function setParts(list) { PARTS = (Array.isArray(list) ? list : []).filter(p => p && p.name).map(p => ({ name: String(p.name).trim(), about: String(p.about || ''), keys: (p.keys || []).filter(k => ['pm', 'art', 'make', 'biz'].includes(k)) })); }
+export function setParts(list) { PARTS = (Array.isArray(list) ? list : []).filter(p => p && p.name).map(p => ({ name: String(p.name).trim(), about: String(p.about || ''), keys: (p.keys || []).filter(k => ['pm', 'art', 'make', 'biz'].includes(k)), was: (Array.isArray(p.was) ? p.was : []).map(w => String(w).trim()).filter(Boolean) })); }   /* was: 이 파트가 전에 쓰던 이름 (이름을 바꿔도 예전 역할 글을 알아봄) */
 export const parts = () => PARTS.slice();
 export function roleKeys(role) {
   const r = String(role || ''), out = [];
@@ -17,7 +17,7 @@ export function roleKeys(role) {
   if (/아트|디자인|디렉|UX|UI|일러/i.test(r)) out.push('art');
   if (/콘텐츠|제작|영상|촬영|편집|SNS|마케팅|에디터/i.test(r)) out.push('make');
   if (/경영|회계|정산|재무|서기|총무|운영|세무/i.test(r)) out.push('biz');
-  for (const p of PARTS) if (r.includes(p.name)) for (const k of p.keys) if (!out.includes(k)) out.push(k);
+  for (const p of PARTS) if (r.includes(p.name) || p.was.some(w => r.includes(w))) for (const k of p.keys) if (!out.includes(k)) out.push(k);
   return out;
 }
 

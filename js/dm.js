@@ -28,12 +28,12 @@ export async function judge(text, fromName = '') {
       out.note = w.time ? `${when}에는 겹치는 일정이 없어요.` : `${when}에 일정 ${evs.length}개가 있어요.`;
       if (ASK.test(text)) out.replies.push(w.time ? `네, ${when} 가능해요.` : '네, 그날 괜찮아요. 몇 시가 좋아요?');
     }
-    const title = brain.cleanTask(text.replace(ASK, ' ')).replace(/[?？]/g, '').trim().slice(0, 40) || `${fromName} 님과 약속`;
+    const title = brain.askTitle(text).slice(0, 40) || `${fromName} 님과 약속`;
     if (!brain.isDeadline(text)) out.actions.push({ label: `일정으로 추가 · ${when}`, kind: 'event', data: { title: title.length < 3 ? `${fromName} 님과 약속` : title, date: w.date, start: w.time || '', end: w.end || '', memo: `${fromName}: ${text}` } });
   }
   const a = brain.analyzeNotes(text, { people });
   for (const t of a.actions.slice(0, 2)) out.actions.push({ label: `할 일로 추가 · ${t.title.slice(0, 22)}`, kind: 'task', data: { title: t.title, due: t.due || w.date || '', who: '', priority: 'normal', memo: `${fromName}: ${text}` } });
-  if (!a.actions.length && brain.isDeadline(text) && w.date) out.actions.push({ label: `할 일로 추가 · ${fmtDate(w.date)}까지`, kind: 'task', data: { title: brain.cleanTask(text).slice(0, 60), due: w.date, priority: 'normal', memo: `${fromName}: ${text}` } });
+  if (!a.actions.length && brain.isDeadline(text) && w.date) out.actions.push({ label: `할 일로 추가 · ${fmtDate(w.date)}까지`, kind: 'task', data: { title: (brain.askTitle(text) || brain.cleanTask(text)).slice(0, 60), due: w.date, priority: 'normal', memo: `${fromName}: ${text}` } });
   const money = brain.parseMoney(text); if (money && /(보내|입금|정산|송금|결제)/.test(text)) out.actions.push({ label: `비용으로 기록 · ${money.toLocaleString()}원`, kind: 'expense', data: { title: text.slice(0, 40), amount: money, date: db.dayOf(new Date()), memo: `${fromName}: ${text}` } });
   const urls = brain.parseUrls(text); if (urls.length) out.actions.push({ label: '레퍼런스로 저장', kind: 'reference', data: { title: text.replace(urls[0], '').trim().slice(0, 50) || urls[0], url: urls[0] } });
   if (!out.replies.length) out.replies.push(ASK.test(text) ? '확인하고 알려줄게요.' : '확인했어요.');

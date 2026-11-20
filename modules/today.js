@@ -158,7 +158,8 @@ async function teamCard(allTasks, me) {
   const shared = allTasks.filter(t => !t.done && (t.team || (t.who && !mine(t.who))));
   const c = h('div.card', h('div.card-h', h('h3', ic('users'), '팀 할 일'), h('a.btn.sm.ghost', { href: '#/tasks/team' }, '담당자별')));
   if (!shared.length) { c.append(h('div.empty', '담당이 정해진 할 일이 없어요. “민서 금요일까지 썸네일 시안”처럼 적으면 담당자별로 모여요.')); return c; }
-  const by = {}; for (const t of shared) { const k = t.who ? (mine(t.who) ? (me || '나') : t.who) : '담당 미정'; (by[k] = by[k] || []).push(t); }
+  const canon = await store.nameCanon();
+  const by = {}; for (const t of shared) { const k = t.who ? (mine(t.who) ? (canon(me) || me || '나') : canon(t.who) || t.who) : '담당 미정'; (by[k] = by[k] || []).push(t); }
   for (const [who, ts] of Object.entries(by).sort((a, b) => b[1].length - a[1].length)) {
     const late = ts.filter(t => t.due && t.due < today).length, soon = ts.filter(t => t.due && t.due >= today).sort((a, b) => a.due.localeCompare(b.due))[0];
     c.append(h('div.li.click', { onclick: () => go('tasks/team') }, facePic(who, h('div.avatar', { style: { background: colorFor(who), width: '30px', height: '30px', fontSize: '12px' } }, who === '담당 미정' ? '?' : who.slice(-2, -1) || who[0])),

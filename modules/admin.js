@@ -3,7 +3,7 @@ import { h, ic, clear, toast, head, modal, form, tile, seg, rel, fmtDate, confir
 import * as db from '../js/db.js';
 import * as A from '../js/admin.js';
 import { go, loadParts, buildNav } from '../js/app.js';
-import { TEAM_ROLES, teamRoles, parts as customParts } from '../js/prompts.js';
+import { TEAM_ROLES, teamRoles, roleKeys, parts as customParts } from '../js/prompts.js';
 
 let tab = 'log';
 const F = { by: '', col: '', q: '' };
@@ -167,7 +167,7 @@ export default {
       const sub = m => { const g = m.kind === 'guest', l = m.until ? leftOf(m.until) : null;
         return [m.role || '역할 없음', g ? '맡은 프로젝트: ' + ((m.projects || []).join(', ') || '없음') : '', m.until ? `${m.until.slice(5).replace('-', '/')}까지${l < 0 ? '' : l === 0 ? ' (오늘까지)' : ` (${l}일 남음)`}` : '', g ? '' : m.gmail, m.joined ? '로그인함' : '아직 로그인 안 함'].filter(Boolean).join(' · '); };
       const row = m => h('div.li', { style: { flexWrap: 'wrap' } }, h('span.av', { style: { background: colorFor(m.name) } }, m.name.slice(-2, -1) || m.name[0]),
-        h('div.grow', { style: { minWidth: '150px' } }, h('div.t', m.name, m.is_admin ? h('span.chip', { style: { marginLeft: '6px' } }, '관리자') : null, m.kind === 'guest' ? h('span.chip.acc', { style: { marginLeft: '6px' } }, '단기') : null, m.active === false ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '정지') : m.ended ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '기간 끝남') : m.until && leftOf(m.until) <= 3 ? h('span.chip.warn', { style: { marginLeft: '6px' } }, '곧 끝남') : null), h('div.faint.small', sub(m))),
+        h('div.grow', { style: { minWidth: '150px' } }, h('div.t', m.name, m.is_admin ? h('span.chip', { style: { marginLeft: '6px' } }, '관리자') : null, m.kind === 'guest' ? h('span.chip.acc', { style: { marginLeft: '6px' } }, '단기') : null, m.active === false ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '정지') : m.ended ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '기간 끝남') : m.until && leftOf(m.until) <= 3 ? h('span.chip.warn', { style: { marginLeft: '6px' } }, '곧 끝남') : null, m.active !== false && !m.ended && !roleKeys(m.role || '').length ? h('span.chip.warn', { style: { marginLeft: '6px' }, title: '역할이 비었거나 지워진 파트예요. 고치기에서 역할을 골라 주세요.' }, '역할 다시 고르기') : null), h('div.faint.small', sub(m))),
         h('div.row.mem-ctl', h('code.code', m.code || '•••••'), h('button.btn.sm', { 'aria-label': '코드 복사', onclick: () => { navigator.clipboard?.writeText(m.code || ''); toast('코드를 복사했어요'); } }, ic('copy', 14)),
         m.ended && m.active !== false ? h('button.btn.sm', { title: '오늘부터 2주 더 쓰게 해요', onclick: async () => { try { await sync.saveMember({ ...m, until: plus(14) }); toast('2주 늘렸어요'); go('admin/member'); } catch (e) { toast(e.message); } } }, '2주 더') : null,
         h('button.btn.sm', { 'aria-label': '고치기', onclick: () => edit(m) }, ic('edit', 14))));
@@ -184,18 +184,25 @@ export default {
     async function partsCard() {
       const team = await db.get('team-main'); let list = customParts();
       const saveAll = async next => { if (team) await db.patch('team-main', { parts: next }); else await db.kvSet('team:parts', next); await loadParts(); await buildNav(); go('admin/member'); };
+      /* 이 파트를 역할로 가진 멤버 (관리자만 코드까지 받으므로 관리자만 고칠 수 있음) */
+      const holders = async name => { try { const sync = await import('../js/sync.js'); if (!(await sync.me()) || !(await A.isAdmin())) return []; return (await sync.listMembers()).filter(m => String(m.role || '').split(/\s*,\s*/).includes(name)); } catch { return []; } };
       const edit = (p0 = null) => modal(p0 ? '파트 고치기' : '새 파트', close => {
         const p = p0 ? { ...p0, keys: [...p0.keys] } : { name: '', about: '', keys: [] }; const keys = new Set(p.keys);
         const nameIn = h('input.in', { value: p.name, placeholder: '예: 3D, 개발, 음악', maxLength: 12, 'aria-label': '파트 이름' }), aboutIn = h('input.in', { value: p.about, placeholder: '하는 일 한 줄 (예: 모델링, 렌더)', maxLength: 40, 'aria-label': '하는 일' });
         const chip = r => { const c = h('button.chip' + (keys.has(r.key) ? '.on' : ''), { type: 'button', 'aria-pressed': String(keys.has(r.key)), onclick: () => { keys.has(r.key) ? keys.delete(r.key) : keys.add(r.key); c.classList.toggle('on', keys.has(r.key)); c.setAttribute('aria-pressed', String(keys.has(r.key))); } }, r.name); return c; };
         return h('div.stack', h('label.f', '파트 이름', nameIn), h('label.f', '하는 일', aboutIn),
           h('div.f.part-row', '어느 쪽 일과 닮았나요? (여러 개 가능)', h('div.chips', TEAM_ROLES.map(chip)), h('span.faint.tiny', '고른 쪽의 메뉴·바로가기·프롬프트가 이 파트 사람에게 먼저 보여요. 나중에 바꿀 수 있어요.')),
-          h('div.modal-f', p0 ? h('button.btn.danger', { type: 'button', onclick: async () => { if (!(await confirmBox(`“${p0.name}” 파트를 지울까요? 이 파트인 멤버의 역할 글은 그대로 남아요.`, '지우기'))) return; close(); await saveAll(list.filter(x => x.name !== p0.name)); toast('지웠어요'); } }, ic('trash', 14)) : null,
+          h('div.modal-f', p0 ? h('button.btn.danger', { type: 'button', onclick: async () => { const hs = await holders(p0.name); if (!(await confirmBox(hs.length ? `“${p0.name}” 파트를 지울까요? 이 파트인 ${hs.map(m => m.name).join(', ')} 님은 화면이 기본 구성으로 돌아가요. 지운 뒤 멤버 고치기에서 역할을 다시 골라 주세요.` : `“${p0.name}” 파트를 지울까요?`, '지우기'))) return; close(); await saveAll(list.filter(x => x.name !== p0.name)); toast(hs.length ? `지웠어요. ${hs.map(m => m.name).join(', ')} 님의 역할을 다시 골라 주세요` : '지웠어요'); } }, ic('trash', 14)) : null,
             h('button.btn.pri', { type: 'button', onclick: async () => {
               const name = nameIn.value.trim(); if (!name) return toast('파트 이름을 적어 주세요'); if (!keys.size) return toast('닮은 쪽을 하나 이상 골라 주세요');
               if (TEAM_ROLES.some(r => r.name === name) || list.some(x => x.name === name && x.name !== p0?.name)) return toast('이미 있는 이름이에요');
-              const item = { name, about: aboutIn.value.trim(), keys: TEAM_ROLES.map(r => r.key).filter(k => keys.has(k)) };
-              close(); await saveAll(p0 ? list.map(x => (x.name === p0.name ? item : x)) : [...list, item]); toast(p0 ? '고쳤어요' : `“${name}” 파트를 만들었어요. 멤버를 넣거나 고칠 때 역할에서 고를 수 있어요`);
+              const renamed = !!p0 && p0.name !== name;
+              const item = { name, about: aboutIn.value.trim(), keys: TEAM_ROLES.map(r => r.key).filter(k => keys.has(k)), was: [...new Set([...(p0?.was || []), ...(renamed ? [p0.name] : [])])].filter(w => w !== name).slice(-5) };
+              let moved = 0, missed = [];   /* 파트 이름을 바꾸면 그 파트인 멤버의 역할 글도 같이 바꿈. 못 바꾼 사람이 있어도 예전 이름(was)으로 알아봄 */
+              if (renamed) { const sync = await import('../js/sync.js'); for (const m of await holders(p0.name)) { try { await sync.saveMember({ ...m, role: String(m.role).split(/\s*,\s*/).map(x => (x === p0.name ? name : x)).join(', ') }); moved++; } catch { missed.push(m.name); } } }
+              const rest = list.map(x => (x.was || []).includes(name) ? { ...x, was: x.was.filter(w => w !== name) } : x);   /* 다른 파트가 예전에 쓰던 이름을 새로 쓰면 그쪽 기억에서 뺌 */
+              close(); await saveAll(p0 ? rest.map(x => (x.name === p0.name ? item : x)) : [...rest, item]);
+              toast(!p0 ? `“${name}” 파트를 만들었어요. 멤버를 넣거나 고칠 때 역할에서 고를 수 있어요` : missed.length ? `고쳤어요. ${missed.join(', ')} 님의 역할은 못 바꿨어요. 멤버 고치기에서 골라 주세요` : moved ? `고쳤어요. 멤버 ${moved}명의 역할도 “${name}”(으)로 바꿨어요` : '고쳤어요');
             } }, '저장')));
       });
       const adm = await A.isAdmin();

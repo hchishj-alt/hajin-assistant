@@ -53,7 +53,7 @@ export default {
         seg([['today', '오늘'], ['upcoming', '예정'], ['all', '전체'], ['done', '완료'], ...(hasTeam ? [['team', '담당자별']] : [])], view, v => { view = v; draw(); }),
         projects.length ? h('select.in', { 'aria-label': '프로젝트 고르기', style: { width: 'auto' }, onchange: e => { proj = e.target.value; draw(); } }, h('option', { value: '' }, '모든 프로젝트'), projects.map(p => h('option', { value: p, selected: p === proj }, p))) : null));
       if (view === 'team' && !hasTeam) view = 'today';
-      if (view === 'team') return body.append(teamView(every.filter(t => (t.team || t.who) && (!proj || t.project === proj)), draw, edit));
+      if (view === 'team') return body.append(teamView(every.filter(t => (t.team || t.who) && (!proj || t.project === proj)), draw, edit, await store.nameCanon()));
       let xs = all.filter(t => !proj || t.project === proj);
       if (view === 'today') xs = xs.filter(t => !t.done && (!t.due || t.due <= today));
       if (view === 'upcoming') xs = xs.filter(t => !t.done && t.due && t.due > today);
@@ -94,9 +94,9 @@ export default {
 };
 
 // 팀 보기: 담당자별 진행률과 남은 일
-function teamView(ts, redraw, edit) {
+function teamView(ts, redraw, edit, canon = w => w) {
   const by = {};
-  ts.forEach(t => { const k = t.who || '담당 없음'; (by[k] ||= []).push(t); });
+  ts.forEach(t => { const k = (t.who && canon(t.who)) || t.who || '담당 없음'; (by[k] ||= []).push(t); });
   const today = todayStr();
   const g = h('div.grid.g2');
   if (!ts.length) g.append(h('div.card', h('div.empty', '담당이 정해진 할 일이 없어요. “민서 금요일까지 썸네일 시안”처럼 이름을 넣어 적으면 담당자별로 모여요.')));

@@ -149,6 +149,11 @@ export async function renameMember(old, to) {
   return n;
 }
 export const sameName = (a, b) => { a = given(a); b = given(b); if (!a || !b) return false; return a === b || (a.length === 3 && a.slice(1) === b) || (b.length === 3 && b.slice(1) === a); };
+/* 담당 이름을 한 사람으로 모음: "민서"와 "최민서"는 명단의 "최민서" 한 줄로 (색·사진도 명단 것을 따라감) */
+export async function nameCanon() {
+  const roster = (await db.kvGet('sync:roster', [])).map(r => r.name).filter(Boolean); const m = await db.kvGet('me:member', null); if (m?.name && !roster.includes(m.name)) roster.push(m.name);
+  return w => { const g = given(w); if (!g) return ''; return roster.find(n => n === g) || roster.find(n => sameName(n, g)) || String(w).trim(); };   /* 팀 밖 사람은 적은 그대로 */
+}
 export async function myNames() {
   const m = await db.kvGet('me:member', null);
   return [await db.kvGet('name', '하진'), m?.name, '나'].filter(Boolean);

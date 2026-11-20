@@ -326,6 +326,19 @@ export function cleanTask(s, who = '') {
   return r.replace(/^[,.:：\s]+|[,.\s]+$/g, '');
 }
 
+// 메신저로 받은 "~ 가능해?", "~ 갈 수 있어?" 같은 물음에서 약속 이름만 남김 ("내일 3시에 루미에 미팅 가능해?" → "루미에 미팅")
+export function askTitle(text, base = new Date()) {
+  const w = parseWhen(text, base); let r = (w.hits || []).reduce((x, hh) => x.replace(hh, ' '), text).replace(/[?？!~.]+\s*$/, '').replace(/(^|\s)(에|에는|엔|까지|부터)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+  const stem = c => { const k = c.charCodeAt(0) - 0xAC00; return k >= 0 && k < 11172 && k % 28 === 8 ? String.fromCharCode(c.charCodeAt(0) - 8) : ''; };   /* 갈 → 가, 볼 → 보 */
+  r = r.replace(/\s*시간\s*(돼|되|괜찮|있|어때|어떠)[가-힣]*$/, '').replace(/\s*\S*[가-힣]도\s*(될까|되나|돼|되|괜찮)[가-힣]*$/, '')
+    .replace(/\s*(?:참석\s*)?(가능|괜찮|되나|되세|되시|될까|돼|어때|어떠|어떨)[가-힣]*$/, '')
+    .replace(/([가-힣])을\s*수\s*있[가-힣]*$/, '$1기').replace(/([가-힣])\s*수\s*있[가-힣]*$/, (m, c) => stem(c) ? stem(c) + '기' : m)
+    .replace(/([가-힣])을(래|까)요?$/, '$1기').replace(/([가-힣])(래|까)요?$/, (m, c) => stem(c) ? stem(c) + '기' : m)
+    .replace(/\s+(있어요?|있음|있습니다|있대요?|잡혔어요?|잡혔대요?|갑니다|가요|갈게요|갈\s*예정\S*)$/, '');
+  r = cleanTask(r).replace(/(^|\s)(같이|혹시|다들|우리)(?=\s)/g, ' ').replace(/\s+/g, ' ').trim().replace(/([가-힣]{2,})하기$/, '$1');
+  return /^(만나기|보기|가기|오기|하기|되기|같이\s*\S{2}기)$/.test(r) ? '' : r;
+}
+
 export function analyzeNotes(text, { people = [], base = new Date() } = {}) {
   const ss = sentences(text);
   const decisions = [], actions = [], questions = [], ideas = [], dates = [];

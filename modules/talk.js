@@ -12,7 +12,7 @@ export default {
     const meM = await sync.me();
     root.append(head('메신저', '비서가 전해 주고, 받은 말은 읽어서 일정·할 일로 바꿔 드려요. 두 사람만 볼 수 있어요.'));
     if (!meM) { root.append(h('div.card', h('div.empty', ic('msg', 28), h('p', '멤버 코드로 로그인하면 팀원과 메시지를 주고받을 수 있어요.'), h('a.btn.pri', { href: '#/settings/sync', style: { marginTop: '10px' } }, '로그인하러 가기')))); return; }
-    if (params[0]) open = params[0];
+    if (params[0]) open = params[0]; else if (matchMedia('(max-width:900px)').matches) open = '';   /* 폰에서는 목록 주소로 오면 목록을 보여 줌 (뒤로 가기가 먹게) */
     const roster = (await db.kvGet('sync:roster', [])).filter(r => r.id && r.id !== meM.id);
     const wrap = h('div.talk' + (open ? '.open' : '')); const listEl = h('div.talk-list'); const pane = h('div.talk-pane');
     wrap.append(listEl, pane); root.append(wrap);
@@ -31,7 +31,7 @@ export default {
         unread ? h('span.badge', unread) : last ? h('span.faint.tiny', whenShort(last.createdAt)) : null));
       clear(pane);
       const other = roster.find(r => r.id === open);
-      if (!other) { pane.append(h('div.empty', ic('msg', 26), h('p', '왼쪽에서 대화할 사람을 골라요.'))); return; }
+      if (!other) { open = ''; wrap.classList.remove('open'); pane.append(h('div.empty', ic('msg', 26), h('p', '왼쪽에서 대화할 사람을 골라요.'))); return; }
       wrap.classList.add('open');
       const ms = all.filter(d => d.other === other.id);
       const ta = h('textarea', { rows: 1, placeholder: `${other.name} 님에게 전할 말`, 'aria-label': '메시지' });
