@@ -2,7 +2,7 @@
 //  · 보관함: 내 것·팀 것 + 역할별 기본 틀. 빈칸({{이름}})은 쓸 때 채우고, 팀·오늘 일정 같은 건 앱이 알아서 채움
 //  · 만들기: 칸을 채우면 프롬프트로 조립, 빠진 것을 점검. 다른 데서 쓴 프롬프트를 붙여 넣어 모아 둘 수도 있음
 //  · 작업 방식: 누가 어떤 일에 어떻게 시키는지 (쓴 기록으로)
-import { h, ic, clear, toast, head, modal, seg, tile, ring, confirmBox, colorFor, debounce, md, busy, rel } from '../js/ui.js';
+import { h, ic, clear, toast, head, modal, seg, tile, ring, confirmBox, colorFor, facePic, debounce, md, busy, rel } from '../js/ui.js';
 import * as db from '../js/db.js';
 import * as P from '../js/prompts.js';
 
@@ -192,7 +192,7 @@ export default {
       wrap.append(h('div.ps-people', rows.map(r => {
         const max = Math.max(1, ...r.cats.map(c => c[1]));
         return h('div.card.ps-person',
-          h('div.row.nowrap', { style: { gap: '10px' } }, h('span.avatar', { style: { background: colorFor(r.name) } }, r.name[0]), h('div.grow', h('b', r.name + (P.samePerson(r.name, me.name) ? ' (나)' : '')), h('div.faint.tiny', roleOf(r.name) || '역할 없음')), r.last ? h('span.faint.tiny', rel(r.last)) : null),
+          h('div.row.nowrap', { style: { gap: '10px' } }, facePic(r.name, h('span.avatar', { style: { background: colorFor(r.name) } }, r.name[0])), h('div.grow', h('b', r.name + (P.samePerson(r.name, me.name) ? ' (나)' : '')), h('div.faint.tiny', roleOf(r.name) || '역할 없음')), r.last ? h('span.faint.tiny', rel(r.last)) : null),
           h('div.ps-nums', h('div', h('b', r.uses), h('small', '쓴 횟수')), h('div', h('b', r.week), h('small', '이번 주')), h('div', h('b', r.made), h('small', '만든 것')), h('div', h('b', r.avg || '-'), h('small', '평균 글자'))),
           r.cats.length ? h('div.ps-bars', r.cats.map(([c, n]) => h('div.ps-barrow', h('span', c), h('i', h('em', { style: { width: Math.round(n / max * 100) + '%' } })), h('b', n)))) : h('p.small.faint', '아직 쓴 기록이 없어요.'),
           r.habits.length ? h('div.chips', { style: { marginTop: '8px' } }, r.habits.map(x => h('span.chip', x))) : r.uses && r.uses < 3 ? h('p.tiny.faint', '세 번 넘게 쓰면 시키는 버릇이 보여요.') : null,

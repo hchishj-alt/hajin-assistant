@@ -1,4 +1,4 @@
-import { h, ic, clear, toast, modal } from './ui.js';
+import { h, ic, clear, toast, modal, setFaces } from './ui.js';
 import * as db from './db.js';
 import * as store from './store.js';
 import { VERSION } from './version.js';
@@ -212,6 +212,7 @@ async function boot() {
   if (!location.hash || location.hash === '#/') { const st = (await db.kvGet('look', null))?.start; if (st && st !== 'today' && MODULES.some(m => m.id === st)) history.replaceState(null, '', '#/' + st); }
   if (/^#k=/.test(location.hash) || sessionStorage.getItem('hajin:pk')) await (await import('./keyshare.js')).takeFromHash();
   await store.loadLearned();
+  await loadFaces();
   await buildNav();
   window.addEventListener('hashchange', async () => { if (/^#k=/.test(location.hash)) await (await import('./keyshare.js')).takeFromHash(); render(); });
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
@@ -237,8 +238,8 @@ async function boot() {
     toast(`${d.otherName}: ${d.body.slice(0, 40)}`, { label: '보기', fn: () => go('talk/' + d.other) });
     try { if (document.visibilityState !== 'visible' && Notification?.permission === 'granted') (await navigator.serviceWorker?.ready)?.showNotification(`${d.otherName} 님의 메시지`, { body: d.body.slice(0, 120), tag: 'dm-' + d.other, icon: 'icons/icon-192.png', data: { route: 'talk/' + d.other } }); } catch { }
   });
-  window.addEventListener('hajin:remote', () => {
-    updateBadge(); applyTheme();
+  window.addEventListener('hajin:remote', async () => {
+    updateBadge(); applyTheme(); await loadFaces();
     const a = document.activeElement;
     if (document.querySelector('.modal-bg') || (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || document.querySelector('.avail.painting') || document.querySelector('[data-live]')) return; // 녹음·작성 중인 화면은 건드리지 않음
     render();
@@ -246,3 +247,10 @@ async function boot() {
   if (!(await db.kvGet('onboarded', false))) { await db.kvSet('onboarded', true); (await import('./seed.js')).welcome(); }
 }
 boot().catch(e => { console.error(e); const v = document.getElementById('view') || document.body; const box = document.createElement('div'); box.style.cssText = 'padding:24px;line-height:1.7'; box.textContent = '앱을 열지 못했어요. 사생활 보호(시크릿) 창이거나 브라우저가 기기 저장소를 막아 둔 것 같아요. 일반 창에서 다시 열어 주세요. (' + (e && e.message || e) + ')'; v.append(box); });
+
+// 멤버가 정한 색·사진을 이름표에 쓰도록 읽어 둠. 로그인하지 않은 기기는 이 기기에서 고른 것(me:face)만
+export async function loadFaces() {
+  try { const list = [...(await db.kvGet('sync:roster', []))]; const mine = await db.kvGet('me:face', null), nm = await db.kvGet('name', ''), meM = await db.kvGet('me:member', null);
+    if (!meM && mine && nm && (mine.color || mine.avatar)) list.push({ name: nm, color: mine.color || '', avatar: mine.avatar || '' });
+    setFaces(list); } catch (e) { console.error(e); }
+}

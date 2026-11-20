@@ -1,5 +1,5 @@
 // 메신저: 팀원과 1:1. 비서가 가운데에서 전하고, 받은 내용을 판단해 일정·할 일로 바꿔 줌
-import { h, ic, clear, toast, head, colorFor, fmtDate } from '../js/ui.js';
+import { h, ic, clear, toast, head, colorFor, fmtDate, facePic } from '../js/ui.js';
 import * as db from '../js/db.js';
 import * as store from '../js/store.js';
 import * as DM from '../js/dm.js';
@@ -26,7 +26,7 @@ export default {
       if (!roster.length) listEl.append(h('div.empty', '아직 다른 멤버가 없어요.'));
       const rows = roster.map(r => { const ms = all.filter(d => d.other === r.id); return { r, last: ms[ms.length - 1], unread: ms.filter(d => !d.mine && !d.readAt).length }; }).sort((a, b) => (b.last?.createdAt || '').localeCompare(a.last?.createdAt || ''));
       for (const { r, last, unread } of rows) listEl.append(h('button.talk-p' + (open === r.id ? '.on' : ''), { onclick: () => { open = r.id; go('talk/' + r.id); } },
-        h('span.avatar', { style: { background: colorFor(r.name), width: '38px', height: '38px' } }, r.name.slice(-2, -1) || r.name[0]),
+        facePic(r.name, h('span.avatar', { style: { background: colorFor(r.name), width: '38px', height: '38px' } }, r.name.slice(-2, -1) || r.name[0])),
         h('span.grow', h('b', r.name), h('span.faint.tiny', last ? `${last.mine ? '나: ' : ''}${last.body}` : (r.user ? '아직 대화가 없어요' : '아직 로그인 전이에요'))),
         unread ? h('span.badge', unread) : last ? h('span.faint.tiny', (last.createdAt || '').slice(11, 16)) : null));
       clear(pane);
@@ -47,7 +47,7 @@ export default {
       if (!ms.length) log.append(h('div.empty', `${other.name} 님에게 전할 말을 아래에 적어 보세요.`));
       ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
       ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; });
-      pane.append(h('div.talk-h', h('button.btn.sm.icon.ghost.talk-back', { 'aria-label': '목록', onclick: () => { open = ''; wrap.classList.remove('open'); go('talk'); } }, ic('left', 16)), h('span.avatar', { style: { background: colorFor(other.name), width: '30px', height: '30px', fontSize: '12px' } }, other.name.slice(-2, -1) || other.name[0]), h('b', other.name), h('span.faint.tiny', other.role || '')),
+      pane.append(h('div.talk-h', h('button.btn.sm.icon.ghost.talk-back', { 'aria-label': '목록', onclick: () => { open = ''; wrap.classList.remove('open'); go('talk'); } }, ic('left', 16)), facePic(other.name, h('span.avatar', { style: { background: colorFor(other.name), width: '30px', height: '30px', fontSize: '12px' } }, other.name.slice(-2, -1) || other.name[0])), h('b', other.name), h('span.faint.tiny', other.role || '')),
         log, h('div.talk-in', ta, h('button.btn.pri.icon', { 'aria-label': '보내기', onclick: () => send() }, ic('send', 16))));
       if (scroll !== false || true) log.scrollTop = log.scrollHeight;
       if (ms.some(d => !d.mine && !d.readAt)) { await sync.dmRead(other.id); updateBadge(); }

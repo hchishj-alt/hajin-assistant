@@ -212,7 +212,13 @@ export function pickFile(accept, multiple = false) {
   });
 }
 export const COLORS = ['#4b5bff', '#ff7a59', '#1fae84', '#e3a008', '#b05cff', '#14a3c7', '#e24c8a', '#6b7280'];
-export const colorFor = s => { let x = 0; for (const c of String(s)) x = (x * 31 + c.charCodeAt(0)) >>> 0; return COLORS[x % COLORS.length]; };
+// 멤버가 직접 정한 색·사진 (이름 → { color, avatar }). 명단을 받을 때마다 setFaces로 다시 채움. 성을 뗀 이름으로도 찾음
+const FACES = new Map();
+export function setFaces(list = []) { FACES.clear(); for (const m of list) { if (!m || !m.name || (!m.color && !m.avatar)) continue; const f = { color: m.color || '', avatar: m.avatar || '' }; FACES.set(m.name, f); const s = m.name.length === 3 ? m.name.slice(1) : m.name; if (!FACES.has(s)) FACES.set(s, f); } }
+export const faceOf = name => FACES.get(String(name || '')) || null;
+// 동그란 이름표에 그 사람이 올린 사진이 있으면 글자 대신 사진을 넣음
+export const facePic = (name, el) => { const f = FACES.get(String(name || '')); if (f && f.avatar) el.replaceChildren(h('img', { src: f.avatar, alt: '' })); return el; };
+export const colorFor = s => { const f = FACES.get(String(s)); if (f && f.color) return f.color; let x = 0; for (const c of String(s)) x = (x * 31 + c.charCodeAt(0)) >>> 0; return COLORS[x % COLORS.length]; };
 export const debounce = (fn, ms = 400) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 export function busy(btn, on, label) {
   if (on) { btn._l = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> ${esc(label || '처리 중')}`; }

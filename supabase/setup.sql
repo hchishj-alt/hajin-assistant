@@ -71,8 +71,7 @@ create policy spaces_read on public.spaces for select to authenticated using (pu
 
 drop policy if exists members_read on public.space_members;
 create policy members_read on public.space_members for select to authenticated using (public.is_member(space));
-drop policy if exists members_self_update on public.space_members;
-create policy members_self_update on public.space_members for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists members_self_update on public.space_members;   -- (v1.36.0) 이름을 스스로 고치는 길을 없앰
 drop policy if exists members_leave on public.space_members;
 create policy members_leave on public.space_members for delete to authenticated using (user_id = auth.uid());
 
@@ -87,7 +86,7 @@ declare s public.spaces;
 begin
   if auth.uid() is null then raise exception '로그인이 필요해요'; end if;
   insert into public.spaces (name) values (p_name) returning * into s;
-  insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), coalesce(p_my_name, ''));
+  insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), coalesce((select name from public.members where user_id = auth.uid()), p_my_name, ''));
   return s;
 end $$;
 
@@ -98,7 +97,7 @@ begin
   if auth.uid() is null then raise exception '로그인이 필요해요'; end if;
   select * into s from public.spaces where code = upper(trim(p_code)) and not coalesce(is_main, false);
   if s.id is null then raise exception '참여 코드가 맞지 않아요'; end if;
-  insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), coalesce(p_my_name, ''))
+  insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), coalesce((select name from public.members where user_id = auth.uid()), p_my_name, ''))
     on conflict (space, user_id) do update set name = excluded.name;
   return s;
 end $$;
@@ -163,10 +162,14 @@ begin
 end $$;
 
 -- 멤버 목록: 관리자에게만 코드가 보임
+-- 멤버가 직접 정하는 색·사진 (15번 참고). list_members가 읽으므로 칸은 여기서 먼저 만듦
+alter table public.members add column if not exists color text not null default '';
+alter table public.members add column if not exists avatar text not null default '';
 create or replace function public.list_members() returns setof json
 language sql security definer set search_path = public stable as $$
   select json_build_object('id', id, 'name', name, 'role', role, 'gmail', gmail, 'is_admin', is_admin, 'active', active,
-    'joined', user_id is not null, 'user_id', user_id, 'code', case when public.is_admin() then code else null end)
+    'joined', user_id is not null, 'user_id', user_id, 'code', case when public.is_admin() then code else null end,
+    'color', color, 'avatar', avatar)
   from public.members
   where exists (select 1 from public.members me where me.user_id = auth.uid() and me.active)
   order by is_admin desc, created_at
@@ -316,7 +319,7 @@ declare s public.spaces;
 begin
   if auth.uid() is null or not public.is_active() then raise exception '로그인이 필요해요'; end if;
   insert into public.spaces (name) values (p_name) returning * into s;
-  insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), coalesce(p_my_name, ''));
+  insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), coalesce((select name from public.members where user_id = auth.uid()), p_my_name, ''));
   return s;
 end $$;
 create or replace function public.join_space(p_code text, p_my_name text)
@@ -326,13 +329,13 @@ begin
   if auth.uid() is null or not public.is_active() then raise exception '로그인이 필요해요'; end if;
   select * into s from public.spaces where code = upper(trim(p_code)) and not coalesce(is_main, false);
   if s.id is null then raise exception '참여 코드가 맞지 않아요'; end if;
-  insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), coalesce(p_my_name, ''))
+  insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), coalesce((select name from public.members where user_id = auth.uid()), p_my_name, ''))
     on conflict (space, user_id) do update set name = excluded.name;
   return s;
 end $$;
--- 내 참여 정보는 이름만 고칠 수 있음 (다른 공간으로 옮겨 적지 못하게)
+-- 내 참여 정보는 직접 고칠 수 없음 (이름은 관리자가 정한 것만)
 revoke update on public.space_members from authenticated;
-grant update (name) on public.space_members to authenticated;
+-- (v1.36.0) 이름은 관리자만 정하므로 멤버에게는 고칠 권한을 주지 않음
 -- 받은 메시지는 '읽음'만 바꿀 수 있음 (내용은 못 고침)
 revoke update on public.dms from authenticated;
 grant update (read_at) on public.dms to authenticated;
@@ -404,7 +407,7 @@ grant select, insert, update, delete on public.items to authenticated;
 grant select, insert, update, delete on public.space_items to authenticated;
 grant select on public.spaces to authenticated;
 grant select, delete on public.space_members to authenticated;
-grant update (name) on public.space_members to authenticated;
+-- (v1.36.0) 이름은 관리자만 정하므로 멤버에게는 고칠 권한을 주지 않음
 grant select, insert on public.dms to authenticated;
 grant update (read_at) on public.dms to authenticated;
 -- 함수로만 다루는 표(members, code_tries, team_secrets)는 열지 않음. 쓸 일 없는 권한은 거둠
@@ -590,3 +593,32 @@ end $$;
 revoke all on function public.dm_alarm() from public, anon, authenticated;
 drop trigger if exists dms_alarm on public.dms;
 create trigger dms_alarm after insert on public.dms for each row execute function public.dm_alarm();
+
+-- ============================================================
+-- 15. 내 프로필 (v1.36.0): 색과 사진은 멤버가 직접, 이름은 관리자만
+-- ============================================================
+-- 사진은 앱이 128px로 줄인 작은 그림을 글자로 넣음(저장 공간 요금 없음). 색은 #rrggbb.
+do $$ begin
+  alter table public.members add constraint members_color_ok check (color ~ '^(#[0-9a-fA-F]{6})?$');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter table public.members add constraint members_avatar_ok check (avatar = '' or (char_length(avatar) <= 40000 and avatar ~ '^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$'));
+exception when duplicate_object then null; end $$;
+
+-- 내 줄의 색·사진만 바꿈. null은 그대로, ''는 지움. 이름·역할은 여기서 못 바꿈
+create or replace function public.set_my_profile(p_color text, p_avatar text) returns json
+language plpgsql security definer set search_path = public as $$
+declare m public.members;
+begin
+  update public.members set color = coalesce(p_color, color), avatar = coalesce(p_avatar, avatar)
+    where user_id = auth.uid() and active returning * into m;
+  if m.id is null then raise exception '로그인한 멤버만 바꿀 수 있어요'; end if;
+  update public.space_members set name = m.name where user_id = auth.uid();   -- 같은 팀 기기들이 바로 다시 받아 가게 건드림
+  return json_build_object('id', m.id, 'color', m.color, 'avatar', m.avatar);
+end $$;
+revoke all on function public.set_my_profile(text, text) from public, anon;
+grant execute on function public.set_my_profile(text, text) to authenticated;
+
+-- 이름을 스스로 고치는 길을 막음 (관리자의 멤버 수정만 이름을 바꿈)
+drop policy if exists members_self_update on public.space_members;
+revoke update on public.space_members from authenticated;

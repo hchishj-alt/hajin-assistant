@@ -1,4 +1,4 @@
-import { h, ic, clear, toast, head, seg, modal, form, todayStr, addDays, ymd, startOfWeek, fmtDate, colorFor, confirmBox, download, pickFile, wd, kindPair } from '../js/ui.js';
+import { h, ic, clear, toast, head, seg, modal, form, todayStr, addDays, ymd, startOfWeek, fmtDate, colorFor, facePic, confirmBox, download, pickFile, wd, kindPair } from '../js/ui.js';
 import * as db from '../js/db.js';
 import * as store from '../js/store.js';
 import * as brain from '../js/brain.js';
@@ -54,7 +54,7 @@ export default {
       const scopeName = { mine: '내 일정', work: '팀 업무', personal: '개인만', all: '전체' }; const labName = labF ? ((LB.all().find(l => l.id === labF) || {}).name || '') : '';
       const fbtn = h('button.btn.sm.ghost.cal-fbtn', { type: 'button', 'aria-expanded': String(fOpen), onclick: () => { fOpen = !fOpen; draw(); } }, ic('sliders', 14), `보기 설정 · ${[scopeName[scopeF], labName, peopleF.length ? peopleF.length + '명' : ''].filter(Boolean).join(' · ')}`, ic(fOpen ? 'up' : 'down', 14));
       body.append(nav, fbtn, h('div.cal-filters' + (fOpen ? '.open' : ''),
-        members.length > 1 ? h('div.chips.cal-people', h('span.faint.tiny', '사람'), ...members.map(n => h('button.chip' + (peopleF.includes(n) ? '.acc' : ''), { onclick: () => { peopleF = peopleF.includes(n) ? peopleF.filter(x => x !== n) : [...peopleF, n]; draw(); } }, h('span.avatar.xs', { style: { background: colorFor(n) } }, n[0]), n === me ? n + ' (나)' : n)), peopleF.length ? h('button.chip', { onclick: () => { peopleF = []; draw(); } }, '모두 보기') : null) : null,
+        members.length > 1 ? h('div.chips.cal-people', h('span.faint.tiny', '사람'), ...members.map(n => h('button.chip' + (peopleF.includes(n) ? '.acc' : ''), { onclick: () => { peopleF = peopleF.includes(n) ? peopleF.filter(x => x !== n) : [...peopleF, n]; draw(); } }, facePic(n, h('span.avatar.xs', { style: { background: colorFor(n) } }, n[0])), n === me ? n + ' (나)' : n)), peopleF.length ? h('button.chip', { onclick: () => { peopleF = []; draw(); } }, '모두 보기') : null) : null,
         h('div.row.between', { style: { marginBottom: '10px', gap: '8px', flexWrap: 'wrap' } }, seg([['mine', '내 일정'], ['work', '팀 업무'], ['personal', '개인만'], ['all', '전체']], scopeF, v => { scopeF = v; draw(); }), h('span.faint.tiny', { mine: '개인 일정과 내가 낀 팀 업무를 같이 봐요', work: '팀 전체가 보는 업무 일정이에요', personal: '나만 보는 일정이에요', all: '개인과 팀 업무 전부예요' }[scopeF])),
         h('div.labels', { style: { marginBottom: '10px' } }, [{ id: '', name: '전체', color: 'var(--line2)' }, ...LB.all()].map(l => h('button.lab' + (labF === l.id ? '.on' : ''), { style: { '--lc': l.color }, onclick: () => { labF = l.id; draw(); } }, h('i'), l.name)))));
       const on = d => events.filter(e => (!labF || e.label === labF) && store.occursOn(e, d)).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
@@ -85,7 +85,7 @@ export default {
         const bodyEl = h('div.pp-body', days.map(d => { const de = evs.filter(e => e._d === d), dt = tks.filter(t => t.due === d); if (!de.length && !dt.length) return null; return h('div.pp-day', h('div.pp-d' + (d === todayStr() ? '.today' : ''), fmtDate(d)), h('div.list', de.map(e => evRow(e)), dt.map(t => h('div.li', ic('check2', 16), h('div.grow', h('div.small', t.title), h('div.faint.tiny', '마감' + (t.handoffs?.length ? ' · ' + t.handoffs[t.handoffs.length - 1].from + '에게서 넘겨받음' : '')))))));
         }), !evs.length && !tks.length ? h('div.faint.small', { style: { padding: '4px 2px 10px' } }, '이번 주에 잡힌 게 없어요') : null);
         const head = h('button.pp-h', { 'aria-expanded': String(open), onclick: async () => { const now = head.getAttribute('aria-expanded') !== 'true'; head.setAttribute('aria-expanded', String(now)); sec.classList.toggle('open', now); const f = await db.kvGet('cal:fold', {}); f[n] = !now; await db.kvSet('cal:fold', f); } },
-          h('span.avatar', { style: { background: colorFor(n) } }, n[0]), h('b.grow', n), h('span.chip', `일정 ${evs.length}`), h('span.chip', `할 일 ${tks.length}`), ic('down', 14));
+          facePic(n, h('span.avatar', { style: { background: colorFor(n) } }, n[0])), h('b.grow', n), h('span.chip', `일정 ${evs.length}`), h('span.chip', `할 일 ${tks.length}`), ic('down', 14));
         const sec = h('div.card.pp' + (open ? '.open' : ''), head, h('div.pp-wrap', bodyEl)); wrap.append(sec);
       }
       return wrap;

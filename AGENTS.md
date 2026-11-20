@@ -63,3 +63,10 @@
 ## 배포
 - `main`에 올리면 GitHub Pages가 그대로 배포한다. 별도 빌드가 없다.
 - 서버(Supabase) 변경은 `supabase/setup.sql`에 추가하고, 사람이 SQL Editor에서 실행해야 한다고 결과에 적는다.
+
+## 멤버 색·사진·이름 (v1.36.0)
+
+- 색과 사진은 멤버가 설정의 "내 프로필"에서 직접 정함. 서버 `members.color`·`members.avatar`(128px로 줄인 data URL, 4만 자 이하), 바꾸는 길은 `set_my_profile` 하나(내 줄만). 명단(`list_members`)에 같이 내려오고 `ui.setFaces`가 이름표에 씀. 새 이름표를 만들 때는 `colorFor(이름)`과 `facePic(이름, 이름표)`를 쓸 것.
+- 이름과 역할은 관리자만(관리자 화면의 멤버). 멤버가 `space_members.name`을 고치던 권한은 없앰. 기기는 명단이 바뀌면 `me:member`와 부를 이름을 따라 바꿈.
+- 로그인하지 않은 기기는 `me:face`(이 기기에만)로 같은 화면을 씀.
+- 메신저 알림(서버 14번): `dms`에 글이 들어오면 받는 사람 `alarms`에 `dm|…` 줄을 넣어 닫힌 앱에도 푸시가 감.

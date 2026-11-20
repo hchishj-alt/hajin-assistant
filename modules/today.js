@@ -1,4 +1,4 @@
-import { h, ic, clear, toast, todayStr, fmtDate, tile, ring, colorFor, won, countUp, KIND_RULE } from '../js/ui.js';
+import { h, ic, clear, toast, todayStr, fmtDate, tile, ring, colorFor, facePic, won, countUp, KIND_RULE } from '../js/ui.js';
 import * as SC from '../js/scope.js';
 import * as db from '../js/db.js';
 import * as store from '../js/store.js';
@@ -145,7 +145,7 @@ async function teamCard(allTasks, me) {
   const by = {}; for (const t of shared) { const k = t.who ? (mine(t.who) ? (me || '나') : t.who) : '담당 미정'; (by[k] = by[k] || []).push(t); }
   for (const [who, ts] of Object.entries(by).sort((a, b) => b[1].length - a[1].length)) {
     const late = ts.filter(t => t.due && t.due < today).length, soon = ts.filter(t => t.due && t.due >= today).sort((a, b) => a.due.localeCompare(b.due))[0];
-    c.append(h('div.li.click', { onclick: () => go('tasks/team') }, h('div.avatar', { style: { background: colorFor(who), width: '30px', height: '30px', fontSize: '12px' } }, who === '담당 미정' ? '?' : who.slice(-2, -1) || who[0]),
+    c.append(h('div.li.click', { onclick: () => go('tasks/team') }, facePic(who, h('div.avatar', { style: { background: colorFor(who), width: '30px', height: '30px', fontSize: '12px' } }, who === '담당 미정' ? '?' : who.slice(-2, -1) || who[0])),
       h('div.grow', h('div.t.small', who), h('div.faint.tiny', soon ? `다음 마감 ${fmtDate(soon.due)} · ${soon.title}` : ts[0].title)),
       late ? h('span.chip.bad', `밀림 ${late}`) : null, h('span.chip', `${ts.length}개`)));
   }
@@ -156,7 +156,7 @@ async function activityCard() {
   const c = h('div.card', h('div.card-h', h('h3', ic('clock'), '팀 최근 활동')));
   if (!au.length) c.append(h('div.empty', '팀원이 공유 항목을 만들거나 고치면 여기 보여요'));
   const LB = { tasks: '할 일', events: '일정', meetings: '회의록', refs: '레퍼런스', buys: '구매 목록', expenses: '비용', bnodes: '마인드맵', boards: '마인드맵 회의', figmafiles: '피그마', contacts: '연락처', grants: '지원사업' };
-  au.forEach(a => c.append(h('div.li', h('div.avatar', { style: { background: colorFor(a.by || '?'), width: '26px', height: '26px', fontSize: '11px' } }, (a.by || '?').slice(0, 1)), h('div.grow', h('div.small', h('b', a.by), ` ${LB[a.refCol] || ''} ${a.action}`), h('div.faint.tiny', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, a.title)), h('span.faint.tiny', relShort(a.createdAt)))));
+  au.forEach(a => c.append(h('div.li', facePic(a.by, h('div.avatar', { style: { background: colorFor(a.by || '?'), width: '26px', height: '26px', fontSize: '11px' } }, (a.by || '?').slice(0, 1))), h('div.grow', h('div.small', h('b', a.by), ` ${LB[a.refCol] || ''} ${a.action}`), h('div.faint.tiny', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, a.title)), h('span.faint.tiny', relShort(a.createdAt)))));
   return c;
 }
 const relShort = d => { const m = Math.round((Date.now() - new Date(d)) / 60000); return m < 1 ? '방금' : m < 60 ? m + '분 전' : m < 1440 ? Math.round(m / 60) + '시간 전' : Math.round(m / 1440) + '일 전'; };

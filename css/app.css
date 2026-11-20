@@ -1100,3 +1100,10 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 
 /* v1.35.6 비서 창 안의 입력칸은 창 바탕색 그대로 (큰 비서 화면용 회색 바탕·그림자가 창 안까지 먹던 것) */
 @media (max-width:900px){.aisheet .chatpage .composer{background:var(--card);box-shadow:none}}
+/* v1.36.0 내 프로필: 색 고르기는 손가락으로 누르기 좋은 크기 */
+.face-sw{gap:8px;align-items:center}
+.face-sw .sw{width:36px;height:36px}
+.face-sw input[type=color]{-webkit-appearance:none;appearance:none;width:36px!important;height:36px!important;border-radius:50%;overflow:hidden;cursor:pointer;outline:1px dashed color-mix(in srgb,var(--ink) 35%,transparent);outline-offset:2px}
+.face-sw input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.face-sw input[type=color]::-webkit-color-swatch{border:0;border-radius:50%}
+.face-sw input[type=color]::-moz-color-swatch{border:0;border-radius:50%}

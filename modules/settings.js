@@ -1,11 +1,11 @@
-import { h, ic, clear, toast, head, seg, modal, form, confirmBox, download, pickFile, busy } from '../js/ui.js';
+import { h, ic, clear, toast, head, seg, modal, form, confirmBox, download, pickFile, busy, colorFor, facePic, faceOf, COLORS } from '../js/ui.js';
 import * as Install from '../js/install.js';
 import { panel as alarmPanel } from '../js/alarmui.js';
 import * as db from '../js/db.js';
 import * as brain from '../js/brain.js';
 import * as store from '../js/store.js';
 import { VERSION } from '../js/version.js';
-import { applyTheme, go } from '../js/app.js';
+import { applyTheme, go, loadFaces } from '../js/app.js';
 
 export default {
   async render(root, params) {
@@ -22,7 +22,7 @@ export default {
     const sec = (title, iconName, ...kids) => h('div.card', { style: { marginBottom: '14px' }, id: 'sec-' + iconName }, h('div.card-h', h('h3', ic(iconName), title)), ...kids);
 
     root.append(
-      sec('나', 'user', h('div.grid.g2', h('label.f', '부를 이름', nameIn))),
+      await profileSection(sec, nameIn, name),
       sec('화면 · 색 조합', 'palette',
         h('div.row', { style: { marginBottom: '12px' } }, seg([['auto', '시스템 따라'], ['light', '밝게'], ['dark', '어둡게']], theme, async v => { await db.kvSet('theme', v); await applyTheme(v); go('settings'); })),
         await palettePicker()),
@@ -73,6 +73,45 @@ export default {
   },
 };
 
+// 내 프로필: 사진과 색은 내가 정하고 팀원 화면에도 바로 보임. 이름은 관리자가 정한 것만
+const FACE_COLORS = [...COLORS, '#111827', '#0ea5e9', '#f43f5e', '#84cc16'];
+async function shrink(file, px = 128) {   // 가운데를 정사각형으로 잘라 작게 줄임 (서버에 글자로 넣을 수 있는 크기)
+  const img = await new Promise((res, rej) => { const i = new Image(), u = URL.createObjectURL(file); i.onload = () => { URL.revokeObjectURL(u); res(i); }; i.onerror = () => { URL.revokeObjectURL(u); rej(new Error('그림 파일을 열지 못했어요')); }; i.src = u; });
+  const side = Math.min(img.naturalWidth, img.naturalHeight); if (!side) throw new Error('그림 파일을 열지 못했어요');
+  for (const [size, q] of [[px, .85], [px, .7], [96, .7], [72, .6]]) { const c = document.createElement('canvas'); c.width = c.height = size;
+    c.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+    const d = c.toDataURL('image/jpeg', q); if (d.length <= 38000) return d; }
+  throw new Error('사진이 너무 커요. 다른 사진으로 해 주세요');
+}
+async function profileSection(sec, nameIn, localName) {
+  const meM = await db.kvGet('me:member', null);
+  const box = h('div');
+  const draw = async () => {
+    const who = meM ? meM.name : localName, f = faceOf(who) || {}, col = f.color || colorFor(who || '?');
+    const save = async patch => {
+      try {
+        const S = await import('../js/sync.js');
+        if (meM && await S.me()) await S.setProfile(patch);
+        else { if (meM) toast('지금은 로그인이 풀려 있어서 이 기기에만 바꿨어요'); const cur = (await db.kvGet('me:face', null)) || {}; await db.kvSetRaw('me:face', { color: patch.color ?? cur.color ?? '', avatar: patch.avatar ?? cur.avatar ?? '' }); }
+        await loadFaces(); await draw(); toast(meM ? '바꿨어요. 팀원 화면에도 바로 보여요' : '바꿨어요');
+      } catch (e) { toast(e.message || '바꾸지 못했어요'); }
+    };
+    const pic = facePic(who, h('span.avatar', { style: { background: col, width: '64px', height: '64px', fontSize: '24px' } }, (who || '?').slice(who && who.length > 2 ? 1 : 0, who && who.length > 2 ? 2 : 1)));
+    const pick = h('button.btn.sm', { type: 'button', onclick: async () => { const file = await pickFile('image/*'); if (!file) return; busy(pick, true, '올리는 중'); try { await save({ avatar: await shrink(file) }); } catch (e) { toast(e.message || '사진을 넣지 못했어요'); } finally { busy(pick, false); } } }, ic('image', 14), f.avatar ? '사진 바꾸기' : '사진 넣기');
+    const drop = f.avatar ? h('button.btn.sm.ghost', { type: 'button', onclick: () => save({ avatar: '' }) }, '사진 빼기') : null;
+    const custom = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(col) ? col : '#4b5bff', 'aria-label': '다른 색 고르기', style: { width: '44px', height: '44px', padding: '0', border: '0', background: 'none' }, onchange: () => save({ color: custom.value }) });
+    box.replaceChildren(
+      h('div.row.nowrap', { style: { gap: '14px', alignItems: 'center', marginBottom: '12px' } }, pic,
+        h('div.grow', h('div', h('b', who || '이름 없음'), meM && meM.role ? h('span.chip', { style: { marginLeft: '6px' } }, meM.role) : null),
+          h('p.faint.tiny', { style: { margin: '2px 0 0' } }, meM ? (meM.is_admin ? '이름과 역할은 관리자 화면의 멤버에서 바꿔요.' : '이름과 역할은 관리자가 정해요. 바꾸려면 관리자에게 말해 주세요.') : '멤버 코드로 로그인하면 사진과 색이 팀원 화면에도 보여요.'))),
+      h('div.row', { style: { gap: '8px', marginBottom: '12px' } }, pick, drop),
+      h('div.small.muted', { style: { marginBottom: '6px' } }, '내 색'),
+      h('div.swatches.face-sw', FACE_COLORS.map(c => h('button.sw' + (c.toLowerCase() === String(col).toLowerCase() ? '.on' : ''), { type: 'button', 'aria-label': '색 ' + c, style: { background: c }, onclick: () => save({ color: c }) })), custom),
+      meM && !meM.is_admin ? null : h('div.grid.g2', { style: { marginTop: '14px' } }, h('label.f', meM ? '비서가 부를 이름' : '부를 이름', nameIn)));
+  };
+  await draw();
+  return sec('내 프로필', 'user', box);
+}
 async function extSection(focus) {
   const ext = await import('../js/ext.js');
   const box = h('div.card', { style: { marginBottom: '14px', outline: focus ? '2px solid var(--acc)' : '' }, id: 'sec-cloud' });
