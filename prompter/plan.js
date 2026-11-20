@@ -1,6 +1,6 @@
 // 구독: 상태, 잠금(needPro), 구독 관리 화면(#/plan), 관리 화면(#/admin)
 // 구독 중 = 서버 pr_customers.paid_until > now(). 이 기기는 마지막 상태를 기억해 두고 열 때마다 새로 받는다.
-import { SB, PRICE, FREE } from './config.js';
+import { SB, PRICE, FREE, CONTACT } from './config.js';
 // 이벤트 가격 표시: ~~9,900원~~ 90% 월 990원
 const off = () => PRICE.list > PRICE.month ? Math.round((1 - PRICE.month / PRICE.list) * 100) : 0;
 const priceTag = () => off() ? `<span class="ptag"><span class="ev">${PRICE.event || '이벤트가'}</span><s>${won(PRICE.list)}</s><b class="off">${off()}% 할인</b><b>월 ${won(PRICE.month)}</b></span>` : `월 ${won(PRICE.month)}`;
@@ -135,7 +135,7 @@ export async function planView(view) {
       <p class="tip">구독은 이 코드에 묶여 있어요. 폰을 바꾸면 이 코드를 넣어 주세요.</p></div>
 
     ${hist.length ? `<div class="sec">${ic('receipt', 16)}결제 내역</div><div class="box list">${hist.map(h => `<div class="li"><span>${h.method === 'card' ? '카드' : h.method === 'gift' ? '기프트 키' : '운영자 지급'}${h.status === 'failed' ? ' · 실패' : ''}</span><span class="muted">${ymd(h.created_at)}</span><b>${h.amount ? won(h.amount) : h.days ? h.days + '일' : h.status === 'failed' ? '—' : '평생'}</b></div>`).join('')}</div>` : ''}
-    <p class="tip c" style="margin-top:24px">결제·환불 문의는 앱 운영자에게 해 주세요.</p>`;
+    <p class="tip c" style="margin-top:24px"><a class="mailto" href="mailto:${CONTACT}?subject=${encodeURIComponent('[PROMPRI EDIT] 문의')}">${ic('mail', 14)}<span>결제·환불 문의</span></a> <span class="noi18n">${CONTACT}</span></p>`;
 
   const g = sessionStorage.getItem('prompter:gift'); if (g) { $('#giftin').value = g; sessionStorage.removeItem('prompter:gift'); }
   $('#sub')?.addEventListener('click', e => subscribe(e.currentTarget));

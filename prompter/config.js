@@ -21,3 +21,6 @@ export const PORTONE = {
   sdk: 'https://cdn.portone.io/v2/browser-sdk.js',
   fn: SB.url + '/functions/v1/prompter-billing',
 };
+
+// 문의 메일(하진 요청 11/21: 일단 내 메일로)
+export const CONTACT = 'hchis.hj@gmail.com';
