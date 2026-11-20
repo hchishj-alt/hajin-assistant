@@ -27,6 +27,8 @@ export async function get(k, d = null) { const v = await tx('readonly', s => s.g
 export async function set(k, v) { await tx('readwrite', s => s.put(v, ns(k))); subs.forEach(f => f(k)); return v; }
 export async function del(k) { await tx('readwrite', s => s.delete(ns(k))); subs.forEach(f => f(k)); }
 export async function clearDemo() { const d = await open(); await new Promise((res, rej) => { const t = d.transaction('kv', 'readwrite'); const s = t.objectStore('kv'); const q = s.getAllKeys(); q.onsuccess = () => q.result.filter(k => String(k).startsWith('demo:')).forEach(k => s.delete(k)); t.oncomplete = res; t.onerror = () => rej(t.error); }); }
+// 이 기기의 내 기록을 전부 지움 (연습 기록 포함, 토큰 포함)
+export async function clearAll() { const d = await open(); await new Promise((res, rej) => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').clear(); t.oncomplete = res; t.onerror = () => rej(t.error); }); subs.forEach(f => f('*')); }
 export async function update(k, d, fn) { const v = await get(k, d); const n = await fn(v); return set(k, n === undefined ? v : n); }
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 

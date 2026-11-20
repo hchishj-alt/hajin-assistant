@@ -17,7 +17,9 @@ const BASE = [
   { name: '일상·나', ex: ['솔직 Q&A', '오늘 하루 1분 요약', '친구랑 있었던 일 공감 썰'] },
 ];
 // 고른 분야가 있으면 그 분야를 축으로, 없으면 기본 세 축
-const pillarsOf = st => { const f = pick(st.about?.vibe || ''); if (!f.length) return BASE; const out = f.slice(0, 3).map(x => ({ name: x.name.split('·')[0], ex: x.ex })); while (out.length < 3) out.push(out.length === 1 ? { name: out[0].name, ex: [...out[0].ex].reverse() } : BASE[2]); return out; };
+const pillarsOf = st => { const f = pick(st.about?.vibe || ''); if (!f.length) return BASE; const out = f.slice(0, 3).map(x => ({ name: x.name.split('·')[0], ex: x.ex })); if (out.length < 3) out.push(BASE[2]); return out; };
+// 축을 돌아가며 한 번씩, 같은 아이디어가 겹치지 않게
+const ideaPool = P => { const out = []; for (let k = 0; k < 3; k++) for (const p of P) if (p.ex[k]) out.push({ pillar: p.name, idea: p.ex[k] }); return out; };
 // 쓰는 플랫폼만 (아이디를 적었거나 기록이 있는 곳). 아무것도 없으면 둘 다
 const planEnd = ws => addDays(ws, kdate() >= addDays(ws, 4) ? 13 : 6);
 const usePlats = (st, An) => { const u = ['ig', 'tt'].filter(p => st.profile?.[p]?.username || An.plats[p].n); return u.length ? u : ['ig', 'tt']; };
@@ -30,15 +32,15 @@ function frame(st, An) {
   return { cadence: { ig: 4, tt: 3 }, slot: { ig: slot('ig'), tt: slot('tt') }, igKind, lastRes };
 }
 function rulePlan(st, An, ws) {
-  const f = frame(st, An); const items = []; const PILLARS = pillarsOf(st);
+  const f = frame(st, An); const items = []; const POOL = ideaPool(pillarsOf(st));
   const use = usePlats(st, An);
   const sched = use.length === 2 ? { ig: [1, 3, 5, 6], tt: [2, 4, 0] } : { [use[0]]: [1, 2, 4, 5, 0] };
   let n = 0;
   for (const plat of use) for (const w of sched[plat]) {
   for (const wk of planEnd(ws) > addDays(ws, 6) ? [0, 7] : [0]) {
-    const pil = PILLARS[n % 3]; const date = addDays(ws, (w === 0 ? 6 : w - 1) + wk);
-    if (date < kdate()) { n++; continue; }
-    items.push({ id: S.uid(), date, time: f.slot[plat], plat, kind: plat === 'tt' ? 'video' : (n % 4 === 3 ? 'carousel' : f.igKind), pillar: pil.name, idea: pil.ex[Math.floor(n / 3) % 3], hook: '결과(완성 모습)부터 1초 보여 주고 시작', why: '', status: '예정' });
+    const pil = POOL[n % POOL.length]; const date = addDays(ws, (w === 0 ? 6 : w - 1) + wk);
+    if (date < kdate()) continue;
+    items.push({ id: S.uid(), date, time: f.slot[plat], plat, kind: plat === 'tt' ? 'video' : (n % 4 === 3 ? 'carousel' : f.igKind), pillar: pil.pillar, idea: pil.idea, hook: '결과(완성 모습)부터 1초 보여 주고 시작', why: '', status: '예정' });
     n++;
   } }
   return { items: items.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), focus: '꾸준히 같은 시간에 올려서 알고리즘에 "이 계정은 이때 올라온다"를 학습시키기', experiment: { hypo: '첫 1초에 결과를 먼저 보여 주면 끝까지 보는 비율이 오른다', metric: '완주율' } };

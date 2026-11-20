@@ -11,7 +11,7 @@ import * as EX from './explore.js';
 import * as W from './web.js';
 import { FIELDS } from './fields.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.4.0';
+export const VERSION = '1.4.1';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
@@ -28,16 +28,18 @@ const snapshotText = (st, An) => ['ig', 'tt'].map(p => { const a = An.plats[p]; 
 // ── 라우터 ──
 let cleanup = null;
 async function route() {
-  const [name, ...rest] = (location.hash.replace(/^#\/?/, '') || 'today').split('/');
+  let [name, ...rest] = (location.hash.replace(/^#\/?/, '') || 'today').split('/');
+  const fresh = !localStorage.getItem('mgr:onboarded') && S.getMode() !== 'demo';
+  if (fresh && !['hello', 'start', 'about'].includes(name)) { location.replace('#/hello'); return; }
   if (cleanup) { try { cleanup(); } catch { } cleanup = null; }
   document.getElementById('sheet-root').replaceChildren();
   document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.t === name));
-  document.body.classList.toggle('bare', name === 'hello' || name === 'start');
+  document.body.classList.toggle('bare', name === 'hello' || name === 'start' || fresh);
   view.classList.remove('in'); void view.offsetWidth;
   const st = await state(); const An = A.analyze(st);
   view.replaceChildren();
   const fn = SCREENS[name] || SCREENS.today;
-  try { cleanup = await fn(view, st, An, rest); } catch (e) { console.error(e); view.append(h('div.card', '화면을 그리다 문제가 생겼어요: ' + e.message)); }
+  try { cleanup = await fn(view, st, An, rest); } catch (e) { console.error(e); view.append(h('div.card', h('b', '화면을 그리다 문제가 생겼어요'), h('p.muted', String(e.message || e)), h('div.row.gap', h('button.btn.sm', { onclick: () => location.reload() }, '다시 열기'), h('button.ghost.sm', { onclick: () => go('#/today') }, '오늘로')))); }
   view.classList.add('in'); window.scrollTo(0, 0);
 }
 const head = (title, sub, right) => h('header.top', h('div', h('h1', title), sub ? h('p.sub', sub) : null), h('div.topr', right));
@@ -650,7 +652,9 @@ SCREENS.settings = async (root, st) => {
   root.append(h('h2.sec', '연습 모드'), h('div.card', h('p', '가상의 초보 인플루언서 "봄이"(인스타 팔로워 860명쯤, 협찬 3건)의 계정으로 모든 기능을 미리 써 봐요. 내 기록과 따로 저장돼요.'), h('button.btn.wide' + (demo ? '.warn' : ''), { onclick: async () => { if (demo) { localStorage.setItem('mgr:mode', 'real'); S.setMode('real'); await S.clearDemo(); toast('연습 모드를 껐어요'); if (!localStorage.getItem('mgr:onboarded')) { go('#/hello'); return; } } else { localStorage.setItem('mgr:mode', 'demo'); S.setMode('demo'); await seed(); toast('봄이 계정으로 바꿨어요'); } go('#/today'); background(true); } }, demo ? '연습 모드 끄기' : '봄이로 연습하기')));
   // 설치
   root.append(h('h2.sec', '폰에 설치'), h('div.card', h('p', /iphone|ipad/i.test(navigator.userAgent) ? 'Safari 아래 공유 버튼 › "홈 화면에 추가"' : 'Chrome 메뉴(⋮) › "앱 설치" 또는 "홈 화면에 추가"'), h('p.fhint', '홈 화면에 아이콘이 생기고 앱처럼 열려요. 카카오톡·인스타 안에서 열었다면 먼저 Safari나 Chrome으로 열어 주세요.')));
-  root.append(h('h2.sec', '데이터'), h('div.card.form', h('p.muted', '모든 기록은 이 기기에만 있어요. 인스타 토큰도 이 기기에만.'), h('div.row.gap', h('button.ghost', { onclick: async () => { const all = {}; for (const k of ['profile', 'posts', 'snaps', 'people', 'handled', 'deals', 'about', 'ads', 'reviews', 'plan']) all[k] = await S.get(k); const b = new Blob([JSON.stringify(all)], { type: 'application/json' }); const a = h('a', { href: URL.createObjectURL(b), download: 'manager-backup.json' }); a.click(); } }, ic('download', 15), '백업 받기'), h('button.ghost', { onclick: () => { const i = h('input', { type: 'file', accept: '.json', onchange: async e => { try { const j = JSON.parse(await e.target.files[0].text()); for (const [k, v] of Object.entries(j)) if (v != null) await S.set(k, v); toast('되살렸어요'); route(); } catch { toast('백업 파일이 아니에요'); } } }); i.click(); } }, ic('upload', 15), '백업 넣기'))), h('div.row.gap.center', h('button.link', { onclick: () => go('#/about') }, '개인정보·이용 안내'), h('button.link', { onclick: () => go('#/hello') }, '소개 다시 보기')), h('p.ver', '매니저 ' + VERSION));
+  const BK = ['profile', 'posts', 'snaps', 'people', 'handled', 'deals', 'about', 'ads', 'reviews', 'plan', 'strategy', 'explore', 'routine', 'drafts', 'refs', 'chat'];
+  root.append(h('h2.sec', '데이터'), h('div.card.form', h('p.muted', '모든 기록은 이 기기에만 있어요. 폰을 바꾸거나 브라우저 기록을 지우면 사라지니 가끔 백업을 받아 두세요. 백업 파일에 인스타 토큰과 AI 키는 넣지 않아요.'), h('div.row.gap', h('button.ghost', { onclick: async () => { if (S.getMode() === 'demo') return toast('연습 모드를 끄고 받아 주세요'); const all = { _app: 'manager', _v: VERSION, _at: new Date().toISOString() }; for (const k of BK) all[k] = await S.get(k); const b = new Blob([JSON.stringify(all)], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = h('a', { href: u, download: 'manager-backup-' + SG.kdate() + '.json' }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); localStorage.setItem('mgr:backupAt', Date.now()); toast('백업 파일을 받았어요'); } }, ic('download', 15), '백업 받기'), h('button.ghost', { onclick: () => { const i = h('input', { type: 'file', accept: '.json,application/json', onchange: async e => { try { const j = JSON.parse(await e.target.files[0].text()); if (S.getMode() === 'demo') return toast('연습 모드를 끄고 넣어 주세요'); if (!j || typeof j !== 'object' || !(j.profile || j.about || j.posts)) throw 0; let n = 0; for (const k of BK) if (j[k] != null) { await S.set(k, j[k]); n++; } localStorage.setItem('mgr:onboarded', '1'); toast('되살렸어요 (' + n + '가지)'); route(); } catch { toast('매니저 백업 파일이 아니에요'); } } }); i.click(); } }, ic('upload', 15), '백업 넣기')),
+    h('button.link.danger', { onclick: () => { const close = sheet('이 기기의 기록 전부 지우기', h('div.form', h('p', '숫자, 계획, 협찬 기록, 인스타 연결, 연습 기록까지 이 기기에서 전부 지워요. 되돌릴 수 없어요. 인스타·틱톡 계정에는 아무 영향이 없어요.'), h('div.row.gap', h('button.ghost', { onclick: () => close() }, '그만두기'), h('button.btn.bad', { onclick: async () => { await S.clearAll(); ['mgr:onboarded', 'mgr:mode', 'mgr:plat', 'mgr:ainudge', 'mgr:backupAt'].forEach(k => localStorage.removeItem(k)); S.setMode('real'); close(); toast('전부 지웠어요'); go('#/hello'); } }, '전부 지우기')))); } }, '이 기기의 기록 전부 지우기')), h('div.row.gap.center', h('button.link', { onclick: () => go('#/about') }, '개인정보·이용 안내'), h('button.link', { onclick: () => go('#/hello') }, '소개 다시 보기')), h('p.ver', '매니저 ' + VERSION));
 };
 
 // 매니저가 뒤에서 하는 일: 분야 탐색(하루 한 번) → 이번 주 전략 점검·조정 → 캡션 미리 쓰기
@@ -672,8 +676,10 @@ async function boot() {
   window.addEventListener('hashchange', route);
   window.addEventListener('mgr:strategy', () => { if (/^(today|plan)?$/.test(location.hash.replace(/^#\/?/, '').split('/')[0])) route(); });
   await route();
+  if (localStorage.getItem('mgr:onboarded')) navigator.storage?.persist?.().catch(() => { });
   if (localStorage.getItem('mgr:onboarded') || S.getMode() === 'demo') background(true);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (localStorage.getItem('mgr:onboarded') || S.getMode() === 'demo')) background(); });
+  window.addEventListener('offline', () => toast('인터넷이 끊겼어요. 적어 둔 기록은 그대로 볼 수 있어요'));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (localStorage.getItem('mgr:onboarded') || S.getMode() === 'demo')) background(); });
   // 인스타가 연결돼 있으면 열 때마다 새 숫자 (30분 간격)
   if (S.getMode() === 'real' && (await IG.tokenInfo()) && Date.now() - (await S.get('g:iglast', 0)) > 30 * 60e3) { try { await IG.sync(); if (/today|stats|^$/.test(location.hash.replace(/^#\/?/, '') || 'today')) route(); } catch (e) { if (e.code === 190) toast('인스타 연결이 끊겼어요. 숫자 채우기에서 다시 연결해 주세요', 5000); } }
   // 새 판이 나오면 알아서 받아서 한 번 새로 고침 (처음 설치 때는 안 함)

@@ -214,3 +214,4 @@ body.bare #tabbar{display:none}body.bare #view{padding-bottom:calc(32px + env(sa
 .pchip{border:1.5px solid var(--line);background:var(--card);border-radius:999px;min-height:42px;padding:0 14px;font-weight:700;font-size:14px;cursor:pointer;transition:transform .3s var(--spring),background .2s,color .2s,border-color .2s}
 .pchip.on{background:var(--acc);color:#fff;border-color:var(--acc);transform:scale(1.04)}
 .nudge{display:flex;gap:12px;align-items:flex-start;border:1.5px dashed color-mix(in srgb,var(--acc) 45%,transparent)}.nudge p{margin:2px 0 8px;font-size:13.5px}.btn.sm{min-height:38px;padding:0 14px;font-size:14px}
+.link.danger{color:var(--bad);margin-top:12px;font-size:13px}.btn.bad{background:var(--bad);color:#fff}
