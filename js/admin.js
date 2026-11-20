@@ -43,7 +43,7 @@ async function guard(prev, item) {
   /* 단기 작업자: 맡은 프로젝트가 하나면 새로 적는 것에 그 프로젝트를 붙이고, 맡은 프로젝트 것만 팀에 공유. 그 밖은 나만 보는 기록 */
   if (me.guest && !item.deleted && GUEST_COLS.has(item.col)) {
     if (!prev && !item.project && me.projects.length === 1 && item.scope !== 'personal' && item.team !== '') item.project = me.projects[0];   /* 개인 일로 읽힌 것(병원, 약속 …)이나 '나만 보기'로 적은 것은 팀 프로젝트에 붙이지 않음 */
-    if (item.project && me.projects.includes(item.project)) { if (!prev && (await db.get('team-main'))) item.team = 'team-main'; } else if (!prev?.team) item.team = '';
+    if (item.project && me.projects.includes(item.project)) { if (!prev) { if (await db.get('team-main')) item.team = 'team-main'; else if (item.scope === 'work') item.shareLater = true; } }   /* 코드가 멈춘 동안 적은 것은 다시 살아나면 팀에 올림 */ else if (!prev?.team) item.team = '';
   } else if (me.guest && !prev && item.team) item.team = '';
   const shared = !!(item.team || prev?.team || item.space || prev?.space);
   if (!prev && shared && !item.by) item.by = me.name;

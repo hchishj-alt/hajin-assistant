@@ -41,7 +41,7 @@ export default {
           h('div.row.between', h('span.chip' + (n.type === 'memo' ? '' : '.acc'), n.template || (n.type === 'memo' ? '메모' : '문서')), h('span.faint.tiny', fmtDate(n.updatedAt))),
           h('h3', { style: { margin: '8px 0 4px' } }, n.title || '(제목 없음)'),
           h('p.faint.small', { style: { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, (n.body || '').replace(/[#\-*]/g, '').slice(0, 160)),
-          h('div.chips', { style: { marginTop: '8px' } }, (Array.isArray(n.tags) ? n.tags : []).slice(0, 4).map(t => h('span.chip', '#' + t)), n.project ? h('span.chip.acc', n.project) : null))));
+          h('div.chips', { style: { marginTop: '8px' } }, (Array.isArray(n.tags) ? n.tags : []).slice(0, 4).map(t => h('span.chip', '#' + t)), n.project ? h('span.chip.acc.cut', { title: n.project }, n.project) : null))));
         body.append(g);
       }
       if (tab === 'ideas') {
@@ -113,7 +113,7 @@ async function refsView(refs, redraw) {
       blob ? h('img', { src: URL.createObjectURL(blob), style: { width: '100%', borderRadius: '8px', display: 'block' }, loading: 'lazy' }) : null,
       h('div', { style: { padding: '6px 4px 2px' } }, h('div.small', { style: { fontWeight: 650 } }, r.url ? h('a', { href: r.url, target: '_blank', rel: 'noopener' }, r.title || r.url) : r.title),
         r.memo ? h('p.faint.tiny', r.memo) : null,
-        h('div.row.between', { style: { marginTop: '4px' } }, h('div.chips', (r.tags || []).slice(0, 3).map(t => h('span.chip', '#' + t)), r.project ? h('span.chip.acc', r.project) : null),
+        h('div.row.between', { style: { marginTop: '4px' } }, h('div.chips', (r.tags || []).slice(0, 3).map(t => h('span.chip', '#' + t)), r.project ? h('span.chip.acc.cut', { title: r.project }, r.project) : null),
           h('div.row', { style: { gap: '2px' } }, h('button.btn.sm.ghost', { 'aria-label': '고치기', onclick: () => modal('레퍼런스 고치기', close => form([...FIELDS.reference, { k: 'tagsS', label: '태그 (쉼표로)', full: true }], { ...r, tagsS: (r.tags || []).join(', ') }, async v => { const { tagsS, ...rest } = v; await db.put('refs', { ...r, ...rest, tags: tagsS.split(/[,，]/).map(s => s.trim()).filter(Boolean) }); close(); redraw(); })) }, ic('edit', 13)), h('button.btn.sm.ghost', { 'aria-label': '지우기', onclick: async () => { if (await confirmBox('지울까요?', '지우기')) { await db.remove(r.id); redraw(); } } }, ic('trash', 13)))))));
   }
   wrap.append(g);

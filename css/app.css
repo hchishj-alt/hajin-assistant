@@ -1193,3 +1193,9 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 @media (min-width:1500px){#view{max-width:1320px;margin-inline:auto}}
 /* 제목을 적는 큰 입력 칸: 폰에서 입력 칸 글자를 16px로 맞추는 규칙보다 앞서게 */
 #view input.in-title{font-size:calc(20px*var(--fs,1))!important;letter-spacing:-.02em}#view input.in-title.lg{font-size:calc(22px*var(--fs,1))!important}
+/* 멤버 줄의 코드·복사·고치기는 한 덩어리로: 폰에서 줄이 바뀌어도 같이 오른쪽에 붙음 */
+.mem-ctl{flex:none;flex-wrap:nowrap;gap:6px;margin-left:auto}
+/* 줄 안의 색 칩은 줄바꿈 없이 두되(1099줄), 이름이 아주 길면 칸 밖으로 나가지 않게 자름. .cut은 말줄임표까지 (프로젝트 이름처럼 길어질 수 있는 글) */
+.li .chip.acc,.li .chip.bad,.kcard .chip{max-width:100%;overflow:hidden}
+.chip.cut{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.chips>.chip.cut{flex:0 1 auto;min-width:0}

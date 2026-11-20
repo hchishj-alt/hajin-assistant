@@ -120,7 +120,7 @@ export function taskRow(t, onChange, onEdit) {
         t.due ? h('span.chip' + (t.due < todayStr() && !t.done ? '.bad' : t.due === todayStr() ? '.warn' : ''), ic('calendar', 11), rel(t.due)) : null,
         t.time ? h('span.chip', ic('clock', 11), t.time) : null,
         t.who ? h('span.chip', ic('user', 11), t.handoffs?.length ? `${t.handoffs[t.handoffs.length - 1].from} → ${t.who}` : t.who) : null,
-        t.project ? h('span.chip.acc', '#' + t.project) : null)));
+        t.project ? h('span.chip.acc.cut', { title: t.project }, '#' + t.project) : null)));
   cb.addEventListener('change', async () => {
     cb.classList.add('check-anim');
     await db.patch(t.id, { done: cb.checked, doneAt: cb.checked ? db.now() : null });

@@ -168,9 +168,9 @@ export default {
         return [m.role || '역할 없음', g ? '맡은 프로젝트: ' + ((m.projects || []).join(', ') || '없음') : '', m.until ? `${m.until.slice(5).replace('-', '/')}까지${l < 0 ? '' : l === 0 ? ' (오늘까지)' : ` (${l}일 남음)`}` : '', g ? '' : m.gmail, m.joined ? '로그인함' : '아직 로그인 안 함'].filter(Boolean).join(' · '); };
       const row = m => h('div.li', { style: { flexWrap: 'wrap' } }, h('span.av', { style: { background: colorFor(m.name) } }, m.name.slice(-2, -1) || m.name[0]),
         h('div.grow', { style: { minWidth: '150px' } }, h('div.t', m.name, m.is_admin ? h('span.chip', { style: { marginLeft: '6px' } }, '관리자') : null, m.kind === 'guest' ? h('span.chip.acc', { style: { marginLeft: '6px' } }, '단기') : null, m.active === false ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '정지') : m.ended ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '기간 끝남') : m.until && leftOf(m.until) <= 3 ? h('span.chip.warn', { style: { marginLeft: '6px' } }, '곧 끝남') : null), h('div.faint.small', sub(m))),
-        h('code.code', m.code || '•••••'), h('button.btn.sm', { 'aria-label': '코드 복사', onclick: () => { navigator.clipboard?.writeText(m.code || ''); toast('코드를 복사했어요'); } }, ic('copy', 14)),
+        h('div.row.mem-ctl', h('code.code', m.code || '•••••'), h('button.btn.sm', { 'aria-label': '코드 복사', onclick: () => { navigator.clipboard?.writeText(m.code || ''); toast('코드를 복사했어요'); } }, ic('copy', 14)),
         m.ended && m.active !== false ? h('button.btn.sm', { title: '오늘부터 2주 더 쓰게 해요', onclick: async () => { try { await sync.saveMember({ ...m, until: plus(14) }); toast('2주 늘렸어요'); go('admin/member'); } catch (e) { toast(e.message); } } }, '2주 더') : null,
-        h('button.btn.sm', { 'aria-label': '고치기', onclick: () => edit(m) }, ic('edit', 14)));
+        h('button.btn.sm', { 'aria-label': '고치기', onclick: () => edit(m) }, ic('edit', 14))));
       const regular = ms.filter(m => m.kind !== 'guest'), guests = ms.filter(m => m.kind === 'guest');
       box.append(h('div.card', h('div.card-h', h('h3', ic('users'), `멤버 ${regular.length}`), h('div.row', h('button.btn.sm', { onclick: () => edit({ active: true, kind: 'guest' }) }, ic('plus', 14), '단기 작업자'), h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '멤버 추가'))),
         regular.map(row)));

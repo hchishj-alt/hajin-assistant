@@ -296,14 +296,14 @@ async function dropUnseen(spaceId, seen) {
   return n;
 }
 /* 서버가 거절해서 못 올린 것: 다시 쓸 수 있게 되면(코드가 다시 살아남, 맡은 프로젝트가 늘어남) 한 번 더 올려 봄 */
-async function retryDenied() { for (const it of await db.allItems()) if (it.syncDenied) { const { syncDenied, ...x } = it; await db.putRaw({ ...x, dirty: true }); } }
+async function retryDenied() { for (const it of await db.allItems()) { if (it.syncDenied) { const { syncDenied, ...x } = it; await db.putRaw({ ...x, dirty: true }); } else if (it.shareLater && !it.deleted) { const { shareLater, ...x } = it; await db.putRaw({ ...x, team: 'team-main', dirty: true, updatedAt: new Date().toISOString() }); } } }   /* shareLater: 단기 작업자가 코드가 멈춘 동안 맡은 프로젝트에 적은 것 */
 export function spaceFor(it, tmap) {
   if (!SHARE_COLS.has(it.col)) return null;
   if (GUEST && !guestCanShare(it)) return null;
   if (it.col === 'teams') return it.space || null;
   return (it.team && tmap[it.team]) || null;
 }
-const row = it => { const { dirty, sharedMembers, syncDenied, ...data } = it; return { id: it.id, col: it.col, data, deleted: !!it.deleted, updated_at: it.updatedAt || new Date().toISOString() }; };
+const row = it => { const { dirty, sharedMembers, syncDenied, shareLater, ...data } = it; return { id: it.id, col: it.col, data, deleted: !!it.deleted, updated_at: it.updatedAt || new Date().toISOString() }; };
 
 async function push() {
   const dirty = await db.dirtyItems();
