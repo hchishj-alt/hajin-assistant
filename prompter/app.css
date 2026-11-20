@@ -397,3 +397,5 @@ html[lang=ko] .onlyfx{display:none}
 .seo{padding:24px 4px;color:var(--sub)}
 .legal a,.hfoot .mailto,.hfoot .linkbtn,.tip .mailto{display:inline-flex;align-items:center;min-height:40px;padding:0 6px}
 .legal{gap:4px}
+#toast.show:has(.undo){pointer-events:auto;display:flex;white-space:nowrap;align-items:center;gap:12px;padding:6px 6px 6px 16px}
+#toast .undo{white-space:nowrap;flex:none;border:0;background:var(--acc);color:#fff;font:inherit;font-weight:800;border-radius:10px;min-height:36px;padding:0 12px;cursor:pointer}

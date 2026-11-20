@@ -1,13 +1,13 @@
 // 프롬프리에딧(PROMPRI EDIT): 카메라 위에 대본을 띄우고 씬별로 찍어 이어 붙이는 앱. sw.js의 VERSION과 같이 올릴 것
 import { scripts, takes, uid, flag } from './store.js';
-import { ic, esc, $, el, chars, fmt, paras, toast, buzz, sheet } from './ui.js';
+import { ic, esc, $, el, chars, fmt, paras, toast, buzz, sheet, undoToast } from './ui.js';
 import * as plan from './plan.js';
 import { mountStage, autoSec } from './stage.js';
 import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
 import { CONTACT } from './config.js';
 import { legalView, legalLinks, bizLine } from './legal.js';
 
-export const VERSION = '1.5.1';
+export const VERSION = '1.5.2';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -225,7 +225,11 @@ async function editView(id) {
       <div class="row"><button class="ghost grow" data-x>그만두기</button><button class="btn grow" style="background:var(--rec);color:#fff" data-d>지우기</button></div></div>`);
     const sh = sheet(box);
     $('[data-x]', box).onclick = sh.close;
-    $('[data-d]', box).onclick = async () => { dirty = false; await scripts.remove(s.id); sh.close(); location.replace('#/'); toast('지웠어요'); };
+    $('[data-d]', box).onclick = async () => {
+      dirty = false; const keep = await takes.of(s.id);
+      await scripts.remove(s.id); sh.close(); location.replace('#/');
+      setTimeout(() => undoToast('대본을 지웠어요', async () => { await scripts.put(s); for (const t of keep) await takes.put(t); route(); }), 300);
+    };
   };
   await renderTakes(s, $('#tk'));
   return save;
@@ -243,7 +247,7 @@ async function renderTakes(s, box) {
       <div class="tb"><span>${t.joined ? '이어 붙임' : '#' + n} · ${fmt(t.dur)}</span><span class="row"><button class="mini" data-s aria-label="저장">${ic('share', 18)}</button><button class="mini" data-d aria-label="지우기">${ic('trash', 18)}</button></span></div></div>`);
     $('video', c).onclick = () => takeSheet(s, t, n, () => renderTakes(s, box));
     $('[data-s]', c).onclick = () => saveTake(s, t, n);
-    $('[data-d]', c).onclick = async () => { await takes.remove(t.id); toast('테이크를 지웠어요'); renderTakes(s, box); };
+    $('[data-d]', c).onclick = async () => { await takes.remove(t.id); renderTakes(s, box); undoToast('테이크를 지웠어요', async () => { await takes.put(t); renderTakes(s, box); }); };
     const k = $('[data-k]', c); if (k) k.onclick = async () => { s.picks = { ...(s.picks || {}), [t.part]: t.id }; await scripts.put(s); buzz(8); renderTakes(s, box); };
     return c;
   };
@@ -333,7 +337,7 @@ function takeSheet(s, t, n, onChange, { fresh, joined } = {}) {
     ${fresh && !joined ? `<button class="ghost wide" data-r style="margin-top:8px">${ic('cam', 18)}다시 찍기</button>` : ''}</div>`);
   const sh = sheet(box, { onClose: () => setTimeout(() => URL.revokeObjectURL(u), 500) });
   $('[data-s]', box).onclick = () => saveTake(s, t, n);
-  $('[data-d]', box).onclick = async () => { await takes.remove(t.id); sh.close(); toast('테이크를 지웠어요'); onChange?.(); };
+  $('[data-d]', box).onclick = async () => { await takes.remove(t.id); sh.close(); onChange?.(); undoToast('테이크를 지웠어요', async () => { await takes.put(t); onChange?.(); }); };
   const r = $('[data-r]', box); if (r) r.onclick = sh.close;
   return sh;
 }

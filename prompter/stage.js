@@ -249,7 +249,7 @@ export function mountStage({ script: T, limits, needPro, onTake, onSec, onExit, 
     recW = S.mode == 'L' ? long : q; recH = S.mode == 'L' ? q : long; let src = stream;
     try { cv = cv || document.createElement('canvas'); cv.width = recW; cv.height = recH; const cs = cv.captureStream(30); stream.getAudioTracks().forEach(t => cs.addTrack(t)); src = cs; } catch { cv = null; src = stream; }
     chunks = [];
-    try { recd = new MediaRecorder(src, { mimeType: mt || undefined, videoBitsPerSecond: q >= 1080 ? 12e6 : 6e6, audioBitsPerSecond: 192e3 }); } catch (e) { say('녹화를 시작하지 못했어요 (' + e.name + ')'); return; }
+    try { recd = new MediaRecorder(src, { mimeType: mt || undefined, videoBitsPerSecond: q >= 1080 ? 8e6 : 4e6, audioBitsPerSecond: 160e3 }); } catch (e) { say('녹화를 시작하지 못했어요 (' + e.name + ')'); return; }
     const r = recd;
     r.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
     r.onstop = () => {
@@ -257,6 +257,8 @@ export function mountStage({ script: T, limits, needPro, onTake, onSec, onExit, 
       const blob = new Blob(chunks, { type: mt || 'video/webm' }); chunks = [];
       if (blob.size && alive) onTake({ blob, mime: blob.type, dur: d });
     };
+    // 저장 공간이 모자라면 미리 알림(1분 ≈ 720p 30MB · 1080p 60MB)
+    try { navigator.storage?.estimate?.().then(e => { const free = (e.quota || 0) - (e.usage || 0); if (e.quota && free < 400e6) say(`저장 공간이 ${Math.max(0, Math.round(free / 1e6))}MB 남았어요. 지난 테이크를 사진첩에 저장하고 지우면 더 길게 찍을 수 있어요.`); }); } catch {}
     r.start(1000); recT0 = performance.now(); $('rec').hidden = false; if (cv) paint();
     recTimer = setInterval(() => {
       const t = (performance.now() - recT0) / 1000, cap = L().recSec;
