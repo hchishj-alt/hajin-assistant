@@ -294,12 +294,15 @@ function saveBox(t, body, v, save, closeSheet) {
     paintChips();
     const addF = async () => {
       const name = newF.value.trim(); if (!name) return;
-      if (!mine.folders.includes(name)) { await ensureMe(); mine.folders.push(name); await rpc('ps_folders', { p_token: S.me.token, p_folders: mine.folders }); }
+      const fresh = !mine.folders.includes(name);
+      if (fresh) mine.folders.push(name);
       folder = name; newF.value = ''; paintChips();
+      if (fresh) try { await ensureMe(); await rpc('ps_folders', { p_token: S.me.token, p_folders: mine.folders }); } catch { toast('폴더를 저장하지 못했어요'); }
     };
     const doSave = async () => {
       try {
         await ensureMe();
+        if (folder && !(S.mine?.folders || []).includes(folder)) await rpc('ps_folders', { p_token: S.me.token, p_folders: [...(S.mine?.folders || []), folder] });
         const r = await rpc('ps_save', { p_token: S.me.token, p_item: { id: save?.id, title: title.value.trim() || t.title, template_id: t.id, folder, vals: v, text: fill(body, v), pinned: save?.pinned || false } });
         await loadMine(true); toast(folder ? `"${folder}" 폴더에 보관했어요` : '보관함에 넣었어요');
         if (save) { save.title = title.value.trim(); save.folder = folder; save.vals = { ...v }; closeSheet(); if (location.hash.startsWith('#me')) render(); }
