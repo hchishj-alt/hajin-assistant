@@ -11,7 +11,7 @@ import * as EX from './explore.js';
 import * as W from './web.js';
 import { FIELDS } from './fields.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.4.1';
+export const VERSION = '1.4.2';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
@@ -617,7 +617,7 @@ SCREENS.start = async root => {
       if (S.getMode() === 'demo') { await S.clearDemo(); localStorage.setItem('mgr:mode', 'real'); S.setMode('real'); }
       await S.set('about', { name: name.value.trim(), ig: a, tt: b, goal, goalAt: Date.now(), vibe: [...picked].join(', ') });
       await S.set('profile', { ...(a ? { ig: { username: a } } : {}), ...(b ? { tt: { username: b } } : {}) });
-      localStorage.setItem('mgr:onboarded', '1'); bgAt = 0;
+      localStorage.setItem('mgr:onboarded', '1'); $plat.set(a ? 'ig' : 'tt'); bgAt = 0;
       await background(true).catch(() => { }); go('#/today');
     } }, '시작하기'), h('p.fhint.center', '적은 내용은 이 기기에만 저장돼요.'));
 };

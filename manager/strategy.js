@@ -12,14 +12,14 @@ export function weekStart(d = kdate()) { const w = dow(d); return addDays(d, w =
 export const dayLabel = d => { const t = kdate(); return d === t ? '오늘' : d === addDays(t, 1) ? '내일' : d === addDays(t, -1) ? '어제' : `${+d.slice(5, 7)}/${+d.slice(8)} ${DAYS[dow(d)]}`; };
 
 const BASE = [
-  { name: '스타일', ex: ['오늘 코디 30초 GRWM', '같은 옷 3가지로 입기', '요즘 꽂힌 아이템 3개'] },
-  { name: '하는 일', ex: ['책상·작업 공간 구경', '하는 과정 빨리 감기', '하루 따라가기'] },
-  { name: '일상·나', ex: ['솔직 Q&A', '오늘 하루 1분 요약', '친구랑 있었던 일 공감 썰'] },
+  { name: '스타일', ex: FIELDS.find(f => f.k === 'fashion').ex },
+  { name: '하는 일', ex: FIELDS.find(f => f.k === 'make').ex },
+  { name: '일상·나', ex: FIELDS.find(f => f.k === 'daily').ex },
 ];
 // 고른 분야가 있으면 그 분야를 축으로, 없으면 기본 세 축
-const pillarsOf = st => { const f = pick(st.about?.vibe || ''); if (!f.length) return BASE; const out = f.slice(0, 3).map(x => ({ name: x.name.split('·')[0], ex: x.ex })); if (out.length < 3) out.push(BASE[2]); return out; };
+const pillarsOf = st => { const f = pick(st.about?.vibe || ''); if (!f.length) return BASE; const out = f.slice(0, 3).map(x => ({ name: x.name.split('·')[0], ex: x.ex })); if (out.length < 3 && !f.some(x => x.k === 'daily')) out.push(BASE[2]); return out; };
 // 축을 돌아가며 한 번씩, 같은 아이디어가 겹치지 않게
-const ideaPool = P => { const out = []; for (let k = 0; k < 3; k++) for (const p of P) if (p.ex[k]) out.push({ pillar: p.name, idea: p.ex[k] }); return out; };
+const ideaPool = P => { const out = []; for (let k = 0; k < 6; k++) for (const p of P) if (p.ex[k]) out.push({ pillar: p.name, idea: p.ex[k][0], hook: p.ex[k][1] }); return out; };
 // 쓰는 플랫폼만 (아이디를 적었거나 기록이 있는 곳). 아무것도 없으면 둘 다
 const planEnd = ws => addDays(ws, kdate() >= addDays(ws, 4) ? 13 : 6);
 const usePlats = (st, An) => { const u = ['ig', 'tt'].filter(p => st.profile?.[p]?.username || An.plats[p].n); return u.length ? u : ['ig', 'tt']; };
@@ -31,8 +31,17 @@ function frame(st, An) {
   const lastRes = (st.strategy?.results || []).slice(-6);
   return { cadence: { ig: 4, tt: 3 }, slot: { ig: slot('ig'), tt: slot('tt') }, igKind, lastRes };
 }
+// AI 없이 굴릴 때 주마다 돌아가는 전략·실험
+const RULE_WEEKS = [
+  { focus: '꾸준히 같은 시간에 올려서 알고리즘에 "이 계정은 이때 올라온다"를 학습시키기', experiment: { hypo: '첫 1초에 결과를 먼저 보여 주면 끝까지 보는 비율이 오른다', metric: '완주율' } },
+  { focus: '저장하고 싶은 정보 한 가지를 매번 넣어서 "쓸모 있는 계정"으로 기억되기', experiment: { hypo: '끝에 "저장해 두고 따라 해요" 한마디를 넣으면 저장이 는다', metric: '저장률' } },
+  { focus: '친구한테 보내고 싶은 공감 한 줄로 팔로워 밖으로 퍼지기', experiment: { hypo: '화면 글자로 "이거 나만 그래?" 같은 공감 문장을 넣으면 보내기가 는다', metric: '보내기율' } },
+  { focus: '같은 제목 틀로 시리즈를 만들어서 다음 편을 기다리게 하기', experiment: { hypo: '제목에 "1편, 2편"을 붙이면 프로필 방문과 팔로우가 는다', metric: '팔로워 증가' } },
+];
 function rulePlan(st, An, ws) {
-  const f = frame(st, An); const items = []; const POOL = ideaPool(pillarsOf(st));
+  const f = frame(st, An); const items = [];
+  const used = new Set([...(st.strategy?.cur?.items || []), ...(st.strategy?.results || [])].map(i => i.idea));
+  const all = ideaPool(pillarsOf(st)); const POOL = [...all.filter(x => !used.has(x.idea)), ...all.filter(x => used.has(x.idea))];
   const use = usePlats(st, An);
   const sched = use.length === 2 ? { ig: [1, 3, 5, 6], tt: [2, 4, 0] } : { [use[0]]: [1, 2, 4, 5, 0] };
   let n = 0;
@@ -40,10 +49,10 @@ function rulePlan(st, An, ws) {
   for (const wk of planEnd(ws) > addDays(ws, 6) ? [0, 7] : [0]) {
     const pil = POOL[n % POOL.length]; const date = addDays(ws, (w === 0 ? 6 : w - 1) + wk);
     if (date < kdate()) continue;
-    items.push({ id: S.uid(), date, time: f.slot[plat], plat, kind: plat === 'tt' ? 'video' : (n % 4 === 3 ? 'carousel' : f.igKind), pillar: pil.pillar, idea: pil.idea, hook: '결과(완성 모습)부터 1초 보여 주고 시작', why: '', status: '예정' });
+    items.push({ id: S.uid(), date, time: f.slot[plat], plat, kind: plat === 'tt' ? 'video' : (n % 4 === 3 ? 'carousel' : f.igKind), pillar: pil.pillar, idea: pil.idea, hook: pil.hook, why: '', status: '예정' });
     n++;
   } }
-  return { items: items.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), focus: '꾸준히 같은 시간에 올려서 알고리즘에 "이 계정은 이때 올라온다"를 학습시키기', experiment: { hypo: '첫 1초에 결과를 먼저 보여 주면 끝까지 보는 비율이 오른다', metric: '완주율' } };
+  return { items: items.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), ...RULE_WEEKS[(st.strategy?.past?.length || 0) % RULE_WEEKS.length] };
 }
 async function aiPlan(st, An, ws, note = '') {
   const f = frame(st, An);
