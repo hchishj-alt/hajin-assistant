@@ -3,9 +3,12 @@
 import { SB, PRICE, FREE, CONTACT } from './config.js';
 // 이벤트 가격 표시: ~~9,900원~~ 90% 월 990원
 const off = () => PRICE.list > PRICE.month ? Math.round((1 - PRICE.month / PRICE.list) * 100) : 0;
-const priceTag = () => off() ? `<span class="ptag"><span class="ev">${PRICE.event || '이벤트가'}</span><s>${won(PRICE.list)}</s><b class="off">${off()}% 할인</b><b>월 ${won(PRICE.month)}</b></span>` : `월 ${won(PRICE.month)}`;
+export const priceTag = () => off() ? `<span class="ptag"><span class="ev">${PRICE.event || '이벤트가'}</span><s>${won(PRICE.list)}</s><b class="off">${off()}% 할인</b><b>월 ${won(PRICE.month)}</b></span>` : `월 ${won(PRICE.month)}`;
 import { cardReady, startCard, finishRedirect } from './billing.js';
 import { ic, esc, $, el, toast, sheet, copy, buzz } from './ui.js';
+import { legalLinks, bizLine } from './legal.js';
+// 정기결제 전 알릴 것(전자상거래법): 금액·주기·해지·환불, 약관 동의
+const subNote = () => `<p class="subnote">매달 ${won(PRICE.month)} 자동결제 · ${PRICE.days}일마다 · 언제든 해지 · 결제 후 7일 안 전액 환불<br>구독하면 <a href="#/terms">이용약관</a>·<a href="#/refund">환불 규정</a>에 동의하는 거예요</p>`;
 
 const LS = { token: 'prompter:token', me: 'prompter:me', admin: 'prompter:admin' };
 const ls = {
@@ -71,17 +74,18 @@ const PERKS = [
   ['film', '저장 화질', '720p', '1080p'],
   ['mic', '목소리 따라가기', '—', '사용'],
 ];
-const perkTable = () => `<div class="perks"><div class="ph"><span></span><span>무료</span><span class="pro">프로</span></div>${PERKS.map(([i, l, f, p]) => `<div class="pr"><span class="lab">${ic(i, 16)}${l}</span><span>${f}</span><b>${p}</b></div>`).join('')}</div>`;
+export const perkTable = () => `<div class="perks"><div class="ph"><span></span><span>무료</span><span class="pro">프로</span></div>${PERKS.map(([i, l, f, p]) => `<div class="pr"><span class="lab">${ic(i, 16)}${l}</span><span>${f}</span><b>${p}</b></div>`).join('')}</div>`;
 
 // 잠긴 기능을 눌렀을 때
 export function needPro(kind) {
   const [a, b] = WHY[kind] || ['프로 기능이에요', ''];
   const box = el(`<div><div class="upic">${ic('star', 26)}</div><h2 style="text-align:center;margin-bottom:4px">${a}<br>프로가 필요해요</h2><p class="muted c">${b}</p>
     ${perkTable()}
-    <div class="pline">${priceTag()}</div><button class="btn acc wide" data-card>${ic('card', 18)}카드로 구독 · 월 ${won(PRICE.month)}</button>
+    <div class="pline">${priceTag()}</div><button class="btn acc wide${cardReady() ? '' : ' soon'}" data-card>${ic('card', 18)}카드로 구독 · 월 ${won(PRICE.month)}</button>${cardReady() ? subNote() : '<p class="tip c">카드 결제는 준비 중이에요. 지금은 기프트 키로 열 수 있어요.</p>'}
     <button class="ghost wide" data-gift style="margin-top:8px">${ic('gift', 18)}기프트 키가 있어요</button></div>`);
   const sh = sheet(box);
-  $('[data-card]', box).onclick = () => { sh.close(); subscribe(); };
+  $('[data-card]', box).onclick = () => { if (cardReady()) sh.close(); subscribe(); };
+  box.querySelectorAll('.subnote a').forEach(a => a.addEventListener('click', () => sh.close()));
   $('[data-gift]', box).onclick = () => { sh.close(); location.hash = '#/plan'; setTimeout(() => $('#giftin')?.focus(), 500); };
 }
 
@@ -98,8 +102,9 @@ async function subscribe(btn) {
 
 function celebrate(msg = '프로가 열렸어요') {
   buzz([15, 40, 15]);
-  const box = el(`<div class="c"><div class="upic big">${ic('check', 34)}</div><h2>${msg}</h2><p class="muted">${isForever(me?.paid_until) ? '평생 쓸 수 있어요' : ymd(me?.paid_until) + '까지 쓸 수 있어요'}</p><button class="btn wide" data-x>좋아요</button></div>`);
+  const box = el(`<div class="c"><div class="upic big">${ic('check', 34)}</div><h2>${msg}</h2><p class="muted">${isForever(me?.paid_until) ? '평생 쓸 수 있어요' : ymd(me?.paid_until) + '까지 쓸 수 있어요'}</p>${token() ? `<div class="keep"><small>${ic('key', 14)}복구 코드 · 폰을 바꾸면 이걸로 구독을 되찾아요</small><div class="code noi18n">${group4(token())}</div><button class="ghost sm" data-cp>${ic('copy', 16)}복사해 두기</button></div>` : ''}<button class="btn wide" data-x>좋아요</button></div>`);
   const sh = sheet(box); $('[data-x]', box).onclick = sh.close;
+  $('[data-cp]', box)?.addEventListener('click', () => copy(token(), '복구 코드를 복사했어요'));
   if (location.hash.startsWith('#/plan')) setTimeout(() => window.dispatchEvent(new HashChangeEvent('hashchange')), 50);
 }
 
@@ -120,7 +125,7 @@ export async function planView(view) {
     </div>
     ${perkTable()}
     <div class="acts">
-      ${!pro || (card && card.status !== 'active' && !forever) ? `<button class="btn acc wide" id="sub">${ic('card', 18)}카드로 구독 · 월 ${won(PRICE.month)}${off() ? ` (${off()}% 할인)` : ''}</button>${cardReady() ? '' : '<p class="tip c">카드 결제는 준비 중이에요. 지금은 기프트 키로 열 수 있어요.</p>'}` : ''}
+      ${!pro || (card && card.status !== 'active' && !forever) ? `<button class="btn acc wide${cardReady() ? '' : ' soon'}" id="sub">${ic('card', 18)}카드로 구독 · 월 ${won(PRICE.month)}${off() ? ` (${off()}% 할인)` : ''}</button>${cardReady() ? subNote() : '<p class="tip c">카드 결제는 준비 중이에요. 지금은 기프트 키로 열 수 있어요.</p>'}` : ''}
       ${card && card.status === 'active' ? `<div class="row"><button class="ghost grow" id="chg">${ic('card', 18)}카드 바꾸기</button><button class="ghost grow" id="cancel">해지하기</button></div>` : ''}
     </div>
 
@@ -135,7 +140,7 @@ export async function planView(view) {
       <p class="tip">구독은 이 코드에 묶여 있어요. 폰을 바꾸면 이 코드를 넣어 주세요.</p></div>
 
     ${hist.length ? `<div class="sec">${ic('receipt', 16)}결제 내역</div><div class="box list">${hist.map(h => `<div class="li"><span>${h.method === 'card' ? '카드' : h.method === 'gift' ? '기프트 키' : '운영자 지급'}${h.status === 'failed' ? ' · 실패' : ''}</span><span class="muted">${ymd(h.created_at)}</span><b>${h.amount ? won(h.amount) : h.days ? h.days + '일' : h.status === 'failed' ? '—' : '평생'}</b></div>`).join('')}</div>` : ''}
-    <p class="tip c" style="margin-top:24px"><a class="mailto" href="mailto:${CONTACT}?subject=${encodeURIComponent('[PROMPRI EDIT] 문의')}">${ic('mail', 14)}<span>결제·환불 문의</span></a> <span class="noi18n">${CONTACT}</span></p>`;
+    <p class="tip c" style="margin-top:24px"><a class="mailto" href="mailto:${CONTACT}?subject=${encodeURIComponent('[PROMPRI EDIT] 문의')}">${ic('mail', 14)}<span>결제·환불 문의</span></a> <span class="noi18n">${CONTACT}</span></p>${legalLinks()}${bizLine()}`;
 
   const g = sessionStorage.getItem('prompter:gift'); if (g) { $('#giftin').value = g; sessionStorage.removeItem('prompter:gift'); }
   $('#sub')?.addEventListener('click', e => subscribe(e.currentTarget));

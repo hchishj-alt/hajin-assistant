@@ -5,8 +5,9 @@ import * as plan from './plan.js';
 import { mountStage, autoSec } from './stage.js';
 import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
 import { CONTACT } from './config.js';
+import { legalView, legalLinks, bizLine } from './legal.js';
 
-export const VERSION = '1.4.0';
+export const VERSION = '1.5.0';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -53,6 +54,7 @@ async function route() {
   }
   if (a === 'hello') { helloView(); requestAnimationFrame(() => view.classList.add('in')); return; }
   if (a === 'plan') { await plan.planView(view); requestAnimationFrame(() => view.classList.add('in')); return; }
+  if (a === 'terms' || a === 'privacy' || a === 'refund') { legalView(view, a); scrollTo(0, 0); requestAnimationFrame(() => view.classList.add('in')); return; }
   if (a === 'admin') { await plan.adminView(view); requestAnimationFrame(() => view.classList.add('in')); return; }
   if (a === 's' && b) cleanup = await editView(b);
   else if (a === 'shoot' && b) cleanup = await shootView(b, +c || 0);
@@ -298,6 +300,7 @@ function joinSheet(s, list, miss, onDone) {
       const r = await joinTakes(list, f => { $('.jprog i', box).style.width = (f * 100).toFixed(1) + '%'; $('.jpct', box).textContent = Math.round(f * 100) + '%'; });
       const t = { id: uid(), scriptId: s.id, createdAt: Date.now(), dur: r.dur, mime: r.mime, blob: r.blob, joined: true };
       try { await takes.put(t); } catch { toast('저장 공간이 부족해요. 지금 바로 저장해 주세요'); }
+      try { navigator.storage?.persist?.(); } catch {} // 브라우저가 영상을 함부로 지우지 않게
       sh.close(); onDone?.();
       setTimeout(() => takeSheet(s, t, 1, onDone, { fresh: true, joined: true }), 400);
     } catch (e) { busy = false; $('[data-go]', box).disabled = false; $('[data-x]', box).disabled = false; toast('이어 붙이지 못했어요 · ' + (e?.message || e)); }
@@ -360,6 +363,7 @@ async function shootView(id, k = 0) {
       const t = { id: uid(), scriptId: s.id, createdAt: Date.now(), dur, mime, blob };
       if (k) t.part = names[k];
       try { await takes.put(t); } catch { toast('저장 공간이 부족해요. 지금 바로 저장해 주세요'); }
+      try { navigator.storage?.persist?.(); } catch {} // 브라우저가 영상을 함부로 지우지 않게
       const list = await takes.of(s.id);
       const done = !names || !k || P.every(p => list.some(x => x.part === p.name));
       if (done && s.status !== 'done') { s.status = 'done'; s.updatedAt = Date.now(); await scripts.put(s); }
@@ -460,6 +464,14 @@ function installTip() {
     <span>${isIOS() ? '사파리 공유 버튼 → 홈 화면에 추가' : '크롬 ⋮ 메뉴 → 홈 화면에 추가'} · 전체 화면으로 열리고 찍은 영상도 더 안전하게 보관돼요</span></div>
     <button class="mini" onclick="localStorage.setItem('prompter:hideInstall','1');this.closest('.itip').remove()" aria-label="닫기">${ic('x', 18)}</button></div>`;
 }
+const FAQ = [
+  ['찍은 영상이 서버에 올라가나요?', '아니요. 대본과 영상은 이 기기 브라우저에만 저장돼요. 카메라 화면도 밖으로 나가지 않아요.'],
+  ['가입해야 하나요?', '아니요. 열자마자 바로 써요. 프로를 쓰면 이름·메일 대신 16자리 복구 코드가 생겨요.'],
+  ['아이폰에서도 되나요?', '사파리에서 돼요. 홈 화면에 추가해 두면 영상이 더 오래 안전하게 보관돼요.'],
+  ['영상은 어떻게 꺼내요?', '찍고 나서 저장을 누르면 폰은 사진첩·파일로, PC는 다운로드 폴더로 저장돼요.'],
+  ['해지는 어떻게 해요?', '구독 관리에서 해지하기를 두 번 누르면 끝이에요. 남은 기간은 그대로 쓰고, 결제 후 7일 안이면 전액 환불해 드려요.'],
+  ['인터넷이 없어도 되나요?', '한 번 열어 두면 비행기 모드에서도 대본 보고 찍을 수 있어요.'],
+];
 function helloView() {
   flag('hello', '1');
   document.body.classList.add('hello-on');
@@ -481,7 +493,14 @@ function helloView() {
       <p class="tip c">설치 없이 브라우저에서 바로 · 폰 · 아이패드 · PC</p>
     </section>
     <section class="feat">${F.map(([i, t, d], k) => `<div class="fc" style="animation-delay:${k * 50}ms"><span class="fi">${ic(i, 22)}</span><b>${t}</b><span>${d}</span></div>`).join('')}</section>
-    <section class="nums"><div><b>3</b><span>무료 대본</span></div><div><b>3분</b><span>무료 한 번 녹화</span></div><div><b>0원</b><span>설치·서버 비용</span></div></section>
+    <section class="nums"><div><b>3</b><span>무료 대본</span></div><div><b>3분</b><span>무료 한 번 녹화</span></div><div><b>0</b><span>서버로 가는 영상</span></div></section>
+    <section class="howto price2"><h2>${ic('star', 20)}요금</h2>
+      <div class="pcols"><div class="pc"><b class="pn">무료</b><div class="pv2">0원</div><span>가입 없이 바로</span></div>
+        <div class="pc pro"><b class="pn">프로</b><div class="pv2">${plan.priceTag()}</div><span>언제든 해지 · 7일 안 전액 환불</span></div></div>
+      ${plan.perkTable()}
+      <a class="btn acc wide" href="#/plan" style="margin-top:12px">${ic('star', 18)}프로 보기</a></section>
+    <section class="howto faq"><h2>${ic('help', 20)}자주 묻는 것</h2>
+      ${FAQ.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</section>
     <section class="howto"><h2>${ic('devices', 20)}앱처럼 쓰기</h2>
       <p>폰이랑 아이패드는 <b>홈 화면에 추가</b>하면 앱처럼 쓸 수 있어요. 전체 화면으로 열리고, 찍은 영상도 브라우저에 더 오래 안전하게 보관돼요.</p>
       ${installSteps()}</section>
@@ -489,6 +508,7 @@ function helloView() {
       <ol class="flow"><li><b>대본 쓰기</b>붙여넣기 OK. 길면 씬 추가로 나눠요</li><li><b>찍기</b>빨간 버튼 → 3·2·1 → 읽기만 하면 끝</li><li><b>고르고 붙이기</b>씬마다 ★ 고르고 이어 붙이기</li><li><b>저장</b>사진첩·파일로 바로 저장</li></ol></section>
     <a class="btn acc wide" href="#/">${ic('cam', 18)}지금 시작하기</a>
     <footer class="hfoot"><a class="mailto" href="mailto:${CONTACT}?subject=${encodeURIComponent('[PROMPRI EDIT] 문의')}">${ic('mail', 15)}<span>문의</span></a><span class="noi18n">${CONTACT}</span><button class="linkbtn" data-lang>${ic('globe', 15)}<span class="noi18n">${LANGS[lang()]}</span></button></footer>
+    ${legalLinks()}${bizLine()}
   </div>`;
   const off = () => document.body.classList.remove('hello-on');
   addEventListener('hashchange', off, { once: true });

@@ -51,3 +51,9 @@
 2. 화면: Playwright(`channel: 'chromium'`, `--use-fake-device-for-media-stream`, 권한 camera·microphone)로 390px·1280px. Supabase는 `page.route`로 가짜 응답.
    꼭 지나갈 흐름: 목록 → 편집 → 촬영(흐름·멈춤) → 녹화 → 테이크 저장 → 잠긴 기능 → 구독 관리 → 기프트 키 → 관리 화면. 가로 넘침·콘솔 오류 0.
 3. 시험 스크립트는 저장소에 넣지 않는다.
+
+## 약관·사업자 정보 (v1.5.0)
+- 이용약관·개인정보처리방침·환불 규정: `prompter/legal.js` (#/terms, #/privacy, #/refund). 초안이며 한국어 원문만 둔다.
+- 사업자 정보(상호·대표·사업자등록번호·통신판매업·주소)는 `prompter/config.js`의 `BIZ`만 채우면 소개·구독 화면 아래에 나온다. 상호나 등록번호가 비면 줄 전체가 안 나온다.
+- 정기결제 고지(금액·주기·해지·7일 환불·약관 동의)는 `plan.js`의 `subNote`. 카드 결제가 열릴 때(`cardReady()`) 구독 단추 아래에 나온다.
+- 공유 미리보기 `prompter/og.png`(1200×630), 주소는 `config.js SITE`와 `index.html`의 og·canonical.
