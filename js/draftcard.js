@@ -1,4 +1,4 @@
-import { h, ic, modal, form, toast, md } from './ui.js';
+import { h, ic, modal, form, toast, md, KIND_RULE } from './ui.js';
 import * as store from './store.js';
 import * as db from './db.js';
 import { FIELDS, describe } from './fields.js';
@@ -13,15 +13,19 @@ function placeRow(e) { const q = [e.area && !(e.place || '').includes(e.area) ? 
   return h('div.chips', { style: { marginTop: '6px' } }, e.addr ? h('span.faint.tiny', `${e.placeBy || '지도'}에서 찾은 주소예요`) : h('span.faint.tiny', '주소는 못 찾았어요. 지도에서 확인해 주세요'), e.mapUrl ? a(e.mapUrl, '장소 정보') : null, a('https://map.naver.com/p/search/' + encodeURIComponent(q), '네이버 지도'), a('https://map.kakao.com/?q=' + encodeURIComponent(q), '카카오맵')); }
 export function draftCard(d, onDone) {
   const k = store.KINDS[d.kind] || { label: d.kind, icon: 'file' };
-  const el = h('div.draft', { 'data-did': d.id });
+  const el = h('div.draft', { 'data-did': d.id, 'data-kind': d.kind });
+  const swapTo = d.kind === 'event' ? 'task' : d.kind === 'task' ? 'event' : '';
+  const swap = async () => { const cur = await fresh(); if (!cur) return; const nd = await store.changeKind(cur, swapTo); toast(`${store.KINDS[swapTo].label}(으)로 바꿨어요. 다음부터 비슷한 말은 이렇게 알아들을게요.`); el.replaceWith(draftCard(nd, onDone)); };
+  const why = swapTo ? h('div.why', h('span', d.kind === 'event' ? `${KIND_RULE.event}이라 일정이에요. 확정하면 캘린더에 들어가요.` : `${KIND_RULE.task}이라 할 일이에요. 끝내면 체크해요.`), h('button', { type: 'button', onclick: swap }, d.kind === 'event' ? '할 일로 바꾸기' : '일정으로 바꾸기')) : null;
   // 말로 고친 뒤일 수 있으니, 누르는 순간의 최신 내용으로 처리
   const fresh = async () => { const cur = await db.get(d.id); if (!cur || cur.status !== 'pending') { finish(cur?.status === 'approved' ? 'approved' : 'rejected', true); return null; } d = cur; return cur; };
   const title = d.kind === 'summary' ? (d.data.title || '요약') : (d.data.title || d.data.name || '(제목 없음)');
   const body = h('div.grow',
-    h('div.row.nowrap', h('span.chip.acc', k.label), confBars(d.confidence), h('span.faint.tiny', d.origin === 'meeting' ? '회의에서' : d.origin === 'voice' ? '음성에서' : d.origin === 'palette' ? '빠른 입력' : '')),
+    h('div.row.nowrap', h('span.chip' + (d.kind === 'task' ? '.ok' : '.acc'), k.label), confBars(d.confidence), h('span.faint.tiny', d.origin === 'meeting' ? '회의에서' : d.origin === 'voice' ? '음성에서' : d.origin === 'palette' ? '빠른 입력' : '')),
     h('div.t', { style: { marginTop: '4px', fontWeight: 650 } }, title),
     d.kind === 'summary' ? summaryView(d.data) : h('div.faint.small', describe(d.kind, d.data)),
     d.kind === 'event' && (d.data.place || d.data.area) ? placeRow(d.data) : null,
+    why,
     d.source && d.kind !== 'summary' ? h('div.faint.tiny', { style: { marginTop: '4px' } }, '“' + d.source.slice(0, 120) + (d.source.length > 120 ? '…' : '') + '”') : null,
     h('div.row', { style: { marginTop: '8px', gap: '6px' } },
       h('button.btn.sm.pri', { onclick: async () => { const cur = await fresh(); if (!cur) return; finish('approved', false, await store.approve(cur)); } }, ic('check', 14), '확정'),

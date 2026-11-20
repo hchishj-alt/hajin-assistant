@@ -1,4 +1,4 @@
-import { h, ic, clear, toast, head, seg, modal, form, rel, todayStr, tile, ring, confirmBox, fmtDate } from '../js/ui.js';
+import { h, ic, clear, toast, head, seg, modal, form, rel, todayStr, tile, ring, confirmBox, fmtDate, kindPair } from '../js/ui.js';
 import * as db from '../js/db.js';
 import * as store from '../js/store.js';
 import * as brain from '../js/brain.js';
@@ -30,7 +30,7 @@ export default {
       import('../js/ai.js').then(AI => AI.polishSaved('task', v, p, first, { fix, patch: (id, a) => store.commit('task', { id, ...a }), add: d => store.commit('task', { ...d, project: d.project || first.project || '' }) })).then(async ch => { if (!ch) return; say((await db.get(first.id)) || first, 'AI가 다시 읽고 다듬었어요'); if (location.hash.startsWith('#/tasks')) draw(); }).catch(() => { });
     };
     quick.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addQuick(); } });
-    root.append(head('할 일', '직접 적은 할 일은 바로 확정돼요. 비서가 뽑은 건 확인 대기함으로 가요.',
+    root.append(kindPair('task'), head('할 일', '끝내면 체크해요. 약속은 일정에 있어요.',
       h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '할 일')),
       h('div.quick', { style: { marginBottom: '6px' } }, ic('plus'), quick, h('button.btn.icon.ghost', { type: 'button', 'aria-label': '추가', onclick: addQuick }, ic('send'))), hint, body);
     await draw();

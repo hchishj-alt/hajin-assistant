@@ -8,7 +8,7 @@ export const MODULES = [
   { id: 'today', title: '오늘', icon: 'home', group: '하루', tab: 1 },
   { id: 'assistant', title: '비서', icon: 'sparkles', group: '하루', tab: 3 },
   { id: 'inbox', title: '확인 대기함', icon: 'inbox', group: '하루', tab: 4, short: '대기함' },
-  { id: 'calendar', title: '캘린더', icon: 'calendar', group: '시간', tab: 2 },
+  { id: 'calendar', title: '캘린더', icon: 'calendar', group: '시간', tab: 2, short: '일정·할 일' },
   { id: 'tasks', title: '할 일', icon: 'check2', group: '시간', short: '할 일' },
   { id: 'meetings', title: '회의록', icon: 'mic', group: '작업' },
   { id: 'board', title: '마인드맵 회의', icon: 'share', group: '작업', short: '마인드맵' },
@@ -73,7 +73,7 @@ async function render() {
 export function refresh() { render(); }
 
 function markNav(id) {
-  document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === id || (id !== 'today' && a.dataset.nav === 'menu' && !MODULES.find(m => m.id === id)?.tab)));
+  document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === id || (id === 'tasks' && a.dataset.nav === 'calendar' && !!a.closest('#tabbar')) || (id !== 'today' && id !== 'tasks' && a.dataset.nav === 'menu' && !MODULES.find(m => m.id === id)?.tab)));
   { const box = document.querySelector(`#nav .navlink[data-nav="${id}"]`)?.closest('.navg'); if (box && !box.classList.contains('open') && navFold[box.dataset.g] !== true) { /* 직접 접어 둔 묶음은 다시 열지 않음 */ box.classList.add('open'); box.previousElementSibling?.setAttribute('aria-expanded', 'true'); } }
 }
 

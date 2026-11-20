@@ -1,4 +1,4 @@
-import { h, ic, clear, toast, todayStr, fmtDate, tile, ring, colorFor, won, countUp } from '../js/ui.js';
+import { h, ic, clear, toast, todayStr, fmtDate, tile, ring, colorFor, won, countUp, KIND_RULE } from '../js/ui.js';
 import * as SC from '../js/scope.js';
 import * as db from '../js/db.js';
 import * as store from '../js/store.js';
@@ -71,7 +71,7 @@ export default {
       else if (r.s.mins >= 30) tl.append(h('div.tl-i', { style: { opacity: .75 } }, h('div.mono.tiny.faint', `${r.s.start}–${r.s.end}`), h('div.small.faint', `빈 시간 ${Math.floor(r.s.mins / 60) ? Math.floor(r.s.mins / 60) + '시간 ' : ''}${r.s.mins % 60 ? (r.s.mins % 60) + '분' : ''}`)));
     }
 
-    const tcard = h('div.card', h('div.card-h', h('h3', ic('check2'), '오늘 할 일'), h('div.row', ring((doneToday + todays.length) ? doneToday / (doneToday + todays.length) : 0, { size: 36, stroke: 4, label: `${doneToday}` }), h('a.btn.sm.ghost', { href: '#/tasks' }, '전체'))));
+    const tcard = h('div.card', h('div.card-h', h('h3', ic('check2'), '오늘 할 일', h('small', KIND_RULE.task)), h('div.row', ring((doneToday + todays.length) ? doneToday / (doneToday + todays.length) : 0, { size: 36, stroke: 4, label: `${doneToday}` }), h('a.btn.sm.ghost', { href: '#/tasks' }, '전체'))));
     if (!todays.length) tcard.append(h('div.empty', '오늘 할 일이 없어요'));
     todays.slice(0, 7).forEach(t => tcard.append(taskRow(t, () => this.render(clear(root)), () => go('tasks'))));
 
@@ -91,7 +91,7 @@ export default {
     const blocks = {
       quick: () => h('div.home-full', h('div.quick', ic('zap'), qi, h('button.btn.icon.ghost', { type: 'button', 'aria-label': '적기', onclick: addQuick }, ic('send')), h('a.btn.icon.ghost', { href: '#/assistant', 'aria-label': '말로 입력' }, ic('mic'))), qp, qres),
       tiles: () => h('div.home-full', tiles),
-      flow: () => h('div.card', h('div.card-h', h('h3', ic('clock'), '오늘 흐름'), h('a.btn.sm.ghost', { href: '#/calendar' }, '캘린더')), tl),
+      flow: () => h('div.card', h('div.card-h', h('h3', ic('calendar'), '오늘 일정', h('small', KIND_RULE.event)), h('a.btn.sm.ghost', { href: '#/calendar' }, '캘린더')), tl),
       tasks: () => tcard, people: () => pc, meetings: () => mc, sns: () => snsCard(), team: () => teamCard(allTasks, name), projects: () => projectCard(), activity: () => activityCard(),
     };
     const grid = h('div.home-grid');
@@ -107,7 +107,7 @@ export default {
     if (!grid.children.length) grid.append(h('div.card.home-full', h('div.empty', '메인 화면 카드를 모두 껐어요. 꾸미기 › 메인 화면에서 다시 켤 수 있어요.', h('a.btn.sm', { href: '#/look', style: { marginTop: '10px' } }, '꾸미기 열기'))));
   },
 };
-export const HOME = { quick: '빠른 입력', tiles: '숫자 요약', team: '팀 할 일 (담당자별)', projects: '프로젝트 (진행·마감·받을 돈)', flow: '오늘 흐름(일정)', tasks: '내 할 일', activity: '팀 최근 활동', meetings: '최근 회의', sns: 'SNS 예정', people: '챙길 사람' };
+export const HOME = { quick: '빠른 입력', tiles: '숫자 요약', team: '팀 할 일 (담당자별)', projects: '프로젝트 (진행·마감·받을 돈)', flow: '오늘 일정', tasks: '내 할 일', activity: '팀 최근 활동', meetings: '최근 회의', sns: 'SNS 예정', people: '챙길 사람' };
 export const homeOrder = L => [...(L.home || []).filter(k => HOME[k]), ...Object.keys(HOME).filter(k => !(L.home || []).includes(k))];
 const shortWon = n => n >= 10000 ? (Math.round(n / 1000) / 10).toLocaleString() + '만' : n.toLocaleString();
 async function snsCard() {

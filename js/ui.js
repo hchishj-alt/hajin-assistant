@@ -259,3 +259,13 @@ export function countUp(el, to, ms = 700) {
   requestAnimationFrame(step);
   return el;
 }
+
+// 일정과 할 일의 차이를 한 줄로. 화면마다 같은 말을 씀
+export const KIND_RULE = { event: '때가 정해진 약속', task: '마감까지 끝낼 일' };
+// 캘린더·할 일 화면 맨 위의 전환: 둘이 무엇이 다른지와 어디에 있는지를 같이 보여 줌
+export function kindPair(on) {
+  return h('nav.kindpair', { 'aria-label': '일정과 할 일 바꿔 보기' },
+    h('a.ev' + (on === 'event' ? '.on' : ''), { href: '#/calendar', 'aria-current': on === 'event' ? 'page' : null }, ic('calendar', 20), h('span', h('b', '일정'), h('small', KIND_RULE.event))),
+    h('a.tk' + (on === 'task' ? '.on' : ''), { href: '#/tasks', 'aria-current': on === 'task' ? 'page' : null }, ic('check2', 20), h('span', h('b', '할 일'), h('small', KIND_RULE.task))));
+}
+

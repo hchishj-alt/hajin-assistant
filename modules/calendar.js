@@ -1,4 +1,4 @@
-import { h, ic, clear, toast, head, seg, modal, form, todayStr, addDays, ymd, startOfWeek, fmtDate, colorFor, confirmBox, download, pickFile, wd } from '../js/ui.js';
+import { h, ic, clear, toast, head, seg, modal, form, todayStr, addDays, ymd, startOfWeek, fmtDate, colorFor, confirmBox, download, pickFile, wd, kindPair } from '../js/ui.js';
 import * as db from '../js/db.js';
 import * as store from '../js/store.js';
 import * as brain from '../js/brain.js';
@@ -27,7 +27,7 @@ export default {
       import('../js/ai.js').then(AI => AI.polishSaved('event', v, p, ev, { patch: (id, a) => db.patch(id, a), add: d => db.put('events', d) })).then(async ch => { if (!ch) return; const now = await db.get(ev.id); toast(`AI가 다시 읽고 다듬었어요: ${fmtDate(now.date)} ${now.start || '종일'}`); if (location.hash.startsWith('#/calendar')) { cursor = new Date(now.date); draw(); } }).catch(() => { });
     };
     quick.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addQuick(); } });
-    root.append(head('캘린더', null,
+    root.append(kindPair('event'), head('캘린더', '할 일도 마감 날짜에 체크 표시로 같이 보여요.',
       h('button.btn.sm.ghost', { onclick: importIcs, title: '구글·애플 캘린더에서 내보낸 .ics 파일 가져오기' }, ic('upload', 14), '.ics 가져오기'),
       h('button.btn.sm.ghost', { onclick: gcalModal, title: '구글 캘린더에서 알림 받기' }, ic('calendar', 14), '구글 캘린더'),
       h('button.btn.sm.pri', { onclick: () => edit({ date: ymd(cursor) }) }, ic('plus', 14), '일정')),
