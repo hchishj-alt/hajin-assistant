@@ -38,7 +38,8 @@ async function rpc(fn, args = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 const won = n => Number(n || 0).toLocaleString('ko-KR') + '원';
-const ymd = s => { const d = new Date(s); return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`; };
+const isForever = s => /infinity/i.test(String(s || ''));
+const ymd = s => { if (isForever(s)) return '평생'; const d = new Date(s); return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`; };
 const group4 = s => String(s || '').replace(/(.{4})(?=.)/g, '$1 ');
 let toastT;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200); }
@@ -82,6 +83,7 @@ const S = { list: [], me: null, bank: null, cat: '전체', q: '', loaded: false,
 const vals = store.get('vals', {});
 const saveVals = () => store.set('vals', vals);
 const active = () => !!(S.me && S.me.active);
+const forever = () => active() && isForever(S.me.paid_until);
 
 async function loadMe() {
   const tok = store.get('token', '');
@@ -233,6 +235,7 @@ function lockedSheet(t) {
 // 결제(이체) 창
 let poll = null;
 async function paySheet(planId = store.get('plan', 'm1')) {
+  if (forever()) return toast('평생 이용 중이라 결제할 필요가 없어요');
   let me;
   try { me = await ensureMe(); } catch { return toast('잠시 후 다시 눌러 주세요'); }
   if (!S.bank) { try { S.bank = await rpc('ps_bank'); } catch { S.bank = {}; } }
@@ -265,8 +268,37 @@ async function paySheet(planId = store.get('plan', 'm1')) {
           ready ? h('button.acct', { onclick: () => copy(`${b.bank} ${b.account}`, '계좌를 복사했어요') }, h('span', {}, `${b.bank} ${b.account}`), b.holder ? h('em', {}, b.holder) : null, ic('copy'))
             : h('p.warn', {}, '계좌를 준비하고 있어요. 조금 뒤에 다시 열어 주세요.')),
         h('li', {}, h('div', {}, h('b', {}, '끝! 보통 1분 안에 자동으로 열려요'), h('p.muted', {}, '코드를 빼먹었거나 금액이 달라도 확인해서 열어 드려요.')), wait)),
+      h('button.link.gift-link', { onclick: () => giftSheet() }, ic('gift'), '기프트 키가 있나요?'),
     ];
   }, { onClose: () => clearInterval(poll) });
+}
+
+// 기프트 키 넣기 (한 달 무료·평생 무료 등)
+const GIFT_WHY = { format: '키 모양이 달라요. XXXX-XXXX-XXXX 꼴이에요', none: '없는 키예요. 글자를 다시 확인해 주세요', expired: '기한이 지난 키예요', used: '이미 다 쓴 키예요', mine: '이미 이 기기에서 쓴 키예요' };
+async function redeem(key) {
+  const r = await rpc('ps_redeem', { p_token: store.get('token', ''), p_key: key });
+  if (r && r.token) store.set('token', r.token);
+  if (!r || !r.ok) return { ok: false, msg: GIFT_WHY[r && r.why] || '잠시 후 다시 해 주세요' };
+  await loadMe(); S.mine = null;
+  return { ok: true, msg: r.forever ? '평생 무료로 열렸어요! 틀을 전부 쓸 수 있어요' : `${r.days}일 무료가 들어왔어요. ${ymd(r.paid_until)}까지 전부 쓸 수 있어요` };
+}
+function giftSheet(prefill = '') {
+  sheet(close => {
+    const input = h('input.gift-in', { placeholder: 'XXXX-XXXX-XXXX', value: prefill, autocapitalize: 'characters', spellcheck: 'false', autocomplete: 'off' });
+    const msg = h('p.muted.small', {}, '받은 키를 넣으면 바로 열려요. 대소문자·띄어쓰기는 상관없어요.');
+    const go = h('button.cta.gift-go', { onclick: async () => {
+      if (!input.value.trim()) return input.focus();
+      go.disabled = true;
+      try {
+        const r = await redeem(input.value);
+        if (r.ok) { msg.className = 'wait done'; msg.replaceChildren(ic('check'), h('span', {}, r.msg)); render(); setTimeout(() => close(), 2200); }
+        else { msg.className = 'warn'; msg.textContent = r.msg; go.disabled = false; }
+      } catch { msg.className = 'warn'; msg.textContent = '잠시 후 다시 해 주세요'; go.disabled = false; }
+    } }, '키 넣기');
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') go.click(); });
+    setTimeout(() => !prefill && input.focus(), 300);
+    return [h('div.sheet-head', {}, h('div.gift-ic', {}, ic('gift')), h('h2', {}, '기프트 키'), h('p.muted', {}, '친구나 이벤트로 받은 키로 무료로 쓸 수 있어요.')), input, msg, go];
+  });
 }
 
 // ── 보관함 ──
@@ -385,7 +417,7 @@ async function renderSaves(root) {
     h('div.stats', {},
       h('div.stat', {}, ic('bookmark'), h('b', {}, mine.saves.length), h('span', {}, '보관')),
       h('div.stat', {}, ic('folder'), h('b', {}, mine.folders.length), h('span', {}, '폴더')),
-      h('div.stat', {}, ic(active() ? 'check' : 'lock'), h('b', {}, active() ? daysLeft() + '일' : '무료'), h('span', {}, active() ? '남음' : '이용 중'))),
+      h('div.stat', {}, ic(active() ? 'check' : 'lock'), h('b', {}, forever() ? '평생' : active() ? daysLeft() + '일' : '무료'), h('span', {}, forever() ? '이용' : active() ? '남음' : '이용 중'))),
     h('div.chips.folders', {}, ...folders.map(f => h('button.chip' + (f === S.folder ? '.on' : ''), { onclick: () => { S.folder = f; renderSaves(root); } }, f, h('em', {}, count(f))))),
     h('div.row.newf', {}, newF, h('button.btn', { onclick: addFolder }, ic('plus'), '폴더')),
     tools,
@@ -394,11 +426,11 @@ async function renderSaves(root) {
         h('p.muted', {}, '틀을 열고 빈칸을 채운 뒤 "보관"을 누르면 여기에 모여요. 폴더로 나눠 둘 수 있어요.'), h('a.cta', { href: '#' }, '틀 고르러 가기'))].filter(Boolean));
 }
 
-const daysLeft = () => S.me && S.me.paid_until ? Math.max(0, Math.ceil((new Date(S.me.paid_until) - Date.now()) / 864e5)) : 0;
+const daysLeft = () => forever() ? Infinity : S.me && S.me.paid_until ? Math.max(0, Math.ceil((new Date(S.me.paid_until) - Date.now()) / 864e5)) : 0;
 async function renderPlan(root) {
   await loadMe();
   const mine = await loadMine(true), me = S.me, on = active(), left = daysLeft();
-  const total = left > 31 ? 365 : 31, pct = on ? Math.min(100, Math.round(left / total * 100)) : 0;
+  const inf = forever(), total = left > 31 ? 365 : 31, pct = inf ? 100 : on ? Math.min(100, Math.round(left / total * 100)) : 0;
   const input = h('input', { placeholder: '복구 코드 16자리', autocapitalize: 'characters', spellcheck: 'false' });
   const use = async () => {
     const tok = input.value.replace(/\s/g, '').toUpperCase();
@@ -408,16 +440,17 @@ async function renderPlan(root) {
   };
   root.replaceChildren(...[
     h('div.plan-card' + (on ? '.on' : ''), {},
-      h('div.ring', { style: { '--p': pct } }, h('b', {}, on ? left : 0), h('span', {}, '일 남음')),
+      h('div.ring', { style: { '--p': pct } }, h('b', {}, inf ? '∞' : on ? left : 0), h('span', {}, inf ? '평생' : '일 남음')),
       h('div', {},
-        h('b.plan-state', {}, on ? '구독 중' : me && me.paid_until ? '구독이 끝났어요' : '무료로 쓰는 중'),
-        h('p.muted', {}, on ? `${ymd(me.paid_until)}까지 틀 ${S.list.length}개를 전부 쓸 수 있어요.` : `무료 틀 ${S.list.filter(t => t.free).length}개를 쓸 수 있어요. 구독하면 ${S.list.length}개 전부 열려요.`),
-        h('button.cta.small', { onclick: () => paySheet() }, on ? '기간 늘리기' : '월 990원 구독하기'))),
-    h('p.muted.small.note', {}, '자동으로 다시 빠져나가지 않아요. 끝나기 전에 늘리면 남은 기간 뒤에 이어 붙어요.'),
+        h('b.plan-state', {}, inf ? '평생 이용' : on ? '구독 중' : me && me.paid_until ? '구독이 끝났어요' : '무료로 쓰는 중'),
+        h('p.muted', {}, inf ? `틀 ${S.list.length}개를 기간 없이 전부 쓸 수 있어요.` : on ? `${ymd(me.paid_until)}까지 틀 ${S.list.length}개를 전부 쓸 수 있어요.` : `무료 틀 ${S.list.filter(t => t.free).length}개를 쓸 수 있어요. 구독하면 ${S.list.length}개 전부 열려요.`),
+        inf ? null : h('button.cta.small', { onclick: () => paySheet() }, on ? '기간 늘리기' : '월 990원 구독하기'))),
+    inf ? null : h('p.muted.small.note', {}, '자동으로 다시 빠져나가지 않아요. 끝나기 전에 늘리면 남은 기간 뒤에 이어 붙어요.'),
     me ? h('div.me', {},
       h('div.me-row', {}, h('span.muted', {}, '입금 코드'), h('button.code.small', { onclick: () => copy(me.code, '입금 코드를 복사했어요') }, h('span', {}, me.code), ic('copy'))),
       h('div.me-row', {}, h('span.muted', {}, '복구 코드'), h('button.code.small', { onclick: () => copy(me.token, '복구 코드를 복사했어요') }, h('span', {}, group4(me.token)), ic('copy'))),
       h('p.muted.small', {}, '복구 코드를 다른 기기에 넣으면 구독과 보관함이 그대로 이어져요. 남에게 알려 주지 마세요.')) : null,
+    inf ? null : h('button.gift-row', { onclick: () => giftSheet() }, ic('gift'), h('span', {}, h('b', {}, '기프트 키 넣기'), h('em', {}, '한 달 무료·평생 무료 키가 있으면 여기에')), ic('back', 'flip')),
     h('h3', {}, '결제 내역'),
     mine.payments.length ? h('div.pays', {}, ...mine.payments.map(p => h('div.pay', {}, h('span', {}, ymd(p.created_at)), h('b', {}, won(p.amount)), h('span.muted', {}, `+${p.days}일`))))
       : h('p.muted', {}, '아직 결제 내역이 없어요.'),
@@ -532,6 +565,7 @@ async function renderAdmin() {
         x.matched ? h('span.ok', {}, ic('check'), `${x.code} · ${x.days}일`) : h('div.row', {}, c, h('button.btn', { onclick: () => grant(c.value.trim().toUpperCase(), daysOf(x.amount) || 31, x.id) }, '열기')));
     })) : h('p.muted', {}, '아직 없어요.'),
     h('h3', {}, '직접 기간 주기'), h('div.row', {}, gCode, gDays, h('button.btn', { onclick: () => grant(gCode.value.trim().toUpperCase(), gDays.value) }, '주기')),
+    giftAdmin(secret),
     h('h3', {}, '손님에게 보이는 계좌'), h('div.col', {}, fb.bank, fb.account, fb.holder,
       h('button.btn.primary', { onclick: async () => { for (const k of Object.keys(fb)) await rpc('ps_admin_set', { p_secret: secret, p_k: k, p_v: fb[k].value.trim() }); S.bank = null; toast('계좌를 저장했어요'); } }, '저장')),
     h('h3', {}, '입금 알림 자동 연결'),
@@ -545,9 +579,57 @@ async function renderAdmin() {
     h('button.link', { onclick: () => { store.del('admin'); renderAdmin(); } }, '이 기기에서 나가기')));
 }
 
+// 관리: 기프트 키 만들기·목록
+const GIFT_URL = k => new URL('./?gift=' + k, location.href.split('#')[0].split('?')[0]).href;
+function giftAdmin(secret) {
+  const box = h('div.gifts');
+  let kind = 31;
+  const kinds = [[31, '한 달 무료'], [0, '평생 무료'], [-1, '직접 일 수']];
+  const days = h('input', { type: 'number', min: 1, placeholder: '일 수', style: { display: 'none' } });
+  const kindBtns = h('div.chips', {}, ...kinds.map(([v, l]) => h('button.chip' + (v === kind ? '.on' : ''), { onclick: e => {
+    kind = v; days.style.display = v === -1 ? '' : 'none';
+    for (const el of e.currentTarget.parentNode.children) el.classList.toggle('on', el === e.currentTarget);
+  } }, l)));
+  const count = h('input', { type: 'number', min: 1, max: 100, value: 1, 'aria-label': '키 개수' });
+  const uses = h('input', { type: 'number', min: 1, value: 1, 'aria-label': '한 키로 쓸 수 있는 사람 수' });
+  const note = h('input', { placeholder: '메모 (예: 민서 선물, 11월 이벤트)' });
+  const made = h('div');
+  const line = (k, meta, del) => h('div.gkey', {}, h('div.gk-l', {}, h('code', {}, k), meta), h('div.gk-r', {}, del,
+    h('button.icon-btn', { 'aria-label': '키 복사', onclick: () => copy(k, '키를 복사했어요') }, ic('copy')),
+    h('button.icon-btn', { 'aria-label': '링크 복사', onclick: () => copy(GIFT_URL(k), '바로 열리는 링크를 복사했어요') }, ic('out'))));
+  const list = async () => {
+    let gs = []; try { gs = await rpc('ps_admin_gifts', { p_secret: secret }) || []; } catch { }
+    box.replaceChildren(...(gs.length ? gs.map(g => line(g.key, h('span.gmeta', {}, h('b', {}, g.days ? `${g.days}일` : '평생'), ` ${g.used}/${g.max_uses}명`, g.note ? h('em', {}, g.note) : null),
+      g.used ? null : h('button.icon-btn', { 'aria-label': '지우기', onclick: async () => { await rpc('ps_admin_gift_del', { p_secret: secret, p_key: g.key }); toast('지웠어요'); list(); } }, ic('trash')))) : [h('p.muted', {}, '아직 만든 키가 없어요.')]));
+  };
+  const make = async () => {
+    const d = kind === -1 ? +days.value : kind;
+    if (kind === -1 && !(d > 0)) return toast('일 수를 넣어 주세요');
+    try {
+      const keys = await rpc('ps_admin_gift_make', { p_secret: secret, p_days: d, p_count: Math.min(100, Math.max(1, +count.value || 1)), p_max_uses: Math.max(1, +uses.value || 1), p_note: note.value.trim() });
+      made.replaceChildren(h('p.ok-line', {}, ic('check'), `${keys.length}개 만들었어요. 키나 링크를 보내 주면 돼요.`),
+        h('button.btn', { onclick: () => copy(keys.join('\n'), '키를 모두 복사했어요') }, ic('copy'), '키 모두 복사'),
+        h('button.btn', { onclick: () => copy(keys.map(GIFT_URL).join('\n'), '링크를 모두 복사했어요') }, ic('out'), '링크 모두 복사'));
+      note.value = ''; list();
+    } catch { toast('만들지 못했어요. 서버를 확인해 주세요'); }
+  };
+  list();
+  return h('div', {}, h('h3', {}, '기프트 키'),
+    h('p.muted', {}, '한 달 무료나 평생 무료 키를 만들어 나눠 줘요. 링크를 보내면 누르기만 해도 키 창이 열려요.'),
+    kindBtns, days,
+    h('div.gift-form', {}, h('label', {}, h('span', {}, '개수'), count), h('label', {}, h('span', {}, '한 키로 몇 명'), uses)), note,
+    h('button.btn.primary', { onclick: make }, ic('gift'), '키 만들기'), made, box);
+}
+
 // ── 시작 ──
 addEventListener('hashchange', () => { if (closeSheet) closeSheet(true); render(); scrollTo(0, 0); });
 addEventListener('visibilitychange', async () => { if (!document.hidden && location.hash !== '#admin' && S.loaded) { const was = active(); await loadMe(); if (was !== active()) render(); } });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => { });
 render();
-loadAll().then(() => { render(); if (!location.hash) setTimeout(() => onboarding(), 400); });
+const giftParam = new URLSearchParams(location.search).get('gift');
+if (giftParam) history.replaceState(null, '', location.pathname + location.hash);
+loadAll().then(() => {
+  render();
+  if (giftParam) { store.set('onboarded', true); setTimeout(() => giftSheet(giftParam), 400); }
+  else if (!location.hash) setTimeout(() => onboarding(), 400);
+});

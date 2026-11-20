@@ -210,3 +210,20 @@ details.faq p{font-size:14px;color:var(--ink2);padding-bottom:14px}
 @media (max-width:420px){.plan-card{flex-direction:column;align-items:flex-start;gap:14px}.top-gap{width:0}.tab{font-size:13px}}
 @media (max-width:420px){#app{padding:0 16px 32px}.hero{padding-top:28px}.stat{padding:9px 11px}.plans{gap:6px}.plan b{font-size:15px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* 기프트 키 */
+.ic.flip{transform:rotate(180deg);color:var(--ink3)}
+.gift-link{display:inline-flex;align-items:center;gap:6px;margin-top:14px}.gift-link .ic{width:16px;height:16px}
+.gift-ic{display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:var(--hi-soft);margin-bottom:10px;animation:pop .5s var(--spring)}.gift-ic .ic{width:26px;height:26px}
+.gift-in{font-size:20px;font-weight:700;letter-spacing:.12em;text-align:center;text-transform:uppercase;font-variant-numeric:tabular-nums;margin-bottom:10px}
+.gift-in::placeholder{letter-spacing:.12em;font-weight:500}
+.gift-go{width:100%;margin-top:14px}
+.gift-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin-top:16px;padding:14px 16px;border-radius:16px;background:var(--card);border:1px solid var(--line);transition:transform .3s var(--spring)}
+.gift-row:active{transform:scale(.98)}.gift-row>span:nth-child(2){flex:1;display:flex;flex-direction:column}.gift-row em{font-style:normal;font-size:13px;color:var(--ink3)}
+.gift-row>.ic:first-child{width:22px;height:22px}
+.gift-form{display:grid;grid-template-columns:1fr 1fr;gap:8px}.gift-form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink2)}
+.gifts{display:flex;flex-direction:column;gap:6px}
+.gkey{display:flex;align-items:center;gap:6px;padding:8px 6px 8px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.gk-l{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.gk-r{display:flex;flex:none}
+.gkey code{font:700 15px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+.gmeta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--ink2)}.gmeta em{font-style:normal;color:var(--ink3)}
+.ok-line{display:flex;align-items:center;gap:6px;color:var(--ok);font-weight:600;font-size:14px}
