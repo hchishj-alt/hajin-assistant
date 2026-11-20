@@ -160,7 +160,7 @@ async function editor(root, id) {
   const stopPreview = () => { if (player && !making) { player.close(); player = null; playBtn.innerHTML = ''; playBtn.append(ic('play', 16), '미리보기'); } };   /* 클립을 손대기 전에 돌던 미리보기를 멈춤 (같은 영상을 두 곳에서 움직이지 않게) */
 
   const save = debounce(async () => { await db.patch(id, { title: titleIn.value, conceptId: base.id || null, ratio, clips: (() => { const out = clips.map(k => ({ key: k.key, type: k.type, in: k.in, out: k.out, dur: k.dur, vol: k.vol })); for (const g of ghosts) out.splice(Math.min(g.at, out.length), 0, g.raw); return out; })(), subs, sfx, musicVol }); }, 500);
-  const titleIn = h('input.in.editor-title', { value: p.title, 'aria-label': '영상 제목', style: { fontSize: '20px', fontWeight: 700, border: 0, background: 'transparent', padding: '2px 0' }, oninput: save });
+  const titleIn = h('input.in.editor-title.in-title', { value: p.title, 'aria-label': '영상 제목', style: { fontWeight: 700, border: 0, background: 'transparent', padding: '2px 0' }, oninput: save });
   const canvas = h('canvas.editor-canvas');
   const timeEl = h('span.mono.small', '0:00 / 0:00');
   const playBtn = h('button.btn.pri', ic('play', 16), '미리보기');
@@ -399,7 +399,7 @@ async function editor(root, id) {
   }
 
   root.append(
-    h('div.row.between', { style: { marginBottom: '8px' } }, h('a.btn.sm.ghost', { href: '#/studio' }, ic('left', 14), '스튜디오'), h('div.row', h('button.btn.sm.ghost.danger', { onclick: async () => { if (await confirmBox('이 편집을 지울까요?', '지우기')) { await db.remove(id); go('studio'); } } }, ic('trash', 14)))),
+    h('div.row.between', { style: { marginBottom: '8px' } }, h('a.btn.sm.ghost', { href: '#/studio' }, ic('left', 14), '스튜디오'), h('div.row', h('button.btn.sm.ghost.danger', { 'aria-label': '이 편집 지우기', title: '이 편집 지우기', onclick: async () => { if (await confirmBox('이 편집을 지울까요?', '지우기')) { await db.remove(id); go('studio'); } } }, ic('trash', 14)))),
     titleIn,
     h('div.grid', { style: { gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.1fr)', gap: '16px', alignItems: 'start', marginTop: '10px' }, class: 'editor-grid editor-main' },
       h('div.stack', { style: { position: 'sticky', top: '12px' }, class: 'editor-stage' }, canvas, bar, h('div.row.between', h('div.row', playBtn, exportBtn, cancelBtn), timeEl), exportHint),

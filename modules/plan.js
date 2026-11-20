@@ -31,7 +31,7 @@ export default {
       body.append(h('div.tiles', { style: { marginBottom: '12px' } }, tile('file', notes.filter(n => n.type !== 'idea').length, '문서·메모'), tile('bulb', notes.filter(n => n.type === 'idea').length, '아이디어'), tile('link', refs.length, '레퍼런스'), tile('grid', projects.length, '프로젝트')));
       body.append(h('div.row.between', { style: { marginBottom: '12px' } },
         seg([['docs', '문서'], ['ideas', '아이디어 보드'], ['refs', '레퍼런스'], ['projects', '프로젝트']], tab, v => { tab = v; draw(); }),
-        h('select.in', { style: { width: 'auto' }, onchange: e => { projF = e.target.value; draw(); } }, h('option', { value: '' }, '모든 프로젝트'), projects.map(p => h('option', { value: p.name, selected: p.name === projF }, p.name)))));
+        h('select.in', { 'aria-label': '프로젝트 고르기', style: { width: 'auto' }, onchange: e => { projF = e.target.value; draw(); } }, h('option', { value: '' }, '모든 프로젝트'), projects.map(p => h('option', { value: p.name, selected: p.name === projF }, p.name)))));
       const pf = x => !projF || x.project === projF;
       if (tab === 'docs') {
         const xs = notes.filter(n => n.type !== 'idea' && pf(n)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -123,7 +123,7 @@ async function refsView(refs, redraw) {
 async function editor(root, id) {
   const n = await db.get(id);
   if (!n || n.deleted) { root.append(h('div.empty', '문서를 찾을 수 없어요')); return; }
-  const title = h('input.in', { value: n.title || '', placeholder: '제목', style: { fontSize: '22px', fontWeight: 700, border: 0, padding: '4px 0', background: 'transparent' } });
+  const title = h('input.in.in-title.lg', { value: n.title || '', placeholder: '제목', 'aria-label': '제목', style: { fontWeight: 700, border: 0, padding: '4px 0', background: 'transparent' } });
   const ta = h('textarea.in', { rows: 22, style: { minHeight: '50vh', fontSize: '15px', lineHeight: 1.7 } }, n.body || '');
   const status = h('span.faint.tiny', '저장됨');
   const proj = h('input.in', { value: n.project || '', placeholder: '프로젝트', style: { width: '140px', padding: '5px 10px', fontSize: '13px' } });

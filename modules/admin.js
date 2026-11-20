@@ -30,7 +30,7 @@ export default {
       const cols = [...new Set(all.map(a => a.refCol))];
       const today = db.dayOf(new Date());
       const listEl = h('div.card');
-      const sel = (k, opts, first) => h('select.in', { style: { width: 'auto' }, onchange: e => { F[k] = e.target.value; draw(); } }, h('option', { value: '' }, first), opts.map(([v, l]) => h('option', { value: v, selected: F[k] === v }, l)));
+      const sel = (k, opts, first) => h('select.in', { 'aria-label': first, style: { width: 'auto' }, onchange: e => { F[k] = e.target.value; draw(); } }, h('option', { value: '' }, first), opts.map(([v, l]) => h('option', { value: v, selected: F[k] === v }, l)));
       box.append(h('div.tiles', { style: { marginBottom: '14px' } },
         tile('edit', all.filter(a => db.dayOf(a.createdAt || '') === today).length, '오늘 바뀐 것'),
         tile('clock', all.filter(a => Date.now() - new Date(a.createdAt) < 7 * 864e5).length, '최근 7일'),

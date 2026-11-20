@@ -1191,4 +1191,5 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 @media (max-width:560px){.ev-time{width:auto;min-width:44px}.ev-time .ev-end{display:block;color:var(--ink3);font-size:.92em}}
 /* 큰 모니터: 내용을 왼쪽에 몰지 않고 가운데에 */
 @media (min-width:1500px){#view{max-width:1320px;margin-inline:auto}}
-
+/* 제목을 적는 큰 입력 칸: 폰에서 입력 칸 글자를 16px로 맞추는 규칙보다 앞서게 */
+#view input.in-title{font-size:calc(20px*var(--fs,1))!important;letter-spacing:-.02em}#view input.in-title.lg{font-size:calc(22px*var(--fs,1))!important}

@@ -18,7 +18,7 @@ export default {
 
     const nameIn = h('input.in', { value: name, onchange: async () => { await db.kvSet('name', nameIn.value.trim() || '하진'); toast('저장했어요'); } });
     const goalIn = h('input.in', { type: 'number', value: Math.round((await db.kvGet('focusGoal', 240)) / 60), onchange: async () => db.kvSet('focusGoal', (+goalIn.value || 4) * 60) });
-    const accIn = h('input', { type: 'color', value: accent, oninput: async () => { await db.kvSet('accent', accIn.value); applyTheme(); } });
+    const accIn = h('input', { type: 'color', 'aria-label': '강조 색', value: accent, oninput: async () => { await db.kvSet('accent', accIn.value); applyTheme(); } });
     const sec = (title, iconName, ...kids) => h('div.card', { style: { marginBottom: '14px' }, id: 'sec-' + iconName }, h('div.card-h', h('h3', ic(iconName), title)), ...kids);
 
     root.append(
@@ -122,7 +122,7 @@ async function extSection(focus) {
     for (const kind of ['stt', 'llm']) {
       const cur = await db.kvGet('ext:' + kind, null);
       const title = kind === 'stt' ? '음성인식 (녹음·영상 받아쓰기, 자동 자막)' : '문장 다듬기 언어모델 (실험)';
-      const sel = h('select.in', { style: { width: 'auto' } }, ext.MODELS[kind].map(m => h('option', { value: m.id, selected: m.id === cur }, `${m.label} · ${m.note}`)));
+      const sel = h('select.in', { 'aria-label': '모델 고르기', style: { width: 'auto' } }, ext.MODELS[kind].map(m => h('option', { value: m.id, selected: m.id === cur }, `${m.label} · ${m.note}`)));
       const bar = h('div.bar.hide', { style: { marginTop: '6px' } }, h('i', { style: { width: '0%' } }));
       const lbl = h('span.faint.tiny');
       const btn = h('button.btn.sm' + (cur ? '' : '.pri'), cur ? '다시 받기' : '내려받기');
@@ -216,8 +216,8 @@ async function palettePicker() {
   const dark = T.isDark(await db.kvGet('theme', 'auto'));
   const pick = async id => { await db.kvSet('palette', id); await db.kvSet('accent', null); await applyTheme(); go('settings'); };
   const sw = (id, p) => { const [bg, card, ink, acc] = dark ? p.dark : p.light; return h('button.palb' + (cur.id === id ? '.on' : ''), { onclick: () => pick(id), 'aria-pressed': cur.id === id }, h('div.pv', { style: { background: bg } }, h('i', { style: { background: card } }), h('i', { style: { background: ink, opacity: .85 } }), h('i', { style: { background: acc } })), h('b', p.name), h('span', p.note)); };
-  const tint = h('input', { type: 'color', value: cur.tint, oninput: async () => { await db.kvSet('palTint', tint.value); await db.kvSet('palette', 'custom'); await db.kvSet('accent', null); applyTheme(); } });
-  const acc = h('input', { type: 'color', value: cur.cacc, oninput: async () => { await db.kvSet('palAcc', acc.value); await db.kvSet('palette', 'custom'); await db.kvSet('accent', null); applyTheme(); } });
+  const tint = h('input', { type: 'color', 'aria-label': '바탕 색', value: cur.tint, oninput: async () => { await db.kvSet('palTint', tint.value); await db.kvSet('palette', 'custom'); await db.kvSet('accent', null); applyTheme(); } });
+  const acc = h('input', { type: 'color', 'aria-label': '강조 색', value: cur.cacc, oninput: async () => { await db.kvSet('palAcc', acc.value); await db.kvSet('palette', 'custom'); await db.kvSet('accent', null); applyTheme(); } });
   return h('div',
     h('div.pals', Object.entries(T.PALETTES).map(([id, p]) => sw(id, p)), sw('custom', T.customPalette(cur.tint, cur.cacc))),
     h('div.row', { style: { marginTop: '12px', gap: '14px', flexWrap: 'wrap' } }, h('span.small', { style: { fontWeight: 650 } }, '내 조합 만들기'), h('label.row.small', '배경 톤', tint), h('label.row.small', '포인트', acc), h('span.faint.tiny', '고르면 밝게·어둡게 둘 다 자동으로 맞춰요. 글자가 안 보일 조합은 알아서 보정해요.')));
@@ -234,7 +234,7 @@ async function labelSection() {
     clear(box);
     box.append(h('div.card-h', h('h3', ic('palette'), '중요도 · 분류 색'), admin ? h('div.row', h('button.btn.sm', { onclick: async () => { list.push({ id: 'l' + Date.now().toString(36), name: '새 라벨', color: '#14a3c7' }); await save(); draw(); } }, ic('plus', 14), '추가')) : null),
       h('p.small.muted', { style: { marginBottom: '8px' } }, admin ? '일정과 회의에 붙이는 색이에요. 이름과 색을 바꾸면 팀 전체에 같은 뜻으로 적용돼요.' : '일정과 회의에 붙이는 색이에요. 바꾸는 건 관리자만 할 수 있어요.'),
-      ...list.map((l, i) => h('div.li', h('input', { type: 'color', value: l.color, disabled: !admin, onchange: async e => { l.color = e.target.value; await save(); } }),
+      ...list.map((l, i) => h('div.li', h('input', { type: 'color', 'aria-label': `${l.name || '중요도'} 색`, value: l.color, disabled: !admin, onchange: async e => { l.color = e.target.value; await save(); } }),
         h('input.in.grow', { value: l.name, disabled: !admin, 'aria-label': '라벨 이름', onchange: async e => { l.name = e.target.value.trim(); await save(); } }),
         admin ? h('button.btn.sm.icon', { 'aria-label': '위로', disabled: i === 0, onclick: async () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; await save(); draw(); } }, ic('up', 14)) : null,
         admin ? h('button.btn.sm.icon', { 'aria-label': '지우기', onclick: async () => { list.splice(i, 1); await save(); draw(); } }, ic('trash', 14)) : null)));
