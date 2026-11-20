@@ -31,7 +31,7 @@ const md = s => { const d = new Date(s); return `${d.getMonth() + 1}월 ${d.getD
 const won = n => Number(n || 0).toLocaleString('ko-KR') + '원';
 const group4 = s => String(s || '').replace(/(.{4})(?=.)/g, '$1 ');
 
-export const limits = () => isPro() ? { scripts: Infinity, recSec: Infinity, voice: true } : FREE;
+export const limits = () => isPro() ? { scripts: Infinity, recSec: Infinity, voice: true, hq: true } : FREE;
 
 // 서버에서 새로 받기 (열 때, 구독 화면 들어갈 때)
 export async function refresh() {
@@ -60,10 +60,12 @@ const WHY = {
   scripts: ['대본을 더 쓰려면', `무료는 대본 ${FREE.scripts}개까지예요`],
   rec: ['더 길게 찍으려면', `무료는 한 번에 ${Math.round(FREE.recSec / 60)}분까지 찍혀요`],
   voice: ['목소리 따라가기는', '프로에서 쓸 수 있어요'],
+  hq: ['1080p로 저장하려면', '무료는 720p로 저장돼요'],
 };
 const PERKS = [
   ['doc', '대본', `${FREE.scripts}개`, '무제한'],
   ['timer', '한 번 녹화', `${Math.round(FREE.recSec / 60)}분`, '무제한'],
+  ['film', '저장 화질', '720p', '1080p'],
   ['mic', '목소리 따라가기', '—', '사용'],
 ];
 const perkTable = () => `<div class="perks"><div class="ph"><span></span><span>무료</span><span class="pro">프로</span></div>${PERKS.map(([i, l, f, p]) => `<div class="pr"><span class="lab">${ic(i, 16)}${l}</span><span>${f}</span><b>${p}</b></div>`).join('')}</div>`;
@@ -111,7 +113,7 @@ export async function planView(view) {
     <div class="hero ${pro ? 'on' : ''}">
       <div class="row" style="justify-content:space-between"><span class="badge">${ic('star', 14)}${badge}</span>${pro && !forever ? `<span class="until">${ymd(me.paid_until)}까지</span>` : ''}</div>
       <div class="price">${pro ? (forever ? '평생 무료' : card?.status === 'active' ? `다음 결제 ${md(card.next_at)}` : '구독 중') : `월 ${won(PRICE.month)}`}</div>
-      <p class="hs">${pro ? (card ? `${esc(card.label || '카드')} · ${card.status === 'active' ? `매달 ${won(card.amount)} 자동결제` : card.status === 'canceled' ? '해지됨 · 남은 기간만 써요' : '결제 실패'}` : forever ? '기프트 키로 열렸어요' : '기프트 키로 열렸어요') : '대본 무제한 · 길게 찍기 · 목소리 따라가기'}</p>
+      <p class="hs">${pro ? (card ? `${esc(card.label || '카드')} · ${card.status === 'active' ? `매달 ${won(card.amount)} 자동결제` : card.status === 'canceled' ? '해지됨 · 남은 기간만 써요' : '결제 실패'}` : forever ? '기프트 키로 열렸어요' : '기프트 키로 열렸어요') : '대본 무제한 · 길게 찍기 · 1080p · 목소리 따라가기'}</p>
     </div>
     ${perkTable()}
     <div class="acts">

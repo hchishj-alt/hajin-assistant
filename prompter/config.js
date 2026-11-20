@@ -9,6 +9,7 @@ export const FREE = {
   scripts: 3,      // 대본 개수
   recSec: 180,     // 한 번 녹화 최대 길이(초)
   voice: false,    // 목소리 따라가기
+  hq: false,       // 1080p 저장 (무료는 720p)
 };
 
 // 카드 정기결제(포트원 V2). storeId·channelKey는 공개 값이라 여기 둬도 된다.

@@ -6,7 +6,7 @@
 영상 찍을 때 폰 카메라 화면 위에 대본을 띄워 주는 텔레프롬프터. 대본이 흐르고, 그 자리에서 녹화·저장까지 된다.
 무료로 기본 기능을 쓰고, 월 990원 카드 구독(프로)으로 제한이 풀린다. 기프트 키로도 열 수 있다.
 
-- 주소: https://hchishj-alt.github.io/hajin-assistant/prompter/
+- 주소: https://hchishj-alt.github.io/hajin-assistant/prompter/ (예전 https://hchishj-alt.github.io/eternia-exhibition/studio/ 는 여기로 넘어옴, 그곳 대본 `pst_scripts`는 처음 열 때 자동으로 옮김)
 - 구독 관리: 위 주소 + `#/plan` / 관리 화면: `#/admin` (관리 비밀키)
 - 운영자: 김하진(사업자 있음, 디자이너라 UI 기준이 높다)
 - 같은 저장소의 다른 앱(팀 앱 `/`, 매니저 `/manager/`, 틀 스튜디오 `/studio/`)과 **완전히 따로** 돈다.
@@ -24,7 +24,8 @@
 ## 파일 지도
 | 무엇 | 어디 |
 |---|---|
-| 대본 목록·편집·촬영 화면 | `prompter/app.js` (`listView`, `editView`, `shootView`) |
+| 대본 목록(프로젝트 폴더)·편집·촬영 연결 | `prompter/app.js` (`listView`, `editView`, `shootView`, `projects`) |
+| 촬영 엔진 (이터니아 스튜디오에서 옮김: 비율 녹화·조명·렌즈·격자·[[구간]]·목소리 따라가기) | `prompter/stage.js`, `prompter/stage.css` (`#st2` 아래만) |
 | 구독 상태·잠금·구독 관리·관리 화면 | `prompter/plan.js` (`needPro`, `planView`, `adminView`, `limits`) |
 | **카드 결제 어댑터** (결제사 붙이는 곳) | `prompter/billing.js` (`cardReady`, `startCard`, `finishRedirect`) |
 | 공개 설정: 요금, 무료 범위, 포트원 storeId·channelKey | `prompter/config.js` |
@@ -36,7 +37,7 @@
 ## 구독 구조 (이미 다 되어 있음)
 - 손님은 로그인 없이 **복구 코드(token 16자)**로 구분. 브라우저 `localStorage['prompter:token']`. 다른 기기는 구독 관리에서 복구 코드로 이어 쓴다.
 - **구독 중 = `pr_customers.paid_until > now()`**. 카드·기프트 키·손으로 주기 모두 이 값만 늘린다. 평생은 `'infinity'`.
-- 무료 범위는 `config.js`의 `FREE` 한 곳(대본 3개, 한 번 녹화 3분, 목소리 따라가기 잠금). 잠긴 기능을 누르면 `needPro(kind)`가 구독 창을 띄운다.
+- 무료 범위는 `config.js`의 `FREE` 한 곳(대본 3개, 한 번 녹화 3분, 720p 저장, 목소리 따라가기 잠금). 잠긴 기능을 누르면 `needPro(kind)`가 구독 창을 띄운다.
 - 서버 함수: 손님용 `pr_join`·`pr_me`·`pr_redeem`·`pr_card_cancel`, 관리용 `pr_admin*`(비밀키 `pr_settings.admin_secret`),
   결제 반영용(service_role 전용) `pr_card_paid`·`pr_card_failed`·`pr_card_due`. 빌링키는 `pr_billing`에만, 손님 함수 반환값에 절대 넣지 않는다.
 - 기프트 키: 관리 화면에서 한 달·1년·평생 키 만들기 → 링크 `/prompter/?gift=KEY`로 주면 구독 관리에 키가 채워진다.
