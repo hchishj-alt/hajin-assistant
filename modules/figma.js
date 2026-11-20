@@ -173,7 +173,7 @@ function guide() {
       h('p.small.muted', '이 규칙만 지키면 앱이 파일을 자동으로 분류하고, 진행률·할 일·담당을 한눈에 보여줘요.'),
       h('div.list', { style: { margin: '10px 0' } }, F.GUIDE.map(([t, d], i) => h('div.li', { style: { alignItems: 'flex-start' } }, h('span.chip.acc', String(i + 1)), h('div.grow', h('div.t.small', t), h('div.faint.small', d))))),
       h('div.small', { style: { fontWeight: 650, margin: '12px 0 6px' } }, '앱이 알아듣는 분류 (이름에 이 말이 있으면)'),
-      h('div.list', F.CATS.map(c => h('div.li', ic(c.icon, 14), h('b.small', { style: { width: '120px' } }, c.label), h('span.faint.tiny', c.re.source.replace(/\(\^\|_\)SEC_\\d/, 'SEC_번호').replace(/\\/g, '').split('|').slice(0, 9).join(', '))))),
+      h('div.list', F.CATS.map(c => h('div.li', ic(c.icon, 14), h('b.small', { style: { flex: '0 0 96px' } }, c.label), h('span.faint.tiny', { style: { flex: '1 1 0', minWidth: 0, overflowWrap: 'anywhere', whiteSpace: 'normal' } }, c.re.source.replace(/\(\^\|_\)SEC_\\d/, 'SEC_번호').replace(/\\/g, '').split('|').slice(0, 9).join(', '))))),
       h('details', { style: { marginTop: '12px' } }, h('summary.small', '토큰 없이 플러그인 요약으로 넣기'), paste, h('button.btn.sm', { style: { marginTop: '6px' }, onclick: async () => {
         let j; try { j = JSON.parse(paste.value.trim()); } catch { toast('요약 형식이 아니에요'); return; }
         if (j.app !== 'hajin-figma') { toast('하진 정리 플러그인 요약이 아니에요'); return; }

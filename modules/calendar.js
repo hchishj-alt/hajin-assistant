@@ -13,7 +13,8 @@ let mode = matchMedia('(max-width:900px)').matches ? 'agenda' : 'month', cursor 
 export default {
   async render(root, params) {
     if (params[0] === 'phone') setTimeout(() => gcalModal(), 400);   /* 알림 설정에서 넘어온 경우: 폰 캘린더 연결 창을 바로 엶 */
-    else if (params[0]) cursor = new Date(params[0]);
+    else if (params[0]) { const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(params[0]) ? params[0] + 'T00:00' : params[0]); if (!isNaN(d)) cursor = d; else if (['month', 'week', 'agenda', 'people'].includes(params[0])) mode = params[0]; }   /* 주소 뒤: 날짜면 그 날로, 월·주·목록·사람별이면 그 보기로. 못 읽는 말이면 그대로 둠 */
+    if (isNaN(cursor)) cursor = new Date();
     const body = h('div');
     const quick = h('input', { placeholder: '일정 바로 추가: "다음 주 수요일 2시~4시 홍대 촬영"', 'aria-label': '일정 추가', enterkeyhint: 'done' });
     const ctx = { people: await store.peopleNames().catch(() => []), projects: await store.projects().catch(() => []) };
