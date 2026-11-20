@@ -7,7 +7,7 @@ import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
 import { CONTACT } from './config.js';
 import { legalView, legalLinks, bizLine } from './legal.js';
 
-export const VERSION = '1.5.7';
+export const VERSION = '1.5.8';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -84,7 +84,7 @@ async function listView() {
   const P = projects.get(cp);
   view.innerHTML = `
     <div class="top"><a class="brand" href="#/hello" aria-label="프롬프리에딧 소개"><img src="icon.svg" alt=""><span><b>프롬프리에딧</b><em>PROMPRI EDIT</em></span></a>
-      <div class="row"><button class="iconbtn sm" data-lang aria-label="언어">${ic('globe', 18)}</button><a class="planbtn${plan.isPro() ? ' on' : ''}" href="#/plan" aria-label="구독 관리">${ic('star', 16)}${plan.isPro() ? '프로' : '무료'}</a><a class="iconbtn" href="#/new" aria-label="새 대본">${ic('plus', 22)}</a></div></div>
+      <div class="row"><button class="iconbtn sm" data-lang aria-label="언어">${ic('globe', 18)}</button><a class="planbtn${plan.isPro() || plan.beta() ? ' on' : ''}" href="#/plan" aria-label="구독 관리">${ic('star', 16)}${plan.isPro() ? '프로' : plan.beta() ? '베타' : '무료'}</a><a class="iconbtn" href="#/new" aria-label="새 대본">${ic('plus', 22)}</a></div></div>
     ${installTip()}
     <div class="chips" id="chips">
       <button class="chipbtn" data-p="all" aria-pressed="${cp === 'all'}">전체 <b>${all.length}</b></button>
@@ -100,7 +100,7 @@ async function listView() {
     </div>
     <div id="cards"></div>
     <a class="btn wide" href="#/new" style="margin-top:6px">${ic('plus')}새 대본 쓰기</a>
-    ${plan.isPro() ? '' : `<p class="tip c">무료는 대본 ${plan.limits().scripts}개까지 · 지금 ${all.filter(own).length}개${all.some(x => !own(x)) ? ' (예시는 빼고)' : ''}</p>`}`;
+    ${plan.isPro() || plan.beta() ? '' : `<p class="tip c">무료는 대본 ${plan.limits().scripts}개까지 · 지금 ${all.filter(own).length}개${all.some(x => !own(x)) ? ' (예시는 빼고)' : ''}</p>`}`;
   view.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { setCurProj(b.dataset.p); buzz(8); route(); });
   $('#addP').onclick = async () => { const n = await ask('새 프로젝트', '', { ok: '만들기', placeholder: '예: 인스타 릴스 11월' }); if (!n) return; const p = projects.add(n); setCurProj(p.id); route(); };
   $('#pmenu')?.addEventListener('click', () => projectMenu(P, list));
@@ -504,6 +504,7 @@ function helloView() {
       <p class="lead">대본을 카메라 위에 띄우고,<br>씬별로 찍고, 한 번에 이어 붙여요.</p>
       <div class="cta"><a class="btn acc" href="#/" id="go1">${ic('cam', 18)}무료로 시작하기</a><a class="ghost" href="#/plan">${ic('star', 16)}프로 보기</a></div>
       <p class="tip c">설치 없이 브라우저에서 바로 · 폰 · 아이패드 · PC</p>
+      ${plan.beta() ? `<p class="betaline">${ic('star', 14)}<span>출시 베타 · 지금은 프로 기능도 모두 무료</span></p>` : ''}
     </section>
     <section class="feat">${F.map(([i, t, d], k) => `<div class="fc" style="animation-delay:${k * 50}ms"><span class="fi">${ic(i, 22)}</span><b>${t}</b><span>${d}</span></div>`).join('')}</section>
     <section class="nums"><div><b>3</b><span>무료 대본</span></div><div><b>3분</b><span>무료 한 번 녹화</span></div><div><b>0</b><span>서버로 가는 영상</span></div></section>

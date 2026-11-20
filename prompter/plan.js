@@ -1,6 +1,6 @@
 // 구독: 상태, 잠금(needPro), 구독 관리 화면(#/plan), 관리 화면(#/admin)
 // 구독 중 = 서버 pr_customers.paid_until > now(). 이 기기는 마지막 상태를 기억해 두고 열 때마다 새로 받는다.
-import { SB, PRICE, FREE, CONTACT } from './config.js';
+import { SB, PRICE, FREE, CONTACT, BETA } from './config.js';
 // 이벤트 가격 표시: ~~9,900원~~ 90% 월 990원
 const off = () => PRICE.list > PRICE.month ? Math.round((1 - PRICE.month / PRICE.list) * 100) : 0;
 export const priceTag = () => off() ? `<span class="ptag"><span class="ev">${PRICE.event || '이벤트가'}</span><s>${won(PRICE.list)}</s><b class="off">${off()}% 할인</b><b>월 ${won(PRICE.month)}</b></span>` : `월 ${won(PRICE.month)}`;
@@ -38,7 +38,8 @@ const md = s => { const d = new Date(s); return `${d.getMonth() + 1}월 ${d.getD
 const won = n => Number(n || 0).toLocaleString('ko-KR') + '원';
 const group4 = s => String(s || '').replace(/(.{4})(?=.)/g, '$1 ');
 
-export const limits = () => isPro() ? { scripts: Infinity, recSec: Infinity, voice: true, hq: true } : FREE;
+export const beta = () => BETA && !cardReady();
+export const limits = () => isPro() || beta() ? { scripts: Infinity, recSec: Infinity, voice: true, hq: true } : FREE;
 
 // 서버에서 새로 받기 (열 때, 구독 화면 들어갈 때)
 export async function refresh() {
@@ -113,11 +114,12 @@ function celebrate(msg = '프로가 열렸어요') {
 export async function planView(view) {
   await Promise.race([refresh(), new Promise(r => setTimeout(r, 2500))]); // 느린 망에서도 화면은 먼저
   const pro = isPro(), card = me?.card, forever = isForever(me?.paid_until);
-  const badge = forever ? '평생 프로' : pro ? '프로' : '무료';
+  const badge = forever ? '평생 프로' : pro ? '프로' : beta() ? '베타' : '무료';
   const hist = me?.history || [];
   const failed = card?.status === 'failed';
   view.innerHTML = `
     <div class="top"><a class="iconbtn" href="#/" aria-label="목록">${ic('left', 22)}</a><h1 class="h1s">구독 관리</h1><span style="width:44px"></span></div>
+    ${beta() ? `<div class="notice beta">${ic('star', 18)}<span>출시 베타 기간이라 카드 결제가 열릴 때까지 프로 기능을 모두 무료로 써요. 결제가 열리면 무료 범위로 돌아가요.</span></div>` : ''}
     ${failed ? `<div class="notice">${ic('card', 18)}<span>카드 결제가 안 됐어요. 카드를 바꿔 주세요.</span></div>` : ''}
     <div class="hero ${pro ? 'on' : ''}">
       <div class="row" style="justify-content:space-between"><span class="badge">${ic('star', 14)}${badge}</span>${pro && !forever ? `<span class="until">${ymd(me.paid_until)}까지</span>` : ''}</div>
