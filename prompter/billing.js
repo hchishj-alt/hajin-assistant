@@ -32,7 +32,7 @@ export async function startCard(token) {
     channelKey: PORTONE.channelKey,
     billingKeyMethod: 'CARD',
     issueId: 'pr-' + token.slice(0, 8) + '-' + Date.now().toString(36),
-    issueName: `하진 프롬프터 월 구독 ${PRICE.month}원`,
+    issueName: `프롬프리에딧 월 구독 ${PRICE.month}원`,
     customer: { customerId: token },
     redirectUrl: base + '?after=card',
   });

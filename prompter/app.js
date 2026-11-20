@@ -1,10 +1,10 @@
-// 하진 프롬프터: 카메라 위에 대본을 띄우고 바로 찍는 앱. sw.js의 VERSION과 같이 올릴 것
+// 프롬프리에딧(PROMPRI EDIT): 카메라 위에 대본을 띄우고 씬별로 찍어 이어 붙이는 앱. sw.js의 VERSION과 같이 올릴 것
 import { scripts, takes, uid, flag } from './store.js';
 import { ic, esc, $, el, chars, fmt, paras, toast, buzz, sheet } from './ui.js';
 import * as plan from './plan.js';
 import { mountStage, autoSec } from './stage.js';
 
-export const VERSION = '1.2.0';
+export const VERSION = '1.3.0';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -49,6 +49,7 @@ async function route() {
     const cp = curProj();
     const s = await newScript('', '', cp !== 'all' && cp !== 'none' ? cp : ''); location.replace('#/s/' + s.id); return;
   }
+  if (a === 'hello') { helloView(); requestAnimationFrame(() => view.classList.add('in')); return; }
   if (a === 'plan') { await plan.planView(view); requestAnimationFrame(() => view.classList.add('in')); return; }
   if (a === 'admin') { await plan.adminView(view); requestAnimationFrame(() => view.classList.add('in')); return; }
   if (a === 's' && b) cleanup = await editView(b);
@@ -78,8 +79,9 @@ async function listView() {
   const done = list.filter(s => s.status === 'done').length;
   const P = projects.get(cp);
   view.innerHTML = `
-    <div class="top"><div><h1>프롬프터</h1><p class="sub">대본을 띄우고 바로 찍어요</p></div>
+    <div class="top"><a class="brand" href="#/hello" aria-label="프롬프리에딧 소개"><img src="icon.svg" alt=""><span><b>프롬프리에딧</b><em>PROMPRI EDIT</em></span></a>
       <div class="row"><a class="planbtn${plan.isPro() ? ' on' : ''}" href="#/plan" aria-label="구독 관리">${ic('star', 16)}${plan.isPro() ? '프로' : '무료'}</a><a class="iconbtn" href="#/new" aria-label="새 대본">${ic('plus', 22)}</a></div></div>
+    ${installTip()}
     <div class="chips" id="chips">
       <button class="chipbtn" data-p="all" aria-pressed="${cp === 'all'}">전체 <b>${all.length}</b></button>
       ${projs.map(p => `<button class="chipbtn" data-p="${p.id}" aria-pressed="${cp === p.id}">${ic('folder', 14)}${esc(p.name)} <b>${all.filter(s => s.project === p.id).length}</b></button>`).join('')}
@@ -138,6 +140,7 @@ async function editView(id) {
   view.innerHTML = `
     <div class="top"><a class="iconbtn" href="#/" aria-label="목록">${ic('left', 22)}</a>
       <div class="row"><button class="iconbtn" id="del" aria-label="대본 지우기">${ic('trash')}</button></div></div>
+    <div class="edit2"><div class="emain">
     <input class="titlein" id="ti" placeholder="제목 (비우면 첫 줄)" value="${esc(s.title)}" maxlength="60">
     <div class="erow">
       <button class="chipbtn" id="pj">${ic('folder', 14)}<span>${esc(projects.get(s.project)?.name || '프로젝트 없음')}</span></button>
@@ -148,8 +151,9 @@ async function editView(id) {
     <button class="addscn" id="addS">${ic('plus', 18)}씬 추가</button>
     <div class="secrow"><span class="lab">${ic('timer', 16)}읽는 시간</span><input class="inp" id="sec" type="number" min="5" max="3600" inputmode="numeric" value="${secOf(s)}"><span class="muted">초</span><button class="ghost sm" id="auto">글자 수로 맞추기</button></div>
     <p class="tip">대사는 이 시간에 맞춰 올라가요. 촬영 화면에서 속도(%)로 더 조절할 수 있어요.</p>
+    </div><div class="eside">
     <div id="tk"></div>
-    <div class="bar"><a class="btn acc wide" href="#/shoot/${s.id}">${ic('cam')}이 대본으로 찍기</a></div>`;
+    <div class="bar"><a class="btn acc wide" href="#/shoot/${s.id}">${ic('cam')}이 대본으로 찍기</a></div></div></div>`;
   const ti = $('#ti'), em = $('#em'), sec = $('#sec'), scn = $('#scn');
   let SC = toScenes(s.body), lastTa = null;
   const ed = { get value() { return fromScenes(SC); } }; // 아래 코드가 쓰는 '전체 대본'
@@ -245,7 +249,7 @@ async function renderTakes(s, box) {
     if (own.length) {
       box.append(el(`<div class="sec">${ic('film', 16)}찍은 테이크 ${own.length}</div>`));
       const g = el('<div class="takes"></div>'); own.forEach((t, i) => g.append(card(t, own.length - i, i, null))); box.append(g);
-    }
+    } else box.append(el(`<div class="tkempty">${ic('film', 22)}<br>찍은 테이크가 여기에 모여요.<br>씬을 나누면 씬별로 모이고 한 번에 이어 붙일 수 있어요.</div>`));
   } else {
     // 씬마다 고른 테이크(★, 없으면 가장 최근)
     const pick = {};
@@ -438,6 +442,54 @@ async function joinTakes(list, onP) {
   return { blob, mime: blob.type, dur: total };
 }
 
+/* ---------- 소개(첫 화면) ---------- */
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isMobile = () => isIOS() || /Android/.test(navigator.userAgent);
+function installSteps() {
+  return `<div class="steps">
+    <div class="step"><b>아이폰 · 아이패드</b><span>사파리 아래(아이패드는 위) <i>${ic('share', 14)}공유</i> → <i>홈 화면에 추가</i></span></div>
+    <div class="step"><b>갤럭시 · 안드로이드</b><span>크롬 오른쪽 위 <i>⋮</i> → <i>홈 화면에 추가</i> 또는 <i>앱 설치</i></span></div>
+    <div class="step"><b>PC (크롬 · 엣지)</b><span>주소창 오른쪽 <i>설치</i> 아이콘을 누르거나 그냥 즐겨찾기에 두고 써요</span></div></div>`;
+}
+function installTip() {
+  if (standalone() || !isMobile() || flag('hideInstall')) return '';
+  return `<div class="itip" id="itip"><div class="grow"><b>${ic('devices', 16)}홈 화면에 추가하면 앱처럼 써요</b>
+    <span>${isIOS() ? '사파리 공유 버튼 → 홈 화면에 추가' : '크롬 ⋮ 메뉴 → 홈 화면에 추가'} · 전체 화면으로 열리고 찍은 영상도 더 안전하게 보관돼요</span></div>
+    <button class="mini" onclick="localStorage.setItem('prompter:hideInstall','1');this.closest('.itip').remove()" aria-label="닫기">${ic('x', 18)}</button></div>`;
+}
+function helloView() {
+  flag('hello', '1');
+  document.body.classList.add('hello-on');
+  const F = [
+    ['text', '카메라 위에 대본', '렌즈 바로 아래 읽는 줄. 정한 시간에 맞춰 흘러가요'],
+    ['film', '씬으로 나눠 찍기', '씬 추가만 누르면 끝. 씬마다 따로 찍고 ★로 골라요'],
+    ['share', '한 번에 이어 붙이기', '고른 테이크를 순서대로 붙여 영상 하나로 저장'],
+    ['folder', '프로젝트로 정리', '영상 기획을 폴더로 묶고 쓰는 중·촬영 대기·완료'],
+    ['flip', '가로 16:9 · 세로 9:16', '릴스·쇼츠·유튜브 비율 그대로 잘라 저장'],
+    ['mic', '목소리 따라가기', '말하는 속도에 맞춰 대본이 따라와요 (프로)'],
+  ];
+  view.innerHTML = `<div class="hello">
+    <section class="hero">
+      <img class="hmark" src="icon.svg" alt="">
+      <h1>프롬프리에딧</h1><p class="en">PROMPRI EDIT</p>
+      <p class="lead">대본을 카메라 위에 띄우고,<br>씬별로 찍고, 한 번에 이어 붙여요.</p>
+      <div class="cta"><a class="btn acc" href="#/" id="go1">${ic('cam', 18)}무료로 시작하기</a><a class="ghost" href="#/plan">${ic('star', 16)}프로 보기</a></div>
+      <p class="tip c">설치 없이 브라우저에서 바로 · 폰 · 아이패드 · PC</p>
+    </section>
+    <section class="feat">${F.map(([i, t, d], k) => `<div class="fc" style="animation-delay:${k * 50}ms"><span class="fi">${ic(i, 22)}</span><b>${t}</b><span>${d}</span></div>`).join('')}</section>
+    <section class="nums"><div><b>3</b><span>무료 대본</span></div><div><b>3분</b><span>무료 한 번 녹화</span></div><div><b>0원</b><span>설치·서버 비용</span></div></section>
+    <section class="howto"><h2>${ic('devices', 20)}앱처럼 쓰기</h2>
+      <p>폰이랑 아이패드는 <b>홈 화면에 추가</b>하면 앱처럼 쓸 수 있어요. 전체 화면으로 열리고, 찍은 영상도 브라우저에 더 오래 안전하게 보관돼요.</p>
+      ${installSteps()}</section>
+    <section class="howto"><h2>${ic('play', 20)}이렇게 써요</h2>
+      <ol class="flow"><li><b>대본 쓰기</b>붙여넣기 OK. 길면 씬 추가로 나눠요</li><li><b>찍기</b>빨간 버튼 → 3·2·1 → 읽기만 하면 끝</li><li><b>고르고 붙이기</b>씬마다 ★ 고르고 이어 붙이기</li><li><b>저장</b>사진첩·파일로 바로 저장</li></ol></section>
+    <a class="btn acc wide" href="#/">${ic('cam', 18)}지금 시작하기</a>
+  </div>`;
+  const off = () => document.body.classList.remove('hello-on');
+  addEventListener('hashchange', off, { once: true });
+}
+
 /* ---------- 예전 스튜디오(eternia-exhibition/studio) 대본 옮기기 ---------- */
 // 같은 사이트(hchishj-alt.github.io)라 그 페이지가 저장한 localStorage 'pst_scripts'를 읽을 수 있다.
 async function migrateStudio() {
@@ -467,6 +519,8 @@ const SAMPLE = `[[인사]]
   const moved = await migrateStudio();
   if (!flag('seeded')) { flag('seeded', '1'); if (!(await scripts.all()).length) await newScript(SAMPLE, '첫 대본 예시'); }
   if (moved) setTimeout(() => toast(`스튜디오에서 쓰던 대본 ${moved}개를 옮겨 왔어요`), 600);
+  // 처음 온 사람은 소개부터
+  if (!flag('hello') && (!location.hash || location.hash === '#/') && !standalone()) history.replaceState(null, '', '#/hello');
   route();
   plan.boot();
   plan.onChange(() => { if ((location.hash || '#/') === '#/') route(); });
