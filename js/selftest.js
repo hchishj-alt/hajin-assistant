@@ -65,11 +65,11 @@ export function run() {
   const refs = B.recommendRefs('게임 UI 파스텔 미니멀 인벤토리 화면');
   { // 말로 화면 이동
     const nv = t => { const r = B.interpret(t, {}); return r.length === 1 && r[0].kind === 'nav' ? (r[0].data.q ? 'prompts?' + r[0].data.q : r[0].data.make ? 'prompts/make' : B.navTo(r[0].data.to)) : r.map(x => x.kind).join('+') || '-'; };
-    const cases = [['회의록', 'meetings'], ['기획 보드', 'plan'], ['자가 점검', 'health'], ['메신저 열어줘', 'talk'], ['프롬프트 스튜디오 열어 줘', 'prompts'], ['구매 목록', 'shop'], ['설정으로 가줘', 'settings'], ['오늘 화면으로', 'today'], ['견적 프롬프트 보여줘', 'prompts?견적'], ['시안 피드백 프롬프트 쓸래', 'prompts?시안 피드백'], ['프롬프트 만들어줘', 'prompts/make']];
+    const cases = [['회의록', 'meetings'], ['기획 보드', 'plan'], ['자가 점검', 'health'], ['메신저 열어줘', 'talk'], ['프롬프트 스튜디오 열어 줘', 'prompts'], ['구매 목록', 'shop'], ['설정으로 가줘', 'settings'], ['오늘 화면으로', 'today'], ['견적 프롬프트 보여줘', 'prompts?견적'], ['시안 피드백 프롬프트 쓸래', 'prompts?시안 피드백'], ['프롬프트 만들어줘', 'prompts/make'], ['설정 화면 보여줘', 'settings'], ['캘린더 화면 보여줘', 'calendar'], ['할 일 화면 보여줘', 'tasks'], ['회의록 화면으로 가줘', 'meetings'], ['꾸미기 화면 좀 열어줄래?', 'look'], ['메신저로 이동해줘', 'talk'], ['비용 화면을 보여줘', 'money']];
     const bad = cases.filter(([t, want]) => nv(t) !== want);
     results.push({ group: '화면 이동', name: '메뉴 이름을 말하면 그 화면으로 (예전엔 "회의록"이 오늘 화면으로 갔음)', ok: !bad.length, detail: bad.length ? '틀림: ' + bad.map(([t, w]) => `${t} → ${nv(t)} (기대 ${w})`).join(' / ') : `${cases.length}/${cases.length}` });
-    const keep = [['오늘', 'nav'], ['구매', 'nav'], ['점심 9000원', 'nav'], ['내일 3시 회의', 'nav'], ['프롬프트 스튜디오에 견적 틀 저장', 'nav'], ['일정 보여줘', 'nav']].filter(([t]) => B.interpret(t, {}).some(x => x.kind === 'nav'));
-    results.push({ group: '화면 이동', name: '평범한 말을 이동으로 잘못 읽지 않음', ok: !keep.length, detail: keep.length ? '틀림: ' + keep.map(x => x[0]).join(' / ') : '6/6' });
+    const keep = [['오늘', 'nav'], ['구매', 'nav'], ['점심 9000원', 'nav'], ['내일 3시 회의', 'nav'], ['프롬프트 스튜디오에 견적 틀 저장', 'nav'], ['일정 보여줘', 'nav'], ['오늘 할 일 보여줘', 'nav'], ['민서 일정 보여줘', 'nav'], ['비용 보여줘', 'nav'], ['회의록 보여줘', 'nav']].filter(([t]) => B.interpret(t, {}).some(x => x.kind === 'nav'));
+    results.push({ group: '화면 이동', name: '평범한 말을 이동으로 잘못 읽지 않음', ok: !keep.length, detail: keep.length ? '틀림: ' + keep.map(x => x[0]).join(' / ') : '10/10' });
   }
   { // 곧 울릴 알림, 비워 둘 시간, 제목 군말
     const base = new Date(2026, 10, 20, 14, 0), cx = { base, people: ['김하진', '최민서', '안서연'], projects: ['가을 팝업', '루미에'] }; const one = t => B.interpret(t, cx)[0] || { data: {} };

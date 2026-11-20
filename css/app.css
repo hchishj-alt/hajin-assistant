@@ -1097,3 +1097,6 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 @media (max-width:900px){.chatpage .composer{background:var(--bg);box-shadow:0 -8px 12px -8px rgba(0,0,0,.08)}}
 /* 320 너비에서 이름 옆 짧은 칩("관리자")이 끊기던 것 */
 .li .t>.chip,.li .chip.acc,.li .chip.bad{white-space:nowrap}
+
+/* v1.35.6 비서 창 안의 입력칸은 창 바탕색 그대로 (큰 비서 화면용 회색 바탕·그림자가 창 안까지 먹던 것) */
+@media (max-width:900px){.aisheet .chatpage .composer{background:var(--card);box-shadow:none}}

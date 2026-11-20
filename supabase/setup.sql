@@ -492,7 +492,7 @@ declare uid uuid := auth.uid(); n integer;
 begin
   if uid is null or not public.is_active() then raise exception 'not allowed'; end if;
   if jsonb_typeof(p) <> 'array' then raise exception 'bad list'; end if;
-  delete from public.alarms where user_id = uid and (sent_at is null or until < now() - interval '1 day');
+  delete from public.alarms where user_id = uid and id not like 'dm|%' and (sent_at is null or until < now() - interval '1 day');   -- 메시지 알림(dm|…)은 14번이 넣은 것이라 지우지 않음
   insert into public.alarms (user_id, id, at, until, title, body, url)
   select uid, left(x->>'id', 200), (x->>'at')::timestamptz, (x->>'until')::timestamptz,
          left(coalesce(x->>'title', ''), 120), left(coalesce(x->>'body', ''), 300), left(coalesce(x->>'url', ''), 200)
@@ -567,3 +567,25 @@ end $$;
 revoke all on function public.push_tick() from public, anon, authenticated;
 
 select cron.schedule('hajin-push-tick', '* * * * *', $$select public.push_tick()$$);
+
+-- ───────────────────────────────────────────────────────────────
+-- 14. 메신저 알림: 메시지가 오면 받는 사람에게 닫힌 앱 알림 (v1.36.0)
+--     · dms에 한 줄이 들어가면 받는 사람의 alarms에 "○○ 님의 메시지"를 넣음. 다음 1분 주기(push_tick)에 폰으로 나감
+--     · 받는 사람이 아직 로그인한 적이 없으면(user_id 없음) 아무것도 안 함
+create or replace function public.dm_alarm() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare u uuid; nm text;
+begin
+  select user_id into u from public.members where id = new.to_member and active;
+  if u is null then return new; end if;
+  select name into nm from public.members where id = new.from_member;
+  insert into public.alarms (user_id, id, at, until, title, body, url)
+  values (u, 'dm|' || new.id::text, now(), now() + interval '12 hours',
+          coalesce(nm, '팀원') || ' 님의 메시지', left(new.body, 120), '#/talk/' || new.from_member::text)
+  on conflict do nothing;
+  return new;
+exception when others then return new;   -- 알림을 못 넣어도 메시지는 보내짐
+end $$;
+revoke all on function public.dm_alarm() from public, anon, authenticated;
+drop trigger if exists dms_alarm on public.dms;
+create trigger dms_alarm after insert on public.dms for each row execute function public.dm_alarm();

@@ -22,6 +22,11 @@ export default {
     const sendBtn = h('button.btn.pri.icon', { 'aria-label': '보내기', onclick: () => send() }, ic('right', 20));
     const recBar = h('div.row.hide', { style: { padding: '6px 4px', gap: '10px' } });
     let micBusy = false;
+    /* AI가 권한 다음 말 가운데 화면으로 가자는 말은 바로 여는 단추로, 답에 "○○ 화면"이 나오면 그 화면 여는 단추도 붙임 */
+    const navChips = (say, next = []) => { const out = [];
+      for (const s of next) { const to = brain.navPhrase(s); if (to) { if (!out.some(c => c.go === to)) out.push({ label: s.replace(/\s*(화면|메뉴|페이지|탭)?(을|를)?\s*(으로|로)?\s*(좀\s*)?(보여|열어|가|이동해|켜|띄워)\s*(줘|주세요|줄래)?[.!?]*$/, '') + ' 열기', go: to }); } else out.push({ label: s, say: s }); }
+      for (const x of brain.screensIn(say)) if (!out.some(c => c.go === x.to)) out.push({ label: `${x.name} 열기`, go: x.to });
+      return out.slice(0, 4); };
     const botSay = async (text, chips = []) => { await drawMsg(await db.put('chat', { role: 'bot', text, chips }), new Map()); scrollDown(); };
     const micOff = () => { clearInterval(timer); recBar.classList.add('hide'); micBtn.classList.remove('rec'); };
     const projBar = h('div.chips', { style: { padding: '0 4px 6px' } });
@@ -162,7 +167,7 @@ export default {
         if (r.intent === 'edit') { const ACT = await import('../js/act.js'); const a = await ACT.tryAct(src, { people }); if (a) { await refreshCards(a.refresh); await drawMsg(await db.put('chat', { role: 'bot', q: src, text: a.text, chips: a.chips }), new Map()); updateBadge(); return true; }
           await drawMsg(await db.put('chat', { role: 'bot', q: src, text: r.next.length ? `${r.say ? r.say + ' ' : ''}맞으면 아래를 눌러 주세요. 그대로 바꿀게요.` : `${r.say ? r.say + ' ' : ''}이건 말로 바로 바꾸지 못했어요. 아래 항목을 눌러 열어서 고쳐 주세요.`, items, chips: r.next.map(x => ({ label: x, say: x })), ai: true }), new Map()); return true; }
         if (r.intent === 'add') return false;
-        await drawMsg(await db.put('chat', { role: 'bot', q: src, text: r.say, items: [...items, ...(extra.items || [])].filter((x, i, a) => a.findIndex(y => y.title === x.title && y.route === x.route) === i), draftIds: extra.draftIds || [], chips: [...(extra.chips || []), ...r.next.map(s => ({ label: s, say: s }))], ai: true }), new Map((await store.drafts()).map(d => [d.id, d]))); updateBadge(); return true; };
+        await drawMsg(await db.put('chat', { role: 'bot', q: src, text: r.say, items: [...items, ...(extra.items || [])].filter((x, i, a) => a.findIndex(y => y.title === x.title && y.route === x.route) === i), draftIds: extra.draftIds || [], chips: [...(extra.chips || []), ...navChips(r.say, r.next)], ai: true }), new Map((await store.drafts()).map(d => [d.id, d]))); updateBadge(); return true; };
       { const W = await import('../js/where.js'); if (W.isWhere(text)) { const r = await W.find(text); if ((await aiSay(text, r.text, { noAdd: true, items: r.items, draftIds: r.draftIds, chips: r.chips })) === true) return; await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, items: r.items, draftIds: r.draftIds, chips: r.chips }), new Map((await store.drafts()).map(d => [d.id, d]))); updateBadge(); return; } }
       { const pend = await db.kvGet('chat:ask', null); if (pend) { if (looksNew(text, pend.need[0], { projects, people, vendors: vendorNames, project })) await db.kvSet('chat:ask', null); else if (await answerAsk(pend, text)) return; } }
       // 방금 만든 것을 말로 고치기·취소하기

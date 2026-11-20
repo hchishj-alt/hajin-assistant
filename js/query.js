@@ -120,5 +120,7 @@ export async function answer(q, base = new Date()) {
   // 그 밖에는 전체 검색
   const docs = await store.corpus();
   const res = brain.similar(q.replace(/(찾아줘|검색|보여줘|알려줘|뭐였지|\?)/g, ''), docs, 8);
+  if (!res.length) { const scr = brain.screensIn(q.replace(/\s*(찾아\s*줘|검색|보여\s*줘|알려\s*줘|열어\s*줘|뭐였지|\?)\s*$/g, '') + ' 화면');   /* 못 찾았는데 화면 이름을 말한 것이면 그 화면을 여는 단추를 줌 */
+    if (scr.length) return { text: `“${scr[0].name}”에서 맞는 기록은 못 찾았어요. 그 화면을 열어 볼까요?`, items: [], chips: scr.map(x => ({ label: `${x.name} 열기`, go: x.to })) }; }
   return { text: res.length ? `관련 기록 ${res.length}개를 찾았어요.` : '관련 기록을 못 찾았어요. 다르게 물어봐 주세요.', items: res.map(d => ({ icon: 'file', title: d.title || '(제목 없음)', sub: d.text.slice(0, 60), route: d.route + '/' + d.id })) };
 }

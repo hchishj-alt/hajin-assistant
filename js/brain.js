@@ -388,7 +388,16 @@ export const NAV = { 오늘: 'today', 홈: 'today', 비서: 'assistant', 캘린�
   프롬프트: 'prompts', '프롬프트 스튜디오': 'prompts', SNS: 'studio', 'SNS 스튜디오': 'studio', 스튜디오: 'studio', 레퍼런스: 'archive', 피그마: 'figma', '피그마 정리': 'figma', 메신저: 'talk', 인맥: 'people', 연락처: 'people', 팀: 'team',
   비용: 'money', '비용 처리': 'money', 지출: 'money', 구매: 'shop', '구매 목록': 'shop', 업체: 'vendors', '업체 목록': 'vendors', 랭킹: 'radar', 지원사업: 'radar', 스타트업: 'startup', 꾸미기: 'look', 설정: 'settings', '자가 점검': 'health',
   대기함: 'inbox', '확인 대기함': 'inbox', 메뉴: 'menu' };
-const NAV_RE = new RegExp('^(' + Object.keys(NAV).sort((a, b) => b.length - a.length).map(k => k.replace(/ /g, '\\s*')).join('|') + ')\\s*((?:화면|메뉴)?\\s*(?:으로|로)?\\s*(?:열어|가자|가\\s*줘|이동|켜|띄워|보여)?\\s*(?:줘|주세요)?)$', 'i');
+const NAV_RE = new RegExp('^(' + Object.keys(NAV).sort((a, b) => b.length - a.length).map(k => k.replace(/ /g, '\\s*')).join('|') + ')\\s*((?:(?:화면|메뉴|페이지|탭|창)(?:을|를)?)?\\s*(?:으로|로)?\\s*(?:좀\\s*)?(?:열어|가자|가\\s*줘|가\\s*볼래|가고\\s*싶어|들어가|이동|켜|띄워|보여)?\\s*(?:해\\s*)?(?:줘|주세요|줄래)?)\\s*[.!?~]*$', 'i');
+const NAV_NOREC = /^(설정|꾸미기|자가점검|메뉴|캘린더|메신저|마인드맵|마인드맵회의|기획보드|프롬프트|프롬프트스튜디오|SNS스튜디오|스튜디오|SNS|피그마|피그마정리|랭킹|스타트업|홈|비서)$/i;   // 기록을 찾는 말일 리 없는 화면 이름
+// 화면으로 가자는 말이 분명하면 그 화면 주소, 아니면 null. "설정 화면 보여줘"는 찾는 말이 아니라 가자는 말
+export function navPhrase(text) { const t = String(text || '').replace(/\s+/g, ' ').trim(); const m = t.match(NAV_RE); if (!m || !m[2]) return null;
+  if (/(화면|메뉴|페이지|탭|창)/.test(m[2]) || /(열어|가자|가\s*줘|가\s*볼래|가고\s*싶어|들어가|이동|켜|띄워)/.test(m[2]) || NAV_NOREC.test(m[1].replace(/\s+/g, ''))) return navTo(m[1]);
+  return null; }
+// 글 안에 "○○ 화면"이라고 나온 화면들 (비서 답에 "설정 화면에서 바꿀 수 있어요"가 있으면 여는 단추를 붙이려고)
+export function screensIn(text) { const out = []; const re = new RegExp('(' + Object.keys(NAV).sort((a, b) => b.length - a.length).map(k => k.replace(/ /g, '\\s*')).join('|') + ')\\s*(?:화면|메뉴|페이지|탭)', 'gi'); let m;
+  while ((m = re.exec(String(text || '')))) { const to = navTo(m[1]); if (!out.some(x => x.to === to)) out.push({ name: m[1].replace(/\s+/g, ' '), to }); }
+  return out.slice(0, 2); }
 const NAV_SHY = /^(오늘|홈|비서|메뉴|구매|업체|랭킹|지원사업)$/;   // 이름만으로는 다른 뜻일 수 있어서 "열어 줘" 같은 말이 붙어야 이동
 export function navTo(to) { const k = String(to || '').replace(/\s+/g, ' ').trim(); const hit = Object.keys(NAV).find(x => x.replace(/ /g, '').toLowerCase() === k.replace(/ /g, '').toLowerCase()); return hit ? NAV[hit] : 'today'; }
 export function interpret(input, ctx = {}) {
@@ -754,6 +763,7 @@ function interpretOne(s, base, ctx) {
     if (q && !NAV_RE.test(t) && !/(만들|저장|고쳐|고치|지워)/.test(t) && money == null && !phone) return [{ kind: 'nav', data: { to: '프롬프트', q }, label: '이동', confidence: 0.85 }]; }
   if (/^(새\s*)?프롬프트\s*(하나\s*)?(새로\s*)?(만들|짜)/.test(t) && t.length <= 20) return [{ kind: 'nav', data: { to: '프롬프트', make: true }, label: '이동', confidence: 0.85 }];
   if (HELPQ.test(t) && !phone && !urls.length && money == null) return [{ kind: 'talk', data: { text: t }, label: '대화', confidence: 0.6 }];
+  if (navPhrase(t) && money == null && !phone && !w.date) { const nv = t.match(NAV_RE); return [{ kind: 'nav', data: { to: nv[1] }, label: '이동', confidence: 0.9 }]; }
   if (isQ) return [{ kind: 'query', data: { q: t, when: w }, label: '찾아보기', confidence: 0.85 }];
   // 이동
   const nav = t.match(NAV_RE);
