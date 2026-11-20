@@ -1174,6 +1174,21 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
   #view .editor-main .editor-canvas{max-height:calc(100dvh - 158px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
   #view .editor-main>.editor-stage .btn{padding-left:10px;padding-right:10px}
 }
+/* 폰 캘린더: 위쪽 줄을 줄여 일정이 더 위에서 시작하게 (제목+단추 한 줄, 월·주·목록 옆에 보기 설정) */
+.cal-top .cal-fbtn{margin:0}
+@media (max-width:900px){.cal-top{row-gap:8px}}
+@media (max-width:560px){
+  .page-head .row>.fold-phone{display:none}.page-head .row.unfold>.fold-phone{display:inline-flex}
+  .cal-head{flex-wrap:nowrap}.cal-head:has(.row.unfold){flex-wrap:wrap}
+  #view .cal-head>div:first-child{flex:1 1 auto}.cal-head .sub{display:none}
+  .cal-head .row{flex-wrap:nowrap;justify-content:flex-end}.cal-head .row.unfold{flex-wrap:wrap}
+  .cal-top .cal-nav{flex:1 1 100%;flex-wrap:nowrap}.cal-top .cal-nav h2{flex:1 1 auto;min-width:0!important;font-size:calc(18px*var(--fs,1));white-space:nowrap}
+  .cal-top .cal-fbtn{flex:1 1 60px;min-width:0;padding-left:8px;padding-right:4px;justify-content:flex-end}
+  .cal-fpre{display:none}.cal-fsum{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+}
+/* 일정 목록의 시간 칸: 넓은 화면은 한 줄(10:00–12:00), 폰은 좁게 두 줄로 쌓아 제목 자리를 넓힘 */
+.ev-time{width:92px;flex:none}
+@media (max-width:560px){.ev-time{width:auto;min-width:44px}.ev-time .ev-end{display:block;color:var(--ink3);font-size:.92em}}
 /* 큰 모니터: 내용을 왼쪽에 몰지 않고 가운데에 */
 @media (min-width:1500px){#view{max-width:1320px;margin-inline:auto}}
 

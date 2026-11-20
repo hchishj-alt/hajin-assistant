@@ -108,9 +108,12 @@ export async function tryProject(text) {
   const none = q => ({ text: `“${q}” 프로젝트를 못 찾았어요.`, chips: [{ label: '프로젝트 열기', go: 'plan/projects' }] });
   const which = (ps, verb, say) => ({ text: `어느 프로젝트를 ${verb}?`, chips: [...ps.slice(0, 4).map(p => ({ label: p.name.slice(0, 18), say: say(p) })), { label: '아니에요', skip: true }] });
   // 이름·상태 바꾸기: "루미에 프로젝트 이름 루미에 팝업으로 바꿔줘", "프로젝트 루미에를 보류로 바꿔줘"
-  const CH = '(?:바꿔|바꾸|변경|고쳐|수정)\\S*(?:\\s*(?:줘|주세요|줄래))?', MID = '(?:\\s*(?:의\\s*)?(?:이름|명|상태)\\s*(?:을|를|은|는)?|(?:을|를|은|는))';
-  m = t.match(new RegExp(`^(.{1,30}?)\\s*프로젝트${MID}?\\s+(.{1,30}?)\\s*(?:으로|로)\\s*(?:이름\\s*)?${CH}$`)) || t.match(new RegExp(`^프로젝트\\s+(.{1,30}?)${MID}\\s+(.{1,30}?)\\s*(?:으로|로)\\s*(?:이름\\s*)?${CH}$`));
-  if (m) { const ps = await findProj(m[1]); const to = m[2].replace(/\s*프로젝트$/, '').trim(); const st = PSTAT.find(([re]) => re.test(to));
+  const CH = '(?:바꿔|바꾸|변경|고쳐|수정)\\S*(?:\\s*(?:줘|주세요|줄래))?', NAMEW = '(?:\\s*(?:의\\s*)?(?:이름|명|상태)\\s*(?:을|를|은|는)?)', PART = '(?:을|를|은|는)';
+  m = t.match(new RegExp(`^(.{1,30}?)\\s*프로젝트(${NAMEW}|${PART})?\\s+(.{1,30}?)\\s*(?:으로|로)\\s*(이름\\s*)?${CH}$`)) || t.match(new RegExp(`^프로젝트\\s+(.{1,30}?)(${NAMEW}|${PART})\\s+(.{1,30}?)\\s*(?:으로|로)\\s*(이름\\s*)?${CH}$`));
+  if (m) { const to = m[3].replace(/\s*프로젝트$/, '').trim(); const st = PSTAT.find(([re]) => re.test(to)); const named = /이름|명|상태/.test(m[2] || '') || !!m[4];
+    /* "이름"이라는 말이 없으면 프로젝트 안의 일정·할 일을 옮기는 말일 수 있음("루미에 프로젝트 회의 4시로 바꿔줘", "… 마감 금요일로", "… 담당 민서로") → 이름 바꾸기로 읽지 않고 넘김 */
+    if (!st && !named && (!m[2] || brain.parseWhen(to).hits.length || /^(담당|마감|장소|일정|회의|미팅|시간|날짜|색)/.test(to) || /\d\s*(시|분|일|월|주)/.test(to) || (await teammateNames()).some(n => to === n || to === n.slice(1)))) m = null; }
+  if (m) { const ps = await findProj(m[1]); const to = m[3].replace(/\s*프로젝트$/, '').trim(); const st = PSTAT.find(([re]) => re.test(to));
     if (!ps.length) return none(m[1].trim()); if (ps.length > 1) return which(ps, '바꿀까요', p => `${p.name} 프로젝트 ${st ? '' : '이름 '}${to}${euro(to)} 바꿔줘`);
     if (st) return run({ op: 'projStatus', id: ps[0].id, v: st[1] });
     if (!to) return null; if ((await db.list('projects')).some(p => p.id !== ps[0].id && pkey(p.name) === pkey(to))) return { text: `“${to}” 프로젝트는 이미 있어요. 다른 이름으로 해 주세요.` };

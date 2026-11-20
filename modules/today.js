@@ -1,4 +1,4 @@
-import { h, ic, clear, toast, todayStr, fmtDate, tile, ring, colorFor, facePic, won, countUp, KIND_RULE } from '../js/ui.js';
+import { h, ic, clear, toast, todayStr, fmtDate, tile, ring, colorFor, facePic, won, countUp, KIND_RULE, busy } from '../js/ui.js';
 import * as SC from '../js/scope.js';
 import * as db from '../js/db.js';
 import * as store from '../js/store.js';
@@ -99,13 +99,28 @@ export default {
     const grid = h('div.home-grid');
     for (const id of homeOrder(L)) if (!L.homeOff?.includes(id) && blocks[id]) { const el = await blocks[id](); if (el) grid.append(el); }
     root.append(hdr);
-    { const H = await import('../js/helper.js'); const strip = await H.memberStrip().catch(() => null); if (strip) root.append(strip); const row = await H.shortcutRow().catch(() => null); if (row) root.append(row); }   /* 단기 작업자 안내, 내 역할 바로가기 */
+    { const H = await import('../js/helper.js'); const strip = await H.memberStrip().catch(() => null); if (strip) root.append(strip); const row = askName && !name ? null : await H.shortcutRow().catch(() => null); if (row) root.append(row); }   /* 처음 온 사람에게는 이름·코드부터 묻고, 역할은 그다음에 */   /* 단기 작업자 안내, 내 역할 바로가기 */
     { const nd = await Install.nudge().catch(() => null); if (nd) root.append(nd); }
     if (askName && !name) {
-      const ni = h('input.in', { placeholder: '이름 (예: 민서)', 'aria-label': '내 이름', style: { maxWidth: '200px' } });
+      /* 처음 켠 사람: 팀에서 받은 코드가 있으면 여기서 바로 들어감(이름·역할·맡은 일이 따라옴). 없으면 이름만 */
+      const sync = await import('../js/sync.js'); const cfg = await sync.config().catch(() => ({})); const canCode = !!(cfg && cfg.url && cfg.key) && !sync.user();
+      const ni = h('input.in', { placeholder: '이름 (예: 민서)', 'aria-label': '내 이름', style: { maxWidth: '200px', flex: '1 1 120px', minWidth: 0 } });
       const saveName = async () => { const v = ni.value.trim(); if (!v) return toast('이름을 적어 주세요'); await db.kvSet('name', v); await db.kvSet('askName', false); this.render(clear(root)); };
       ni.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) saveName(); });
-      root.append(h('div.card', { style: { marginBottom: '14px' } }, h('h3', '처음 오셨네요. 뭐라고 부를까요?'), h('p.faint.small', { style: { margin: '4px 0 10px' } }, '팀에서 받은 멤버 코드가 있으면 ', h('a', { href: '#/settings' }, '설정'), '에서 로그인해 주세요. 이름과 팀 할 일이 자동으로 맞춰져요.'), h('div.row', ni, h('button.btn.pri', { type: 'button', onclick: saveName }, '저장'))));
+      const nameRow = h('div.row', ni, h('button.btn' + (canCode ? '' : '.pri'), { type: 'button', onclick: saveName }, canCode ? '이름 저장' : '저장'));
+      if (!canCode) root.append(h('div.card.first-card', { style: { marginBottom: '14px' } }, h('h3', '처음 오셨네요. 뭐라고 부를까요?'), h('p.faint.small', { style: { margin: '4px 0 10px' } }, '팀에서 받은 멤버 코드가 있으면 ', h('a', { href: '#/settings' }, '설정'), '에서 로그인해 주세요. 이름과 팀 할 일이 자동으로 맞춰져요.'), nameRow));
+      else {
+        const ci = h('input.in', { placeholder: '코드', 'aria-label': '멤버 코드', maxlength: 5, autocapitalize: 'characters', autocomplete: 'off', spellcheck: false, style: { textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, maxWidth: '150px', flex: '1 1 100px', minWidth: 0 } });
+        const msg = h('p.small', { role: 'status', style: { margin: '8px 0 0', color: 'var(--bad)', display: 'none' } });
+        const login = async btn => { if (!ci.value.trim()) { ci.focus(); return toast('받은 코드를 적어 주세요'); } busy(btn, true, '들어가는 중'); msg.style.display = 'none';
+          try { await sync.loginWithCode(ci.value); await db.kvSet('askName', false); location.reload(); }   /* 메뉴·역할·맡은 프로젝트를 처음부터 다시 맞추려고 새로 엶 */
+          catch (e) { busy(btn, false); msg.textContent = /Failed to fetch|NetworkError|network/i.test(e.message) ? '인터넷 연결을 확인하고 다시 눌러 주세요.' : e.message; msg.style.display = ''; } };
+        const lb = h('button.btn.pri', { type: 'button', style: { flex: 'none' }, onclick: e => login(e.currentTarget) }, '코드로 들어가기');
+        ci.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) login(lb); });
+        root.append(h('div.card.first-card', { style: { marginBottom: '14px' } }, h('h3', '처음 오셨네요'),
+          h('p.faint.small', { style: { margin: '4px 0 10px' } }, '팀에서 받은 코드가 있으면 적어 주세요. 이름과 역할, 맡은 일이 알아서 맞춰져요.'), h('div.row', ci, lb), msg,
+          h('p.faint.small', { style: { margin: '14px 0 8px', paddingTop: '12px', borderTop: '1px solid var(--line)' } }, '코드가 없으면 이름만 알려 주세요. 이 기기에서 혼자 쓸 수 있어요.'), nameRow));
+      }
     }
     root.append(grid);
     if (!grid.children.length) grid.append(h('div.card.home-full', h('div.empty', '메인 화면 카드를 모두 껐어요. 꾸미기 › 메인 화면에서 다시 켤 수 있어요.', h('a.btn.sm', { href: '#/look', style: { marginTop: '10px' } }, '꾸미기 열기'))));

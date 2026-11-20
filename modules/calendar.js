@@ -28,10 +28,12 @@ export default {
       import('../js/ai.js').then(AI => AI.polishSaved('event', v, p, ev, { patch: (id, a) => db.patch(id, a), add: d => db.put('events', d) })).then(async ch => { if (!ch) return; const now = await db.get(ev.id); toast(`AI가 다시 읽고 다듬었어요: ${fmtDate(now.date)} ${now.start || '종일'}`); if (location.hash.startsWith('#/calendar')) { cursor = new Date(now.date); draw(); } }).catch(() => { });
     };
     quick.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addQuick(); } });
-    root.append(kindPair('event'), head('캘린더', '할 일도 마감 날짜에 체크 표시로 같이 보여요.',
+    const hd = head('캘린더', '할 일도 마감 날짜에 체크 표시로 같이 보여요.',
       h('button.btn.sm.ghost.fold', { onclick: importIcs, title: '구글·애플 캘린더에서 내보낸 .ics 파일 가져오기' }, ic('upload', 14), '.ics 가져오기'),
-      h('button.btn.sm.ghost', { onclick: gcalModal, title: '폰 기본 캘린더와 위젯에 내 일정을 보이게 하고 알람을 받아요' }, ic('calendar', 14), '폰 캘린더·위젯'),
-      h('button.btn.sm.pri', { onclick: () => edit({ date: ymd(cursor) }) }, ic('plus', 14), '일정')),
+      h('button.btn.sm.ghost.fold-phone', { onclick: gcalModal, title: '폰 기본 캘린더와 위젯에 내 일정을 보이게 하고 알람을 받아요' }, ic('calendar', 14), '폰 캘린더·위젯'),
+      h('button.btn.sm.pri', { onclick: () => edit({ date: ymd(cursor) }) }, ic('plus', 14), '일정'));
+    hd.classList.add('cal-head');   /* 폰에서는 제목과 단추를 한 줄로 (일정이 한 화면이라도 더 위에 보이게) */
+    root.append(kindPair('event'), hd,
       h('div.quick', { style: { marginBottom: '14px' } }, ic('zap'), quick, h('button.btn.icon.ghost', { type: 'button', 'aria-label': '추가', onclick: addQuick }, ic('send'))), body);
     await draw();
 
@@ -47,13 +49,15 @@ export default {
       const passP = x => !peopleF.length || owners(x).some(o => peopleF.includes(o));
       const events = (await db.list('events')).filter(pass).filter(passP).map(e => ({ ...e, _sc: sc(e) }));
       const tasks = (await db.list('tasks')).filter(t => t.due && !t.done).filter(t => scopeF === 'all' ? true : scopeF === 'work' ? sc(t) === 'work' : scopeF === 'personal' ? sc(t) === 'personal' : (sc(t) === 'personal' || !t.who || SC.involves({ who: t.who, by: t.by }, me))).filter(t => !peopleF.length || peopleF.some(n => (t.who || t.by || members[0]).includes(short(n))));
-      const nav = h('div.row.between', { style: { marginBottom: '12px' } },
-        h('div.row', h('button.btn.icon.ghost', { 'aria-label': '이전', onclick: () => move(-1) }, ic('left')), h('h2', { style: { minWidth: '150px', textAlign: 'center' } }, title()), h('button.btn.icon.ghost', { 'aria-label': '다음', onclick: () => move(1) }, ic('right')), h('button.btn.sm', { onclick: () => { cursor = new Date(); draw(); } }, '오늘')),
+      const nav = h('div.row.between.cal-top', { style: { marginBottom: '12px' } },
+        h('div.row.cal-nav', h('button.btn.icon.ghost', { 'aria-label': '이전', onclick: () => move(-1) }, ic('left')), h('h2', { style: { minWidth: '150px', textAlign: 'center' } }, title()), h('button.btn.icon.ghost', { 'aria-label': '다음', onclick: () => move(1) }, ic('right')), h('button.btn.sm', { onclick: () => { cursor = new Date(); draw(); } }, '오늘')),
         seg([['month', '월'], ['week', '주'], ['agenda', '목록'], ['people', '사람별']], mode, v => { mode = v; draw(); }));
       // 폰에서는 사람·범위·중요도 고르기를 "보기 설정" 한 줄로 접어 둠 (일정이 바로 보이게). 넓은 화면은 늘 펼침
       const scopeName = { mine: '내 일정', work: '팀 업무', personal: '개인만', all: '전체' }; const labName = labF ? ((LB.all().find(l => l.id === labF) || {}).name || '') : '';
-      const fbtn = h('button.btn.sm.ghost.cal-fbtn', { type: 'button', 'aria-expanded': String(fOpen), onclick: () => { fOpen = !fOpen; draw(); } }, ic('sliders', 14), `보기 설정 · ${[scopeName[scopeF], labName, peopleF.length ? peopleF.length + '명' : ''].filter(Boolean).join(' · ')}`, ic(fOpen ? 'up' : 'down', 14));
-      body.append(nav, fbtn, h('div.cal-filters' + (fOpen ? '.open' : ''),
+      const fsum = [scopeName[scopeF], labName, peopleF.length ? peopleF.length + '명' : ''].filter(Boolean).join(' · ');
+      const fbtn = h('button.btn.sm.ghost.cal-fbtn', { type: 'button', 'aria-label': `보기 설정 · ${fsum}`, 'aria-expanded': String(fOpen), onclick: () => { fOpen = !fOpen; draw(); } }, ic('sliders', 14), h('span.cal-fpre', '보기 설정 · '), h('span.cal-fsum', fsum), ic(fOpen ? 'up' : 'down', 14));
+      nav.append(fbtn);
+      body.append(nav, h('div.cal-filters' + (fOpen ? '.open' : ''),
         members.length > 1 ? h('div.chips.cal-people', h('span.faint.tiny', '사람'), ...members.map(n => h('button.chip' + (peopleF.includes(n) ? '.acc' : ''), { onclick: () => { peopleF = peopleF.includes(n) ? peopleF.filter(x => x !== n) : [...peopleF, n]; draw(); } }, facePic(n, h('span.avatar.xs', { style: { background: colorFor(n) } }, n[0])), n === me ? n + ' (나)' : n)), peopleF.length ? h('button.chip', { onclick: () => { peopleF = []; draw(); } }, '모두 보기') : null) : null,
         h('div.row.between', { style: { marginBottom: '10px', gap: '8px', flexWrap: 'wrap' } }, seg([['mine', '내 일정'], ['work', '팀 업무'], ['personal', '개인만'], ['all', '전체']], scopeF, v => { scopeF = v; draw(); }), h('span.faint.tiny', { mine: '개인 일정과 내가 낀 팀 업무를 같이 봐요', work: '팀 전체가 보는 업무 일정이에요', personal: '나만 보는 일정이에요', all: '개인과 팀 업무 전부예요' }[scopeF])),
         h('div.labels', { style: { marginBottom: '10px' } }, [{ id: '', name: '전체', color: 'var(--line2)' }, ...LB.all()].map(l => h('button.lab' + (labF === l.id ? '.on' : ''), { style: { '--lc': l.color }, onclick: () => { labF = l.id; draw(); } }, h('i'), l.name)))));
@@ -147,7 +151,7 @@ export default {
     }
     function evRow(e, before) {
       return h('div.li.click', { onclick: () => { before && before(); edit(e); } }, h('span.dot', { style: { background: evColor(e) } }),
-        h('div.mono.small', { style: { width: '92px' } }, e.start ? `${e.start}${e.end ? '–' + e.end : ''}` : '종일'),
+        h('div.mono.small.ev-time', e.start ? [h('span', e.start), e.end ? h('span.ev-end', '–' + e.end) : null] : '종일'),
         h('div.grow', h('div.t.small', e.title), e.place || e.who ? h('div.faint.tiny', [e.place, e.who && (w => w + (((w.charCodeAt(w.length - 1) - 0xAC00) % 28) > 0 && /[가-힣]$/.test(w) ? '과' : '와') + ' 함께')(e.who)].filter(Boolean).join(' · ')) : null), h('span.chip.tiny' + (e._sc === 'personal' ? '' : '.acc'), SC.LABEL[e._sc || 'work']), e.repeat ? ic('refresh', 14) : null);
     }
     async function dayModal(ds, on) {
