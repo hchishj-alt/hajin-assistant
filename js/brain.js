@@ -428,6 +428,9 @@ const known = (w, ctx) => (ctx.people || []).some(n => n && (n === w || n.slice(
 function splitList(p, base, ctx) {
   if (p.length > 200 || /https?:\/\//.test(p) || /^\s*(업체|거래처)\s*[:：]/.test(p)) return [p];
   p = p.replace(/(\d\s*원)\s*(?:썼고|냈고|샀고|긁었고|결제했고|결제하고|쓰고|내고)\s+(?=[^,]{1,24}?\d[\d,]*\s*(?:만\s*)?(?:천\s*)?원)/g, '$1 결제, ').replace(/(\d\s*원)(?:이랑|하고|이고)\s+(?=[^,]{1,20}?\d[\d,]*\s*(?:만\s*)?(?:천\s*)?원)/g, '$1, ');   // "점심 9000원이랑 커피 4500원"
+  // "인건비 민서 80만원 서연 80만원", "소품 대여 5만원 보증금 10만원": 쉼표 없이 이어 쓴 금액들
+  if (!/,/.test(p) && (p.match(new RegExp(MONEY_SRC, 'g')) || []).filter(z => /\d/.test(z) && /원/.test(z)).length >= 2 && !/\d\s*(장|개|부|매|권|세트|박스|롤|통|ea)(?![가-힣])|업체|거래처|견적|단가|인쇄|제작|예산|총|합계|합쳐|부가세|[+\-*x×]/i.test(p))
+    p = p.replace(new RegExp('(' + MONEY_SRC + ')\\s+(?=[가-힣A-Za-z]{2,8}\\s+\\d[\\d,.]*\\s*(?:만\\s*)?(?:\\d+\\s*천\\s*)?원)', 'g'), (m0, a) => (/\d/.test(a) && /원$/.test(a.trim()) ? a.trim() + ', ' : m0));
   const segs = p.split(/\s*,\s+|\s+\/\s+/).map(x => x.trim()).filter(Boolean); if (segs.length < 2 || segs.length > 6) return [p];
   const lead = x => /^(나|저|내가|제가)(는|은)?\s+\S/.test(x) || (() => { const m = x.match(/^([가-힣]{2,3}?)(이는|는|은|이가|가|이)\s+\S/); return !!m && (known(m[1], ctx) || isName(m[1])); })();
   if (segs.every(lead)) { // 마지막에만 붙은 마감("…, 서연이는 견적서 금요일까지")은 앞사람 것에도
@@ -438,9 +441,12 @@ function splitList(p, base, ctx) {
     let ss = segs; const payer = segs[segs.length - 1].match(/\s([가-힣]{2,4}(?:이가|가|이)\s*(?:냄|냈어요?|냈음|결제|계산|결제함|결제했어요?|계산함|계산했어요?))$/);
     if (payer) ss = segs.map((x, k) => (k < segs.length - 1 && !/(냄|냈|결제|계산)/.test(x) ? x + ' ' + payer[1] : x));           // "…서연이가 냄"은 앞의 것에도
     if (INC.test(p) && bare(ss[0]).split(/\s+/).length >= 2) { const cl = bare(ss[0]).split(/\s+/)[0]; ss = ss.map((x, k) => (k && bare(x).split(/\s+/).length === 1 && INC.test(x) ? cl + ' ' + x : x)); } // "오로라 계약금 300만원, 잔금 200만원"
-    if (ss.every(x => x.length <= 24 && (x.match(MR()) || []).filter(z => /\d/.test(z)).length === 1 && !parseWhen(bare(x), base).hits.length)
+    { const hb = bare(ss[0]).split(/\s+/).filter(w0 => !parseWhen(w0, base).hits.length); const hw = parseWhen(bare(ss[0]), base).hits;   // 앞 조각의 머리말("인건비 민서 …, 서연 …")은 뒤에도
+      const hd = hb.filter(w0 => !hw.some(x => x.includes(w0)));
+      if (!INC.test(p) && hd.length >= 2) ss = ss.map((x, k) => { const b1 = bare(x).split(/\s+/); return k && b1.length === 1 && (known(b1[0], ctx) || isName(b1[0], true) || /^(보증금|부가세|배송비|수수료|팁|추가금|연장료)$/.test(b1[0])) ? hd.slice(0, -1).join(' ') + ' ' + x : x; }); }
+    if (ss.every((x, k) => x.length <= 28 && (x.match(MR()) || []).filter(z => /\d/.test(z)).length === 1 && (!parseWhen(bare(x), base).hits.length || (!k && !parseWhen(bare(x), base).hits.some(isTimeHit))))
       && !/\d\s*(장|개|부|매|권|세트|박스|롤|통|ea)(?![가-힣])|업체|거래처|견적|단가|인쇄|제작|예산/i.test(p) && (!INC.test(p) || ss.every(x => bare(x).split(/\s+/).length >= 2)))
-      return ss.map(x => x.replace(/\s*(썼어요?|썼음|씀)$/, '') + (SPENT.test(p) && !SPENT.test(x) ? ' 결제' : '')); }
+      return ss.map((x, k) => (k ? carryDate(ss[0], x, base) : x).replace(/\s*(썼어요?|썼음|씀)$/, '') + (SPENT.test(p) && !SPENT.test(x) ? ' 결제' : '')); }
   const sig = x => parseWhen(x, base).hits.length > 0 || parseMoney(x) != null;
   if (!segs.every(x => sig(x) && x.replace(/\s/g, '').length >= 3) || segs.filter(x => parseWhen(x, base).hits.length).length < 1) return [p];
   if (segs.every(x => parseMoney(x) != null && !parseWhen(x, base).hits.length) && !/(썼|결제|샀|냈|긁|지출)/.test(p)) return [p]; // 가격표는 한 업체의 품목들
@@ -450,7 +456,7 @@ function splitList(p, base, ctx) {
 const KD = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 }, KU = { 십: 10, 백: 100, 천: 1000 };
 export function korMoney(text) {
   const sec = x => { let tot = 0, cur = 0; for (const ch of x) { if (KD[ch]) cur = KD[ch]; else { tot += (cur || 1) * KU[ch]; cur = 0; } } return tot + cur; };
-  return String(text).replace(/(^|[\s(])([일이삼사오육칠팔구십백천만억]{1,12})\s?원(?![가-힣]{2})/g, (m0, pre, k) => {
+  return String(text).replace(/(^|[\s(])([일이삼사오육칠팔구십백천만억]{1,12})\s?원(?=$|[^가-힣]|이랑|하고|이고|짜리|씩|을|은|이|에|으로|도|만|쯤|정도|입|인데|어치|밖에|부터|까지|과|와|랑)/g, (m0, pre, k) => {
     if (!/[십백천만억]/.test(k) || /(억.*억|만.*만|만.*억)/.test(k) || /[일이삼사오육칠팔구]{2}/.test(k)) return m0;
     const [eok, rest] = k.includes('억') ? k.split('억') : ['', k]; const [man, low] = rest.includes('만') ? rest.split('만') : ['', rest];
     const v = (k.includes('억') ? (sec(eok) || 1) * 1e8 : 0) + (rest.includes('만') ? (sec(man) || 1) * 1e4 : 0) + sec(low);
@@ -464,6 +470,8 @@ function splitChain(p, base, ctx) {
   for (let k = 1; k < toks.length - 1; k++) {
     const tk = toks[k]; let tail;
     if (/^(있고|하고|잡혔고|잡혀있고)$/.test(tk)) tail = '';
+    else if (/^[가-힣]{1,4}고$/.test(tk) && !/^(광고|참고|보고|경고|원고|공고|그리고|최고|사고|재고|창고|하고|있고)$/.test(tk) && /(오전|아침|점심)/.test(toks.slice(0, k).join(' ')) && /^(오후|저녁|밤)(에|엔|에는)?$/.test(toks[k + 1])) { const l2 = [...toks.slice(0, k), /[가-힣]{2,}하고$/.test(tk) ? tk.replace(/하고$/, '') : tk.replace(/고$/, '기')].join(' '), r2 = toks.slice(k + 1).join(' '); const dh = parseWhen(p, base).hits.find(x => !isTimeHit(x) && !/^(오전|오후|아침|점심|저녁|밤)/.test(x)) || '오늘';   // 날짜 말이 없으면 오늘 일
+      return [l2.includes(dh) ? l2 : dh + ' ' + l2, r2.includes(dh) ? r2 : dh + ' ' + r2]; }
     else if (/^[가-힣]{2,}(하고|있고)$/.test(tk) && !nm(tk.replace(/(하고|있고)$/, '')) && !/^(광고|참고|보고|경고)/.test(tk.slice(-4))) tail = tk.replace(/(하고|있고)$/, '');
     else continue;
     let left = [...toks.slice(0, k), tail].filter(Boolean).join(' '); const right = toks.slice(k + 1).join(' ');
@@ -851,6 +859,7 @@ function interpretOne(s, base, ctx) {
   }
   // 금액 읽기: "20만 x 3", "8천원씩 5명", "총 60만", 단위 없는 "12800", 3.3% 메모
   function moneyParts(body, bw) {
+    body = body.replace(/(\d\s*원)(짜리|어치)(?=\s|$)/g, '$1 ');   // "5천원짜리 커피", "3만원어치 간식"
     const MR = new RegExp(MONEY_SRC, 'g'); let amt = parseMoney(body); let memo = ''; let ttl = body;
     const tot = body.match(new RegExp('(?:총|합계|합쳐서|다\\s*해서|토탈)\\s*(' + MONEY_SRC + ')'));
     const part = body.match(new RegExp('(' + MONEY_SRC + ')\\s*중\\s*(선금|계약금|잔금|중도금|일부)?\\s*(' + MONEY_SRC + ')'));
@@ -863,7 +872,7 @@ function interpretOne(s, base, ctx) {
     if (amt == null) { const ba = bareAmount(body); if (ba != null) { amt = ba; ttl = ttl.replace(new RegExp('(?<![\\d,])' + String(ba).replace(/\B(?=(\d{3})+(?!\d))/g, ',?') + '(?![\\d,])'), ' '); } }
     if (/3\.3\s*%/.test(body)) memo = [memo, '3.3% 원천징수'].filter(Boolean).join(' · ');
     if (/부가세\s*(포함|별도)/.test(body)) memo = [memo, '부가세 ' + body.match(/부가세\s*(포함|별도)/)[1]].filter(Boolean).join(' · ');
-    ttl = strip(ttl.replace(MR, ' ').replace(/(?:총|합계|합쳐서|토탈)\s*(?=\s|$)/g, ' ').replace(/\(?\s*부가세\s*(포함|별도)\s*\)?/g, ' ').replace(/3\.3\s*%\s*(떼고|제외|공제)?/g, ' '), bw.hits).replace(/(법인\s*카드|회사\s*카드|개인\s*카드|법카|개카|카드로|카드|현금으로|현금|계좌\s*이체)/g, ' ').replace(/\s+/g, ' ').trim();
+    ttl = strip(ttl.replace(MR, ' ').replace(/(?:총|합계|합쳐서|토탈)\s*(?=\s|$)/g, ' ').replace(/\(?\s*부가세\s*(포함|별도)\s*\)?/g, ' ').replace(/3\.3\s*%\s*(떼고|제외|공제)?/g, ' '), bw.hits).replace(/(법인\s*카드|회사\s*카드|개인\s*카드|법카|개카|카드로|카드|현금으로|현금|계좌\s*이체)(으로|로)?(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
     return { amount: amt || 0, title: ttl, memo };
   }
   function strip(x, hits) {
@@ -882,7 +891,10 @@ const DOING = /(?:\s|^)((?:전시|공연|영화|팝업|박람회|페어|콘서�
 const FAMILY = '엄마|아빠|어머니|아버지|할머니|할아버지|이모|고모|삼촌|언니|오빠|누나|형|동생|친구|남친|여친|남자친구|여자친구|남편|아내|와이프';
 const TITLE_SUF = '대표님?|팀장님?|실장님?|교수님?|선생님|쌤|작가님?|감독님?|피디님?|PD님?|사장님|주무관님?|대리님?|과장님?|차장님?|부장님?|매니저님?|님';
 const DECIDED = /[가-힣A-Za-z0-9]\s*(으로|로)\s*(최종\s*)?(확정|결정|정함|정했어요?|정했음|가기로\s*(함|했\S*)|하기로\s*(함|했\S*))\s*[.!]*\s*$/;
-const PLACE_SUF = /(역|카페|센터|빌딩|학교|대학교|대학|캠퍼스|사무실|스튜디오|홀|관|시청|구청|도청|군청|청사|병원|치과|의원|미술관|박물관|도서관|공원|극장|갤러리|플라자|타워|식당|집|본점|지점|점|DDP|코엑스|킨텍스|벡스코)$/;
+const PLACE_RE = /(역|카페|센터|빌딩|학교|대학교|대학|캠퍼스|사무실|스튜디오|홀|관|시청|구청|도청|군청|청사|병원|치과|의원|미술관|박물관|도서관|공원|극장|갤러리|플라자|타워|식당|집|본점|지점|점|DDP|코엑스|킨텍스|벡스코)$/;
+// 끝 글자만 같고 곳이 아닌 낱말 ("편집 회의"의 편집, "번역 미팅"의 번역 …)
+const NOTPLACE = /^(편집|수집|모집|채집|소집|결집|특집|문집|시집|전집|선집|화집|고집|밀집|응집|촬영편집|영상편집|주관|보관|입관|개관|휴관|세관|습관|기관|주역|통역|번역|지역|영역|구역|현역|용역|무역|교역|악역|배역|단역|대역|시점|관점|초점|요점|중점|장점|단점|강점|약점|문제점|개선점|차이점|공통점|쟁점|논점|거점|정점|종점|기점|득점|감점|가산점|학점|평점|총점|만점|오점|맹점|접점|원점|시작점|출발점|도착점|진단|이의원|의원|국회의원|시의원|구의원)$/;
+const PLACE_SUF = { test: x => PLACE_RE.test(x) && !NOTPLACE.test(x) };
 const MEET = '미팅|회의|상담|인터뷰|식사|점심|저녁|약속|통화|콜|회식|모임|촬영|수업';
 const TAILACT = new RegExp(`(${MEET}|감리|답사|리허설|워크숍|세미나|행사|시사회|설치|철수|납품|수령|픽업|출장|견학|면접|발표|공연|전시)$`);
 const TOPIC_RE = new RegExp(`((?:${MEET}|행사|발표|마감|리허설|답사|감리|워크숍|세미나|시사회))(?:은|는)(?=\\s|$)`, 'g');
@@ -920,7 +932,7 @@ export function eventParts(title, people = []) {
   if (place && /^(보러\s*가기|보러\s*감|가기|가야\s*\S*|예약하기|예약|방문하기|방문|구경|관람|들르기|다녀오기|답사)$/.test(t) && !t.includes(place)) t = `${place} ${t}`;   /* "전시 보러 가기"가 "보러 가기"만 남지 않게 */
   return { title: t || title, who, area, place };
 }
-function placeOf(s) { const m = s.match(/([가-힣A-Za-z0-9]+(?:역|카페|센터|빌딩|학교|대학교|캠퍼스|사무실|스튜디오|홀|관|층|호|점))(?:에서|서)?/); return m ? m[1] : ''; }
+function placeOf(s) { const re = /([가-힣A-Za-z0-9]+(?:역|카페|센터|빌딩|학교|대학교|캠퍼스|사무실|스튜디오|홀|관|층|호|점))(?:에서|서)?(?=\s|$)/g; let m; while ((m = re.exec(s))) if (!NOTPLACE.test(m[1]) && !/^\d+호$|^(번호|신호|기호|보호|선호|암호|구호|간호|상호|부호|애호|옹호|수호|단층|고층|계층|상층|하층)$/.test(m[1])) return m[1]; return ''; }
 // 프로젝트는 이름 앞머리만 불러도 알아듣기: "카페 로우 브랜드 영상" ← "카페 로우 촬영"
 const nsp = x => String(x || '').replace(/\s+/g, '');
 export function projAliases(p) { const ws = String(p || '').trim().split(/\s+/); const out = [p]; if (ws.length >= 3) out.push(ws.slice(0, 2).join(' ')); if (ws.length >= 2 && ws[0].length >= 4 && !/^(브랜드|유튜브|인스타|프로젝트|캠페인)$/.test(ws[0])) out.push(ws[0]); return out.filter(a => nsp(a).length >= 3); }

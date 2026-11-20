@@ -1,5 +1,5 @@
 // 오프라인 실행 + 자동 업데이트. 배포 때 VERSION을 js/version.js와 같이 올리면 새 버전이 설치돼요.
-const VERSION = '1.34.0';
+const VERSION = '1.34.1';
 const CACHE = 'hajin-' + VERSION;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable.png', 'supabase/setup.sql',
   'js/app.js', 'js/install.js', 'js/alarm.js', 'js/alarmui.js', 'js/push.js', 'js/widget.js', 'js/prompts.js', 'js/helper.js', 'modules/prompts.js', 'js/ui.js', 'js/db.js', 'js/icons.js', 'js/brain.js', 'js/store.js', 'js/fields.js', 'js/draftcard.js', 'js/where.js', 'js/context.js', 'js/query.js', 'js/voice.js', 'js/video.js', 'js/ext.js', 'js/seed.js', 'js/selftest.js', 'js/version.js', 'js/sync.js', 'js/config.js', 'js/figma-api.js', 'js/linkpreview.js', 'js/theme.js', 'js/admin.js', 'js/look.js', 'js/labels.js', 'js/auto.js', 'js/feedback.js', 'js/dm.js', 'js/gcal.js', 'js/codex.js', 'js/chat.js', 'js/outline.js', 'js/taste.js', 'js/place.js', 'js/scope.js', 'js/queue.js', 'js/ai.js', 'js/keyshare.js', 'js/vendor-qr.js', 'js/vendor-jsqr.js', 'js/act.js', 'js/ask.js', 'js/follow.js', 'js/xlsx.js', 'js/product.js', 'js/vendor-supabase.js',

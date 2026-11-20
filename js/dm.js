@@ -65,8 +65,14 @@ export function parseSend(text, roster = []) {
   { const req = body.match(/^(.*?)\s*달라고\s*(?:좀\s*)?(?:전해|말해|해|부탁해|얘기해)\s*(?:줘|주세요|줄래|주라|줘요)?\s*[.!?]?$/s); if (req && req[1].trim()) return { to, body: req[1].trim().replace(/["“”']/g, '') + ' 주세요' }; }
   const verb = /\s*(?:(?:이)?라고|다고|냐고|자고|하라고)?\s*(?:좀\s*)?(?:전해|말해|물어봐|물어|보내|알려|연락해|톡해|메시지\s*보내)\s*(?:줘|주세요|줄래|주라|줘요|봐줘|봐)?\s*[.!?]?$/;
   if (!verb.test(body)) return null;
-  const ask = /냐고|물어/.test(body.match(verb)[0]);
+  const vm = body.match(verb)[0]; const ask = /냐고|물어/.test(vm);
+  const q = (vm.match(/^\s*((?:이)?라고|다고|냐고|자고|하라고)/) || [])[1] || '';   // 옮기는 말의 끝("취소됐다고" → "취소됐다", "보자고" → "보자", "수정하라고" → "수정해 주세요")
   body = body.replace(verb, '').replace(/["“”']/g, '').trim();
+  // "민서한테 파일 보내줘"는 전할 말이 아니라 내가 보낼 것 (낱말만 있고 말끝이 없음) → 할 일 쪽으로 넘김
+  if (!q && !ask && /보내/.test(vm) && !/(메시지|톡)/.test(vm) && !/(요|다|어|아|해|음|함|지|죠|까|네|야|임|됨|줘|자|[?？!~ㅋㅎㅠ.])$/.test(body)) return null;
+  if (q === '다고') body = (body + '다').replace(/부탁한다$/, '부탁해요').replace(/고맙다$/, '고마워요').replace(/미안하다$/, '미안해요');
+  else if (q === '자고') body += '자';
+  else if (q === '하라고' && body) body += '해 주세요';
   if (ask && !/[?？]$/.test(body)) body = body.replace(/(는지|인지|한지)$/, '').replace(/하$/, '해').replace(/되$/, '돼').replace(/[가-힣]$/, c => ((c.charCodeAt(0) - 0xac00) % 28 === 20 ? c + '어' : c)).replace(/(없|같)$/, '$1어').replace(/이$/, '이야') + '?';
   return body.length >= 1 ? { to, body } : null;
 }
