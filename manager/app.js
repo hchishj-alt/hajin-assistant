@@ -11,7 +11,7 @@ import * as EX from './explore.js';
 import * as W from './web.js';
 import { FIELDS } from './fields.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.4.4';
+export const VERSION = '1.4.5';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
@@ -37,6 +37,7 @@ async function route() {
   document.body.classList.toggle('bare', name === 'hello' || name === 'start' || fresh);
   view.classList.remove('in'); void view.offsetWidth;
   const st = await state(); const An = A.analyze(st);
+  { const u = ['ig', 'tt'].filter(p => st.profile[p]?.username || An.plats[p].n); USE = u.length ? u : ['ig', 'tt']; if (!USE.includes($plat.get())) $plat.set(USE[0]); }
   view.replaceChildren();
   const fn = SCREENS[name] || SCREENS.today;
   try { cleanup = await fn(view, st, An, rest); } catch (e) { console.error(e); view.append(h('div.card', h('b', '화면을 그리다 문제가 생겼어요'), h('p.muted', String(e.message || e)), h('div.row.gap', h('button.btn.sm', { onclick: () => location.reload() }, '다시 열기'), h('button.ghost.sm', { onclick: () => go('#/today') }, '오늘로')))); }
@@ -46,7 +47,9 @@ const head = (title, sub, right) => h('header.top', h('div', h('h1', title), sub
 const demoBadge = () => S.getMode() === 'demo' ? h('button.demo', { onclick: () => localStorage.getItem('mgr:onboarded') ? go('#/settings') : go('#/start') }, ic('flag', 14), localStorage.getItem('mgr:onboarded') ? '연습 모드 · 봄이' : '구경 중 · 내 계정으로 시작') : null;
 const go = hsh => { location.hash = hsh; };
 const tile = (icn, label, val, sub, cls = '') => h('div.tile' + (cls ? '.' + cls : ''), h('div.tl', ic(icn, 15), label), h('div.tv', val), sub ? h('div.ts', sub) : null);
-const platSeg = (cur, on) => seg([['ig', '인스타', 'ig'], ['tt', '틱톡', 'tt']], cur, on);
+// 한 곳만 쓰는 사람에게는 고르는 단추를 안 보임
+let USE = ['ig', 'tt'];
+const platSeg = (cur, on) => USE.length < 2 ? h('span') : seg([['ig', '인스타', 'ig'], ['tt', '틱톡', 'tt']], cur, on);
 const empty = (icn, title, body, btn) => h('div.empty', ic(icn, 28), h('b', title), h('p', body), btn);
 
 const SCREENS = {};
@@ -545,6 +548,7 @@ SCREENS.deals = async (root, st, An, [tab = 'deals']) => {
       const g = A.rateGuess(fol, a.er);
       root.append(h('div.card', h('div.row.sb', h('b', ic(p, 15), ' ', A.PLAT[p]), h('span.muted', '팔로워 ' + A.fmt(fol) + ' · 반응률 ' + A.pct(a.er))), h('div.big', `${A.fmt(g[0])}~${A.fmt(g[1])}원`), h('p.muted', '게시물 1개 기준 어림값이에요. 반응률이 높으면 더 불러도 돼요. 릴스+스토리 묶음은 1.3~1.5배, 2차 활용(브랜드가 광고로 씀)은 따로 받아요.')));
     }
+    if (!['ig', 'tt'].some(p => An.plats[p].growth.now || st.profile[p]?.followers)) root.append(empty('wallet', '팔로워 숫자가 있어야 어림해요', '팔로워 수와 반응률로 게시물 1개 값을 어림해 드려요. 오늘 화면에서 숫자를 먼저 넣어 주세요.', h('button.btn', { onclick: () => go('#/today') }, '숫자 넣으러 가기')));
     root.append(h('div.card.note', ic('msg', 18), h('p', '단가를 물어보면: "릴스 1개 ○○원, 스토리 추가 ○○원, 2차 활용은 1개월 ○○원이에요. 제품만 받는 협찬은 촬영 일정 맞으면 가능해요." 처럼 묶음으로 답해요.')));
   }
 };
@@ -572,7 +576,17 @@ async function dealReply(d) {
   const facts = `브랜드 ${d.brand}, 종류 ${d.kind || ''}, 올릴 것 ${d.deliverables || '미정'}, 금액 ${d.fee ? d.fee + '원' : '미정'}, 마감 ${d.due || '미정'}, 메모 ${d.memo || ''}. 내 팔로워 ${a.growth.now || '?'}, 반응률 ${A.pct(a.er)}, 어림 단가 ${g ? g[0] + '~' + g[1] + '원' : '?'}`;
   let text;
   if (await AI.hasKey()) { try { text = await AI.gem([`인플루언서 ${st.about.name || '크리에이터'}이 브랜드 담당자에게 인스타 DM이나 메일로 보낼 답장을 써 줘. 목적: ${kind}. 사실: ${facts}. 공손하지만 짧게(5~8줄), 금액·조건은 분명히, 광고 표시("광고" 문구, 유료 파트너십)를 지킨다는 말 한 줄 포함. 지어낸 숫자 금지. 답장 글만.`], { temp: 0.5 }); } catch { } }
-  if (!text) text = d.status === '문의' ? `안녕하세요, ${d.brand} 담당자님! 연락 주셔서 감사해요.\n${d.deliverables || '릴스 1개'} 기준 ${g ? A.fmt(g[1]) + '원' : '○○원'}이고, 스토리 추가는 별도로 협의 가능해요.\n촬영은 제품 받고 1주 안에 가능하고, 게시물에는 "광고" 표시와 유료 파트너십 표시를 함께 넣어요.\n가이드 주시면 일정 맞춰 볼게요. 감사합니다!` : `안녕하세요, ${d.brand} 담당자님! ${d.deliverables || '콘텐츠'} 관련해서 연락드려요.\n마감 ${d.due || '일정'} 맞춰 진행 중이고, 확인 필요한 부분 있으면 말씀 주세요. 감사합니다!`;
+  if (!text) {
+    const hi = `안녕하세요, ${d.brand} 담당자님!`, what = d.deliverables || '릴스 1개', price = d.fee ? A.fmt(d.fee) + '원' : g ? A.fmt(g[1]) + '원' : '○○원', gift = !d.fee && /제품|협찬/.test(d.kind || '');
+    const mark = '게시물에는 "광고" 표시와 유료 파트너십 표시를 함께 넣어요.';
+    text = ({
+      문의: gift ? `${hi} 연락 주셔서 감사해요.\n제품 협찬으로 ${what} 진행 가능해요. 제품 받고 1주 안에 올릴 수 있어요.\n${mark}${g ? `\n유료로 진행하실 경우 ${what} 기준 ${A.fmt(g[1])}원이에요.` : ''}\n가이드 주시면 일정 맞춰 볼게요. 감사합니다!` : `${hi} 연락 주셔서 감사해요.\n${what} 기준 ${price}이고, 스토리 추가나 2차 활용은 따로 협의 가능해요.\n촬영은 제품 받고 1주 안에 가능해요. ${mark}\n가이드 주시면 일정 맞춰 볼게요. 감사합니다!`,
+      협의: `${hi} 조건 정리해서 확인드려요.\n올릴 것: ${what}\n금액: ${d.fee ? price : '제품 제공'}\n마감: ${d.due || '협의'}\n2차 활용(브랜드 계정·광고에 쓰는 것)은 기간과 금액을 따로 정하면 좋겠어요. ${mark}\n이대로 괜찮으시면 진행할게요!`,
+      진행: `${hi} ${what} 준비 중이에요.\n제품 잘 받았고, 마감 ${d.due || '일정'}에 맞춰 올릴게요. 꼭 들어가야 하는 문구나 피해야 할 표현이 있으면 미리 알려 주세요.\n${mark}`,
+      업로드: `${hi} ${what} 올렸어요.\n링크: (여기에 게시물 링크)\n일주일 뒤에 도달·저장 같은 숫자를 캡처해서 보내 드릴게요.${d.fee ? `\n정산은 ${price}, 아래 계좌로 부탁드려요. (계좌)` : ''}\n함께해서 즐거웠어요. 감사합니다!`,
+      정산: `${hi} 정산 확인했어요. 감사합니다!\n이번 콘텐츠 반응이 좋았던 부분을 정리해서 보내 드릴게요. 다음 시즌에도 같이 하면 좋겠어요.`,
+    })[d.status] || `${hi} ${what} 관련해서 연락드려요. 확인 필요한 부분 있으면 말씀 주세요. 감사합니다!`;
+  }
   out.replaceChildren(h('pre', text), h('button.btn.wide', { onclick: () => copy(text) }, ic('copy', 16), '복사'), h('p.fhint', '초안이에요. 금액·날짜는 꼭 확인하고 보내요.'));
 }
 function adForm() {
