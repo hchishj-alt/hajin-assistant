@@ -166,8 +166,11 @@ export async function smart(q, base = new Date(), r = null) {
   if (/(밀린|늦은|지난\s*마감|못\s*끝낸)/.test(q)) { const late = (await store.openTasks()).filter(t => t.due && t.due < today).sort((a, b) => a.due.localeCompare(b.due));
     return { text: late.length ? `밀린 일이 ${late.length}개 있어요. 가장 오래된 건 “${late[0].title}” (마감 ${md(late[0].due)})이에요.` : '밀린 일이 없어요. 잘하고 있어요.', items: late.slice(0, 15).map(t => taskItem(t, today)) }; }
 
+  // "오늘 할 일 다 했어", "할 일 3개 남았어": 남은 것을 세어 맞장구
+  if (/할\s*(일|거)(이|은|는|도|들)?\s*(다\s*(했|끝냈|끝났)|\d+\s*개\s*남았)/.test(q)) { const mine = await store.openTasks(); const td = mine.filter(t => t.due && t.due <= today);
+    return { text: /다\s*(했|끝)/.test(q) ? (td.length ? `수고했어요. 다만 오늘까지인 할 일이 아직 ${td.length}개 남아 있어요.` : mine.length ? `수고했어요! 오늘까지인 건 다 끝났어요. 남은 할 일은 ${mine.length}개인데 급하지 않아요.` : '수고했어요! 남은 할 일이 하나도 없어요.') : `지금 남은 할 일은 ${mine.length}개예요.${td.length ? ` 그중 ${td.length}개는 오늘까지예요.` : ''}`, items: (td.length ? td : mine).slice(0, 6).map(t => ({ icon: 'check2', title: t.title, sub: [t.due ? '마감 ' + md(t.due) : '', t.who].filter(Boolean).join(' · '), route: 'tasks' })) }; }
   // 뭐부터 해야 하는지
-  if (/(뭐\s*부터|뭐부터|뭘\s*먼저|뭐\s*먼저|우선\s*순위|제일\s*급(한|해)|가장\s*급(한|해)|급한\s*(거|것|일)|(뭐가|뭐\s*가|어떤\s*게)\s*(제일\s*|가장\s*)?(급|중요))/.test(q)) {
+  if (/(뭐\s*부터|뭐부터|뭘\s*먼저|뭐\s*먼저|우선\s*순위|제일\s*급(한|해)|가장\s*급(한|해)|급한\s*(거|것|일)|(뭐가|뭐\s*가|어떤\s*게)\s*(제일\s*|가장\s*)?(급|중요)|할\s*(일|거)(이|은|도)?\s*(너무\s*|진짜\s*|엄청\s*)?(많아|많다|많네|많음|쌓였|밀렸))/.test(q)) {
     const mine = await store.openTasks(); const rank = t => (t.due && t.due < today ? 0 : t.due === today ? 1 : 3) + (t.priority === 'high' ? -0.5 : 0) + (t.due && t.due > today ? Math.min(3, (new Date(t.due) - new Date(today)) / 864e5 / 3) : t.due ? 0 : 4);
     const order = mine.slice().sort((a, b) => rank(a) - rank(b) || (a.due || '9').localeCompare(b.due || '9')).slice(0, 5);
     const nextEv = (await store.eventsOn(today)).find(e => e.start && e.start > `${pad(base.getHours())}:${pad(base.getMinutes())}`);
