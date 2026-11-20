@@ -244,3 +244,86 @@ $$;
 
 revoke all on function public.ps_cust(text), public.ps_mine(text), public.ps_save(text, json), public.ps_unsave(text, text), public.ps_folders(text, json), public.ps_move_folder(text, text, text) from public;
 grant execute on function public.ps_mine(text), public.ps_save(text, json), public.ps_unsave(text, text), public.ps_folders(text, json), public.ps_move_folder(text, text, text) to anon, authenticated;
+
+-- ── 기프트 키 (3차): 한 달 무료·평생 무료 등. 평생은 paid_until = 'infinity' ──
+create table if not exists public.ps_gifts (
+  key text primary key,
+  days int,                         -- null이면 평생
+  max_uses int not null default 1,
+  used int not null default 0,
+  note text not null default '',
+  expires_at timestamptz,           -- 이 날짜가 지나면 못 씀(null이면 계속)
+  created_at timestamptz not null default now()
+);
+create table if not exists public.ps_gift_uses (
+  key text not null references public.ps_gifts(key) on delete cascade,
+  token text not null references public.ps_customers(token) on delete cascade,
+  used_at timestamptz not null default now(),
+  primary key (key, token)
+);
+alter table public.ps_gifts enable row level security;
+alter table public.ps_gift_uses enable row level security;
+revoke all on public.ps_gifts, public.ps_gift_uses from anon, authenticated;
+
+-- 손님: 키 넣기. 없으면 손님부터 만들어 줌(복구 코드는 화면이 저장)
+create or replace function public.ps_redeem(p_token text, p_key text)
+returns json language plpgsql volatile security definer set search_path = public as $$
+declare k text := upper(regexp_replace(coalesce(p_key, ''), '[^A-Za-z0-9]', '', 'g')); k2 text; g ps_gifts; c ps_customers := ps_cust(p_token);
+begin
+  if length(k) < 8 then return json_build_object('ok', false, 'why', 'format'); end if;
+  select * into g from ps_gifts where replace(key, '-', '') = k for update;
+  if g.key is null then return json_build_object('ok', false, 'why', 'none'); end if;
+  if g.expires_at is not null and g.expires_at < now() then return json_build_object('ok', false, 'why', 'expired'); end if;
+  if c.token is null then
+    k2 := ps_join()->>'token'; -- 새 손님
+    select * into c from ps_customers where token = k2;
+  end if;
+  if exists (select 1 from ps_gift_uses where key = g.key and token = c.token) then return json_build_object('ok', false, 'why', 'mine', 'token', c.token); end if;
+  if g.used >= g.max_uses then return json_build_object('ok', false, 'why', 'used'); end if;
+  update ps_gifts set used = used + 1 where key = g.key;
+  insert into ps_gift_uses(key, token) values (g.key, c.token);
+  update ps_customers set paid_until = case when g.days is null then 'infinity'::timestamptz
+    else greatest(coalesce(paid_until, now()), now()) + make_interval(days => g.days) end
+  where token = c.token returning * into c;
+  return json_build_object('ok', true, 'token', c.token, 'code', c.code, 'days', g.days, 'forever', g.days is null, 'paid_until', c.paid_until);
+end $$;
+
+-- 관리: 키 만들기. p_days 0이면 평생. 키 모양 XXXX-XXXX-XXXX
+create or replace function public.ps_admin_gift_make(p_secret text, p_days int, p_count int, p_max_uses int default 1, p_note text default '', p_expires timestamptz default null)
+returns json language plpgsql volatile security definer set search_path = public as $$
+declare A text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; out text[] := '{}'; k text; i int; j int;
+begin
+  if not ps_ok(p_secret) then raise exception 'denied'; end if;
+  for i in 1..least(greatest(coalesce(p_count, 1), 1), 100) loop
+    loop
+      k := '';
+      for j in 1..12 loop
+        k := k || substr(A, 1 + (get_byte(decode(md5(gen_random_uuid()::text), 'hex'), 0) % 32), 1);
+        if j in (4, 8) then k := k || '-'; end if;
+      end loop;
+      exit when not exists (select 1 from ps_gifts where key = k);
+    end loop;
+    insert into ps_gifts(key, days, max_uses, note, expires_at)
+    values (k, nullif(p_days, 0), greatest(coalesce(p_max_uses, 1), 1), left(coalesce(p_note, ''), 60), p_expires);
+    out := out || k;
+  end loop;
+  return to_json(out);
+end $$;
+
+create or replace function public.ps_admin_gifts(p_secret text)
+returns json language plpgsql stable security definer set search_path = public as $$
+begin
+  if not ps_ok(p_secret) then raise exception 'denied'; end if;
+  return (select coalesce(json_agg(g order by g.created_at desc), '[]') from (select key, days, max_uses, used, note, expires_at, created_at from ps_gifts order by created_at desc limit 200) g);
+end $$;
+
+create or replace function public.ps_admin_gift_del(p_secret text, p_key text)
+returns boolean language plpgsql volatile security definer set search_path = public as $$
+begin
+  if not ps_ok(p_secret) then raise exception 'denied'; end if;
+  delete from ps_gifts where key = p_key and used = 0;
+  return found;
+end $$;
+
+revoke all on function public.ps_redeem(text, text), public.ps_admin_gift_make(text, int, int, int, text, timestamptz), public.ps_admin_gifts(text), public.ps_admin_gift_del(text, text) from public;
+grant execute on function public.ps_redeem(text, text), public.ps_admin_gift_make(text, int, int, int, text, timestamptz), public.ps_admin_gifts(text), public.ps_admin_gift_del(text, text) to anon, authenticated;

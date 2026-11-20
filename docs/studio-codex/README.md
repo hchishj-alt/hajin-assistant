@@ -51,6 +51,8 @@
 | `ps_deposit(secret, msg)` | 입금 알림 글에서 금액·입금 코드를 찾아 기간을 늘림 (9,900원마다 365일, 990원마다 31일) |
 | `ps_admin*` | 관리 화면용 (비밀키 확인) |
 | `ps_mine`, `ps_save`, `ps_unsave`, `ps_folders`, `ps_move_folder` | 보관함·폴더·결제 내역 |
+| `ps_redeem(token, key)` | 기프트 키 넣기. days null이면 평생(`paid_until = infinity`), 한 사람이 같은 키 두 번 못 씀 |
+| `ps_admin_gift_make/_gifts/_gift_del` | 관리 화면에서 키 만들기(0일=평생)·목록·안 쓴 키 지우기. 링크는 `/studio/?gift=KEY` |
 
 서버 변경은 `supabase/studio.sql` 끝에 **덧붙이고**(다시 실행해도 안전하게), PR 설명에 "SQL Editor에서 실행 필요"라고 적는다.
 새 표를 만들면 반드시 `enable row level security` + `revoke all ... from anon, authenticated`.
