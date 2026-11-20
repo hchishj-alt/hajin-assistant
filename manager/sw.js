@@ -1,7 +1,7 @@
 // 매니저 앱 오프라인 + 자동 업데이트. app.js의 VERSION과 같이 올릴 것
-const VERSION = '1.3.2';
+const VERSION = '1.4.0';
 const CACHE = 'mgr-' + VERSION;
-const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'app.css', 'app.js', 'store.js', 'analyze.js', 'ai.js', 'ig.js', 'importers.js', 'video.js', 'demo.js', 'ui.js', 'strategy.js', 'explore.js', 'web.js', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable.png', '../js/db.js', '../js/icons.js'];
+const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'app.css', 'app.js', 'store.js', 'analyze.js', 'ai.js', 'ig.js', 'importers.js', 'video.js', 'demo.js', 'ui.js', 'strategy.js', 'explore.js', 'web.js', 'fields.js', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable.png', '../js/db.js', '../js/icons.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil((async () => { for (const k of await caches.keys()) if (k.startsWith('mgr-') && k !== CACHE) await caches.delete(k); await self.clients.claim(); })()); });
 self.addEventListener('fetch', e => {

@@ -9,8 +9,9 @@ import { seed } from './demo.js';
 import * as SG from './strategy.js';
 import * as EX from './explore.js';
 import * as W from './web.js';
+import { FIELDS } from './fields.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.3.2';
+export const VERSION = '1.4.0';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
@@ -31,6 +32,7 @@ async function route() {
   if (cleanup) { try { cleanup(); } catch { } cleanup = null; }
   document.getElementById('sheet-root').replaceChildren();
   document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.t === name));
+  document.body.classList.toggle('bare', name === 'hello' || name === 'start');
   view.classList.remove('in'); void view.offsetWidth;
   const st = await state(); const An = A.analyze(st);
   view.replaceChildren();
@@ -39,7 +41,7 @@ async function route() {
   view.classList.add('in'); window.scrollTo(0, 0);
 }
 const head = (title, sub, right) => h('header.top', h('div', h('h1', title), sub ? h('p.sub', sub) : null), h('div.topr', right));
-const demoBadge = () => S.getMode() === 'demo' ? h('button.demo', { onclick: () => go('#/settings') }, ic('flag', 14), '연습 모드 · 봄이') : null;
+const demoBadge = () => S.getMode() === 'demo' ? h('button.demo', { onclick: () => localStorage.getItem('mgr:onboarded') ? go('#/settings') : go('#/start') }, ic('flag', 14), localStorage.getItem('mgr:onboarded') ? '연습 모드 · 봄이' : '구경 중 · 내 계정으로 시작') : null;
 const go = hsh => { location.hash = hsh; };
 const tile = (icn, label, val, sub, cls = '') => h('div.tile' + (cls ? '.' + cls : ''), h('div.tl', ic(icn, 15), label), h('div.tv', val), sub ? h('div.ts', sub) : null);
 const platSeg = (cur, on) => seg([['ig', '인스타', 'ig'], ['tt', '틱톡', 'tt']], cur, on);
@@ -83,6 +85,7 @@ SCREENS.today = async (root, st, An) => {
     h('div.bcm', h('div.bct', h('span.lv.' + LV[c.lvl][1], LV[c.lvl][0]), c.title), h('p', c.body), c.go ? h('button.link', { onclick: () => go(c.go) }, c.btn || '열기', ic('right', 14)) : null),
     c.num ? h('div.bcn', c.num) : null)));
   if (!cards.length) list.append(empty('check', '오늘은 급한 게 없어요', '올릴 거 하나 정해 볼까요?', h('button.btn', { onclick: () => go('#/coach') }, '코치 열기')));
+  if (!(await AI.hasKey()) && !localStorage.getItem('mgr:ainudge')) root.append(h('div.card.nudge', h('div.wi', ic('sparkles', 20)), h('div', h('b', '매니저 머리 켜기 (무료 · 1분)'), h('p.muted', '지금은 정해진 규칙으로만 일해요. 구글 무료 AI 키를 한 번 넣으면 내 분야 트렌드 찾기, 영상·캡션 피드백, 대화가 열려요.'), h('div.row.gap', h('button.btn.sm', { onclick: () => go('#/settings') }, '켜러 가기'), h('button.link', { onclick: e => { localStorage.setItem('mgr:ainudge', '1'); e.currentTarget.closest('.nudge').remove(); } }, '나중에')))));
   root.append(h('h2.sec', '매니저가 본 것 ', h('small', cards.length + '')), list);
   // 매니저에게 묻기
   const q = h('input.ask', { placeholder: '매니저에게 물어보기 (예: 이번 주 뭐 올려?)', enterkeyhint: 'send' });
@@ -91,7 +94,7 @@ SCREENS.today = async (root, st, An) => {
   root.append(h('div.askbar', ic('msg', 18), q, h('button.iconbtn.acc', { 'aria-label': '보내기', onclick: send, html: icon('send', 18) })));
   root.append(h('button.ghost.wide', { onclick: () => openChat(st, An) }, ic('msg', 16), '지난 대화 보기'));
 };
-function greet(st) { const hr = new Date().getHours(); const n = st.about.name || '하진'; return hr < 6 ? `${n}님, 늦었어요. 오늘 할 건 내일 아침에 다시 정리해 둘게요.` : hr < 12 ? `${n}님 좋은 아침이에요. 오늘 챙길 걸 골라 놨어요.` : hr < 18 ? `${n}님, 오후 체크할게요. 아래부터 하나씩요.` : `${n}님, 저녁이에요. 지금이 올리기 좋은 시간대일 수 있어요.`; }
+function greet(st) { const hr = new Date().getHours(); const n = st.about.name ? st.about.name + '님' : ''; return hr < 6 ? `${n ? n + ', ' : ''}늦었어요. 오늘 할 건 내일 아침에 다시 정리해 둘게요.` : hr < 12 ? `${n ? n + ' ' : ''}좋은 아침이에요. 오늘 챙길 걸 골라 놨어요.` : hr < 18 ? `${n ? n + ', ' : ''}오후 체크할게요. 아래부터 하나씩요.` : `${n ? n + ', ' : ''}저녁이에요. 지금이 올리기 좋은 시간대일 수 있어요.`; }
 
 async function openChat(st, An, first) {
   const hist = await S.get('chat', []);
@@ -144,8 +147,9 @@ SCREENS.plan = async (root, st, An) => {
   // 주간 계획
   const byDay = {}; c.items.forEach(i => (byDay[i.date] ||= []).push(i));
   const wk = h('div.week');
-  for (let k = 0; k < 7; k++) {
-    const d = SG.addDays(c.week, k); const its = byDay[d] || []; if (!its.length && d < SG.kdate()) continue;
+  const lastDay = c.items.reduce((m, i) => i.date > m ? i.date : m, SG.addDays(c.week, 6));
+  for (let k = 0; k < 14; k++) {
+    const d = SG.addDays(c.week, k); if (d > lastDay) break; const its = byDay[d] || []; if (!its.length && d < SG.kdate()) continue;
     wk.append(h('div.wd' + (d === SG.kdate() ? '.today' : ''), h('div.wl', SG.dayLabel(d)), its.length ? h('div.wis', its.map(it => h('button.wi2.' + (ST[it.status]?.[1] || 'plan'), { onclick: () => itemSheet(it) }, ic(it.plat, 14), h('span', it.idea), it.verdict ? h('em', it.verdict) : h('em', it.time || '')))) : h('span.muted.small', d < SG.kdate() ? '' : '쉬는 날 · 스토리만')));
   }
   root.append(h('h2.sec', '이번 주 계획'), wk);
@@ -227,7 +231,7 @@ SCREENS.videos = async (root, st, An, [tab = 'refs']) => {
   // 따라 할 점 (AI, 하루 한 번 몰아서)
   if (!Object.keys(notes).length && await AI.hasKey()) {
     try {
-      const r = await AI.gem([`크리에이터 ${st.about.name || '하진'}(분야: ${st.explore?.niche || st.about.vibe || '뷰티·일상'})의 매니저로서, 아래 쇼츠마다 "왜 터졌는지 + 하진이 따라 찍을 때 가져갈 한 가지"를 25자 안쪽 한 줄로. JSON만: {"영상id":"한 줄"}\n` + items.slice(0, 16).map(v => `${v.id}: ${v.title} (조회 ${v.views})`).join('\n')], { json: true, temp: 0.5 });
+      const r = await AI.gem([`크리에이터 ${st.about.name || '크리에이터'}(분야: ${st.explore?.niche || st.about.vibe || '뷰티·일상'})의 매니저로서, 아래 쇼츠마다 "왜 터졌는지 + 이 크리에이터가 따라 찍을 때 가져갈 한 가지"를 25자 안쪽 한 줄로. JSON만: {"영상id":"한 줄"}\n` + items.slice(0, 16).map(v => `${v.id}: ${v.title} (조회 ${v.views})`).join('\n')], { json: true, temp: 0.5 });
       await S.update('refs', null, x => { x.notes = r; return x; });
       grid.querySelectorAll('.vcard').forEach((c, i) => { const v = items[i]; if (v && r[v.id]) c.querySelector('.vn').textContent = r[v.id]; });
     } catch { }
@@ -565,7 +569,7 @@ async function dealReply(d) {
   sheet(d.brand + ' 답장', out);
   const facts = `브랜드 ${d.brand}, 종류 ${d.kind || ''}, 올릴 것 ${d.deliverables || '미정'}, 금액 ${d.fee ? d.fee + '원' : '미정'}, 마감 ${d.due || '미정'}, 메모 ${d.memo || ''}. 내 팔로워 ${a.growth.now || '?'}, 반응률 ${A.pct(a.er)}, 어림 단가 ${g ? g[0] + '~' + g[1] + '원' : '?'}`;
   let text;
-  if (await AI.hasKey()) { try { text = await AI.gem([`인플루언서 ${st.about.name || '하진'}이 브랜드 담당자에게 인스타 DM이나 메일로 보낼 답장을 써 줘. 목적: ${kind}. 사실: ${facts}. 공손하지만 짧게(5~8줄), 금액·조건은 분명히, 광고 표시("광고" 문구, 유료 파트너십)를 지킨다는 말 한 줄 포함. 지어낸 숫자 금지. 답장 글만.`], { temp: 0.5 }); } catch { } }
+  if (await AI.hasKey()) { try { text = await AI.gem([`인플루언서 ${st.about.name || '크리에이터'}이 브랜드 담당자에게 인스타 DM이나 메일로 보낼 답장을 써 줘. 목적: ${kind}. 사실: ${facts}. 공손하지만 짧게(5~8줄), 금액·조건은 분명히, 광고 표시("광고" 문구, 유료 파트너십)를 지킨다는 말 한 줄 포함. 지어낸 숫자 금지. 답장 글만.`], { temp: 0.5 }); } catch { } }
   if (!text) text = d.status === '문의' ? `안녕하세요, ${d.brand} 담당자님! 연락 주셔서 감사해요.\n${d.deliverables || '릴스 1개'} 기준 ${g ? A.fmt(g[1]) + '원' : '○○원'}이고, 스토리 추가는 별도로 협의 가능해요.\n촬영은 제품 받고 1주 안에 가능하고, 게시물에는 "광고" 표시와 유료 파트너십 표시를 함께 넣어요.\n가이드 주시면 일정 맞춰 볼게요. 감사합니다!` : `안녕하세요, ${d.brand} 담당자님! ${d.deliverables || '콘텐츠'} 관련해서 연락드려요.\n마감 ${d.due || '일정'} 맞춰 진행 중이고, 확인 필요한 부분 있으면 말씀 주세요. 감사합니다!`;
   out.replaceChildren(h('pre', text), h('button.btn.wide', { onclick: () => copy(text) }, ic('copy', 16), '복사'), h('p.fhint', '초안이에요. 금액·날짜는 꼭 확인하고 보내요.'));
 }
@@ -575,11 +579,60 @@ function adForm() {
   const close = sheet('광고 기록', h('div.form', field('어디', f.where), inp('what', '무슨 광고', 'text'), h('div.three', inp('spend', '쓴 돈'), inp('reach', '도달'), inp('follows', '늘어난 팔로워')), h('button.btn.wide', { onclick: async () => { await S.update('ads', [], l => { l.unshift({ id: S.uid(), where: f.where.value, what: f.what.value, spend: +f.spend.value || 0, reach: +f.reach.value || 0, follows: +f.follows.value || 0, at: new Date().toISOString() }); return l; }); close(); route(); } }, '저장')));
 }
 
+// ── 처음 온 사람: 소개 ──
+SCREENS.hello = async root => {
+  const feat = (icn, t, b) => h('div.feat', h('div.wi', ic(icn, 20)), h('div', h('b', t), h('p', b)));
+  root.append(h('div.hero', h('div.ava.lg', ic('sparkles', 30)), h('h1', '내 인스타·틱톡을', h('br'), '같이 키우는 매니저'), h('p', '뭘 올릴지, 언제 올릴지, 뭘 고칠지. 매니저가 먼저 정해서 알려 줘요. 나는 찍고 올리기만.')),
+    h('div.card.feats',
+      feat('target', '이번 주 뭘 올릴지 짜 줘요', '내 분야에서 지금 잘되는 영상을 찾아보고, 날짜·시간·첫 장면까지 정해요.'),
+      feat('film', '찍은 영상을 먼저 봐 줘요', '첫 2초, 길이, 화질을 재고 몇 초에 뭘 고칠지 짚어요. 캡션도 써 둬요.'),
+      feat('chart', '올린 결과로 다음을 고쳐요', '잘된 것과 아쉬운 것을 가려서 다음 주 계획에 바로 반영해요.'),
+      feat('users', '맞팔·협찬도 챙겨요', '맞팔 안 한 사람, 협찬 마감, 광고 표시까지 놓치지 않게.')),
+    h('button.btn.wide.xl', { onclick: () => go('#/start') }, '내 계정으로 시작하기'),
+    h('button.ghost.wide', { onclick: async e => { const b = e.currentTarget; busy(b, true, '준비 중'); localStorage.setItem('mgr:mode', 'demo'); S.setMode('demo'); await seed(); go('#/today'); background(true); } }, ic('play', 16), '가입 없이 먼저 구경하기'),
+    h('div.trust', h('span', ic('shield', 14), '가입·비밀번호 없음'), h('span', ic('phone', 14), '기록은 내 폰에만'), h('span', ic('check', 14), '무료')),
+    h('details.card.why', h('summary', '솔직하게, 안 되는 것'), h('p', '팔로우·언팔을 대신 눌러 주지는 않아요. 인스타·틱톡이 금지한 일이라 계정이 정지될 수 있어서요. 누구를 할지는 골라 드리고, 누르는 것만 직접 해요. 그리고 "무조건 뜬다"는 약속은 못 해요. 대신 매주 결과를 보고 계획을 고쳐요.')),
+    h('button.link.center', { onclick: () => go('#/about') }, '개인정보·이용 안내'));
+};
+// ── 처음 온 사람: 시작 (1분) ──
+SCREENS.start = async root => {
+  const name = h('input', { placeholder: '이름이나 별명', autocomplete: 'nickname' }), ig = h('input', { placeholder: '인스타 아이디 (없으면 비워 두기)', autocapitalize: 'off', autocorrect: 'off' }), tt = h('input', { placeholder: '틱톡 아이디 (없으면 비워 두기)', autocapitalize: 'off', autocorrect: 'off' });
+  const picked = new Set(); let goal = '';
+  const chips = h('div.chips', FIELDS.map(f => h('button.pchip', { onclick: e => { if (picked.has(f.name)) picked.delete(f.name); else { if (picked.size >= 3) return toast('3개까지 골라요'); picked.add(f.name); } e.currentTarget.classList.toggle('on', picked.has(f.name)); } }, f.name)));
+  const GOALS = ['3개월 안에 팔로워 1천', '3개월 안에 팔로워 1만', '첫 협찬 받기', '꾸준히 올리는 습관'];
+  const goals = h('div.chips', GOALS.map(g => h('button.pchip', { onclick: e => { goal = g; goals.querySelectorAll('.pchip').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); } }, g)));
+  const clean = v => v.trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?(instagram|tiktok)\.com\/@?/, '').replace(/[\/?].*$/, '').toLowerCase();
+  root.append(h('header.top', h('div', h('h1', '1분이면 돼요'), h('p.sub', '적은 만큼 매니저가 나한테 맞춰져요. 나중에 설정에서 바꿀 수 있어요.')), h('div.topr', h('button.iconbtn', { 'aria-label': '뒤로', onclick: () => go('#/hello'), html: icon('left', 20) }))),
+    h('div.card.form', field('뭐라고 부를까요', name), field('인스타', ig), field('틱톡', tt, '아이디만 적어요. 비밀번호는 묻지 않아요. 틱톡은 공개 숫자를 자동으로 읽어 와요.')),
+    h('h2.sec', '어떤 걸 올려요? ', h('small', '3개까지')), chips,
+    h('h2.sec', '지금 목표는?'), goals,
+    h('button.btn.wide.xl', { onclick: async e => {
+      const a = clean(ig.value), b = clean(tt.value);
+      if (!a && !b) return toast('인스타나 틱톡 아이디를 하나는 적어 주세요');
+      if (!/^[\w.]{1,30}$/.test(a || 'a') || !/^[\w.]{1,30}$/.test(b || 'a')) return toast('아이디는 영문·숫자·점·밑줄만 돼요');
+      if (!picked.size) return toast('올리는 분야를 하나는 골라 주세요');
+      const btn = e.currentTarget; busy(btn, true, '매니저가 준비하는 중');
+      if (S.getMode() === 'demo') { await S.clearDemo(); localStorage.setItem('mgr:mode', 'real'); S.setMode('real'); }
+      await S.set('about', { name: name.value.trim(), ig: a, tt: b, goal, goalAt: Date.now(), vibe: [...picked].join(', ') });
+      await S.set('profile', { ...(a ? { ig: { username: a } } : {}), ...(b ? { tt: { username: b } } : {}) });
+      localStorage.setItem('mgr:onboarded', '1'); bgAt = 0;
+      await background(true).catch(() => { }); go('#/today');
+    } }, '시작하기'), h('p.fhint.center', '적은 내용은 이 기기에만 저장돼요.'));
+};
+SCREENS.about = async root => {
+  const sec = (t, ...p) => h('div.card', h('b', t), p.map(x => h('p.muted', x)));
+  root.append(head('이용 안내', '개인정보와 쓰는 바깥 서비스', h('button.iconbtn', { 'aria-label': '뒤로', onclick: () => history.back(), html: icon('left', 20) })),
+    sec('어디에 저장돼요', '적은 것과 숫자, 계획, 협찬 기록은 전부 이 기기의 브라우저 저장소에만 있어요. 운영자 서버로 보내지 않아요. 그래서 기기를 바꾸거나 브라우저 기록을 지우면 사라져요. 설정 › 백업 받기로 파일을 받아 두세요.'),
+    sec('바깥으로 나가는 것', '틱톡 공개 프로필과 유튜브 쇼츠 검색 결과를 읽을 때 공개 페이지 읽기 서비스(r.jina.ai)에 주소가 전달돼요.', 'AI를 연결했다면 캡션·영상 장면·캡처·계정 숫자 요약이 내 Gemini 키로 Google에 전달돼요. 영상 파일 자체는 보내지 않고 뽑은 장면 사진만 보내요.', '인스타 자동 연결을 했다면 내 토큰으로 인스타그램 공식 API에서 내 숫자를 받아요.'),
+    sec('하지 않는 것', '비밀번호를 묻거나 저장하지 않아요. 팔로우·언팔·좋아요를 대신 누르지 않아요. 다른 사람의 비공개 정보를 모으지 않아요.'),
+    sec('알아 둘 것', '분석과 계획은 참고용이에요. 조회수나 팔로워 증가를 보장하지 않아요. 협찬·광고 게시물의 표시 책임은 올리는 사람에게 있어요.', '인스타그램·틱톡·유튜브와 제휴하거나 승인받은 서비스가 아니에요.'));
+};
+
 // ── 설정 ──
 SCREENS.settings = async (root, st) => {
   root.append(head('설정', null, demoBadge()));
   const ab = await S.get('about', {}); const pr = st.profile;
-  const f = { name: h('input', { value: ab.name || '' , placeholder: '하진' }), ig: h('input', { value: pr.ig?.username || ab.ig || '', placeholder: 'o.xxin.e', autocapitalize: 'off' }), tt: h('input', { value: pr.tt?.username || ab.tt || '', placeholder: '틱톡 아이디', autocapitalize: 'off' }), goal: h('input', { value: ab.goal || '', placeholder: '3개월 안에 팔로워 1만, 패션·일상' }), vibe: h('input', { value: ab.vibe || '', placeholder: '꾸안꾸, 솔직, 디자인 전공' }) };
+  const f = { name: h('input', { value: ab.name || '' , placeholder: '이름이나 별명' }), ig: h('input', { value: pr.ig?.username || ab.ig || '', placeholder: '인스타 아이디', autocapitalize: 'off' }), tt: h('input', { value: pr.tt?.username || ab.tt || '', placeholder: '틱톡 아이디', autocapitalize: 'off' }), goal: h('input', { value: ab.goal || '', placeholder: '3개월 안에 팔로워 1만, 패션·일상' }), vibe: h('input', { value: ab.vibe || '', placeholder: '뷰티·메이크업, 솔직한 말투' }) };
   root.append(h('h2.sec', '나'), h('div.card.form', field('부를 이름', f.name), h('div.two', field('인스타 아이디', f.ig), field('틱톡 아이디', f.tt)), field('목표', f.goal), field('분위기·키워드', f.vibe, 'AI가 캡션·피드백을 여기에 맞춰요'), h('button.btn.wide', { onclick: async () => {
     const clean = v => v.trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?(instagram|tiktok)\.com\/@?/, '').replace(/\/.*$/, '').toLowerCase();
     await S.set('about', { ...ab, name: f.name.value.trim(), ig: clean(f.ig.value), tt: clean(f.tt.value), goal: f.goal.value.trim(), goalAt: f.goal.value.trim() !== (ab.goal || '') ? Date.now() : ab.goalAt, vibe: f.vibe.value.trim() });
@@ -589,15 +642,15 @@ SCREENS.settings = async (root, st) => {
   // AI
   const keyed = await AI.hasKey();
   const key = h('input', { type: 'password', placeholder: 'AIza… 또는 AQ.… 키 붙여넣기', autocomplete: 'off' });
-  root.append(h('h2.sec', 'AI 연결'), h('div.card.form', h('p', keyed ? h('span.ok', ic('check', 15), ' 이 기기는 AI 연결됨 (비서 앱과 같은 무료 Gemini 키)') : '연결 안 됨. 무료 키 하나면 캡션·영상 피드백·캡처 읽기·대화가 돼요.'),
+  root.append(h('h2.sec', 'AI 연결'), h('div.card.form', h('p', keyed ? h('span.ok', ic('check', 15), ' 이 기기는 AI 연결됨 (내 무료 Gemini 키)') : '연결 안 됨. 무료 키 하나면 캡션·영상 피드백·캡처 읽기·대화가 돼요.'),
     keyed ? null : h('a.link', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener' }, '① Google AI Studio에서 무료 키 만들기', ic('ext', 14)),
     keyed ? null : field('② 키 붙여넣기', key), keyed ? null : h('button.btn.wide', { onclick: async () => { if (!AI.looksLikeKey(key.value)) return toast('키 모양이 아니에요. 다시 복사해 주세요'); await AI.saveKey(key.value); toast('연결했어요. 매니저가 탐색을 시작해요'); route(); background(true); } }, '연결')));
   // 연습 모드
   const demo = S.getMode() === 'demo';
-  root.append(h('h2.sec', '연습 모드'), h('div.card', h('p', '가상의 초보 인플루언서 "봄이"(인스타 팔로워 860명쯤, 협찬 3건)의 계정으로 모든 기능을 미리 써 봐요. 내 기록과 따로 저장돼요.'), h('button.btn.wide' + (demo ? '.warn' : ''), { onclick: async () => { if (demo) { localStorage.setItem('mgr:mode', 'real'); S.setMode('real'); await S.clearDemo(); toast('연습 모드를 껐어요'); } else { localStorage.setItem('mgr:mode', 'demo'); S.setMode('demo'); await seed(); toast('봄이 계정으로 바꿨어요'); } go('#/today'); background(true); } }, demo ? '연습 모드 끄기' : '봄이로 연습하기')));
+  root.append(h('h2.sec', '연습 모드'), h('div.card', h('p', '가상의 초보 인플루언서 "봄이"(인스타 팔로워 860명쯤, 협찬 3건)의 계정으로 모든 기능을 미리 써 봐요. 내 기록과 따로 저장돼요.'), h('button.btn.wide' + (demo ? '.warn' : ''), { onclick: async () => { if (demo) { localStorage.setItem('mgr:mode', 'real'); S.setMode('real'); await S.clearDemo(); toast('연습 모드를 껐어요'); if (!localStorage.getItem('mgr:onboarded')) { go('#/hello'); return; } } else { localStorage.setItem('mgr:mode', 'demo'); S.setMode('demo'); await seed(); toast('봄이 계정으로 바꿨어요'); } go('#/today'); background(true); } }, demo ? '연습 모드 끄기' : '봄이로 연습하기')));
   // 설치
-  root.append(h('h2.sec', '폰에 설치'), h('div.card', h('p', /iphone|ipad/i.test(navigator.userAgent) ? 'Safari 아래 공유 버튼 › "홈 화면에 추가"' : 'Chrome 메뉴(⋮) › "앱 설치" 또는 "홈 화면에 추가"'), h('p.fhint', '비서 앱과 따로 아이콘이 생겨요. 주소: hchishj-alt.github.io/hajin-assistant/manager/')));
-  root.append(h('h2.sec', '데이터'), h('div.card.form', h('p.muted', '모든 기록은 이 기기에만 있어요. 인스타 토큰도 이 기기에만.'), h('div.row.gap', h('button.ghost', { onclick: async () => { const all = {}; for (const k of ['profile', 'posts', 'snaps', 'people', 'handled', 'deals', 'about', 'ads', 'reviews', 'plan']) all[k] = await S.get(k); const b = new Blob([JSON.stringify(all)], { type: 'application/json' }); const a = h('a', { href: URL.createObjectURL(b), download: 'manager-backup.json' }); a.click(); } }, ic('download', 15), '백업 받기'), h('button.ghost', { onclick: () => { const i = h('input', { type: 'file', accept: '.json', onchange: async e => { try { const j = JSON.parse(await e.target.files[0].text()); for (const [k, v] of Object.entries(j)) if (v != null) await S.set(k, v); toast('되살렸어요'); route(); } catch { toast('백업 파일이 아니에요'); } } }); i.click(); } }, ic('upload', 15), '백업 넣기'))), h('p.ver', '매니저 ' + VERSION));
+  root.append(h('h2.sec', '폰에 설치'), h('div.card', h('p', /iphone|ipad/i.test(navigator.userAgent) ? 'Safari 아래 공유 버튼 › "홈 화면에 추가"' : 'Chrome 메뉴(⋮) › "앱 설치" 또는 "홈 화면에 추가"'), h('p.fhint', '홈 화면에 아이콘이 생기고 앱처럼 열려요. 카카오톡·인스타 안에서 열었다면 먼저 Safari나 Chrome으로 열어 주세요.')));
+  root.append(h('h2.sec', '데이터'), h('div.card.form', h('p.muted', '모든 기록은 이 기기에만 있어요. 인스타 토큰도 이 기기에만.'), h('div.row.gap', h('button.ghost', { onclick: async () => { const all = {}; for (const k of ['profile', 'posts', 'snaps', 'people', 'handled', 'deals', 'about', 'ads', 'reviews', 'plan']) all[k] = await S.get(k); const b = new Blob([JSON.stringify(all)], { type: 'application/json' }); const a = h('a', { href: URL.createObjectURL(b), download: 'manager-backup.json' }); a.click(); } }, ic('download', 15), '백업 받기'), h('button.ghost', { onclick: () => { const i = h('input', { type: 'file', accept: '.json', onchange: async e => { try { const j = JSON.parse(await e.target.files[0].text()); for (const [k, v] of Object.entries(j)) if (v != null) await S.set(k, v); toast('되살렸어요'); route(); } catch { toast('백업 파일이 아니에요'); } } }); i.click(); } }, ic('upload', 15), '백업 넣기'))), h('div.row.gap.center', h('button.link', { onclick: () => go('#/about') }, '개인정보·이용 안내'), h('button.link', { onclick: () => go('#/hello') }, '소개 다시 보기')), h('p.ver', '매니저 ' + VERSION));
 };
 
 // 매니저가 뒤에서 하는 일: 분야 탐색(하루 한 번) → 이번 주 전략 점검·조정 → 캡션 미리 쓰기
@@ -610,14 +663,17 @@ async function background(force) {
 async function boot() {
   S.setMode(localStorage.getItem('mgr:mode') === 'demo' ? 'demo' : 'real');
   document.getElementById('tabbar').append(...TABS.map(([t, l, i]) => h('button', { 'data-t': t, onclick: () => go('#/' + t), 'aria-label': l }, ic(i, 22), h('span', l))));
-  // 처음 열면 인스타 아이디를 넣어 둠 (하진 계정)
-  if (S.getMode() === 'real') { const p = await S.get('profile', null); if (!p) await S.set('profile', { ig: { username: 'o.xxin.e' }, tt: { username: 'o.xxin.e' } }); }
+  // 처음 온 사람은 소개 화면부터. 이미 쓰던 기기(기록 있음)는 그대로
+  if (!localStorage.getItem('mgr:onboarded')) {
+    S.setMode('real'); const p = await S.get('profile', null); S.setMode(localStorage.getItem('mgr:mode') === 'demo' ? 'demo' : 'real');
+    if (p && (p.ig?.username || p.tt?.username)) localStorage.setItem('mgr:onboarded', '1');
+    else if (S.getMode() !== 'demo' && !/^#\/(hello|start|about)/.test(location.hash)) location.hash = '#/hello';
+  }
   window.addEventListener('hashchange', route);
   window.addEventListener('mgr:strategy', () => { if (/^(today|plan)?$/.test(location.hash.replace(/^#\/?/, '').split('/')[0])) route(); });
   await route();
-  // 매니저가 뒤에서 하는 일: 분야 탐색(하루 한 번) → 이번 주 전략 점검·조정 → 캡션 미리 쓰기
-  background(true);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') background(); });
+  if (localStorage.getItem('mgr:onboarded') || S.getMode() === 'demo') background(true);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (localStorage.getItem('mgr:onboarded') || S.getMode() === 'demo')) background(); });
   // 인스타가 연결돼 있으면 열 때마다 새 숫자 (30분 간격)
   if (S.getMode() === 'real' && (await IG.tokenInfo()) && Date.now() - (await S.get('g:iglast', 0)) > 30 * 60e3) { try { await IG.sync(); if (/today|stats|^$/.test(location.hash.replace(/^#\/?/, '') || 'today')) route(); } catch (e) { if (e.code === 190) toast('인스타 연결이 끊겼어요. 숫자 채우기에서 다시 연결해 주세요', 5000); } }
   // 새 판이 나오면 알아서 받아서 한 번 새로 고침 (처음 설치 때는 안 함)

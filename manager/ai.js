@@ -52,7 +52,7 @@ export async function search(prompt, { ms = 60000 } = {}) {
   throw new Error(last || 'AI 검색 실패');
 }
 // 매니저의 성격과 지식. 모든 부탁에 앞에 붙음
-const ROLE = (about, plat) => `너는 ${about.name || '하진'}의 전담 SNS 매니저야. ${about.name || '하진'}은 자기 자신이 콘텐츠인 초보 크리에이터고 ${plat === 'tt' ? '틱톡' : plat === 'ig' ? '인스타그램' : '인스타그램과 틱톡'}에서 인플루언서로 크는 게 목표야.
+const ROLE = (about, plat) => `너는 ${about.name || '크리에이터'}의 전담 SNS 매니저야. ${about.name || '크리에이터'}은 자기 자신이 콘텐츠인 초보 크리에이터고 ${plat === 'tt' ? '틱톡' : plat === 'ig' ? '인스타그램' : '인스타그램과 틱톡'}에서 인플루언서로 크는 게 목표야.
 계정: 인스타 ${about.ig || '-'} / 틱톡 ${about.tt || '-'}. 목표: ${about.goal || '아직 안 정함'}. 분위기·키워드: ${about.vibe || '-'}.
 말투: 친한 매니저처럼 다정하지만 솔직하게, 해요체. 칭찬은 짧게, 고칠 점은 구체적으로(몇 초, 어떤 말, 어떤 각도). 뜬구름 금지, 바로 할 수 있는 행동으로.
 알고리즘 상식(2025~2026 기준 공개된 내용): 인스타 릴스는 시청 시간·끝까지 보기, 도달 대비 보내기(DM 공유), 도달 대비 좋아요를 핵심으로 보고 비팔로워 추천은 '원본성'을 우대함(재업로드·워터마크 감점). 3초 안에 이탈하면 추천이 끊김. 캐러셀은 넘겨 보기·저장이 신호. 해시태그는 3~5개 정확한 것, 캡션 키워드가 검색에 쓰임. 틱톡은 완주율·다시 보기·공유·댓글, 첫 1~2초 훅, 화면 글자·캡션 키워드 검색(틱톡 SEO), 트렌드 사운드. 둘 다 9:16 세로, 화면 위아래 UI 가리는 영역 피하기.
@@ -92,13 +92,13 @@ export async function talk({ about, q, snapshot, history = [] }) {
 }
 export async function dailyLine({ about, snapshot, cards }) {
   const prompt = `${ROLE(about)}
-오늘 아침 매니저로서 하진에게 건넬 첫마디를 두 문장으로. 오늘 가장 중요한 한 가지를 콕 집어. 숫자 근거: ${snapshot}. 오늘 할 일 후보: ${cards.slice(0, 5).map(c => c.title).join(' / ')}`;
+오늘 아침 매니저로서 ${about.name || '크리에이터'}에게 건넬 첫마디를 두 문장으로. 오늘 가장 중요한 한 가지를 콕 집어. 숫자 근거: ${snapshot}. 오늘 할 일 후보: ${cards.slice(0, 5).map(c => c.title).join(' / ')}`;
   return gem([prompt], { temp: 0.8, ms: 20000 });
 }
 export async function plan({ about, snapshot, days = 7 }) {
   const prompt = `${ROLE(about)}
 지금 계정 상태: ${snapshot}
-앞으로 ${days}일 올릴 계획을 짜 줘. 콘텐츠는 하진 자신(얼굴·일상·스타일·작업)이야. 촬영 부담은 적게.
+앞으로 ${days}일 올릴 계획을 짜 줘. 콘텐츠는 본인 자신(얼굴·일상·스타일·작업)이야. 촬영 부담은 적게.
 JSON으로만: {"items":[{"day":"월" 같은 요일,"plat":"ig"|"tt"|"both","kind":"reels"|"carousel"|"photo"|"story"|"video","idea":"무엇을 찍을지 한 줄","hook":"첫 1초에 할 말이나 장면","time":"올릴 시각 HH:MM"}]}`;
   return gem([prompt], { json: true, temp: 0.8 });
 }
