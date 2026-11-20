@@ -7,6 +7,7 @@ import { handoff, teammateNames, approve, reject, occursOn } from './store.js';
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
 const WHENTOK = /^(오늘|내일|모레|글피|어제|이번\s*주|다음\s*주|다다음\s*주|이번주|다음주|담주|주말|평일|오전|오후|아침|점심|저녁|밤|새벽|정오|자정|반|[월화수목금토일]요일|[월화수목금토일]욜|\d{1,2}월|\d{1,2}일|\d{1,2}\/\d{1,2}|\d{1,2}시(\s*반)?|\d{1,2}분|\d{1,2}:\d{2}|\d+일\s*(뒤|후)|\d+주\s*(뒤|후)|한\s*시간|\d+시간)(에|까지|부터|쯤|경)?$/;
 const STOP = /^(일정|약속|할일|할\s*일|일|거|것|그|저|이|좀|그거|건|마감|담당|업무|작업)$/;
+const eul = s => { const c = String(s || '').trim().slice(-1).charCodeAt(0); return c >= 0xAC00 && c <= 0xD7A3 ? ((c - 0xAC00) % 28 ? '을' : '를') : '을'; };   /* 받침 있으면 을, 없으면 를 */
 const josa = s => s.replace(/(은|는|이|가|을|를|의|도|만|에|에서|이랑|랑|하고|으로|로)$/, m => (s.length - m.length >= 2 ? '' : m));
 const toks = s => s.split(/[\s,·]+/).map(x => josa(x.trim())).filter(x => x && !STOP.test(x) && !WHENTOK.test(x));
 const fmtD = d => { const x = new Date(d + 'T00:00'); return `${x.getMonth() + 1}/${x.getDate()}(${'일월화수목금토'[x.getDay()]})`; };
@@ -70,13 +71,13 @@ export async function run(a) {
     const p = { date: a.date || it.date };
     if (a.time) { p.start = a.time; if (it.start && it.end) { const m = s => +s.slice(0, 2) * 60 + +s.slice(3); const e = (m(a.time) + Math.max(15, m(it.end) - m(it.start))) % 1440; p.end = `${String(Math.floor(e / 60)).padStart(2, '0')}:${String(e % 60).padStart(2, '0')}`; } }
     await db.patch(it.id, p); const clash = (await db.list('events')).filter(x => x.id !== it.id && x.date === p.date && x.start && (p.start || it.start) && x.start === (p.start || it.start));
-    return { text: `“${it.title}”을 ${fmtD(p.date)}${p.start || it.start ? ' ' + (p.start || it.start) : ''}로 옮겼어요.${clash.length ? ` 그런데 그 시간에 “${clash[0].title}”도 있어요.` : ''}${it.who ? ` ${it.who}에게도 알려 주세요.` : ''}`, chips: [undo(prev)] };
+    return { text: `“${it.title}”${eul(it.title)} ${fmtD(p.date)}${p.start || it.start ? ' ' + (p.start || it.start) : ''}로 옮겼어요.${clash.length ? ` 그런데 그 시간에 “${clash[0].title}”도 있어요.` : ''}${it.who ? ` ${it.who}에게도 알려 주세요.` : ''}`, chips: [undo(prev)] };
   }
   if (a.op === 'remove') { await db.remove(it.id); return { text: `“${it.title || it.name}” 지웠어요.`, chips: [undo(prev)] }; }
   if (a.op === 'got') { await db.patch(it.id, { status: 'got', gotAt: today(), ...(it.date && it.date !== today() ? { date: today(), planned: it.date } : {}) }); const left = (await db.list('incomes')).filter(x => x.status !== 'got'); return { text: `“${it.title}” ${Number(it.amount || 0).toLocaleString()}원 받은 것으로 바꿨어요.${left.length ? ` 아직 받을 돈은 ${left.reduce((s, x) => s + (Number(x.amount) || 0), 0).toLocaleString()}원(${left.length}건)이에요.` : ' 이제 받을 돈이 없어요.'}`, chips: [undo(prev)] }; }
-  if (a.op === 'handoff') { await handoff(it, a.to, a.note || ''); return { text: `“${it.title}”을 ${a.to} 님에게 넘겼어요.${a.note ? ` 메모: ${a.note}` : ''} 넘긴 기록은 할 일을 열면 보여요.`, chips: [undo(prev)] }; }
+  if (a.op === 'handoff') { await handoff(it, a.to, a.note || ''); return { text: `“${it.title}”${eul(it.title)} ${a.to} 님에게 넘겼어요.${a.note ? ` 메모: ${a.note}` : ''} 넘긴 기록은 할 일을 열면 보여요.`, chips: [undo(prev)] }; }
   if (a.op === 'assign') { await db.patch(it.id, { who: a.to }); return { text: `“${it.title}” 담당을 ${a.to} 님으로 했어요.`, chips: [undo(prev)] }; }
-  if (a.op === 'prio') { await db.patch(it.id, { priority: a.v }); return { text: `“${it.title}”을 ${a.v === 'high' ? '중요' : '보통'}으로 표시했어요.`, chips: [undo(prev)] }; }
+  if (a.op === 'prio') { await db.patch(it.id, { priority: a.v }); return { text: `“${it.title}”${eul(it.title)} ${a.v === 'high' ? '중요' : '보통'}으로 표시했어요.`, chips: [undo(prev)] }; }
   return null;
 }
 
@@ -85,9 +86,9 @@ async function runDraft(a, d, prev) {
   const cur = d.data || {}; const save = f => db.patch(d.id, { data: { ...cur, ...f } }); const ttl = cur.title || cur.name || '임시 항목';
   if (a.op === 'done') { const saved = await approve(d); if (saved) await db.patch(saved.id, { done: true, doneAt: db.now() }); return { text: `“${ttl}” 확정하고 완료로 넘겼어요.` }; }
   if (a.op === 'remove' || a.op === 'skipOnce') { await reject(d); return { text: `“${ttl}” 버렸어요.`, chips: [undo(prev)] }; }
-  if (a.op === 'move' || a.op === 'moveOnce') { const f = d.kind === 'task' ? { due: a.date || cur.due || today(), ...(a.time ? { time: a.time } : {}) } : { date: a.date || cur.date || today(), ...(a.time ? { start: a.time } : {}) }; await save(f); return { text: `“${ttl}”을 ${fmtD(f.due || f.date)}${a.time ? ' ' + a.time : ''}로 바꿨어요. 아직 확인 전이에요.`, chips: [undo(prev)], refresh: [d.id] }; }
+  if (a.op === 'move' || a.op === 'moveOnce') { const f = d.kind === 'task' ? { due: a.date || cur.due || today(), ...(a.time ? { time: a.time } : {}) } : { date: a.date || cur.date || today(), ...(a.time ? { start: a.time } : {}) }; await save(f); return { text: `“${ttl}”${eul(ttl)} ${fmtD(f.due || f.date)}${a.time ? ' ' + a.time : ''}로 바꿨어요. 아직 확인 전이에요.`, chips: [undo(prev)], refresh: [d.id] }; }
   if (a.op === 'assign' || a.op === 'handoff') { await save({ who: a.to }); return { text: `“${ttl}” 담당을 ${a.to} 님으로 했어요. 아직 확인 전이에요.`, chips: [undo(prev)], refresh: [d.id] }; }
-  if (a.op === 'prio') { await save({ priority: a.v }); return { text: `“${ttl}”을 중요로 표시했어요.`, chips: [undo(prev)], refresh: [d.id] }; }
+  if (a.op === 'prio') { await save({ priority: a.v }); return { text: `“${ttl}”${eul(ttl)} 중요로 표시했어요.`, chips: [undo(prev)], refresh: [d.id] }; }
   return { text: '확인 전인 항목이라 대기함에서 고쳐 주세요.' };
 }
 

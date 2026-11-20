@@ -91,6 +91,13 @@ export async function smart(q, base = new Date(), r = null) {
     return { text: `남은 할 일을 사람별로 묶었어요. ${rows.slice(0, 5).map(([n, ts]) => `${n} ${ts.length}개`).join(', ')}.`, items: rows.flatMap(([n, ts]) => ts.sort((x, y) => (x.due || '9').localeCompare(y.due || '9')).slice(0, 4).map(t => ({ ...taskItem(t, today), sub: [n, t.due && (t.due < today ? '밀림 · ' : '') + '마감 ' + md(t.due), t.project].filter(Boolean).join(' · ') }))).slice(0, 20) };
   }
   // 받을 돈
+  // "오로라 계약금 아직 안 들어왔어": 그 건이 받을 돈에 있으면 언제 받기로 했고 며칠 지났는지, 그리고 정중히 묻는 말을 만들 수 있게
+  if (/(안|못)\s*(들어왔|들어옴|받았|받음|입금\s*됐|입금됨)/.test(q)) {
+    const due = (await db.list('incomes')).filter(x => x.status !== 'got'); const words = q.replace(/(아직|여태|계속|안|못|들어왔\S*|들어옴|받았\S*|받음|입금\S*|돈)/g, ' ').split(/\s+/).map(x => x.replace(/(이|가|은|는|을|를|도)$/, '')).filter(x => x.length >= 2);
+    const hit = due.filter(x => words.some(k => `${x.title} ${x.from || ''} ${x.project || ''}`.includes(k))).sort((x, y) => (x.date || '9').localeCompare(y.date || '9'))[0];
+    if (hit) { const late = hit.date && hit.date < today ? Math.round((new Date(today) - new Date(hit.date)) / 864e5) : 0;
+      return { text: `“${hit.title}” ${won(hit.amount)}은 아직 받을 돈으로 남아 있어요. ${hit.date ? (late ? `받기로 한 날(${md(hit.date)})에서 ${late}일 지났어요.` : `받기로 한 날은 ${md(hit.date)}이에요.`) : '받기로 한 날은 안 적혀 있어요.'}${late ? ' 정중하게 묻는 말을 만들어 드릴까요?' : ''}`, items: [{ icon: 'wallet', title: hit.title, sub: [won(hit.amount), hit.date ? '받는 날 ' + md(hit.date) : '날짜 미정', hit.from].filter(Boolean).join(' · '), route: 'money' }], chips: [{ label: '묻는 말 만들기', go: 'prompts/use/builtin:biz-dunning' }, { label: '들어왔어요', say: `${hit.title} 들어왔어` }] }; }
+  }
   if (/(받을\s*돈|미수금|입금\s*(안|예정|언제|됐|들어)|안\s*들어온|들어올\s*돈|수금|매출)/.test(q)) {
     let xs = await db.list('incomes'); if (proj) xs = xs.filter(x => x.project === proj || key(x.title).includes(key(proj))); const due = xs.filter(x => x.status !== 'got').sort((x, y) => (x.date || '9').localeCompare(y.date || '9')), got = xs.filter(x => x.status === 'got');
     const sum = a => a.reduce((s2, x) => s2 + (Number(x.amount) || 0), 0);

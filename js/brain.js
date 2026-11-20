@@ -604,6 +604,8 @@ function interpretOne(s, base, ctx) {
     if (bm && w.date && money == null) { const span = bm[1] === '오전' ? ['09:00', '12:00'] : bm[1] === '오후' ? ['13:00', '18:00'] : bm[1] === '저녁' ? ['18:00', '21:00'] : null;
       return [{ kind: 'event', label: '일정', confidence: 0.8, data: { title: '비워 둔 시간', date: w.date, ...(span ? { start: span[0], end: span[1] } : { _allday: true }), scope: 'personal', _dated: true } }]; } }
   // "오늘 뭐 했는지 정리": 적어 둘 일이 아니라 한 일을 묻는 말
+  // "오로라 계약금 아직 안 들어왔어": 적어 둘 말이 아니라 받을 돈 상태를 보는 말
+  if (t.length <= 40 && money == null && /(아직|여태|계속)?\s*(안|못)\s*(들어왔|들어옴|받았|받음|입금\s*됐|입금됨)\S*\s*[.!?]*$/.test(t) && /(계약금|선금|착수금|잔금|중도금|대금|입금|돈|비용|정산|페이)/.test(t)) return [{ kind: 'query', data: { q: t, when: w }, label: '찾아보기', confidence: 0.85 }];
   if (t.length <= 30 && /(뭐|뭘|무엇을?|무슨\s*일)\s*했는지\s*(좀\s*)?(정리|알려|보여|말해|요약)/.test(t)) return [{ kind: 'query', data: { q: t, when: w }, label: '찾아보기', confidence: 0.85 }];
   // 명시 접두어: "일정:", "할일:", "지출:" ...
   if (/^(업체|거래처)\s*[:：]/.test(t)) return [build('vendor')];
@@ -661,6 +663,8 @@ function interpretOne(s, base, ctx) {
     if ((made.kind === 'task' || made.kind === 'event') && !/(같이|함께)\s+(하자|합시다)$/.test(tt)) tt = tt.replace(/\s+(하자|합시다|할게|할래|해야지)$/, '');
     for (const pn of (ctx.projects || [])) if (typeof pn === 'string' && pn.length >= 3 && t.includes(pn) && !tt.includes(pn) && tt.includes(pn.slice(0, -1))) tt = tt.replace(pn.slice(0, -1), pn);   /* "루미에"처럼 조사로 끝나는 프로젝트 이름이 잘린 것 되살림 */
     if (made.kind === 'expense') tt = tt.replace(/\s*(매달|매월|매주|매년)\s*$/, '');
+    if (made.kind === 'expense') { const pm = tt.match(/^(.+?)\s+(\S{2,4}?)(이가|가|이)$/); const who = pm && (ctx.people || []).find(n => n === pm[2] || n.slice(1) === pm[2]);   /* "굿즈 샘플비 15만원 서연이가 냄": 낸 사람은 제목이 아니라 메모로 */
+      if (who) { tt = pm[1]; made.data.memo = [made.data.memo, `${who} 결제`].filter(Boolean).join(' · '); } }
     if (made.kind === 'event' && /^(나\s*)?(좀\s*)?(깨워|알려|알람|알림)\s*(해\s*)?(줘|주세요|줄래)?$/.test(tt.trim())) tt = /깨워/.test(t) ? '일어나기' : '알림';
     if (tt.trim()) made.data.title = tt.trim(); }
   // 날짜·시간을 빼고 나니 남는 말이 없으면("금요일로 하자", "오늘 다 했어") 만들지 않고 대화로 받음
@@ -725,6 +729,8 @@ function interpretOne(s, base, ctx) {
     if ((w.time || w.date) && /(회의|미팅|약속|만나|만남|수업|면접|발표|전시|촬영|병원|저녁|점심|콜|통화|줌|zoom|meet|일정|스케줄|행사|세미나|오픈(?!채팅|톡|카톡|소스)|마감식|파티|회식|생일|생신|결혼식|송년회|신년회|기념일|돌잔치|제사|엠티|런칭|론칭|페스티벌|여행|공연|콘서트|(?<!업)데이트|식사|모임|스터디|레슨|강의|워크숍|휴가|설명회|간담회|관람|방문|상담|진료|치과|인터뷰|구경|팝업|나들이|답사|견학|투어|페어|박람회)/i.test(T) && !(dl && ACTION.test(t)) && !(OBLIG.test(t) && !w.time && /(짜|준비|섭외|확정|정리|예약)/.test(t))) return 'event';
     if (w.time && w.end && !dl) return 'event';
     if (w.time && !doit) return 'event';
+    // "인쇄 감리 목요일 2시 파주": 시각이 있고, 시키는 말(~하기, ~해야)이 아니라 이름씨로 끝나면 약속. '인쇄·예약·주문' 같은 낱말이 들어 있다는 것만으로 할 일로 보지 않음
+    if (w.time && w.date && !dl && !OBLIG.test(t) && !TASKEND.test(tail) && money == null && !ACTION.test(t.replace(/(인쇄|출력|주문|결제|구매|신청|발송|예약|피드백|리뷰|컨펌|검토|준비|담당|확인|공유|전달|제출|수정|작성|체크)(?![하해할한됐되])/g, '□'))) return 'event';
     if (/(오전|오후|아침|저녁|밤)(에)?(\s|$)/.test(t) && w.date && !doit && !dl) return 'event';
     if (/(회의|미팅|약속|만나|수업|면접|발표|행사|세미나|전시)/.test(T) && w.date && !(dl && /(기로|해야|야\s*(함|해|돼|됨|한다|겠)|제출|보내|넘기|넘겨|내야|내기|공유|정리|작성)/.test(t))) return 'event';
     if (dl && w.date && !/(어떨까|하면\s*좋|해볼까)/.test(t)) return 'task';

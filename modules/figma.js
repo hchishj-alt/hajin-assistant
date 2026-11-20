@@ -47,7 +47,7 @@ function tokenCard() {
       h('li.small', '권한: File content 읽기, File versions 읽기, Comments 읽기·쓰기, 만료는 가장 길게'),
       h('li.small', '만든 토큰을 아래에 붙여넣기')),
     h('div.row', inp, h('button.btn.sm.pri', { onclick: async e => { const btn = e.currentTarget; busy(btn, true, '확인 중'); try { await F.setToken(inp.value); const me = await F.me(); toast(`${me.handle} 님 피그마에 연결했어요`); go('figma'); } catch (err) { await F.setToken(''); toast(err.message === 'Failed to fetch' ? '인터넷 연결을 확인해 주세요' : err.message); } busy(btn, false); } }, '연결')),
-    h('p.faint.tiny', { style: { marginTop: '6px' } }, '토큰은 이 기기에만 저장되고 백업·동기화·팀 공유 안 돼요. 팀원은 각자 자기 토큰을 넣거나, 넣지 않아도 하진이 읽은 분석 결과는 팀 공유로 봐요.'));
+    h('p.faint.tiny', { style: { marginTop: '6px' } }, '토큰은 이 기기에만 저장되고 백업·동기화·팀 공유 안 돼요. 팀원은 각자 자기 토큰을 넣거나, 넣지 않아도 관리자가 읽은 분석 결과는 팀 공유로 봐요.'));
 }
 
 async function addFile() {

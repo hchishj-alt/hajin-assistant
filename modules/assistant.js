@@ -27,6 +27,8 @@ export default {
     const projBar = h('div.chips', { style: { padding: '0 4px 6px' } });
     const aiBar = h('div.chips', { style: { margin: '-6px 0 10px' } });
     const sug = h('div.suggest', (sheet && sheet.suggest && sheet.suggest.length ? sheet.suggest : SUGGEST).map(s => h('button.chip', { onclick: () => { ta.value = s; send(); } }, s)));
+    /* 큰 비서 화면에서도 내 역할에서 자주 묻는 말을 앞에 둠 */
+    if (!sheet) import('../js/helper.js').then(H => H.suggestFor('assistant')).then(xs => { const add = xs.filter(x => !SUGGEST.includes(x)).slice(0, 3); sug.prepend(...add.map(s => h('button.chip', { onclick: () => { ta.value = s; send(); } }, s))); }).catch(() => { });
 
     const page = h('div.chatpage');
     root.append(page);
@@ -66,7 +68,8 @@ export default {
     drawAiBar(); window.removeEventListener('hajin:ai-key', onAiKey); onAiKey = drawAiBar; window.addEventListener('hajin:ai-key', onAiKey);
     // 기존 대화
     const msgs = (await db.list('chat')).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-60);
-    if (!msgs.length) list.append(botBubble(h('div', h('p', '안녕하세요 하진님. 이렇게 말해 보세요.'), h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, ['"다음 주 화요일 2시 홍대 촬영"', '"어도비 구독 3만7천원 결제"', '"홍길동 010-1234-5678 디자이너"', '"오늘 일정 보여줘"', '회의나 생각을 길게 말하면 요약·키워드·할 일로 정리해요'].map(x => h('li.small', x))))));
+    const hello = ((await db.kvGet('me:member', null)) || {}).name || (await db.kvGet('name', '')) || '';   /* 팀원이 열어도 자기 이름으로 인사 */
+    if (!msgs.length) list.append(botBubble(h('div', h('p', `안녕하세요${hello ? ' ' + hello + '님' : ''}. 이렇게 말해 보세요.`), h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, ['"다음 주 화요일 2시 홍대 촬영"', '"어도비 구독 3만7천원 결제"', '"홍길동 010-1234-5678 디자이너"', '"오늘 일정 보여줘"', '회의나 생각을 길게 말하면 요약·키워드·할 일로 정리해요'].map(x => h('li.small', x))))));
     const pending = new Map((await store.drafts()).map(d => [d.id, d]));
     for (const m of msgs) await drawMsg(m, pending, false);
     // 답을 못 받고 지나간 말(오류·끊김)이 있으면 한 번 알려 주고 다시 읽을 수 있게 함
@@ -246,7 +249,7 @@ export default {
       if (aiAdd && !ids.length && !replies.length && !parsed.length) { await talk(text); return; } /* AI도 항목을 못 만들면 어떻게 적을지 물음 */
       await F.remember(ids);
       for (const a of replies) {
-        const msg = await db.put('chat', { role: 'bot', q: text, text: a.text, items: a.items.slice(0, 12) });
+        const msg = await db.put('chat', { role: 'bot', q: text, text: a.text, items: a.items.slice(0, 12), ...(a.chips && a.chips.length ? { chips: a.chips } : {}) });
         await drawMsg(msg, new Map());
       }
       if (ids.length === 1 && parsed.filter(p => p.kind === 'event').length === 1 && !parsed.find(p => p.kind === 'event').data.repeat) {

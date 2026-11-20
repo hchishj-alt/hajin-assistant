@@ -79,6 +79,13 @@ export function run() {
     const g = one('영수증 정리 금요일에 하자'), h2 = one('사무실 월세 80만원 매달 5일'), i = one('세금계산서 발행 루미에 550만원'), j = one('내일 아침 9시에 깨워줘'), k = one('오늘 뭐 했는지 정리');
     results.push({ group: '알림 말', name: '제목 군말 다듬기, 세금계산서 발행은 받을 돈, "뭐 했는지 정리"는 묻는 말', ok: g.data.title === '영수증 정리' && h2.data.title === '사무실 월세' && i.kind === 'income' && /루미에/.test(i.data.title) && j.data.title === '일어나기' && k.kind === 'query', detail: [g.data.title, h2.data.title, i.kind + ' ' + i.data.title, j.data.title, k.kind].join(' / ') });
   }
+  { // 시각이 있는 약속, 낸 사람, 안 들어온 돈
+    const cx = { base: new Date(2026, 10, 20, 14, 0), people: ['김하진', '최민서', '안서연'], projects: ['가을 팝업', '루미에'] }; const one = t => B.interpret(t, cx)[0] || { data: {} };
+    const a = one('인쇄 감리 목요일 2시 파주'), b2 = one('포스터 인쇄 맡기기 목요일 2시까지'), c = one('목요일 2시까지 견적서 보내기');
+    results.push({ group: '약속과 할 일', name: '"인쇄 감리 목요일 2시 파주"는 약속, "…2시까지 보내기"는 할 일', ok: a.kind === 'event' && a.data.start === '14:00' && b2.kind === 'task' && c.kind === 'task', detail: [a, b2, c].map(x => x.kind).join(' / ') });
+    const d = one('굿즈 샘플비 15만원 서연이가 냄'), e = one('오로라 계약금 아직 안 들어왔어'), f = one('오로라 계약금 300만원 들어왔어');
+    results.push({ group: '약속과 할 일', name: '낸 사람은 제목에서 빼 메모로, "아직 안 들어왔어"는 받을 돈을 보는 말', ok: d.kind === 'expense' && d.data.title === '굿즈 샘플비' && /안서연/.test(d.data.memo || '') && e.kind === 'query' && f.kind === 'income', detail: `${d.data.title} (${d.data.memo}) / ${e.kind} / ${f.kind}` });
+  }
   { // 프롬프트 스튜디오
     const body = '우리 팀: {{팀 소개}}\n팀원: {{팀}}\n\n{{고객사}}에 낼 제안서 목차를 잡아 줘.\n예산: {{예산}}';
     const vs = PS.vars(body), f1 = PS.fill(body, { '팀': '김하진(PM), 최민서(아트디렉터)', '고객사': '아모레' });
