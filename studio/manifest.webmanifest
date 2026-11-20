@@ -1,0 +1,10 @@
+{
+  "name": "프롬프트 스튜디오",
+  "short_name": "프롬프트",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f6f3",
+  "theme_color": "#16161a",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
