@@ -578,6 +578,9 @@ export function vendorParts(t, known = []) {
   return { name, cat, phone: phone || '', kakao, link, memo, prices };
 }
 function interpretOne(s, base, ctx) {
+  // "서연이한테 견적서 보내달라고 해줘": (메신저로 못 전하는 상태면) 서연 담당 할 일로
+  { const rq = s.trim().match(/^([가-힣]{2,4}?)(?:이)?(?:님|씨)?\s*(?:한테|에게|께)\s+(.+?)\s*달라고\s*(?:좀\s*)?(?:전해|말해|해|부탁해|얘기해)\s*(?:줘|주세요|줄래|주라)?\s*[.!]?$/);
+    if (rq && rq[2].trim().length >= 2) s = `${rq[1]} ${rq[2].trim()}${/(해|내|써|봐|둬|놔|워|려|겨|쳐|춰|꿔|켜|들어|올려|바꿔|고쳐|넣어|찾아|잡아|뽑아)$/.test(rq[2].trim()) ? '줘' : ' 주기'}`; }
   const t = s.trim();
   const w = parseWhen(t, base);
   const money = parseMoney(t);
@@ -736,6 +739,7 @@ function interpretOne(s, base, ctx) {
     if (dl && w.date && !/(어떨까|하면\s*좋|해볼까)/.test(t)) return 'task';
     if (dl && /(해야|야\s*(함|해|돼|됨|한다|겠)|하기로|제출|끝내|완료|마쳐|넘겨|보내)/.test(t)) return 'task';
     if (/(미룸|미뤄짐|밀림|바뀜|변경됨|취소됨|확정됨|정해짐|결정됨|하기로\s*했음)\s*$/.test(t) && !OBLIG.test(t)) return 'note';
+    if (DECIDED.test(t) && !w.date && !w.time && !OBLIG.test(t) && money == null) return 'note';   /* "포스터 시안 B안으로 확정", "색상은 파스텔로 결정": 정한 것은 메모로 남김 */
     if (/(아이디어|컨셉|콘셉트|제안서?)\S*\s+(\S+\s+)?\S*(해야|야\s*(함|해|돼|됨|한다|겠))\S*\s*$/.test(t) && !/(어떨까|하면\s*좋|해볼까|하는 건 어때)/.test(t)) return 'task'; /* "아이디어 정리해야 해"는 아이디어가 아니라 할 일 */
     if (IDEA.test(t) || /(떠올|생각났|영감|후보(는|가|로)?\s|후보\s*[:：]|후보$)/.test(t)) return 'idea';
     if (/(달라고\s*(함|했어|했음|하심|하셨어|한다|하네|해)|달래|달라심|해\s*달라는|떨어짐|떨어졌|다\s*씀|다\s*썼|고장|망가졌|안\s*됨$|안\s*나옴$)/.test(t)) return 'task';
@@ -782,7 +786,7 @@ function interpretOne(s, base, ctx) {
       case 'vendor': { const v = vendorParts(body, ctx.vendors || []); return { kind, label: '업체', confidence: v.name && (v.phone || v.link || v.prices.length) ? 0.8 : 0.6, data: v }; }
       case 'buy': { const u = parseUrls(body)[0] || ''; return { kind, label: '살 것', confidence: 0.75, data: { title: strip(body.replace(/https?:\/\/\S+/g, '').replace(/\d[\d,]*\s*(만\s*)?(\d+\s*천\s*)?원/g, ' ').replace(/(사야\s*(돼|해|함|겠다)?|살\s*거|살\s*것|구매\s*(목록|예정|할\s*것)?(에)?\s*(추가|넣어)?(해\s*줘|줘)?|장바구니(에)?\s*(추가|넣어)?(해\s*줘|줘)?|주문해야\s*(돼|해)?)/g, ' '), []) || '(상품명을 적어 주세요)', url: u, price: parseMoney(body) || 0, qty: 1, need: 'must' } }; }
       case 'idea': return { kind, label: '아이디어', confidence: 0.7, data: { title: summarize(body, 1)[0]?.slice(0, 60) || body.slice(0, 60), body, tags: tags.length ? tags : keywords(body, 5) } };
-      case 'note': return { kind, label: '메모', confidence: 0.6, data: { title: (summarize(body, 1)[0] || body).slice(0, 60), body, tags: tags.length ? tags : keywords(body, 6) } };
+      case 'note': { const dec = DECIDED.test(' ' + body.trim()); return { kind, label: '메모', confidence: dec ? 0.75 : 0.6, data: { title: dec ? '결정: ' + body.trim().replace(/\s*(으로|로)\s*(최종\s*)?(확정|결정|정함|정했어요?|정했음|가기로\s*(함|했\S*)|하기로\s*(함|했\S*))\s*[.!]*\s*$/, '').replace(/(은|는)\s+/, ' → ').slice(0, 60) : (summarize(body, 1)[0] || body).slice(0, 60), body, tags: tags.length ? tags : [...(dec ? ['결정'] : []), ...keywords(body, 6)].slice(0, 6) } }; }
       case 'timelog': { const tw = parseWhen(body, base); const span = tw.time && tw.end ? (+tw.end.slice(0, 2) * 60 + +tw.end.slice(3)) - (+tw.time.slice(0, 2) * 60 + +tw.time.slice(3)) : 0; const m = span > 0 ? span : tw.mins || 60; body = span > 0 ? strip(body, tw.hits).replace(/^(부터|까지)\s*/, '') : body; return { kind, label: '작업 기록', confidence: 0.8, data: { title: strip(body, []).replace(/\d+\s*(시간|분)\s*(동안)?/g, '').replace(/\s*(작업)?\s*(했음|했다|했어|함|완료)$/, '').trim() || '작업', minutes: m, date: tw.date && tw.date <= ymd(base) ? tw.date : ymd(base), project: projectOf(body, ctx) } }; }
       case 'sns': return { kind, label: 'SNS 아이디어', confidence: 0.75, data: { title: cleanTitle, platform: /(릴스|인스타)/.test(body) ? '인스타그램' : /(쇼츠|유튜브)/.test(body) ? '유튜브' : /틱톡/.test(body) ? '틱톡' : '인스타그램', status: '아이디어', date: bw.date || '', tags } };
       case 'okr': return { kind, label: '목표', confidence: 0.7, data: { title: cleanTitle.replace(/^(이번|다음|올해|\d분기)?\s*(분기|달|연도)?\s*(목표|OKR|okr)\s*(는|은|:|：)?\s*/, '').trim() || cleanTitle, quarter: quarterOf(base), krs: [] } };
@@ -816,15 +820,18 @@ function interpretOne(s, base, ctx) {
 }
 // "서충주 수집오빠랑 충주본색 전시 방문" → 누구랑 수집오빠 · 지역 서충주 · 장소 충주본색 · 제목 충주본색 전시 방문
 const KIN = '오빠|언니|누나|형|형님|씨|님|쌤|선생님|교수님|대표님|팀장님|실장님|작가님|감독님|엄마|아빠|친구|동생|선배|후배|이모|삼촌|할머니|할아버지|사장님|피디님|PD님';
-const AREA = /^((서|동|남|북)?[가-힣]{1,3}(시|군|구|동|읍|면|도)|서충주|충주|서울|홍대|강남|성수|합정|연남|망원|이태원|한남|을지로|종로|대학로|잠실|여의도|판교|분당|일산|부산|해운대|대전|대구|광주|인천|수원|청주|제주|전주|춘천|강릉|원주|천안|세종|울산|창원|포항|경주|여수|목포)$/;
+const AREA = /^((서|동|남|북)?[가-힣]{1,3}(시|군|구|동|읍|면|도)|서충주|충주|서울|홍대|강남|성수|합정|연남|망원|이태원|한남|을지로|종로|대학로|잠실|여의도|판교|분당|일산|부산|해운대|대전|대구|광주|인천|수원|청주|제주|전주|춘천|강릉|원주|천안|세종|울산|창원|포항|경주|여수|목포|파주|용산|신촌|건대|압구정|청담|마포|상수|문래|서촌|북촌|선릉|역삼|고양|김포|하남|구리|안양|부천|성남|용인|평택|안산|화성|의정부|남양주|양평|가평|속초|양양|통영|거제|순천|군산|안동|구미|김해)$/;
 // "전시", "운동", "화면"처럼 끝 글자만 지역 같은 흔한 말은 지역이 아님
 const NOT_AREA = /^(전시|도시|임시|잠시|동시|일시|수시|역시|즉시|다시|표시|무시|당시|게시|공시|제시|명시|개시|상시|감시|응시|출시|고시|활동|행동|운동|이동|감동|자동|수동|노동|진동|변동|작동|연동|공동|합동|아동|협동|화면|장면|측면|방면|정면|표면|전면|국면|수면|라면|냉면|가면|태도|정도|지도|제도|용도|속도|온도|강도|진도|각도|시도|의도|유도|보도|주도|과도|구도|농도|빈도|고도|포도|기도|효도|검도)$/;
 const isArea = x => AREA.test(x) && !NOT_AREA.test(x);
 const DOING = /(?:\s|^)((?:전시|공연|영화|팝업|박람회|페어|콘서트|축제|행사)?\s*(?:방문|관람|구경|보기|보러\s*가기|미팅|회의|촬영|답사|식사|점심|저녁|약속|모임|견학|투어|상담|인터뷰|수업|강의|워크숍|설치|철수|회식|데이트|나들이|여행|전시|공연|팝업))$/;
 const FAMILY = '엄마|아빠|어머니|아버지|할머니|할아버지|이모|고모|삼촌|언니|오빠|누나|형|동생|친구|남친|여친|남자친구|여자친구|남편|아내|와이프';
 const TITLE_SUF = '대표님?|팀장님?|실장님?|교수님?|선생님|쌤|작가님?|감독님?|피디님?|PD님?|사장님|주무관님?|대리님?|과장님?|차장님?|부장님?|매니저님?|님';
+const DECIDED = /[가-힣A-Za-z0-9]\s*(으로|로)\s*(최종\s*)?(확정|결정|정함|정했어요?|정했음|가기로\s*(함|했\S*)|하기로\s*(함|했\S*))\s*[.!]*\s*$/;
 const PLACE_SUF = /(역|카페|센터|빌딩|학교|대학교|대학|캠퍼스|사무실|스튜디오|홀|관|시청|구청|도청|군청|청사|병원|치과|의원|미술관|박물관|도서관|공원|극장|갤러리|플라자|타워|식당|집|본점|지점|점|DDP|코엑스|킨텍스|벡스코)$/;
 const MEET = '미팅|회의|상담|인터뷰|식사|점심|저녁|약속|통화|콜|회식|모임|촬영|수업';
+const TAILACT = new RegExp(`(${MEET}|감리|답사|리허설|워크숍|세미나|행사|시사회|설치|철수|납품|수령|픽업|출장|견학|면접|발표|공연|전시)$`);
+const SHOP = /^(스타벅스|스벅|투썸|투썸플레이스|이디야|할리스|메가커피|컴포즈|폴바셋|블루보틀|커피빈|파스쿠찌|빽다방|탐앤탐스|엔제리너스)$/;
 const esc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export function eventParts(title, people = []) {
   let t = String(title || '').replace(/\s+/g, ' ').trim(); if (!t) return null; let who = '', area = '', place = '';
@@ -841,9 +848,15 @@ export function eventParts(title, people = []) {
   // "○○에서"
   if (!place && (m = t.match(/(^|\s)((?:\S+\s)?\S+?)에서(?:\s+(?:하는|열리는|있는|진행하는|진행되는|한다는))?(?=\s|$)/))) { /* "서충주에서 하는 전시" → 곳 서충주, 제목 전시 */ const ph = m[2].trim(); const ws = ph.split(' '); if (ws.length === 2 && isArea(ws[0])) area = ws[0]; if (isArea(ph)) area = ph; else place = ph; cut(m); }
   let words = t.split(' ');
-  if (!area && words.length > 1 && isArea(words[0].replace(/(에서|에)$/, ''))) { area = words.shift().replace(/(에서|에)$/, ''); t = words.join(' '); }
-  // 이름 끝이 장소 같은 말 (○○센터, ○○시청, ○○역…): 앞에 붙은 말까지 묶음
-  if (!place) { words = t.split(' '); const k = words.findIndex(x => PLACE_SUF.test(x) && x.length >= 2); if (k >= 0 && k <= 2 && !(who && words.slice(0, k + 1).join(' ').includes(who))) { place = words.slice(0, k + 1).join(' '); const restT = words.slice(k + 1).join(' '); if (/^(에\s*)?(가야\s*\S*(\s*\S{1,2})?|가기|감|갈\s*\S*|들르\S*|다녀오\S*)$/.test(restT)) t = place; else if (restT.length >= 2) t = restT; } }
+  if (!area && words.length > 1 && isArea(words[0].replace(/(에서|에)$/, '')) && !(words.length > 2 && /^(스튜디오|카페|사무실|센터|갤러리|극장|식당|공원)$/.test(words[1]))) {   /* "성수 스튜디오 촬영"은 곳이 "성수 스튜디오" */ area = words.shift().replace(/(에서|에)$/, ''); t = words.join(' '); }
+  // 곳이 맨 뒤에 온 말: "촬영 성수 스튜디오" → 곳 성수 스튜디오, "인쇄 감리 파주" → 곳 파주
+  if (!place) { words = t.split(' '); const L = words.length - 1;
+    if (L >= 1 && PLACE_SUF.test(words[L]) && words[L].length >= 2 && !(who && words[L].includes(who))) {
+      if (L >= 2 && isArea(words[L - 1])) { place = words.slice(L - 1).join(' '); t = words.slice(0, L - 1).join(' '); }
+      else if (TAILACT.test(words[L - 1])) { place = words[L]; t = words.slice(0, L).join(' '); } }
+    else if (L >= 1 && !area && isArea(words[L]) && TAILACT.test(words[L - 1])) { area = words[L]; t = words.slice(0, L).join(' '); } }
+  // 이름 끝이 장소 같은 말 (○○센터, ○○시청, ○○역…): 앞에 붙은 말까지 묶음. 바로 뒤가 가게 이름이면 같이 묶음 ("강남역 스타벅스")
+  if (!place) { words = t.split(' '); let k = words.findIndex(x => (PLACE_SUF.test(x) && x.length >= 2) || SHOP.test(x)); while (k >= 0 && k < words.length - 2 && k <= 2 && (SHOP.test(words[k + 1]) || (PLACE_SUF.test(words[k + 1]) && words[k + 1].length >= 3))) k++; if (k >= 0 && k <= 2 && !(who && words.slice(0, k + 1).join(' ').includes(who))) { place = words.slice(0, k + 1).join(' '); const restT = words.slice(k + 1).join(' '); if (/^(에\s*)?(가야\s*\S*(\s*\S{1,2})?|가기|감|갈\s*\S*|들르\S*|다녀오\S*)$/.test(restT)) t = place; else if (restT.length >= 2) t = restT; } }
   // 보러 가는 일정이면 앞말이 장소
   const dm = t.match(DOING);
   if (!place && dm && dm.index > 0) { const head = t.slice(0, dm.index).trim().replace(/(에서|에|으로|로)$/, ''); if (head && head.split(' ').length <= 3 && !/(하|되)$/.test(head) && /(방문|관람|구경|보기|가기|견학|투어|답사|전시|공연|팝업|나들이|여행|데이트)$/.test(dm[1])) place = head; }

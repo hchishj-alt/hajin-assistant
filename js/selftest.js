@@ -3,6 +3,7 @@
 import * as B from './brain.js';
 import { isWhere } from './where.js';
 import * as PS from './prompts.js';
+import * as DM from './dm.js';
 export const BASE = new Date(2026, 10, 19, 10, 0, 0);
 
 export const CASES = [
@@ -85,6 +86,12 @@ export function run() {
     results.push({ group: '약속과 할 일', name: '"인쇄 감리 목요일 2시 파주"는 약속, "…2시까지 보내기"는 할 일', ok: a.kind === 'event' && a.data.start === '14:00' && b2.kind === 'task' && c.kind === 'task', detail: [a, b2, c].map(x => x.kind).join(' / ') });
     const d = one('굿즈 샘플비 15만원 서연이가 냄'), e = one('오로라 계약금 아직 안 들어왔어'), f = one('오로라 계약금 300만원 들어왔어');
     results.push({ group: '약속과 할 일', name: '낸 사람은 제목에서 빼 메모로, "아직 안 들어왔어"는 받을 돈을 보는 말', ok: d.kind === 'expense' && d.data.title === '굿즈 샘플비' && /안서연/.test(d.data.memo || '') && e.kind === 'query' && f.kind === 'income', detail: `${d.data.title} (${d.data.memo}) / ${e.kind} / ${f.kind}` });
+    const g = one('루미에 촬영 다음 주 수요일 오전 10시 성수 스튜디오'), h2 = one('내일 2시 강남역 스타벅스 미팅');
+    results.push({ group: '약속과 할 일', name: '맨 뒤에 온 곳("…성수 스튜디오", "…파주")과 가게 이름을 곳으로', ok: g.data.place === '성수 스튜디오' && g.data.title === '루미에 촬영' && a.data.area === '파주' && a.data.title === '인쇄 감리' && h2.data.place === '강남역 스타벅스', detail: `${g.data.title} @ ${g.data.place} / ${a.data.title} @ ${a.data.area} / ${h2.data.title} @ ${h2.data.place}` });
+    const n1 = one('포스터 시안 B안으로 확정'), n2 = one('서연이한테 견적서 보내달라고 해줘');
+    results.push({ group: '약속과 할 일', name: '정한 것은 "결정" 메모로, "○○한테 ~달라고 해줘"는 그 사람 할 일로', ok: n1.kind === 'note' && n1.data.title === '결정: 포스터 시안 B안' && (n1.data.tags || []).includes('결정') && n2.kind === 'task' && n2.data.title === '견적서 보내기' && /서연/.test(n2.data.who || ''), detail: `${n1.kind} ${n1.data.title} / ${n2.kind} ${n2.data.title} (${n2.data.who})` });
+    { const ro = [{ id: 'a', name: '최민서' }, { id: 'b', name: '안서연' }]; const s1 = DM.parseSend('서연이한테 견적서 보내달라고 해줘', ro), s2 = DM.parseSend('서연이한테 정산 끝났냐고 물어봐줘', ro);
+      results.push({ group: '메신저', name: '"서연이한테 ~달라고 해줘"는 부탁하는 말로, "~냐고 물어봐줘"는 묻는 말로 전함', ok: !!s1 && s1.to.name === '안서연' && s1.body === '견적서 보내 주세요' && !!s2 && s2.body === '정산 끝났어?', detail: `${s1 && s1.body} / ${s2 && s2.body}` }); }
   }
   { // 프롬프트 스튜디오
     const body = '우리 팀: {{팀 소개}}\n팀원: {{팀}}\n\n{{고객사}}에 낼 제안서 목차를 잡아 줘.\n예산: {{예산}}';

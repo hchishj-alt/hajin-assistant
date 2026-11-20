@@ -57,13 +57,16 @@ export function parseSend(text, roster = []) {
   const m = t.match(/^(.{1,10}?)\s*(?:님)?\s*(?:한테|에게|께|보고)\s+(.+)$/s);
   if (!m) return null;
   const who = m[1].replace(/\s/g, '');
-  const to = roster.find(r => r.name === who || r.name.endsWith(who) || (who.length >= 2 && r.name.includes(who)));
+  const hit = n => roster.find(r => r.name === n || r.name.endsWith(n) || (n.length >= 2 && r.name.includes(n)));
+  const to = hit(who) || (/[가-힣]{2,}이$/.test(who) ? hit(who.slice(0, -1)) : null);   /* "서연이한테"도 안서연으로 */
   if (!to) return null;
   let body = m[2].trim();
+  // "견적서 보내달라고 해줘", "시안 금요일까지 달라고 전해줘" → 부탁하는 말로 바꿔 전함
+  { const req = body.match(/^(.*?)\s*달라고\s*(?:좀\s*)?(?:전해|말해|해|부탁해|얘기해)\s*(?:줘|주세요|줄래|주라|줘요)?\s*[.!?]?$/s); if (req && req[1].trim()) return { to, body: req[1].trim().replace(/["“”']/g, '') + ' 주세요' }; }
   const verb = /\s*(?:(?:이)?라고|다고|냐고|자고|하라고)?\s*(?:좀\s*)?(?:전해|말해|물어봐|물어|보내|알려|연락해|톡해|메시지\s*보내)\s*(?:줘|주세요|줄래|주라|줘요|봐줘|봐)?\s*[.!?]?$/;
   if (!verb.test(body)) return null;
   const ask = /냐고|물어/.test(body.match(verb)[0]);
   body = body.replace(verb, '').replace(/["“”']/g, '').trim();
-  if (ask && !/[?？]$/.test(body)) body = body.replace(/(는지|인지|한지)$/, '').replace(/하$/, '해').replace(/되$/, '돼').replace(/(있|없|았|었|였|겠|같)$/, '$1어').replace(/이$/, '이야') + '?';
+  if (ask && !/[?？]$/.test(body)) body = body.replace(/(는지|인지|한지)$/, '').replace(/하$/, '해').replace(/되$/, '돼').replace(/[가-힣]$/, c => ((c.charCodeAt(0) - 0xac00) % 28 === 20 ? c + '어' : c)).replace(/(없|같)$/, '$1어').replace(/이$/, '이야') + '?';
   return body.length >= 1 ? { to, body } : null;
 }
