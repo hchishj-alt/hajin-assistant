@@ -11,7 +11,7 @@ import * as EX from './explore.js';
 import * as W from './web.js';
 import { FIELDS } from './fields.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.4.3';
+export const VERSION = '1.4.4';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
@@ -646,6 +646,7 @@ SCREENS.settings = async (root, st) => {
   const keyed = await AI.hasKey();
   const key = h('input', { type: 'password', placeholder: 'AIza… 또는 AQ.… 키 붙여넣기', autocomplete: 'off' });
   root.append(h('h2.sec', 'AI 연결'), h('div.card.form', h('p', keyed ? h('span.ok', ic('check', 15), ' 이 기기는 AI 연결됨 (내 무료 Gemini 키)') : '연결 안 됨. 무료 키 하나면 캡션·영상 피드백·캡처 읽기·대화가 돼요.'),
+    keyed ? null : h('p.fhint', '구글 계정만 있으면 되고 카드 등록은 없어요. 링크를 열어 로그인하고 \'API 키 만들기\'를 누른 뒤, 나온 글자를 복사해서 아래에 붙여넣어요. 키는 이 기기에만 저장돼요.'),
     keyed ? null : h('a.link', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener' }, '① Google AI Studio에서 무료 키 만들기', ic('ext', 14)),
     keyed ? null : field('② 키 붙여넣기', key), keyed ? null : h('button.btn.wide', { onclick: async () => { if (!AI.looksLikeKey(key.value)) return toast('키 모양이 아니에요. 다시 복사해 주세요'); await AI.saveKey(key.value); toast('연결했어요. 매니저가 탐색을 시작해요'); route(); background(true); } }, '연결')));
   // 연습 모드
