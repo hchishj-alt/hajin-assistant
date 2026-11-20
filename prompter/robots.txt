@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://prompri-edit.pages.dev/sitemap.xml

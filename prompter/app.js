@@ -3,8 +3,10 @@ import { scripts, takes, uid, flag } from './store.js';
 import { ic, esc, $, el, chars, fmt, paras, toast, buzz, sheet } from './ui.js';
 import * as plan from './plan.js';
 import { mountStage, autoSec } from './stage.js';
+import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
+import { CONTACT } from './config.js';
 
-export const VERSION = '1.3.0';
+export const VERSION = '1.4.0';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -80,7 +82,7 @@ async function listView() {
   const P = projects.get(cp);
   view.innerHTML = `
     <div class="top"><a class="brand" href="#/hello" aria-label="프롬프리에딧 소개"><img src="icon.svg" alt=""><span><b>프롬프리에딧</b><em>PROMPRI EDIT</em></span></a>
-      <div class="row"><a class="planbtn${plan.isPro() ? ' on' : ''}" href="#/plan" aria-label="구독 관리">${ic('star', 16)}${plan.isPro() ? '프로' : '무료'}</a><a class="iconbtn" href="#/new" aria-label="새 대본">${ic('plus', 22)}</a></div></div>
+      <div class="row"><button class="iconbtn sm" data-lang aria-label="언어">${ic('globe', 18)}</button><a class="planbtn${plan.isPro() ? ' on' : ''}" href="#/plan" aria-label="구독 관리">${ic('star', 16)}${plan.isPro() ? '프로' : '무료'}</a><a class="iconbtn" href="#/new" aria-label="새 대본">${ic('plus', 22)}</a></div></div>
     ${installTip()}
     <div class="chips" id="chips">
       <button class="chipbtn" data-p="all" aria-pressed="${cp === 'all'}">전체 <b>${all.length}</b></button>
@@ -95,7 +97,7 @@ async function listView() {
       <div class="stat"><div class="n">${ic('clock', 18)}${fmt(time)}</div><div class="l">읽는 시간 합</div></div>
     </div>
     <div id="cards"></div>
-    <a class="btn wide" href="#/new" style="margin-top:6px">${ic('plus')}${P ? esc(P.name) + '에 ' : ''}새 대본 쓰기</a>
+    <a class="btn wide" href="#/new" style="margin-top:6px">${ic('plus')}새 대본 쓰기</a>
     ${plan.isPro() ? '' : `<p class="tip c">무료는 대본 ${plan.limits().scripts}개까지 · 지금 ${all.length}개</p>`}`;
   view.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { setCurProj(b.dataset.p); buzz(8); route(); });
   $('#addP').onclick = async () => { const n = await ask('새 프로젝트', '', { ok: '만들기', placeholder: '예: 인스타 릴스 11월' }); if (!n) return; const p = projects.add(n); setCurProj(p.id); route(); };
@@ -144,7 +146,7 @@ async function editView(id) {
     <input class="titlein" id="ti" placeholder="제목 (비우면 첫 줄)" value="${esc(s.title)}" maxlength="60">
     <div class="erow">
       <button class="chipbtn" id="pj">${ic('folder', 14)}<span>${esc(projects.get(s.project)?.name || '프로젝트 없음')}</span></button>
-      <div class="seg sm" id="stt">${Object.entries(STATUS).map(([k, [n]]) => `<button data-s="${k}" aria-pressed="${(s.status || 'draft') === k}">${n}</button>`).join('')}</div>
+      <div class="stepper" id="stt" data-i="${Object.keys(STATUS).indexOf(s.status || 'draft')}" role="group" aria-label="진행 상태"><i class="track"><b></b></i>${Object.entries(STATUS).map(([k, [n, i]]) => `<button data-s="${k}" aria-pressed="${(s.status || 'draft') === k}"><span class="dot">${ic(i, 13)}</span><em>${n}</em></button>`).join('')}</div>
     </div>
     <div class="emeta"><div class="meta" id="em"></div><button class="ghost sm" id="paste">${ic('paste', 16)}붙여넣기</button></div>
     <div id="scn"></div>
@@ -194,7 +196,7 @@ async function editView(id) {
   ti.oninput = later;
   sec.onchange = () => { s.sec = Math.max(5, Math.min(3600, +sec.value || 30)); sec.value = s.sec; autoS = false; later(); };
   $('#auto').onclick = () => { s.sec = 0; autoS = true; sec.value = autoSec(ed.value); later(); toast(`${sec.value}초로 맞췄어요`); };
-  $('#stt').querySelectorAll('button').forEach(b => b.onclick = () => { s.status = b.dataset.s; $('#stt').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); buzz(8); later(); });
+  $('#stt').querySelectorAll('button').forEach((b, i) => b.onclick = () => { s.status = b.dataset.s; $('#stt').dataset.i = i; $('#stt').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); buzz(8); later(); });
   $('#pj').onclick = () => {
     const box = el(`<div><h2>프로젝트로 옮기기</h2><div class="plist">
       <button data-p="" aria-pressed="${!s.project}">${ic('doc', 16)}프로젝트 없음</button>
@@ -256,7 +258,7 @@ async function renderTakes(s, box) {
     for (const p of P) { const mine = list.filter(t => t.part === p.name && !t.joined); pick[p.name] = mine.find(t => t.id === s.picks?.[p.name]) || mine[0] || null; }
     const ready = P.filter(p => pick[p.name]), miss = P.filter(p => !pick[p.name]);
     const total = ready.reduce((a, p) => a + (pick[p.name].dur || 0), 0);
-    const jb = el(`<div class="joinbox"><div><b>이어서 한 번에 저장</b><span>${ready.length}/${P.length}씬 · ${fmt(total)}${miss.length ? ` · 아직 안 찍은 씬: ${miss.map(p => esc(p.name)).join(', ')}` : ''}</span></div>
+    const jb = el(`<div class="joinbox"><div><b>이어서 한 번에 저장</b><span><span>${ready.length}/${P.length}씬 · ${fmt(total)}</span>${miss.length ? `<span> · 아직 안 찍은 씬:</span> <span class="noi18n">${miss.map(p => esc(p.name)).join(', ')}</span>` : ''}</span></div>
       <button class="btn acc" ${ready.length < 2 ? 'disabled' : ''}>${ic('film', 18)}이어 붙이기</button></div>`);
     $('button', jb).onclick = () => joinSheet(s, ready.map(p => pick[p.name]), miss, () => renderTakes(s, box));
     box.append(jb);
@@ -283,7 +285,7 @@ async function renderTakes(s, box) {
 
 function joinSheet(s, list, miss, onDone) {
   const box = el(`<div><h2>${list.length}개 씬을 이어 붙여요</h2>
-    <p class="tip" style="margin:0 0 12px">${list.map(t => esc(t.part)).join(' → ')}${miss.length ? `<br>${miss.map(p => esc(p.name)).join(', ')}은(는) 아직 없어서 빼고 붙여요.` : ''}<br>영상 길이(${fmt(list.reduce((a, t) => a + (t.dur || 0), 0))})만큼 걸려요. 그동안 화면을 켜 두세요.</p>
+    <p class="tip" style="margin:0 0 12px"><span class="noi18n">${list.map(t => esc(t.part)).join(' → ')}</span>${miss.length ? `<br><span>아직 안 찍은 씬은 빼고 붙여요:</span> <span class="noi18n">${miss.map(p => esc(p.name)).join(', ')}</span>` : ''}<br>영상 길이(${fmt(list.reduce((a, t) => a + (t.dur || 0), 0))})만큼 걸려요. 그동안 화면을 켜 두세요.</p>
     <div class="jprog"><i></i></div><p class="jpct">0%</p>
     <div class="row"><button class="ghost grow" data-x>그만두기</button><button class="btn acc grow" data-go>${ic('film', 18)}시작</button></div></div>`);
   let busy = false;
@@ -321,9 +323,9 @@ async function saveTake(s, t, n) {
 
 function takeSheet(s, t, n, onChange, { fresh, joined } = {}) {
   const u = URL.createObjectURL(t.blob);
-  const box = el(`<div><h2>${joined ? '이어 붙였어요' : fresh ? '찍었어요' : t.joined ? '이어 붙인 영상' : (t.part ? esc(t.part) + ' · ' : '') + '테이크 ' + n}</h2>
+  const box = el(`<div><h2>${joined ? '이어 붙였어요' : fresh ? '찍었어요' : t.joined ? '이어 붙인 영상' : (t.part ? `<span class="noi18n">${esc(t.part)}</span> · ` : '') + '<span>테이크 ' + n + '</span>'}</h2>
     <video class="tview" src="${u}" playsinline controls ${fresh ? 'autoplay' : ''}></video>
-    <div class="tinfo"><span>${ic('clock', 14)}${fmt(t.dur)}</span><span>${ic('film', 14)}${t.joined ? '이어 붙임' : (t.part ? esc(t.part) + ' ' : '') + '테이크 ' + n}</span><span>${(t.blob.size / 1048576).toFixed(1)}MB</span></div>
+    <div class="tinfo"><span>${ic('clock', 14)}${fmt(t.dur)}</span><span>${ic('film', 14)}${t.joined ? '이어 붙임' : (t.part ? `<span class="noi18n">${esc(t.part)}</span> ` : '') + '<span>테이크 ' + n + '</span>'}</span><span>${(t.blob.size / 1048576).toFixed(1)}MB</span></div>
     <div class="row"><button class="ghost grow" data-d>${ic('trash', 18)}지우기</button><button class="btn acc grow" data-s>${ic('share', 18)}사진첩에 저장</button></div>
     ${fresh && !joined ? `<button class="ghost wide" data-r style="margin-top:8px">${ic('cam', 18)}다시 찍기</button>` : ''}</div>`);
   const sh = sheet(box, { onClose: () => setTimeout(() => URL.revokeObjectURL(u), 500) });
@@ -364,7 +366,7 @@ async function shootView(id, k = 0) {
       const sh = takeSheet(s, t, list.filter(x => x.part === t.part && !x.joined).length, null, { fresh: true });
       // 다음 씬으로 바로 넘어가기
       if (k && k < names.length - 1) {
-        const nb = el(`<button class="btn acc wide" style="margin-top:8px">${ic('play', 18)}다음 씬 · ${esc(names[k + 1])}</button>`);
+        const nb = el(`<button class="btn acc wide" style="margin-top:8px">${ic('play', 18)}<span>다음 씬 ·</span> <span class="noi18n">${esc(names[k + 1])}</span></button>`);
         nb.onclick = () => { sh.close(); onPartGo(k + 1); };
         sh.el.lastElementChild.append(nb);
       }
@@ -470,6 +472,7 @@ function helloView() {
     ['mic', '목소리 따라가기', '말하는 속도에 맞춰 대본이 따라와요 (프로)'],
   ];
   view.innerHTML = `<div class="hello">
+    <div class="hbar"><button class="ghost sm" data-lang aria-label="언어">${ic('globe', 16)}<span class="noi18n">${LANGS[lang()]}</span></button></div>
     <section class="hero">
       <img class="hmark" src="icon.svg" alt="">
       <h1>프롬프리에딧</h1><p class="en">PROMPRI EDIT</p>
@@ -485,6 +488,7 @@ function helloView() {
     <section class="howto"><h2>${ic('play', 20)}이렇게 써요</h2>
       <ol class="flow"><li><b>대본 쓰기</b>붙여넣기 OK. 길면 씬 추가로 나눠요</li><li><b>찍기</b>빨간 버튼 → 3·2·1 → 읽기만 하면 끝</li><li><b>고르고 붙이기</b>씬마다 ★ 고르고 이어 붙이기</li><li><b>저장</b>사진첩·파일로 바로 저장</li></ol></section>
     <a class="btn acc wide" href="#/">${ic('cam', 18)}지금 시작하기</a>
+    <footer class="hfoot"><a class="mailto" href="mailto:${CONTACT}?subject=${encodeURIComponent('[PROMPRI EDIT] 문의')}">${ic('mail', 15)}<span>문의</span></a><span class="noi18n">${CONTACT}</span><button class="linkbtn" data-lang>${ic('globe', 15)}<span class="noi18n">${LANGS[lang()]}</span></button></footer>
   </div>`;
   const off = () => document.body.classList.remove('hello-on');
   addEventListener('hashchange', off, { once: true });
@@ -515,9 +519,29 @@ const SAMPLE = `[[인사]]
 
 여러분은 어떤 루틴이 있나요? 댓글로 알려 주세요!`;
 
+/* ---------- 언어 고르기 ---------- */
+function langSheet() {
+  const cur = langPref();
+  const box = el(`<div><h2>언어</h2><div class="plist">
+    <button data-l="auto" aria-pressed="${cur === 'auto'}">${ic('globe', 16)}<span>자동 (브라우저 따라감)</span></button>
+    ${Object.entries(LANGS).map(([k, n]) => `<button data-l="${k}" aria-pressed="${cur === k}"><b class="lcode noi18n">${k.toUpperCase()}</b><span class="noi18n">${n}</span></button>`).join('')}</div></div>`);
+  const sh = sheet(box);
+  box.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { setLang(b.dataset.l); sh.close(); setTimeout(() => location.reload(), 250); });
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-lang]')) { e.preventDefault(); langSheet(); } });
+
+const SAMPLES = {
+  ko: [SAMPLE, '첫 대본 예시'],
+  en: ['[[Hello]]\nHi everyone! Today I’ll show you the work routine I use every single day.\n\n[[Routine]]\nFirst thing in the morning, I write down just three things to do. Write more, and I end up doing none.\n\nThen I put on music I love and do only one thing for an hour.\n\n[[Outro]]\nWhat’s your routine? Tell me in the comments!', 'Sample script'],
+  ja: ['[[あいさつ]]\nみなさん、こんにちは。今日は私が毎日やっている作業ルーティンを紹介します。\n\n[[ルーティン]]\n朝起きたら、まず今日やることを3つだけ書きます。多く書くと逆にひとつもできないんです。\n\nそれから好きな音楽をかけて、1時間ひとつのことだけをします。\n\n[[おわり]]\nみなさんのルーティンは？コメントで教えてください！', '台本の例'],
+  zh: ['[[开场]]\n大家好！今天给大家看看我每天都在用的工作习惯。\n\n[[习惯]]\n早上起床后，我先只写下今天要做的三件事。写多了反而一件都做不完。\n\n然后放上喜欢的音乐，一小时只做一件事。\n\n[[结尾]]\n你有什么习惯？在评论里告诉我吧！', '台词示例'],
+  es: ['[[Hola]]\n¡Hola a todos! Hoy os enseño la rutina de trabajo que uso cada día.\n\n[[Rutina]]\nNada más levantarme, apunto solo tres cosas que hacer. Si apunto más, no hago ninguna.\n\nLuego pongo música que me gusta y hago una sola cosa durante una hora.\n\n[[Final]]\n¿Cuál es tu rutina? ¡Cuéntamelo en los comentarios!', 'Guion de ejemplo'],
+};
+
 (async () => {
+  startI18n();
   const moved = await migrateStudio();
-  if (!flag('seeded')) { flag('seeded', '1'); if (!(await scripts.all()).length) await newScript(SAMPLE, '첫 대본 예시'); }
+  if (!flag('seeded')) { flag('seeded', '1'); if (!(await scripts.all()).length) { const [b, ti] = SAMPLES[lang()] || SAMPLES.ko; await newScript(b, ti); } }
   if (moved) setTimeout(() => toast(`스튜디오에서 쓰던 대본 ${moved}개를 옮겨 왔어요`), 600);
   // 처음 온 사람은 소개부터
   if (!flag('hello') && (!location.hash || location.hash === '#/') && !standalone()) history.replaceState(null, '', '#/hello');

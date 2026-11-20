@@ -335,3 +335,30 @@ em.pro{font-style:normal;font-size:10.5px;font-weight:800;color:#fff;background:
 .ghost{color:var(--ink)}
 .tkempty{color:var(--sub);font-size:13px;font-weight:600;text-align:center;padding:26px 10px;border:1.5px dashed var(--line);border-radius:var(--rd);margin-top:14px}
 @media (max-width:899px){.tkempty{display:none}}
+
+/* 진행 상태: 쓰는 중 → 촬영 대기 → 완료 (단계가 차오르는 토글) */
+.stepper{position:relative;display:grid;grid-template-columns:repeat(3,1fr);background:var(--card);border-radius:16px;box-shadow:0 1px 0 var(--line);padding:10px 4px 8px;min-width:236px;--c:var(--sub)}
+.stepper[data-i="1"]{--c:var(--acc)}
+.stepper[data-i="2"]{--c:#12a56b}
+.stepper .track{position:absolute;left:16.66%;right:16.66%;top:21px;height:3px;border-radius:3px;background:var(--line)}
+.stepper .track b{display:block;height:100%;width:0;border-radius:3px;background:var(--c);transition:width .55s var(--spring),background .3s}
+.stepper[data-i="1"] .track b{width:50%}
+.stepper[data-i="2"] .track b{width:100%}
+.stepper button{position:relative;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:5px;padding:0;color:var(--sub);font-size:12px;font-weight:700}
+.stepper .dot{width:24px;height:24px;border-radius:50%;background:var(--card);border:2px solid var(--line);display:grid;place-items:center;color:transparent;transition:transform .45s var(--spring),background .25s,border-color .25s,color .25s}
+.stepper em{font-style:normal;white-space:nowrap}
+/* 지나온 단계: 채운 점, 지금 단계: 크게 + 글씨 진하게 */
+.stepper[data-i="1"] button:nth-of-type(1) .dot,.stepper[data-i="2"] button:nth-of-type(-n+2) .dot{background:var(--c);border-color:var(--c);color:#fff}
+.stepper button[aria-pressed=true] .dot{background:var(--c);border-color:var(--c);color:#fff;transform:scale(1.25);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 18%,transparent)}
+.stepper button[aria-pressed=true] em{color:var(--ink);font-weight:850}
+.stepper button:active .dot{transform:scale(.85)}
+.erow{align-items:flex-start}
+@media (max-width:420px){.erow{flex-direction:column;align-items:stretch}.erow .chipbtn{max-width:100%;align-self:flex-start}.stepper{width:100%}}
+
+.iconbtn.sm{width:40px;height:40px;border-radius:13px}
+.hbar{display:flex;justify-content:flex-end;margin-bottom:-14px}
+.hfoot{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;color:var(--sub);font-size:13px;font-weight:650;padding:10px 0 4px}
+.mailto{display:inline-flex;align-items:center;gap:5px;color:var(--acc);font-weight:750;text-decoration:none}
+.linkbtn{border:0;background:none;color:var(--sub);display:inline-flex;align-items:center;gap:5px;font-weight:650;padding:6px}
+.lcode{width:30px;height:22px;border-radius:7px;background:var(--bg);display:inline-grid;place-items:center;font-size:11px;font-weight:850;color:var(--sub)}
+html:not([lang=ko]) .brand em,html:not([lang=ko]) .hero .en{display:none}

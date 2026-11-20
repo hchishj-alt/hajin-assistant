@@ -1,0 +1,370 @@
+// 언어: 기본은 브라우저 언어를 따라가고, 언어 고르기에서 바꿀 수 있다(localStorage 'prompter:lang').
+// 화면 코드는 한국어로 쓰고, 여기서 화면에 그려진 글자(텍스트·placeholder·aria-label·title)를 바꿔 끼운다.
+// 숫자는 {n}으로 바꿔 찾고, 번역문에서는 {0}, {1} 순서대로 다시 넣는다. 사용자가 쓴 글(대본, 이름)은 .noi18n·#script·textarea라 건드리지 않는다.
+
+export const LANGS = { ko: '한국어', en: 'English', ja: '日本語', zh: '中文(简体)', es: 'Español' };
+const ORDER = ['en', 'ja', 'zh', 'es'];
+const KEY = 'prompter:lang';
+
+export function langPref() { try { return localStorage.getItem(KEY) || 'auto'; } catch { return 'auto'; } }
+export function setLang(l) { try { l === 'auto' ? localStorage.removeItem(KEY) : localStorage.setItem(KEY, l); } catch {} }
+export function lang() {
+  const p = langPref();
+  if (p !== 'auto' && LANGS[p]) return p;
+  for (const l of navigator.languages || [navigator.language || 'ko']) { const b = String(l).slice(0, 2).toLowerCase(); if (LANGS[b]) return b; }
+  return 'en';
+}
+
+// [영어, 일본어, 중국어, 스페인어]
+const D = {
+  // 브랜드·소개
+  '프롬프리에딧': ['PROMPRI EDIT', 'プロンプリエディット', 'PROMPRI EDIT', 'PROMPRI EDIT'],
+  '프롬프리에딧 소개': ['About PROMPRI EDIT', 'PROMPRI EDITについて', '关于 PROMPRI EDIT', 'Acerca de PROMPRI EDIT'],
+  '프롬프리에딧 · 촬영용 대본 프롬프터': ['PROMPRI EDIT · Teleprompter for filming', 'PROMPRI EDIT · 撮影用プロンプター', 'PROMPRI EDIT · 拍摄用提词器', 'PROMPRI EDIT · Teleprompter para grabar'],
+  '대본을 카메라 위에 띄우고,': ['Put your script over the camera,', '台本をカメラの上に表示して、', '把台词放在镜头上方，', 'Pon tu guion sobre la cámara,'],
+  '씬별로 찍고, 한 번에 이어 붙여요.': ['shoot scene by scene, and join them in one go.', 'シーンごとに撮って、まとめてつなげます。', '分场景拍摄，一键拼接。', 'graba por escenas y únelas de una vez.'],
+  '무료로 시작하기': ['Start free', '無料ではじめる', '免费开始', 'Empieza gratis'],
+  '프로 보기': ['See Pro', 'Proを見る', '查看 Pro', 'Ver Pro'],
+  '설치 없이 브라우저에서 바로 · 폰 · 아이패드 · PC': ['No install, right in your browser · Phone · iPad · PC', 'インストール不要でブラウザからすぐ · スマホ · iPad · PC', '无需安装，浏览器直接使用 · 手机 · iPad · 电脑', 'Sin instalar, en tu navegador · Móvil · iPad · PC'],
+  '카메라 위에 대본': ['Script over the camera', 'カメラの上に台本', '镜头上方显示台词', 'Guion sobre la cámara'],
+  '렌즈 바로 아래 읽는 줄. 정한 시간에 맞춰 흘러가요': ['A reading line right below the lens. Scrolls to your set time', 'レンズのすぐ下に読む線。決めた時間に合わせて流れます', '阅读线就在镜头下方，按设定时间滚动', 'Línea de lectura justo bajo la lente. Avanza según el tiempo fijado'],
+  '씬으로 나눠 찍기': ['Shoot in scenes', 'シーンに分けて撮影', '分场景拍摄', 'Graba por escenas'],
+  '씬 추가만 누르면 끝. 씬마다 따로 찍고 ★로 골라요': ['Just tap Add scene. Shoot each one and pick with ★', 'シーン追加を押すだけ。シーンごとに撮って★で選びます', '点“添加场景”即可。逐个拍摄，用★挑选', 'Pulsa Añadir escena. Graba cada una y elige con ★'],
+  '한 번에 이어 붙이기': ['Join in one go', 'まとめてつなげる', '一键拼接', 'Une todo de una vez'],
+  '고른 테이크를 순서대로 붙여 영상 하나로 저장': ['Joins your picked takes in order into one video', '選んだテイクを順番につなげて1本の動画に保存', '把选中的镜头按顺序拼成一个视频', 'Une las tomas elegidas en orden en un solo vídeo'],
+  '프로젝트로 정리': ['Organize by project', 'プロジェクトで整理', '按项目整理', 'Organiza por proyecto'],
+  '영상 기획을 폴더로 묶고 쓰는 중·촬영 대기·완료': ['Group video plans in folders: Writing · Ready · Done', '企画をフォルダにまとめて 作成中・撮影待ち・完了', '用文件夹归类：写作中 · 待拍摄 · 完成', 'Agrupa en carpetas: Escribiendo · Listo · Hecho'],
+  '가로 {n} · 세로 {n}': ['Landscape {0} · Portrait {1}', '横 {0} · 縦 {1}', '横屏 {0} · 竖屏 {1}', 'Horizontal {0} · Vertical {1}'],
+  '릴스·쇼츠·유튜브 비율 그대로 잘라 저장': ['Saved cropped for Reels, Shorts and YouTube', 'リール・ショート・YouTubeの比率でそのまま保存', '按 Reels、Shorts、YouTube 比例裁切保存', 'Se guarda recortado para Reels, Shorts y YouTube'],
+  '목소리 따라가기': ['Voice follow', '声に合わせる', '跟随语音', 'Seguir la voz'],
+  '말하는 속도에 맞춰 대본이 따라와요 (프로)': ['The script follows your speaking pace (Pro)', '話す速さに台本がついてきます (Pro)', '台词跟随你的语速 (Pro)', 'El guion sigue tu ritmo al hablar (Pro)'],
+  '무료 대본': ['Free scripts', '無料の台本', '免费台词', 'Guiones gratis'],
+  '무료 한 번 녹화': ['Free per recording', '無料の1回の録画', '免费单次录制', 'Gratis por grabación'],
+  '설치·서버 비용': ['Install & server cost', 'インストール・サーバー費用', '安装和服务器费用', 'Coste de instalación y servidor'],
+  '{n}원': ['₩{0}', '₩{0}', '₩{0}', '₩{0}'],
+  '{n}분': ['{0} min', '{0}分', '{0} 分钟', '{0} min'],
+  '{n}초': ['{0} s', '{0}秒', '{0} 秒', '{0} s'],
+  '{n}개': ['{0}', '{0}件', '{0} 个', '{0}'],
+  '{n}자': ['{0} chars', '{0}文字', '{0} 字', '{0} car.'],
+  '앱처럼 쓰기': ['Use it like an app', 'アプリのように使う', '像 App 一样使用', 'Úsala como una app'],
+  '폰이랑 아이패드는': ['On phones and iPads,', 'スマホとiPadは', '手机和 iPad 上，', 'En móviles y iPad,'],
+  '홈 화면에 추가': ['Add to Home Screen', 'ホーム画面に追加', '添加到主屏幕', 'Añadir a pantalla de inicio'],
+  '하면 앱처럼 쓸 수 있어요. 전체 화면으로 열리고, 찍은 영상도 브라우저에 더 오래 안전하게 보관돼요.': ['and it works like an app. It opens full screen, and your takes stay safe in the browser longer.', 'するとアプリのように使えます。全画面で開き、撮った動画もブラウザに長く安全に保存されます。', '后即可像 App 一样使用。全屏打开，拍好的视频也能在浏览器里更久更安全地保存。', 'y funciona como una app. Se abre a pantalla completa y tus tomas se guardan más tiempo.'],
+  '아이폰 · 아이패드': ['iPhone · iPad', 'iPhone · iPad', 'iPhone · iPad', 'iPhone · iPad'],
+  '사파리 아래(아이패드는 위)': ['In Safari, bottom (top on iPad)', 'Safariの下(iPadは上)', 'Safari 底部(iPad 在顶部)', 'En Safari, abajo (arriba en iPad)'],
+  '공유': ['Share', '共有', '分享', 'Compartir'],
+  '갤럭시 · 안드로이드': ['Galaxy · Android', 'Galaxy · Android', 'Galaxy · Android', 'Galaxy · Android'],
+  '크롬 오른쪽 위': ['Chrome, top right', 'Chrome 右上', 'Chrome 右上角', 'Chrome, arriba a la derecha'],
+  '또는': ['or', 'または', '或', 'o'],
+  '앱 설치': ['Install app', 'アプリをインストール', '安装应用', 'Instalar app'],
+  'PC (크롬 · 엣지)': ['PC (Chrome · Edge)', 'PC (Chrome · Edge)', '电脑 (Chrome · Edge)', 'PC (Chrome · Edge)'],
+  '주소창 오른쪽': ['Right side of the address bar:', 'アドレスバーの右の', '地址栏右侧的', 'A la derecha de la barra de direcciones:'],
+  '설치': ['Install', 'インストール', '安装', 'Instalar'],
+  '아이콘을 누르거나 그냥 즐겨찾기에 두고 써요': ['icon, or just bookmark it', 'アイコンを押すか、ブックマークして使います', '图标，或直接加入书签', 'icono, o simplemente guárdala en marcadores'],
+  '이렇게 써요': ['How it works', '使い方', '使用方法', 'Cómo funciona'],
+  '대본 쓰기': ['Write', '台本を書く', '写台词', 'Escribe'],
+  '붙여넣기 OK. 길면 씬 추가로 나눠요': ['Paste is fine. Split long ones into scenes', '貼り付けOK。長ければシーンに分けます', '可直接粘贴，太长就分场景', 'Puedes pegar. Si es largo, divídelo en escenas'],
+  '찍기': ['Shoot', '撮る', '拍摄', 'Graba'],
+  '빨간 버튼 → {n}·{n}·{n} → 읽기만 하면 끝': ['Red button → {0}·{1}·{2} → just read', '赤いボタン → {0}·{1}·{2} → 読むだけ', '红色按钮 → {0}·{1}·{2} → 照着读就行', 'Botón rojo → {0}·{1}·{2} → solo lee'],
+  '고르고 붙이기': ['Pick & join', '選んでつなぐ', '挑选并拼接', 'Elige y une'],
+  '씬마다 ★ 고르고 이어 붙이기': ['Pick ★ per scene, then join', 'シーンごとに★を選んでつなぐ', '每个场景选★再拼接', 'Elige ★ por escena y une'],
+  '저장': ['Save', '保存', '保存', 'Guardar'],
+  '사진첩·파일로 바로 저장': ['Save straight to Photos or Files', '写真・ファイルにすぐ保存', '直接存到相册或文件', 'Guarda directo en Fotos o Archivos'],
+  '지금 시작하기': ['Start now', '今すぐはじめる', '立即开始', 'Empieza ya'],
+  '홈 화면에 추가하면 앱처럼 써요': ['Add to Home Screen to use it like an app', 'ホーム画面に追加するとアプリのように使えます', '添加到主屏幕，像 App 一样使用', 'Añádela a inicio y úsala como app'],
+  '사파리 공유 버튼 → 홈 화면에 추가 · 전체 화면으로 열리고 찍은 영상도 더 안전하게 보관돼요': ['Safari Share → Add to Home Screen · Opens full screen and keeps your takes safer', 'Safariの共有 → ホーム画面に追加 · 全画面で開き、動画もより安全に保存', 'Safari 分享 → 添加到主屏幕 · 全屏打开，视频保存更安全', 'Safari Compartir → Añadir a inicio · Pantalla completa y tomas más seguras'],
+  '크롬 ⋮ 메뉴 → 홈 화면에 추가 · 전체 화면으로 열리고 찍은 영상도 더 안전하게 보관돼요': ['Chrome ⋮ menu → Add to Home screen · Opens full screen and keeps your takes safer', 'Chrome ⋮ メニュー → ホーム画面に追加 · 全画面で開き、動画もより安全に保存', 'Chrome ⋮ 菜单 → 添加到主屏幕 · 全屏打开，视频保存更安全', 'Menú ⋮ de Chrome → Añadir a inicio · Pantalla completa y tomas más seguras'],
+  '언어': ['Language', '言語', '语言', 'Idioma'],
+  '자동 (브라우저 따라감)': ['Auto (follow browser)', '自動 (ブラウザに合わせる)', '自动 (跟随浏览器)', 'Automático (según el navegador)'],
+  '문의': ['Contact', 'お問い合わせ', '联系我们', 'Contacto'],
+  '문의는 메일로 보내 주세요': ['Send questions by email', 'お問い合わせはメールでどうぞ', '如有问题请发邮件', 'Escríbenos por correo'],
+
+  // 목록
+  '새 대본': ['New script', '新しい台本', '新台词', 'Nuevo guion'],
+  '새 대본 쓰기': ['Write a new script', '新しい台本を書く', '写新台词', 'Escribir guion nuevo'],
+  '구독 관리': ['Subscription', 'サブスク管理', '订阅管理', 'Suscripción'],
+  '무료': ['Free', '無料', '免费', 'Gratis'],
+  '프로': ['Pro', 'Pro', 'Pro', 'Pro'],
+  '전체': ['All', 'すべて', '全部', 'Todo'],
+  '미분류': ['Unsorted', '未分類', '未分类', 'Sin carpeta'],
+  '프로젝트': ['Project', 'プロジェクト', '项目', 'Proyecto'],
+  '대본': ['Scripts', '台本', '台词', 'Guiones'],
+  '대본 {n} · 완료 {n}': ['{0} scripts · {1} done', '台本 {0} · 完了 {1}', '台词 {0} · 完成 {1}', '{0} guiones · {1} hechos'],
+  '대본 · 완료 {n}': ['Scripts · {0} done', '台本 · 完了 {0}', '台词 · 完成 {0}', 'Guiones · {0} hechos'],
+  '찍은 테이크': ['Takes', '撮ったテイク', '已拍镜头', 'Tomas'],
+  '읽는 시간 합': ['Total read time', '読む時間の合計', '朗读总时长', 'Tiempo total de lectura'],
+  '무료는 대본 {n}개까지 · 지금 {n}개': ['Free: up to {0} scripts · now {1}', '無料は台本{0}件まで · いま{1}件', '免费版最多 {0} 个台词 · 当前 {1} 个', 'Gratis: hasta {0} guiones · ahora {1}'],
+  '아직 대본이 없어요.': ['No scripts yet.', 'まだ台本がありません。', '还没有台词。', 'Aún no hay guiones.'],
+  '이 프로젝트에 아직 대본이 없어요.': ['No scripts in this project yet.', 'このプロジェクトにはまだ台本がありません。', '这个项目还没有台词。', 'Este proyecto aún no tiene guiones.'],
+  '새 대본을 쓰거나 복사한 글을 붙여 넣어요.': ['Write a new script or paste copied text.', '新しい台本を書くか、コピーした文を貼り付けます。', '写新台词，或粘贴复制的文字。', 'Escribe un guion o pega un texto copiado.'],
+  '새 프로젝트': ['New project', '新しいプロジェクト', '新项目', 'Nuevo proyecto'],
+  '예: 인스타 릴스 {n}월': ['e.g. Instagram Reels, month {0}', '例: インスタリール {0}月', '例如：Instagram Reels {0}月', 'p. ej. Reels de Instagram, mes {0}'],
+  '만들기': ['Create', '作成', '创建', 'Crear'],
+  '그만두기': ['Cancel', 'やめる', '取消', 'Cancelar'],
+  '프로젝트 관리': ['Manage project', 'プロジェクト管理', '管理项目', 'Gestionar proyecto'],
+  '이름 바꾸기': ['Rename', '名前を変更', '重命名', 'Renombrar'],
+  '프로젝트 지우기': ['Delete project', 'プロジェクトを削除', '删除项目', 'Eliminar proyecto'],
+  '프로젝트 이름': ['Project name', 'プロジェクト名', '项目名称', 'Nombre del proyecto'],
+  '프로젝트를 지워도 대본은 지워지지 않고 미분류로 옮겨져요.': ['Deleting a project keeps its scripts; they move to Unsorted.', 'プロジェクトを削除しても台本は消えず、未分類に移ります。', '删除项目不会删除台词，台词会移到未分类。', 'Al eliminar un proyecto, sus guiones pasan a Sin carpeta.'],
+  '프로젝트를 지웠어요. 대본은 미분류로 옮겼어요': ['Project deleted. Scripts moved to Unsorted', 'プロジェクトを削除しました。台本は未分類に移しました', '项目已删除，台词已移到未分类', 'Proyecto eliminado. Guiones movidos a Sin carpeta'],
+  '쓰는 중': ['Writing', '作成中', '写作中', 'Escribiendo'],
+  '촬영 대기': ['Ready', '撮影待ち', '待拍摄', 'Listo'],
+  '완료': ['Done', '完了', '完成', 'Hecho'],
+  '진행 상태': ['Progress', '進行状況', '进度', 'Progreso'],
+  '스튜디오에서 옮긴 대본': ['Moved from Studio', 'スタジオから移した台本', '从工作室迁移的台词', 'Traídos del Studio'],
+  '스튜디오에서 쓰던 대본 {n}개를 옮겨 왔어요': ['Moved {0} scripts from the Studio', 'スタジオの台本{0}件を移しました', '已迁移工作室里的 {0} 个台词', 'Se trajeron {0} guiones del Studio'],
+  '첫 대본 예시': ['Sample script', '台本の例', '台词示例', 'Guion de ejemplo'],
+
+  // 편집
+  '목록': ['List', '一覧', '列表', 'Lista'],
+  '대본 지우기': ['Delete script', '台本を削除', '删除台词', 'Eliminar guion'],
+  '제목 (비우면 첫 줄)': ['Title (blank = first line)', 'タイトル (空なら1行目)', '标题（留空则用第一行）', 'Título (vacío = primera línea)'],
+  '프로젝트 없음': ['No project', 'プロジェクトなし', '无项目', 'Sin proyecto'],
+  '프로젝트로 옮기기': ['Move to project', 'プロジェクトへ移動', '移到项目', 'Mover a proyecto'],
+  '새 프로젝트 만들기': ['New project', '新しいプロジェクトを作成', '新建项目', 'Crear proyecto'],
+  '옮겼어요': ['Moved', '移動しました', '已移动', 'Movido'],
+  '붙여넣기': ['Paste', '貼り付け', '粘贴', 'Pegar'],
+  '문단 {n}': ['{0} paragraphs', '段落 {0}', '{0} 段', '{0} párrafos'],
+  '여기에 대본을 쓰거나 붙여 넣어요.\n\n여러 번 나눠 찍으려면 아래 [씬 추가]를 눌러요.': ['Write or paste your script here.\n\nTo shoot in parts, tap [Add scene] below.', 'ここに台本を書くか貼り付けます。\n\n分けて撮るなら下の[シーン追加]を押します。', '在这里写或粘贴台词。\n\n想分段拍摄，点下面的[添加场景]。', 'Escribe o pega tu guion aquí.\n\nPara grabar por partes, pulsa [Añadir escena].'],
+  '이 씬에서 할 말': ['What to say in this scene', 'このシーンで話すこと', '这个场景要说的话', 'Lo que dirás en esta escena'],
+  '씬 추가': ['Add scene', 'シーン追加', '添加场景', 'Añadir escena'],
+  '씬 지우기': ['Delete scene', 'シーンを削除', '删除场景', 'Eliminar escena'],
+  '위로': ['Move up', '上へ', '上移', 'Subir'],
+  '씬을 지웠어요': ['Scene deleted', 'シーンを削除しました', '场景已删除', 'Escena eliminada'],
+  '씬 {n}': ['Scene {0}', 'シーン {0}', '场景 {0}', 'Escena {0}'],
+  '읽는 시간': ['Read time', '読む時間', '朗读时长', 'Tiempo de lectura'],
+  '초': ['sec', '秒', '秒', 's'],
+  '글자 수로 맞추기': ['Fit to length', '文字数に合わせる', '按字数计算', 'Ajustar al texto'],
+  '{n}초로 맞췄어요': ['Set to {0} s', '{0}秒にしました', '已设为 {0} 秒', 'Ajustado a {0} s'],
+  '대사는 이 시간에 맞춰 올라가요. 촬영 화면에서 속도(%)로 더 조절할 수 있어요.': ['Lines scroll to this time. Fine-tune with speed (%) while shooting.', 'セリフはこの時間に合わせて流れます。撮影画面で速度(%)を調整できます。', '台词按这个时长滚动。拍摄时可用速度(%)微调。', 'El texto avanza según este tiempo. Ajusta la velocidad (%) al grabar.'],
+  '이 대본으로 찍기': ['Shoot this script', 'この台本で撮る', '用这个台词拍摄', 'Grabar este guion'],
+  '이 대본을 지울까요?': ['Delete this script?', 'この台本を削除しますか？', '删除这个台词？', '¿Eliminar este guion?'],
+  '찍은 테이크도 같이 지워져요. 되돌릴 수 없어요.': ['Its takes are deleted too. This can’t be undone.', '撮ったテイクも一緒に消えます。元に戻せません。', '已拍镜头也会一起删除，无法恢复。', 'También se borran sus tomas. No se puede deshacer.'],
+  '지우기': ['Delete', '削除', '删除', 'Eliminar'],
+  '지웠어요': ['Deleted', '削除しました', '已删除', 'Eliminado'],
+  '복사한 글이 없어요': ['Nothing copied', 'コピーした文がありません', '没有复制的文字', 'No hay nada copiado'],
+  '{n}자를 붙였어요': ['Pasted {0} chars', '{0}文字を貼り付けました', '已粘贴 {0} 字', 'Pegados {0} car.'],
+  '글 칸을 길게 눌러 붙여 넣어 주세요': ['Long-press the text box to paste', 'テキスト欄を長押しして貼り付けてください', '请长按文本框粘贴', 'Mantén pulsado el cuadro para pegar'],
+  '찍은 테이크가 여기에 모여요.': ['Your takes collect here.', '撮ったテイクがここに集まります。', '拍好的镜头会集中在这里。', 'Tus tomas se reúnen aquí.'],
+  '씬을 나누면 씬별로 모이고 한 번에 이어 붙일 수 있어요.': ['Split into scenes to group them and join in one go.', 'シーンに分けるとシーンごとにまとまり、まとめてつなげられます。', '分场景后按场景归类，可一键拼接。', 'Divide en escenas para agruparlas y unirlas de una vez.'],
+
+  // 테이크·이어 붙이기
+  '찍은 테이크 {n}': ['{0} takes', '撮ったテイク {0}', '已拍镜头 {0}', '{0} tomas'],
+  '테이크 {n}': ['Take {0}', 'テイク {0}', '镜头 {0}', 'Toma {0}'],
+  '저장': ['Save', '保存', '保存', 'Guardar'],
+  '테이크를 지웠어요': ['Take deleted', 'テイクを削除しました', '镜头已删除', 'Toma eliminada'],
+  '이 테이크 쓰기': ['Use this take', 'このテイクを使う', '使用这个镜头', 'Usar esta toma'],
+  '이어서 한 번에 저장': ['Save all as one', 'まとめて1本に保存', '合并保存为一个', 'Guardar todo en uno'],
+  '{n}/{n}씬 · {n}': ['{0}/{1} scenes · {2}', '{0}/{1}シーン · {2}', '{0}/{1} 场景 · {2}', '{0}/{1} escenas · {2}'],
+  '· 아직 안 찍은 씬:': ['· Not shot yet:', '· まだ撮っていないシーン:', '· 还没拍的场景：', '· Sin grabar:'],
+  '이어 붙이기': ['Join', 'つなげる', '拼接', 'Unir'],
+  '이어 붙인 영상 {n}': ['{0} joined videos', 'つなげた動画 {0}', '拼接的视频 {0}', '{0} vídeos unidos'],
+  '이어 붙인 영상': ['Joined video', 'つなげた動画', '拼接的视频', 'Vídeo unido'],
+  '이어 붙임 · {n}': ['Joined · {0}', 'つなげた · {0}', '已拼接 · {0}', 'Unido · {0}'],
+  '이어 붙임': ['Joined', 'つなげた', '已拼接', 'Unido'],
+  '이 씬 찍기': ['Shoot this scene', 'このシーンを撮る', '拍这个场景', 'Grabar esta escena'],
+  '아직 안 찍었어요': ['Not shot yet', 'まだ撮っていません', '还没拍', 'Aún sin grabar'],
+  '통째로 찍은 테이크 {n}': ['{0} full-script takes', '通しで撮ったテイク {0}', '整段拍摄的镜头 {0}', '{0} tomas completas'],
+  '{n}개 씬을 이어 붙여요': ['Joining {0} scenes', '{0}シーンをつなげます', '拼接 {0} 个场景', 'Uniendo {0} escenas'],
+  '아직 안 찍은 씬은 빼고 붙여요:': ['Skipping scenes not shot yet:', 'まだ撮っていないシーンは除いてつなげます:', '跳过还没拍的场景：', 'Se omiten las escenas sin grabar:'],
+  '영상 길이({n})만큼 걸려요. 그동안 화면을 켜 두세요.': ['Takes as long as the video ({0}). Keep the screen on.', '動画の長さ({0})だけかかります。その間は画面をつけたままにしてください。', '需要与视频等长的时间({0})，期间请保持屏幕常亮。', 'Tarda lo que dura el vídeo ({0}). Mantén la pantalla encendida.'],
+  '시작': ['Start', '開始', '开始', 'Iniciar'],
+  '이어 붙였어요': ['Joined!', 'つなげました', '拼接完成', '¡Unido!'],
+  '이어 붙이지 못했어요 ·': ['Couldn’t join ·', 'つなげられませんでした ·', '拼接失败 ·', 'No se pudo unir ·'],
+  '영상을 열지 못했어요': ['Couldn’t open the video', '動画を開けませんでした', '无法打开视频', 'No se pudo abrir el vídeo'],
+  '재생이 멈췄어요': ['Playback stopped', '再生が止まりました', '播放中断', 'La reproducción se detuvo'],
+  '찍었어요': ['Got it!', '撮れました', '拍好了', '¡Grabado!'],
+  '사진첩에 저장': ['Save to Photos', '写真に保存', '存到相册', 'Guardar en Fotos'],
+  '다시 찍기': ['Retake', '撮り直す', '重拍', 'Repetir'],
+  '다음 씬 ·': ['Next scene ·', '次のシーン ·', '下一个场景 ·', 'Siguiente escena ·'],
+  '내려받기를 시작했어요': ['Download started', 'ダウンロードを始めました', '已开始下载', 'Descarga iniciada'],
+  '저장 공간이 부족해요. 지금 바로 저장해 주세요': ['Storage is low. Save it now', '空き容量が足りません。今すぐ保存してください', '存储空间不足，请立即保存', 'Poco espacio. Guárdalo ahora'],
+  '저장': ['Save', '保存', '保存', 'Guardar'],
+
+  // 촬영 화면
+  '‹ 나가기': ['‹ Exit', '‹ 戻る', '‹ 退出', '‹ Salir'],
+  '나가기': ['Exit', '戻る', '退出', 'Salir'],
+  '화면 비율': ['Aspect ratio', '画面比率', '画面比例', 'Proporción'],
+  '가로': ['Landscape', '横', '横屏', 'Horizontal'],
+  '세로': ['Portrait', '縦', '竖屏', 'Vertical'],
+  '설정': ['Settings', '設定', '设置', 'Ajustes'],
+  '찍을 씬': ['Scene to shoot', '撮るシーン', '要拍的场景', 'Escena a grabar'],
+  '처음': ['Restart', '最初', '回到开头', 'Inicio'],
+  '처음으로': ['Back to start', '最初へ', '回到开头', 'Volver al inicio'],
+  '카메라': ['Camera', 'カメラ', '相机', 'Cámara'],
+  '조명': ['Light', '照明', '补光', 'Luz'],
+  '느리게': ['Slower', '遅く', '变慢', 'Más lento'],
+  '빠르게': ['Faster', '速く', '变快', 'Más rápido'],
+  '속도': ['Speed', '速度', '速度', 'Velocidad'],
+  '시작·멈춤': ['Start/Stop', '開始・停止', '开始/停止', 'Iniciar/Parar'],
+  '멈춤': ['Pause', '停止', '暂停', 'Pausa'],
+  '폰을 가로로 돌리면 더 크게 보여요': ['Turn your phone sideways for a bigger view', 'スマホを横にすると大きく見えます', '横过手机看得更大', 'Gira el móvil para verlo más grande'],
+  '대본이 비어 있어요. 나가서 대본을 써 주세요.': ['The script is empty. Go back and write one.', '台本が空です。戻って台本を書いてください。', '台词是空的，请返回写台词。', 'El guion está vacío. Vuelve y escribe uno.'],
+  '녹화가 끝난 뒤에 씬을 바꿀 수 있어요': ['You can switch scenes after recording', '録画が終わってからシーンを変えられます', '录制结束后才能切换场景', 'Puedes cambiar de escena al terminar'],
+  '목소리 따라가는 중': ['Following your voice', '声に合わせ中', '正在跟随语音', 'Siguiendo tu voz'],
+  '글자': ['Text', '文字', '文字', 'Texto'],
+  '크기': ['Size', 'サイズ', '大小', 'Tamaño'],
+  '줄 간격': ['Line spacing', '行間', '行距', 'Interlineado'],
+  '글 폭': ['Text width', '文字の幅', '文字宽度', 'Ancho del texto'],
+  '정렬': ['Align', '揃え', '对齐', 'Alinear'],
+  '왼쪽': ['Left', '左', '左', 'Izquierda'],
+  '가운데': ['Center', '中央', '居中', 'Centro'],
+  '글자 색': ['Text color', '文字色', '文字颜色', 'Color del texto'],
+  '배경 색': ['Background', '背景色', '背景颜色', 'Fondo'],
+  '배경 진하기': ['Background opacity', '背景の濃さ', '背景浓度', 'Opacidad del fondo'],
+  '직접 고르기': ['Custom', '自分で選ぶ', '自定义', 'Personalizado'],
+  '스크롤': ['Scrolling', 'スクロール', '滚动', 'Desplazamiento'],
+  '읽는 줄 위치': ['Reading line position', '読む線の位置', '阅读线位置', 'Posición de la línea'],
+  '카운트다운': ['Countdown', 'カウントダウン', '倒计时', 'Cuenta atrás'],
+  '없음': ['Off', 'なし', '无', 'No'],
+  '{n}초': ['{0} s', '{0}秒', '{0} 秒', '{0} s'],
+  '시작 신호음·플래시': ['Start beep & flash', '開始音・フラッシュ', '开始提示音和闪光', 'Pitido y flash al empezar'],
+  '글자 좌우 반전': ['Mirror text horizontally', '文字を左右反転', '文字左右镜像', 'Espejo horizontal'],
+  '글자 상하 반전': ['Flip text vertically', '文字を上下反転', '文字上下翻转', 'Voltear vertical'],
+  '조명 색': ['Light color', '照明の色', '补光颜色', 'Color de luz'],
+  '밝기(테두리)': ['Brightness (border)', '明るさ(枠)', '亮度(边框)', 'Brillo (borde)'],
+  '전체 화면 조명': ['Full-screen light', '全画面照明', '全屏补光', 'Luz a pantalla completa'],
+  '조명은 화면 테두리를 밝게 켜 얼굴을 비춰요. 화면 밝기를 최대로 올리면 더 밝아요. 전체 화면 조명은 화면을 누르면 꺼져요.': ['The light brightens the screen border to light your face. Max screen brightness helps. Tap to turn off full-screen light.', '照明は画面の枠を明るくして顔を照らします。画面の明るさを最大にするとより明るくなります。全画面照明は画面を押すと消えます。', '补光会点亮屏幕边框照亮脸部，屏幕亮度调到最大更亮。全屏补光点一下屏幕即关闭。', 'La luz ilumina el borde de la pantalla para tu cara. Sube el brillo al máximo. Toca para apagar la luz completa.'],
+  '카메라·렌즈': ['Camera & lens', 'カメラ・レンズ', '相机和镜头', 'Cámara y lente'],
+  '기본 (전면)': ['Default (front)', '標準 (前面)', '默认 (前置)', 'Predeterminada (frontal)'],
+  '마이크': ['Microphone', 'マイク', '麦克风', 'Micrófono'],
+  '기본 마이크': ['Default mic', '標準マイク', '默认麦克风', 'Micrófono predeterminado'],
+  '줌 (낮추면 광각)': ['Zoom (lower = wider)', 'ズーム (下げると広角)', '变焦 (调低为广角)', 'Zoom (menos = gran angular)'],
+  '저장 화질': ['Save quality', '保存画質', '保存画质', 'Calidad'],
+  '{n}p (프로)': ['{0}p (Pro)', '{0}p (Pro)', '{0}p (Pro)', '{0}p (Pro)'],
+  '좌우 반전해서 저장': ['Save mirrored', '左右反転して保存', '镜像保存', 'Guardar en espejo'],
+  '거울처럼 보기': ['Mirror preview', '鏡のように表示', '镜像预览', 'Vista en espejo'],
+  '{n}분할 격자': ['Rule of thirds grid', '{0}分割グリッド', '{0} 分网格', 'Cuadrícula de tercios'],
+  '전체 화면': ['Full screen', '全画面', '全屏', 'Pantalla completa'],
+  '목소리 따라가기를 켜면 버튼을 누르지 않아도 읽는 만큼 대사가 따라 올라와요(실험 기능, 크롬·사파리).': ['With voice follow on, the lines move as you read, no buttons needed (beta, Chrome & Safari).', '声に合わせるをオンにすると、ボタンを押さなくても読んだ分だけセリフが進みます(試験機能、Chrome・Safari)。', '开启跟随语音后，无需按键，台词会随你朗读自动推进(实验功能，Chrome 和 Safari)。', 'Con Seguir la voz, el texto avanza mientras lees, sin botones (beta, Chrome y Safari).'],
+  '단축키 (PC·블루투스 리모컨)': ['Shortcuts (PC & Bluetooth remote)', 'ショートカット (PC・Bluetoothリモコン)', '快捷键 (电脑和蓝牙遥控器)', 'Atajos (PC y mando Bluetooth)'],
+  'Space 시작·멈춤 · ↑↓ 속도 · PageUp/PageDown 대사 위치 · 마우스 휠이나 드래그로 대사 위치 이동': ['Space start/stop · ↑↓ speed · PageUp/PageDown position · mouse wheel or drag to move', 'Space 開始・停止 · ↑↓ 速度 · PageUp/PageDown 位置 · ホイールやドラッグで移動', 'Space 开始/停止 · ↑↓ 速度 · PageUp/PageDown 位置 · 滚轮或拖动移动', 'Espacio iniciar/parar · ↑↓ velocidad · RePág/AvPág posición · rueda o arrastrar'],
+  '카메라를 켜고 가운데 버튼을 누르면 녹화가 시작되고, 다시 누르면 영상이 저장돼요. 영상은 고른 비율({n} 또는 {n})로 잘려 저장되고 대사와 격자는 들어가지 않아요. 찍은 영상은 대본 화면의 "찍은 테이크"에 모여요.': ['Turn on the camera and press the center button to record; press again to save. Videos are cropped to your ratio ({0} or {1}) without the text or grid. Takes collect under “Takes” on the script screen.', 'カメラをつけて中央のボタンを押すと録画が始まり、もう一度押すと保存されます。動画は選んだ比率({0}または{1})で保存され、セリフやグリッドは入りません。撮った動画は台本画面の「撮ったテイク」に集まります。', '打开相机，按中间按钮开始录制，再按一次保存。视频按所选比例({0} 或 {1})裁切保存，不含台词和网格。拍好的视频会出现在台词页面的“已拍镜头”里。', 'Enciende la cámara y pulsa el botón central para grabar; púlsalo otra vez para guardar. Se recorta a tu proporción ({0} o {1}) sin texto ni cuadrícula. Las tomas aparecen en “Tomas”.'],
+  '설정 초기화': ['Reset settings', '設定をリセット', '重置设置', 'Restablecer ajustes'],
+  '닫기': ['Close', '閉じる', '关闭', 'Cerrar'],
+  '녹화를 먼저 멈춰 주세요.': ['Stop recording first.', '先に録画を止めてください。', '请先停止录制。', 'Detén la grabación primero.'],
+  '카메라 권한이 막혀 있어요. 주소창 옆 아이콘에서 카메라와 마이크를 허용한 뒤 다시 눌러 주세요.': ['Camera access is blocked. Allow camera and mic from the icon next to the address bar, then try again.', 'カメラの許可がブロックされています。アドレスバー横のアイコンでカメラとマイクを許可して、もう一度押してください。', '相机权限被阻止。请在地址栏旁的图标中允许相机和麦克风后重试。', 'El acceso a la cámara está bloqueado. Permite cámara y micrófono junto a la barra de direcciones e inténtalo de nuevo.'],
+  '이 화면에서는 카메라를 쓸 수 없어요. 크롬이나 사파리에서 주소를 직접 열어 주세요.': ['The camera can’t be used here. Open the address directly in Chrome or Safari.', 'この画面ではカメラを使えません。ChromeかSafariで直接開いてください。', '这里无法使用相机，请在 Chrome 或 Safari 中直接打开网址。', 'Aquí no se puede usar la cámara. Abre la dirección en Chrome o Safari.'],
+  '마이크 권한이 없어 목소리 따라가기를 껐어요.': ['No mic permission, so voice follow is off.', 'マイクの許可がないため、声に合わせるをオフにしました。', '没有麦克风权限，已关闭跟随语音。', 'Sin permiso de micrófono; Seguir la voz desactivado.'],
+  '이 브라우저는 목소리 따라가기를 못 해요. 크롬이나 사파리에서 열어 주세요.': ['This browser can’t do voice follow. Open it in Chrome or Safari.', 'このブラウザは声に合わせるに対応していません。ChromeかSafariで開いてください。', '这个浏览器不支持跟随语音，请用 Chrome 或 Safari 打开。', 'Este navegador no admite Seguir la voz. Usa Chrome o Safari.'],
+
+  // 구독
+  '무료는 대본 {n}개까지예요': ['Free is up to {0} scripts', '無料は台本{0}件までです', '免费版最多 {0} 个台词', 'Gratis: hasta {0} guiones'],
+  '대본을 더 쓰려면': ['To write more scripts', 'もっと台本を書くには', '想写更多台词', 'Para escribir más guiones'],
+  '더 길게 찍으려면': ['To record longer', 'もっと長く撮るには', '想拍更久', 'Para grabar más tiempo'],
+  '1080p로 저장하려면': ['To save in 1080p', '1080pで保存するには', '想保存 1080p', 'Para guardar en 1080p'],
+  '목소리 따라가기는': ['Voice follow', '声に合わせるは', '跟随语音', 'Seguir la voz'],
+  '프로가 필요해요': ['you need Pro', 'Proが必要です', '需要 Pro', 'necesitas Pro'],
+  '프로에서 쓸 수 있어요': ['is available in Pro', 'Proで使えます', '仅限 Pro', 'está en Pro'],
+  '프로 기능이에요': ['This is a Pro feature', 'Pro機能です', '这是 Pro 功能', 'Es una función Pro'],
+  '무료는 {n}p로 저장돼요': ['Free saves in {0}p', '無料は{0}pで保存されます', '免费版保存为 {0}p', 'Gratis guarda en {0}p'],
+  '무료는 한 번에 {n}분까지 찍혀요': ['Free records up to {0} min at a time', '無料は1回{0}分まで撮れます', '免费版单次最多 {0} 分钟', 'Gratis graba hasta {0} min seguidos'],
+  '한 번 녹화': ['Per recording', '1回の録画', '单次录制', 'Por grabación'],
+  '무제한': ['Unlimited', '無制限', '无限', 'Ilimitado'],
+  '사용': ['On', '使える', '可用', 'Sí'],
+  '대본 무제한 · 길게 찍기 · {n}p · 목소리 따라가기': ['Unlimited scripts · Longer takes · {0}p · Voice follow', '台本無制限 · 長く撮影 · {0}p · 声に合わせる', '台词无限 · 长时间录制 · {0}p · 跟随语音', 'Guiones ilimitados · Tomas largas · {0}p · Seguir la voz'],
+  '오픈 이벤트가': ['Launch price', 'オープン記念価格', '开业特价', 'Precio de lanzamiento'],
+  '이벤트가': ['Event price', 'イベント価格', '活动价', 'Precio especial'],
+  '{n}% 할인': ['{0}% off', '{0}%オフ', '{0}% 折扣', '{0}% dto.'],
+  '월 {n}원': ['₩{0}/month', '月 ₩{0}', '每月 ₩{0}', '₩{0}/mes'],
+  '카드로 구독 · 월 {n}원': ['Subscribe by card · ₩{0}/month', 'カードで購読 · 月 ₩{0}', '刷卡订阅 · 每月 ₩{0}', 'Suscribirse con tarjeta · ₩{0}/mes'],
+  '카드로 구독 · 월 {n}원 ({n}% 할인)': ['Subscribe by card · ₩{0}/month ({1}% off)', 'カードで購読 · 月 ₩{0} ({1}%オフ)', '刷卡订阅 · 每月 ₩{0} ({1}% 折扣)', 'Suscribirse con tarjeta · ₩{0}/mes ({1}% dto.)'],
+  '카드 결제는 준비 중이에요. 지금은 기프트 키로 열 수 있어요.': ['Card payment is coming soon. For now, unlock with a gift key.', 'カード決済は準備中です。今はギフトキーで開けます。', '刷卡支付即将开放，目前可用礼品码解锁。', 'El pago con tarjeta llega pronto. Por ahora, usa una clave regalo.'],
+  '카드 결제는 곧 열려요. 지금은 기프트 키로 열 수 있어요': ['Card payment opens soon. For now, use a gift key', 'カード決済はまもなく開始します。今はギフトキーで開けます', '刷卡支付即将开放，目前可用礼品码', 'El pago con tarjeta llega pronto. Usa una clave regalo'],
+  '기프트 키': ['Gift key', 'ギフトキー', '礼品码', 'Clave regalo'],
+  '기프트 키가 있어요': ['I have a gift key', 'ギフトキーがあります', '我有礼品码', 'Tengo una clave regalo'],
+  '넣기': ['Apply', '入力', '使用', 'Aplicar'],
+  '받은 키를 넣으면 한 달·평생처럼 키에 적힌 만큼 프로가 열려요.': ['Enter a key to unlock Pro for its period, like a month or lifetime.', 'キーを入れると、1か月・永久などキーに書かれた分だけProが開きます。', '输入礼品码，按码上的期限（一个月、终身等）开通 Pro。', 'Introduce una clave para activar Pro por su periodo (un mes, de por vida…).'],
+  '다른 기기에서 이어 쓰기': ['Continue on another device', '別の端末で続ける', '在其他设备继续使用', 'Seguir en otro dispositivo'],
+  '다른 기기의 복구 코드 {n}자': ['{0}-char recovery code from another device', '別の端末の復元コード{0}文字', '其他设备的 {0} 位恢复码', 'Código de recuperación de {0} caracteres'],
+  '불러오기': ['Load', '読み込む', '载入', 'Cargar'],
+  '구독은 이 코드에 묶여 있어요. 폰을 바꾸면 이 코드를 넣어 주세요.': ['Your subscription is tied to this code. Enter it on a new phone.', 'サブスクはこのコードに紐づいています。機種変更したらこのコードを入れてください。', '订阅绑定在这个码上，换手机时请输入此码。', 'Tu suscripción está ligada a este código. Úsalo en un móvil nuevo.'],
+  '내 복구 코드': ['My recovery code', '自分の復元コード', '我的恢复码', 'Mi código de recuperación'],
+  '복사': ['Copy', 'コピー', '复制', 'Copiar'],
+  '복사했어요': ['Copied', 'コピーしました', '已复制', 'Copiado'],
+  '복구 코드를 복사했어요': ['Recovery code copied', '復元コードをコピーしました', '恢复码已复制', 'Código copiado'],
+  '결제·환불 문의는 앱 운영자에게 해 주세요.': ['For payment or refund questions, contact us.', '決済・返金のお問い合わせは運営者へどうぞ。', '支付或退款问题请联系我们。', 'Para pagos o reembolsos, contáctanos.'],
+  '결제·환불 문의': ['Payment & refund questions', '決済・返金のお問い合わせ', '支付与退款咨询', 'Pagos y reembolsos'],
+  '결제 내역': ['Payment history', '決済履歴', '支付记录', 'Historial de pagos'],
+  '구독 중': ['Subscribed', '購読中', '订阅中', 'Suscrito'],
+  '평생 무료': ['Free for life', '永久無料', '终身免费', 'Gratis de por vida'],
+  '평생 프로': ['Lifetime Pro', '永久Pro', '终身 Pro', 'Pro de por vida'],
+  '평생 쓸 수 있어요': ['Yours for life', '永久に使えます', '可终身使用', 'Para siempre'],
+  '카드 바꾸기': ['Change card', 'カードを変更', '更换卡', 'Cambiar tarjeta'],
+  '해지하기': ['Cancel subscription', '解約する', '取消订阅', 'Cancelar suscripción'],
+  '한 번 더 누르면 해지': ['Tap again to cancel', 'もう一度押すと解約', '再点一次即取消', 'Pulsa otra vez para cancelar'],
+  '해지했어요. 남은 기간은 그대로 써요': ['Canceled. You keep Pro until the period ends', '解約しました。残り期間はそのまま使えます', '已取消，剩余期限内仍可使用', 'Cancelada. Sigues con Pro hasta que termine el periodo'],
+  '해지됨 · 남은 기간만 써요': ['Canceled · active until period ends', '解約済み · 残り期間のみ', '已取消 · 用到期限结束', 'Cancelada · activa hasta el final'],
+  '다음 결제': ['Next payment', '次回決済', '下次扣款', 'Próximo pago'],
+  '카드 결제가 안 됐어요. 카드를 바꿔 주세요.': ['Card payment failed. Please change your card.', 'カード決済ができませんでした。カードを変更してください。', '刷卡失败，请更换卡片。', 'El pago falló. Cambia tu tarjeta.'],
+  '기프트 키로 열렸어요': ['Unlocked with a gift key', 'ギフトキーで開きました', '已用礼品码开通', 'Activado con clave regalo'],
+  '프로가 열렸어요': ['Pro unlocked', 'Proが開きました', 'Pro 已开通', 'Pro activado'],
+  '평생 프로가 열렸어요': ['Lifetime Pro unlocked', '永久Proが開きました', '终身 Pro 已开通', 'Pro de por vida activado'],
+  '없는 키예요': ['Key not found', '存在しないキーです', '礼品码不存在', 'Clave no encontrada'],
+  '이미 넣은 키예요': ['Key already used here', 'すでに入力したキーです', '已使用过这个礼品码', 'Clave ya usada'],
+  '이미 다 쓴 키예요': ['Key fully used', '使い切ったキーです', '礼品码已用完', 'Clave agotada'],
+  '기한이 지난 키예요': ['Key expired', '期限切れのキーです', '礼品码已过期', 'Clave caducada'],
+  '키 모양이 달라요': ['That doesn’t look like a key', 'キーの形式が違います', '礼品码格式不对', 'Formato de clave no válido'],
+  '키를 넣지 못했어요': ['Couldn’t apply the key', 'キーを入力できませんでした', '无法使用礼品码', 'No se pudo aplicar la clave'],
+  '복구 코드는 {n}자예요': ['Recovery codes are {0} characters', '復元コードは{0}文字です', '恢复码为 {0} 位', 'El código tiene {0} caracteres'],
+  '없는 코드예요': ['Code not found', '存在しないコードです', '恢复码不存在', 'Código no encontrado'],
+  '불러왔어요': ['Loaded', '読み込みました', '已载入', 'Cargado'],
+  '지금은 서버에 닿지 않아요': ['Can’t reach the server right now', '今はサーバーにつながりません', '暂时无法连接服务器', 'No se puede conectar al servidor'],
+  '카드 등록을 마치지 못했어요': ['Couldn’t finish adding the card', 'カード登録を完了できませんでした', '未能完成绑卡', 'No se pudo registrar la tarjeta'],
+  '결제를 마치지 못했어요': ['Couldn’t complete payment', '決済を完了できませんでした', '未能完成支付', 'No se pudo completar el pago'],
+  '지금은 해지를 못 했어요. 잠시 뒤 다시 해 주세요': ['Couldn’t cancel now. Try again shortly', '今は解約できませんでした。少し後でもう一度どうぞ', '暂时无法取消，请稍后再试', 'No se pudo cancelar. Inténtalo luego'],
+  '아직 없어요': ['Nothing yet', 'まだありません', '暂无', 'Aún nada'],
+  '좋아요': ['OK', 'OK', '好的', 'Vale'],
+  '열기': ['Open', '開く', '打开', 'Abrir'],
+  '평생': ['Lifetime', '永久', '终身', 'De por vida'],
+  '한 달': ['1 month', '1か月', '一个月', '1 mes'],
+  '내용 없음': ['No content', '内容なし', '无内容', 'Sin contenido'],
+  '제목 없음': ['Untitled', '無題', '无标题', 'Sin título'],
+};
+
+// 숫자 자리를 {n}으로
+const NUM = /\d+(?:[.,:]\d+)*/g;
+const IDX = ORDER.reduce((o, l, i) => (o[l] = i, o), {});
+let L = 'ko';
+
+export function tr(s) {
+  if (L === 'ko' || !s || !/[가-힣]/.test(s)) return s;
+  const m = s.match(/^(\s*)([\s\S]*?)(\s*)$/);
+  const core = m[2];
+  const nums = core.match(NUM) || [];
+  const row = D[core.replace(NUM, '{n}')];
+  if (!row) return s;
+  const out = row[IDX[L]].replace(/\{(\d)\}/g, (_, i) => nums[+i] ?? '');
+  return m[1] + out + m[3];
+}
+// 코드에서 직접 쓰는 글(토스트 등)
+export const t = s => tr(s);
+
+const SKIP = '#script, textarea, .noi18n, .card h3, .card .pv, .phead b';
+const ATTRS = ['placeholder', 'aria-label', 'title'];
+function fixText(n) {
+  const p = n.parentElement; if (!p || p.closest(SKIP)) return;
+  const v = tr(n.nodeValue); if (v !== n.nodeValue) n.nodeValue = v;
+}
+function fixAttr(e, a) { const v = e.getAttribute(a); if (!v) return; const w = tr(v); if (w !== v) e.setAttribute(a, w); }
+function fixTree(r) {
+  if (r.nodeType === 3) return fixText(r);
+  if (r.nodeType !== 1 || r.closest?.(SKIP)) return;
+  const w = document.createTreeWalker(r, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) fixText(n);
+  for (const a of ATTRS) { if (r.hasAttribute?.(a)) fixAttr(r, a); r.querySelectorAll(`[${a}]`).forEach(e => fixAttr(e, a)); }
+}
+
+export function startI18n() {
+  L = lang();
+  document.documentElement.lang = L === 'zh' ? 'zh-Hans' : L;
+  if (L === 'ko') return;
+  document.title = tr(document.title);
+  fixTree(document.body);
+  new MutationObserver(ms => {
+    for (const m of ms) {
+      if (m.type === 'characterData') fixText(m.target);
+      else if (m.type === 'attributes') { if (!m.target.closest?.(SKIP)) fixAttr(m.target, m.attributeName); }
+      else m.addedNodes.forEach(fixTree);
+    }
+  }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+}
