@@ -19,7 +19,7 @@ const ls = {
 };
 
 export async function rpc(fn, args = {}) {
-  const r = await fetch(`${SB.url}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: SB.key, authorization: 'Bearer ' + SB.key, 'content-type': 'application/json' }, body: JSON.stringify(args) });
+  const r = await fetch(`${SB.url}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: SB.key, authorization: 'Bearer ' + SB.key, 'content-type': 'application/json' }, body: JSON.stringify(args), signal: AbortSignal.timeout?.(8000) });
   const txt = await r.text();
   if (!r.ok) { let m = txt; try { m = JSON.parse(txt).message || txt; } catch {} throw new Error(m); }
   return txt ? JSON.parse(txt) : null;
@@ -111,7 +111,7 @@ function celebrate(msg = '프로가 열렸어요') {
 
 /* ---------- 구독 관리 화면 ---------- */
 export async function planView(view) {
-  await refresh();
+  await Promise.race([refresh(), new Promise(r => setTimeout(r, 2500))]); // 느린 망에서도 화면은 먼저
   const pro = isPro(), card = me?.card, forever = isForever(me?.paid_until);
   const badge = forever ? '평생 프로' : pro ? '프로' : '무료';
   const hist = me?.history || [];
