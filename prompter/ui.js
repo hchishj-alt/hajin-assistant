@@ -53,6 +53,14 @@ export const estimate = (s, cpm) => chars(s) / (cpm / 60);
 export const paras = s => (s || '').split(/\n\s*\n/).filter(p => p.trim()).length;
 let toastT;
 export function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
+// 지운 뒤 5초 동안 되돌리기 (영상은 다시 못 찍으니 한 번 누름으로 영영 잃지 않게)
+export function undoToast(msg, onUndo) {
+  const t = $('#toast'); t.innerHTML = ''; t.append(document.createTextNode(msg));
+  const b = document.createElement('button'); b.className = 'undo'; b.textContent = '되돌리기'; t.append(b);
+  t.classList.add('show'); clearTimeout(toastT);
+  b.onclick = async () => { b.disabled = true; clearTimeout(toastT); t.classList.remove('show'); try { await onUndo(); } catch {} toast('되돌렸어요'); };
+  toastT = setTimeout(() => t.classList.remove('show'), 5000);
+}
 export const buzz = n => { try { navigator.vibrate?.(n); } catch {} };
 
 /* ---------- 시트 ---------- */

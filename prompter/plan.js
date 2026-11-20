@@ -7,6 +7,7 @@ export const priceTag = () => off() ? `<span class="ptag"><span class="ev">${PRI
 import { cardReady, startCard, finishRedirect } from './billing.js';
 import { ic, esc, $, el, toast, sheet, copy, buzz } from './ui.js';
 import { legalLinks, bizLine } from './legal.js';
+import { scripts } from './store.js';
 // 정기결제 전 알릴 것(전자상거래법): 금액·주기·해지·환불, 약관 동의
 const subNote = () => `<p class="subnote">매달 ${won(PRICE.month)} 자동결제 · ${PRICE.days}일마다 · 언제든 해지 · 결제 후 7일 안 전액 환불<br>구독하면 <a href="#/terms">이용약관</a>·<a href="#/refund">환불 규정</a>에 동의하는 거예요</p>`;
 
@@ -139,6 +140,10 @@ export async function planView(view) {
       <div class="row"><input id="restore" class="inp grow" placeholder="다른 기기의 복구 코드 16자" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="ghost" id="rs">불러오기</button></div>
       <p class="tip">구독은 이 코드에 묶여 있어요. 폰을 바꾸면 이 코드를 넣어 주세요.</p></div>
 
+    <div class="sec">${ic('doc', 16)}대본 옮기기 · 백업</div>
+    <div class="box"><div class="row"><button class="ghost grow" id="bkOut">${ic('share', 16)}파일로 내보내기</button><button class="ghost grow" id="bkIn">${ic('paste', 16)}파일 가져오기</button></div>
+      <p class="tip">대본과 프로젝트를 파일 하나로 저장해요(영상은 빼고). 새 폰에서 가져오면 그대로 이어 써요.</p><input type="file" id="bkFile" accept=".json,application/json" hidden></div>
+
     ${hist.length ? `<div class="sec">${ic('receipt', 16)}결제 내역</div><div class="box list">${hist.map(h => `<div class="li"><span>${h.method === 'card' ? '카드' : h.method === 'gift' ? '기프트 키' : '운영자 지급'}${h.status === 'failed' ? ' · 실패' : ''}</span><span class="muted">${ymd(h.created_at)}</span><b>${h.amount ? won(h.amount) : h.days ? h.days + '일' : h.status === 'failed' ? '—' : '평생'}</b></div>`).join('')}</div>` : ''}
     <p class="tip c" style="margin-top:24px"><a class="mailto" href="mailto:${CONTACT}?subject=${encodeURIComponent('[PROMPRI EDIT] 문의')}">${ic('mail', 14)}<span>결제·환불 문의</span></a> <span class="noi18n">${CONTACT}</span></p>${legalLinks()}${bizLine()}`;
 
@@ -163,6 +168,27 @@ export async function planView(view) {
       await refresh(); celebrate(r.forever ? '평생 프로가 열렸어요' : `${r.days}일 프로가 열렸어요`); planView(view);
     } catch { toast('지금은 서버에 닿지 않아요'); }
     finally { b.disabled = false; }
+  };
+  $('#bkOut').onclick = async () => {
+    const data = { app: 'prompri-edit', v: 1, at: new Date().toISOString(), projects: ls.get('prompter:projects', []), scripts: await scripts.all() };
+    const d = new Date(), name = `프롬프리에딧_대본_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.json`;
+    const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+    const f = new File([blob], name, { type: 'application/json' });
+    if (navigator.canShare?.({ files: [f] }) && /iP(hone|ad)|Android/.test(navigator.userAgent)) { try { await navigator.share({ files: [f], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+    toast(`대본 ${data.scripts.length}개를 내보냈어요`);
+  };
+  $('#bkIn').onclick = () => $('#bkFile').click();
+  $('#bkFile').onchange = async e => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    let d; try { d = JSON.parse(await file.text()); } catch { return toast('읽을 수 없는 파일이에요'); }
+    if (d?.app !== 'prompri-edit' || !Array.isArray(d.scripts)) return toast('프롬프리에딧 백업 파일이 아니에요');
+    const have = new Set((await scripts.all()).map(x => x.id));
+    const projs = ls.get('prompter:projects', []), pids = new Set(projs.map(x => x.id));
+    for (const p of d.projects || []) if (p?.id && !pids.has(p.id)) projs.push(p);
+    ls.set('prompter:projects', projs);
+    let n = 0; for (const x of d.scripts) if (x?.id && typeof x.body === 'string' && !have.has(x.id)) { await scripts.put(x); n++; }
+    toast(n ? `대본 ${n}개를 가져왔어요` : '이미 다 있는 대본이에요');
   };
   $('#cp')?.addEventListener('click', () => copy(token(), '복구 코드를 복사했어요'));
   $('#rs').onclick = async () => {
