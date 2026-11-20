@@ -99,7 +99,7 @@ export default {
     const grid = h('div.home-grid');
     for (const id of homeOrder(L)) if (!L.homeOff?.includes(id) && blocks[id]) { const el = await blocks[id](); if (el) grid.append(el); }
     root.append(hdr);
-    { const H = await import('../js/helper.js'); const strip = await H.memberStrip().catch(() => null); if (strip) root.append(strip); const row = askName && !name ? null : await H.shortcutRow().catch(() => null); if (row) root.append(row); }   /* 처음 온 사람에게는 이름·코드부터 묻고, 역할은 그다음에 */   /* 단기 작업자 안내, 내 역할 바로가기 */
+    { const H = await import('../js/helper.js'); const strip = await H.memberStrip().catch(() => null); if (strip) root.append(strip); const ss = await H.syncStrip().catch(() => null); if (ss) root.append(ss); const row = askName && !name ? null : await H.shortcutRow().catch(() => null); if (row) root.append(row); }   /* 처음 온 사람에게는 이름·코드부터 묻고, 역할은 그다음에 */   /* 단기 작업자 안내, 내 역할 바로가기 */
     { const nd = await Install.nudge().catch(() => null); if (nd) root.append(nd); }
     if (askName && !name) {
       /* 처음 켠 사람: 팀에서 받은 코드가 있으면 여기서 바로 들어감(이름·역할·맡은 일이 따라옴). 없으면 이름만 */

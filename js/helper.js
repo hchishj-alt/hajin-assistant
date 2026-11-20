@@ -101,6 +101,14 @@ export async function memberStrip() {
   return h('div.guest-strip' + (left != null && left <= 3 ? '.soon' : ''), ic('briefcase', 16), h('div.grow', h('b', ps.length ? ps.join(', ') : '맡은 프로젝트가 아직 없어요'),
     h('span', [ps.length ? '이 프로젝트의 할 일·일정·회의록·레퍼런스를 팀과 같이 봐요. 그 밖에 적는 것은 나만 봐요.' : '관리자가 프로젝트를 맡기면 그 일이 여기 보여요.', m.until ? `${m.until.slice(5).replace('-', '/')}까지${left === 0 ? ' (오늘까지)' : left > 0 ? ` (${left}일 남음)` : ''}` : ''].filter(Boolean).join(' '))));
 }
+// 오늘 화면: 다른 기기·팀과 맞추지 못하고 있을 때만 보이는 한 줄 (평소에는 없음)
+export async function syncStrip() {
+  const S = await import('./sync.js'); const tr = S.trouble(); if (!tr) return null;
+  const n = (await db.dirtyItems()).filter(x => x.col !== '_kv').length;
+  const box = h('div.guest-strip.end.sync-strip', ic('cloud', 16), h('div.grow', h('b', '다른 기기와 맞추지 못하고 있어요'), h('span', tr.replace(/[.\s]*$/, '.') + (n ? ` 아직 못 올린 기록 ${n}개는 이 기기에 그대로 있어요.` : ' 기록은 이 기기에 그대로 있어요.'))),
+    h('button.btn.sm', { style: { flex: 'none', alignSelf: 'center' }, onclick: async e => { const b = e.currentTarget; b.disabled = true; b.textContent = '맞추는 중'; const st = await S.syncNow(); if (st.status === 'idle') box.remove(); else { b.disabled = false; b.textContent = '다시 맞추기'; } } }, '다시 맞추기'));
+  return box;
+}
 export async function shortcutRow() {
   const me = await who(); const { go, refresh, buildNav } = await import('./app.js');
   const redo = async () => { await buildNav(); refresh(); };

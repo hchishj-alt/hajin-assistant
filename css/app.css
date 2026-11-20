@@ -1046,7 +1046,7 @@ a.as-row.as-link{color:inherit;text-decoration:none}
 .role-row .chip{flex:none;min-height:44px;padding:8px 14px;font-size:calc(13px*var(--fs,1));background:var(--card);gap:6px}
 .role-row.pick .chip.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
 .role-row .chip.go{background:var(--acc-soft);color:var(--acc);border-color:transparent;font-weight:700}
-.role-row .chip.ghost{background:transparent;color:var(--muted)}
+.role-row .chip.ghost{background:transparent;color:var(--ink2)}
 button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;font-family:inherit}
 .role-tag{flex:none;font-size:calc(12px*var(--fs,1));font-weight:700;color:var(--acc);background:var(--acc-soft);border-radius:99px;padding:4px 10px;white-space:nowrap}
 .ps-tips{margin-bottom:14px}
@@ -1137,7 +1137,7 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 @media (max-width:520px){.sub-row{flex-wrap:wrap!important}.sub-row .sub-text{order:-1;flex:1 0 100%}}
 /* 단기 작업자 안내 줄 (v1.39.0) */
 .guest-strip{display:flex;align-items:flex-start;gap:10px;margin:-4px 0 14px;padding:10px 12px;border-radius:calc(12px*var(--rd,1));background:color-mix(in srgb,var(--acc) 9%,var(--card));border:1px solid color-mix(in srgb,var(--acc) 22%,transparent);font-size:calc(13px*var(--fs,1));line-height:1.5}
-.guest-strip>svg{flex:none;margin-top:2px;color:var(--acc)}.guest-strip b{display:block}.guest-strip span{color:var(--muted)}
+.guest-strip>svg{flex:none;margin-top:2px;color:var(--acc)}.guest-strip b{display:block}.guest-strip span{color:var(--ink2)}
 .guest-strip.soon,.guest-strip.end{background:color-mix(in srgb,#e3a008 12%,var(--card));border-color:color-mix(in srgb,#e3a008 35%,transparent)}.guest-strip.soon>svg,.guest-strip.end>svg{color:#b45309}
 .part-row .chips{margin-top:4px}
 

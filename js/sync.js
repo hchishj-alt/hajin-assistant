@@ -10,11 +10,13 @@ const SHARE_COLS = new Set(['teams', 'events', 'polls', 'pollvotes', 'tasks', 'm
 const CHUNK = 200;
 let client = null, session = null, channel = null;
 let pushT = null, pullT = null, busy = null, startP = null, pendingAgain = false, wired = false;
-const state = { status: 'off', last: null, error: '', pushed: 0, pulled: 0 };
+const state = { status: 'off', last: null, error: '', pushed: 0, pulled: 0, fails: 0 };
 const subs = new Set();
 const set = p => { Object.assign(state, p); subs.forEach(f => { try { f({ ...state }); } catch { } }); };
 export const onState = f => (subs.add(f), () => subs.delete(f));
 export const getState = () => ({ ...state });
+/* 사람에게 알릴 만한 동기화 문제인지: 인터넷이 잠깐 끊긴 것은 두 번 이어질 때만, 그 밖(서버가 거절, 로그인 풀림)은 바로 */
+export const trouble = (st = state) => ((st.status === 'error' || st.status === 'syncing') && st.error && (st.fails >= 2 || !/인터넷 연결/.test(st.error)) ? st.error : '');
 export const user = () => session?.user || null;
 export const userId = () => session?.user?.id || null;
 
@@ -238,17 +240,26 @@ function koErr(m = '') {
 export async function syncNow() {
   if (!session || !client) return state;
   if (busy) { pendingAgain = true; return busy; }
-  if (!navigator.onLine) { set({ status: 'offline' }); return state; }
+  if (!navigator.onLine) { set({ status: 'offline', error: '', fails: 0 }); return state; }
   busy = (async () => {
-    set({ status: 'syncing', error: '' });
-    try {
+    set({ status: 'syncing' });   /* 지난번 문제 글은 성공할 때까지 남겨 둠 (맞추는 동안 안내가 깜빡이지 않게) */
+    const once = async () => {
       const pulled = await pull();
       try { await dmPull(); } catch { }
       const pushed = await push();
-      set({ status: 'idle', last: new Date().toISOString(), pulled, pushed });
+      set({ status: 'idle', error: '', last: new Date().toISOString(), pulled, pushed, fails: 0 });
       if (pulled) window.dispatchEvent(new CustomEvent('hajin:remote', { detail: { pulled } }));
+    };
+    try {
+      try { await once(); }
+      catch (e) {
+        /* 오래 닫아 뒀다 열면 로그인 표가 낡아 있을 수 있음: 한 번 새로 받아서 다시 해 봄 */
+        if (!/JWT expired|invalid JWT|PGRST301/i.test(`${e.code || ''} ${e.message || ''}`)) throw e;
+        const r = await client.auth.refreshSession(); if (r.error || !r.data?.session) throw e;
+        session = r.data.session; await once();
+      }
     } catch (e) {
-      set({ status: 'error', error: koErr(e.message || String(e)) });
+      set({ status: 'error', error: koErr(e.message || String(e)), fails: state.fails + 1 });
     } finally {
       busy = null;
       if (pendingAgain) { pendingAgain = false; schedulePull(); }
