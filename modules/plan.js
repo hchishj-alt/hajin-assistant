@@ -128,14 +128,47 @@ async function editor(root, id) {
   const status = h('span.faint.tiny', '저장됨');
   const proj = h('input.in', { value: n.project || '', placeholder: '프로젝트', style: { width: '140px', padding: '5px 10px', fontSize: '13px' } });
   const side = h('div.stack');
-  const save = debounce(async () => { await db.patch(id, { title: title.value, body: ta.value, project: proj.value }); status.textContent = '저장됨'; drawSide(); }, 700);
-  [title, ta, proj].forEach(x => x.addEventListener('input', () => { status.textContent = '저장 중…'; save(); }));
+  /* 같은 문서를 다른 기기(내 폰·PC, 관리자)에서도 고칠 수 있음. 마지막으로 맞춰 본 내용(base)과 견줘, 안 겹치면 합치고 같은 칸을 둘 다 고쳤으면 멈추고 물음 */
+  const canEdit = await (await import('../js/admin.js')).canEdit(n);
+  const F = { title, body: ta, project: proj }; const KEYS = ['title', 'body', 'project'];
+  let base = { title: n.title || '', body: n.body || '', project: n.project || '', at: n.updatedAt }, held = null;
+  const note = h('div');
+  const setVal = (el, v) => { const a = el.selectionStart, b = el.selectionEnd, on = document.activeElement === el; el.value = v; if (on) { try { el.setSelectionRange(Math.min(a, v.length), Math.min(b, v.length)); } catch { } } };
+  const doSave = async () => { try { const sv = await db.patch(id, { title: title.value, body: ta.value, project: proj.value }); if (sv) base = { title: title.value, body: ta.value, project: proj.value, at: sv.updatedAt }; status.textContent = '저장됨'; drawSide(); } catch (e) { status.textContent = '저장 못 함'; toast(e.message); } };
+  const settle = async how => {
+    const t = held; if (!t) return; held = null; clear(note);
+    if (how === 'theirs') { for (const k of KEYS) setVal(F[k], t[k]); base = { ...t }; status.textContent = '저장됨'; drawSide(); return; }
+    if (how === 'both' && t.clash.includes('body')) setVal(ta, ta.value.replace(/\s+$/, '') + '\n\n――― 다른 기기에서 고친 내용 ―――\n' + t.body);
+    base = { title: t.title, body: t.body, project: t.project, at: t.at }; await doSave();
+  };
+  /* 다른 곳에서 바뀐 것을 받아 맞춤. 겹치지 않으면 true(이어서 저장해도 됨), 같은 칸을 둘 다 고쳤으면 false(고를 때까지 자동 저장을 멈춤) */
+  const merge = async cur => {
+    const t = { title: cur.title || '', body: cur.body || '', project: cur.project || '', at: cur.updatedAt, clash: [] };
+    for (const k of KEYS) { const mine = F[k].value; if (t[k] === base[k] || t[k] === mine) continue; if (mine === base[k]) setVal(F[k], t[k]); else t.clash.push(k); }
+    if (!t.clash.length) { base = { title: t.title, body: t.body, project: t.project, at: t.at }; return true; }
+    held = t; status.textContent = '저장 멈춤';
+    clear(note).append(h('div.guest-strip.end', { role: 'alert', style: { margin: '0 0 12px' } }, ic('cloud', 16), h('div.grow', h('b', '이 문서를 다른 기기에서도 고쳤어요'), h('span', '지금 쓴 내용은 아직 이 화면에만 있어요. 어떻게 할지 골라 주세요.'),
+      h('div.row', { style: { gap: '6px', marginTop: '8px', flexWrap: 'wrap' } }, h('button.btn.sm.pri', { onclick: () => settle('both') }, '둘 다 남기기'), h('button.btn.sm', { onclick: () => settle('mine') }, '내 내용으로'), h('button.btn.sm', { onclick: () => settle('theirs') }, '그쪽 내용으로')))));
+    return false;
+  };
+  const save = debounce(async () => {
+    if (held || !canEdit) return;
+    const cur = await db.get(id); if (!cur || cur.deleted) { status.textContent = '지워진 문서예요'; return; }
+    if (cur.updatedAt !== base.at && !(await merge(cur))) return;
+    await doSave();
+  }, 700);
+  if (canEdit) [title, ta, proj].forEach(x => x.addEventListener('input', () => { if (!held) status.textContent = '저장 중…'; save(); }));
+  else { for (const x of [title, ta, proj]) x.readOnly = true; status.textContent = '읽기 전용'; note.append(h('div.guest-strip', { style: { margin: '0 0 12px' } }, ic('eye', 16), h('div', h('b', `${n.by} 님이 올린 문서예요`), h('span', '읽기만 할 수 있어요. 고칠 내용은 메신저로 전해 주세요.')))); }
+  const onRemote = async () => { if (!ta.isConnected || held || !canEdit) return; const cur = await db.get(id); if (cur && !cur.deleted && cur.updatedAt !== base.at) { await merge(cur); if (!held) drawSide(); } };
+  window.addEventListener('hajin:remote', onRemote);
   root.append(
     h('div.row.between', { style: { marginBottom: '8px' } }, h('a.btn.sm.ghost', { href: '#/plan' }, ic('left', 14), '기획 보드'),
       h('div.row', status, proj, h('button.btn.sm.ghost', { onclick: () => download((title.value || '문서') + '.md', `# ${title.value}\n\n${ta.value}`, 'text/markdown') }, ic('download', 14)),
-        h('button.btn.sm.ghost.danger', { onclick: async () => { if (await confirmBox('이 문서를 지울까요?', '지우기')) { await db.remove(id); go('plan'); } } }, ic('trash', 14)))),
+        canEdit ? h('button.btn.sm.ghost.danger', { 'aria-label': '이 문서 지우기', onclick: async () => { if (await confirmBox('이 문서를 지울까요?', '지우기')) { await db.remove(id); go('plan'); } } }, ic('trash', 14)) : null)),
+    note,
     h('div.grid', { style: { gridTemplateColumns: 'minmax(0,1fr) 300px', alignItems: 'start' }, class: 'editor-grid' }, h('div.card', title, ta), side));
   drawSide();
+  return () => window.removeEventListener('hajin:remote', onRemote);
 
   async function drawSide() {
     const text = title.value + '\n' + ta.value;
@@ -144,14 +177,14 @@ async function editor(root, id) {
     const kws = brain.keywords(text, 8);
     const cur = new Set(n.tags || []);
     side.append(h('div.card', h('div.card-h', h('h3', ic('hash'), '키워드 제안')),
-      h('div.chips', kws.map(k => h('button.chip' + (cur.has(k) ? '.acc' : ''), { onclick: async e => { cur.has(k) ? cur.delete(k) : cur.add(k); n.tags = [...cur]; await db.patch(id, { tags: n.tags }); e.target.classList.toggle('acc'); } }, '#' + k))),
-      h('p.faint.tiny', { style: { marginTop: '6px' } }, '눌러서 태그로 확정')));
+      h('div.chips', kws.map(k => h('button.chip' + (cur.has(k) ? '.acc' : ''), { disabled: !canEdit, onclick: async e => { cur.has(k) ? cur.delete(k) : cur.add(k); n.tags = [...cur]; const sv = await db.patch(id, { tags: n.tags }); if (sv && !held) base.at = sv.updatedAt; e.target.classList.toggle('acc'); } }, '#' + k))),
+      canEdit ? h('p.faint.tiny', { style: { marginTop: '6px' } }, '눌러서 태그로 확정') : null));
     if (sentCount(text) >= 4) {
       const sum = brain.summarize(text, 3);
       let lines = sum; const ul = h('ul', { style: { margin: 0, paddingLeft: '18px' } }, sum.map(s => h('li.small', s)));
       const aiBtn = h('button.btn.sm', { style: { marginTop: '8px' }, onclick: async () => { const AI = await import('../js/ai.js'); if (!(await AI.enabled())) { toast('설정에서 Gemini 키를 넣으면 AI가 요약해요', { label: '설정', fn: () => go('settings') }); return; } aiBtn.disabled = true; aiBtn.textContent = 'AI가 읽는 중…'; const r = await AI.summarize(text, title.value); aiBtn.disabled = false; aiBtn.textContent = 'AI로 요약'; if (!r) { toast('AI가 답하지 못했어요. 조금 뒤에 다시 해 주세요.'); return; } lines = r.lines; clear(ul).append(...lines.map(s => h('li.small', s))); } }, ic('sparkles', 14), 'AI로 요약');
       side.append(h('div.card', h('div.card-h', h('h3', ic('sparkles'), '요약 미리보기'), h('span.chip.warn', '임시')), ul,
-        h('div.row', { style: { gap: '6px', flexWrap: 'wrap' } }, aiBtn, h('button.btn.sm', { style: { marginTop: '8px' }, onclick: async () => { ta.value = `> 요약\n${lines.map(s => '> - ' + s).join('\n')}\n\n` + ta.value; save(); } }, '문서 맨 위에 넣기'))));
+        h('div.row', { style: { gap: '6px', flexWrap: 'wrap' } }, aiBtn, h('button.btn.sm', { style: { marginTop: '8px' }, disabled: !canEdit, onclick: async () => { ta.value = `> 요약\n${lines.map(s => '> - ' + s).join('\n')}\n\n` + ta.value; save(); } }, '문서 맨 위에 넣기'))));
       const a = brain.analyzeNotes(text);
       if (a.actions.length) side.append(h('div.card', h('div.card-h', h('h3', ic('check2'), '할 일 후보'), h('span.chip', a.actions.length)), a.actions.slice(0, 5).map(t => h('div.li', h('div.grow.small', t.title), h('button.btn.sm', { onclick: async e => { await store.draft('task', { title: t.title, due: t.due || '', who: t.who, project: proj.value, priority: 'normal' }, { source: t.src, sourceRef: id, origin: 'doc' }); e.target.disabled = true; e.target.textContent = '대기함'; } }, '+')))));
     }

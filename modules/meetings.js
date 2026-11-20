@@ -130,8 +130,14 @@ async function detail(root, id) {
   const drafts = (await store.drafts()).filter(d => d.sourceRef === id);
   const audio = m.audioKey ? await db.getBlob(m.audioKey) : null;
   const ta = h('textarea.in', { rows: 14 }, m.transcript || '');
-  const saveBtn = h('button.btn.sm', { onclick: async () => { await db.patch(id, { transcript: ta.value }); toast('저장했어요'); } }, '저장');
-  const reBtn = h('button.btn.sm', { onclick: async () => { busy(reBtn, true); await db.patch(id, { transcript: ta.value }); await analyze({ ...m, transcript: ta.value }); go('meetings/' + id); } }, ic('refresh', 14), '다시 정리');
+  /* 창을 연 사이에 다른 기기에서 받아쓴 글을 고쳤으면 덮어쓰기 전에 물음 (둘 다 남기기가 기본) */
+  let seenT = m.transcript || '';
+  const keepT = async () => { const cur = await db.get(id); const theirs = (cur && cur.transcript) || '';
+    if (cur && theirs !== seenT && theirs !== ta.value && ta.value !== seenT) { const both = await confirmBox('창을 연 사이에 다른 기기에서 이 회의록의 받아쓴 글을 고쳤어요. 둘 다 남길까요? (취소하면 지금 화면의 내용으로 저장해요)', '둘 다 남기기'); if (both) ta.value = ta.value.replace(/\s+$/, '') + '\n\n――― 다른 기기에서 고친 내용 ―――\n' + theirs; }
+    else if (cur && theirs !== seenT && ta.value === seenT) ta.value = theirs;   /* 나는 안 고쳤으면 그쪽 내용을 따름 */
+    await db.patch(id, { transcript: ta.value }); seenT = ta.value; };
+  const saveBtn = h('button.btn.sm', { onclick: async () => { await keepT(); toast('저장했어요'); } }, '저장');
+  const reBtn = h('button.btn.sm', { onclick: async () => { busy(reBtn, true); await keepT(); await analyze({ ...m, transcript: ta.value }); go('meetings/' + id); } }, ic('refresh', 14), '다시 정리');
   const sttBtn = audio ? h('button.btn.sm', { onclick: async () => {
     busy(sttBtn, true, '받아쓰는 중');
     try { const t = await toText(audio, p => (sttBtn.lastChild.textContent = ` ${Math.round(p * 100)}%`)); if (t) { ta.value = t; await db.patch(id, { transcript: t }); toast('받아쓰기 끝'); } else toast('알아들은 말이 없어요.'); }

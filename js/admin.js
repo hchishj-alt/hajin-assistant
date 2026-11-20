@@ -22,6 +22,8 @@ export async function who() {
 }
 export const isAdmin = async () => (await who()).admin;
 export const clearCache = () => { cache = null; };
+// 이 기기의 내가 이 기록을 고칠 수 있는지 (자동 저장하는 화면이 미리 읽기 전용으로 바꾸려고 씀. 규칙은 아래 guard와 같음)
+export async function canEdit(it) { const me = await who(); if (!it || !me.loggedIn || me.admin) return true; const shared = !!(it.team || it.space); return !(shared && !FREE.has(it.col) && it.by && it.by !== me.name && !(me.was || []).includes(it.by)); }
 
 const short = (v, k) => { if (k === 'team') return v ? '팀 공유' : '나만 보기';  if (v == null || v === '') return '없음'; if (typeof v === 'boolean') return v ? '예' : '아니오'; const s = typeof v === 'object' ? JSON.stringify(v) : String(v); return s.length > 70 ? s.slice(0, 70) + '…' : s; };
 export function diff(prev, item) {
