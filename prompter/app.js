@@ -7,7 +7,7 @@ import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
 import { CONTACT } from './config.js';
 import { legalView, legalLinks, bizLine } from './legal.js';
 
-export const VERSION = '1.5.4';
+export const VERSION = '1.5.5';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -575,5 +575,12 @@ const SAMPLES = {
   route();
   plan.boot();
   plan.onChange(() => { if ((location.hash || '#/') === '#/') route(); });
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').then(r => setInterval(() => r.update().catch(() => {}), 30 * 60e3)).catch(() => {});
+    // 새 버전이 들어오면: 목록·소개 화면에서 아무것도 안 열려 있을 때만 조용히 새로 고침 (촬영·편집 중에는 안 건드림)
+    const had = !!navigator.serviceWorker.controller; let pend = false;
+    const tryReload = () => { if (!pend) return; const h = location.hash; if ((!h || h === '#/' || h === '#/hello') && !document.querySelector('#sheet-root > *')) location.reload(); };
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (!had) return; pend = true; tryReload(); });
+    addEventListener('hashchange', () => setTimeout(tryReload, 50));
+  }
 })();
