@@ -893,3 +893,21 @@ html,body{touch-action:manipulation}
 .inst-steps .n{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--acc);color:#fff;font-weight:700;font-size:13px}
 .inst-steps .ic{display:inline-block;vertical-align:-3px;color:var(--acc)}
 
+/* 홈 화면에 설치한 앱(아이폰·아이패드): 내리는 글이 위쪽 시계·배터리 줄 밑으로 지나가며 겹쳐 보이지 않게 그 자리를 가림 */
+body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:45;pointer-events:none}
+@media (min-width:901px){#view{padding-top:calc(28px + env(safe-area-inset-top,0px))}#nav{padding-top:calc(18px + env(safe-area-inset-top,0px))}}   /* 아이패드 가로 화면도 같은 자리만큼 내림 */
+
+/* 폰: 숫자 칸의 설명이 "…"로 잘리지 않게 두 줄까지, 긴 값은 칸 밖으로 안 나가게 */
+@media (max-width:600px){
+  .tile{min-width:0}
+  .tile .tn{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .tile .tl{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;text-overflow:clip;word-break:keep-all;overflow-wrap:anywhere}
+}
+
+/* 폰: 랭킹 한 줄 = 순위 | 제목·설명 | 점수, 그 아래에 버튼 줄. (제목 칸이 버튼에 밀려 한 글자씩 세로로 서던 것) */
+@media (max-width:900px){
+  .rank{display:grid;grid-template-columns:30px minmax(0,1fr) auto;column-gap:12px;row-gap:0;align-items:start}
+  .rank>.grow{min-width:0}
+  .rank-a{grid-column:2/-1;margin:0;justify-content:flex-end}
+}
+

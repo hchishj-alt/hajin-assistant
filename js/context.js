@@ -46,7 +46,8 @@ export async function snapshot(now = new Date()) {
 
   // 사람·회의·메모는 이름과 제목만
   const team = await store.teammateNames().catch(() => []);
-  L.push(`[사람] 팀원: ${team.join(', ') || '없음'}. 연락처: ${contacts.slice(0, 40).map(c => c.name + (c.org || c.role ? `(${cut([c.org, c.role].filter(Boolean).join(' '), 14)})` : '')).join(', ') || '없음'}`);
+  const roles = Object.fromEntries((await db.kvGet('sync:roster', []).catch(() => [])).filter(m => m && m.name && m.role).map(m => [m.name, m.role]));   /* 팀원이 맡은 일(아트디렉터, 경영 …)을 같이 알려 줘야 누구 일인지 맞게 답함 */
+  L.push(`[사람] 팀원: ${team.map(n => n + (roles[n] ? `(${cut(roles[n], 14)})` : '')).join(', ') || '없음'}. 연락처: ${contacts.slice(0, 40).map(c => c.name + (c.org || c.role ? `(${cut([c.org, c.role].filter(Boolean).join(' '), 14)})` : '')).join(', ') || '없음'}`);
   const ms = [...meetings].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 6); if (ms.length) { L.push('[회의록] 형식: 번호 | 제목 | 날짜'); ms.forEach((m, i) => add('M' + (i + 1), m, 'meetings', `${cut(m.title)} | ${wd(m.date)}`)); }
   const ns = [...notes].sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 10); if (ns.length) { L.push('[메모·아이디어] 형식: 번호 | 종류 | 제목'); ns.forEach((n, i) => add('N' + (i + 1), n, 'plan', `${n.type === 'idea' ? '아이디어' : '메모'} | ${cut(n.title)}`)); }
   return { text: L.join('\n'), map, today };

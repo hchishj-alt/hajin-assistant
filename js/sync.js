@@ -200,6 +200,8 @@ function koErr(m = '') {
   if (/at least 6/i.test(m)) return '비밀번호는 6자 이상이어야 해요';
   if (/Failed to fetch|NetworkError/i.test(m)) return '인터넷 연결을 확인해 주세요';
   if (/Could not find the function|function .* does not exist/i.test(m)) return '서버 설정이 아직 안 됐어요 (SQL 실행 필요)';
+  if (/permission denied|42501/i.test(m)) return '서버가 이 기록을 열어 주지 않았어요. 관리자가 서버 설정 SQL(표 권한)을 한 번 실행해야 해요';
+  if (/JWT expired|invalid JWT|session.*(missing|expired)/i.test(m)) return '로그인이 오래돼서 풀렸어요. 다시 로그인해 주세요';
   if (/row-level security|violates/i.test(m)) return '등록된 멤버만 쓸 수 있어요. 관리자에게 코드를 받아 주세요';
   if (/relation .* does not exist|schema cache/i.test(m)) return '서버 테이블이 아직 없어요. 설정의 SQL을 Supabase에서 한 번 실행해 주세요';
   return m;

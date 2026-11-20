@@ -394,3 +394,19 @@ revoke all on function public.team_secret(text) from public, anon;
 revoke all on function public.admin_set_team_secret(text, text) from public, anon;
 grant execute on function public.team_secret(text) to authenticated;
 grant execute on function public.admin_set_team_secret(text, text) to authenticated;
+
+-- ── 12) 표 권한 ──
+-- 새 Supabase 프로젝트는 SQL로 만든 표를 로그인한 사용자에게 자동으로 열어 주지 않음.
+-- 이게 없으면 로그인은 되는데 동기화에서 "permission denied for table items"가 남.
+-- 누가 어떤 줄을 볼 수 있는지는 위의 RLS 정책이 그대로 지킴. 여기서는 표에 닿을 수 있게만 함.
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.items to authenticated;
+grant select, insert, update, delete on public.space_items to authenticated;
+grant select on public.spaces to authenticated;
+grant select, delete on public.space_members to authenticated;
+grant update (name) on public.space_members to authenticated;
+grant select, insert on public.dms to authenticated;
+grant update (read_at) on public.dms to authenticated;
+-- 함수로만 다루는 표(members, code_tries, team_secrets)는 열지 않음. 쓸 일 없는 권한은 거둠
+revoke truncate, references, trigger on public.items, public.space_items, public.spaces, public.space_members, public.dms, public.members, public.code_tries, public.team_secrets from anon, authenticated;
+

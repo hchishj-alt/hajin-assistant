@@ -145,17 +145,18 @@ async function syncSection(focus) {
     }
     const me = sync.user();
     if (!me) {
-      const codeIn = h('input.in', { placeholder: '멤버 코드 (예: AB3CD)', maxlength: 5, autocapitalize: 'characters', autocomplete: 'one-time-code', style: { textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, maxWidth: '220px' } });
+      const codeIn = h('input.in', { placeholder: '멤버 코드', 'aria-label': '멤버 코드', maxlength: 5, autocapitalize: 'characters', autocomplete: 'one-time-code', style: { textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, maxWidth: '220px', flex: '1 1 120px', minWidth: 0 } });
       const go1 = async btn => { busy(btn, true, '들어가는 중'); try { const m = await sync.loginWithCode(codeIn.value); toast(`${m.name} 님, 반가워요. 맞추는 중이에요`); } catch (e) { toast(e.message); } busy(btn, false); draw(); };
       codeIn.addEventListener('keydown', e => e.key === 'Enter' && !e.isComposing && go1(e.target.nextSibling));
-      box.append(h('div.row', { style: { marginTop: '10px' } }, codeIn, h('button.btn.sm.pri', { onclick: e => go1(e.currentTarget) }, '로그인'), h('button.btn.sm.ghost', { onclick: () => { focus = 'cfg'; draw(); } }, '서버 바꾸기')),
-        h('p.faint.tiny', { style: { marginTop: '6px' } }, '관리자(하진)가 준 5자리 코드로 들어와요. 폰과 PC에서 같은 코드를 쓰면 기록이 맞춰져요.'));
+      box.append(h('div.row', { style: { marginTop: '10px' } }, codeIn, h('button.btn.sm.pri', { style: { flex: 'none' }, onclick: e => go1(e.currentTarget) }, '로그인')),
+        h('p.faint.tiny', { style: { marginTop: '6px' } }, '관리자(하진)가 준 5자리 코드로 들어와요. 폰과 PC에서 같은 코드를 쓰면 기록이 맞춰져요.'),
+        h('button.btn.sm.ghost', { style: { marginTop: '2px', marginLeft: '-8px' }, onclick: () => { focus = 'cfg'; draw(); } }, '서버 바꾸기'));
       return;
     }
     const mm = await sync.me();
-    box.append(h('div.tiles', { style: { margin: '10px 0' } },
-      h('div.tile', h('div.tn', { style: { fontSize: '16px' } }, mm ? `${mm.name}${mm.is_admin ? ' · 관리자' : ''}` : '로그인됨'), h('div.tl', '멤버')),
-      h('div.tile', h('div.tn', st.last ? new Date(st.last).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '–'), h('div.tl', '마지막으로 맞춘 시각')),
+    box.append(h('div.row', { style: { marginTop: '10px', gap: '6px' } }, h('span.chip.ok', ic('user', 14), mm ? `${mm.name} 님으로 로그인됨` : '로그인됨'), mm?.is_admin ? h('span.chip.acc', '관리자') : null, mm?.role ? h('span.chip', mm.role) : null),
+      h('div.tiles', { style: { margin: '10px 0' } },
+      h('div.tile', h('div.tn', st.last ? new Date(st.last).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '–'), h('div.tl', '마지막 맞춤')),
       h('div.tile', h('div.tn', String(st.pushed || 0)), h('div.tl', '방금 올린 것')),
       h('div.tile', h('div.tn', String(st.pulled || 0)), h('div.tl', '방금 받은 것'))),
       st.error ? h('p.small', { style: { color: 'var(--bad)' } }, st.error) : null,
