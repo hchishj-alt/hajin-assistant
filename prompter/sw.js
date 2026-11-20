@@ -1,5 +1,5 @@
 // 프롬프터 오프라인 + 자동 업데이트. app.js의 VERSION과 같이 올릴 것
-const VERSION = '1.5.6';
+const VERSION = '1.5.7';
 const CACHE = 'prompter-' + VERSION;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'app.css', 'app.js', 'ui.js', 'store.js', 'plan.js', 'billing.js', 'config.js', 'stage.js', 'stage.css', 'i18n.js', 'icon.svg', 'logo.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable.png', 'legal.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
