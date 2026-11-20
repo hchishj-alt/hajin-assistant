@@ -11,7 +11,7 @@ import * as EX from './explore.js';
 import * as W from './web.js';
 import { FIELDS } from './fields.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.4.2';
+export const VERSION = '1.4.3';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
@@ -585,6 +585,7 @@ function adForm() {
 SCREENS.hello = async root => {
   const feat = (icn, t, b) => h('div.feat', h('div.wi', ic(icn, 20)), h('div', h('b', t), h('p', b)));
   root.append(h('div.hero', h('div.ava.lg', ic('sparkles', 30)), h('h1', '내 인스타·틱톡을', h('br'), '같이 키우는 매니저'), h('p', '뭘 올릴지, 언제 올릴지, 뭘 고칠지. 매니저가 먼저 정해서 알려 줘요. 나는 찍고 올리기만.')),
+    h('div.card.sample', h('span.tag', '매니저가 이렇게 알려 줘요'), h('div.row.gap0', ic('ig', 16), h('b', '오늘 20:00'), h('span.pk', '릴스'), h('span.chip', '뷰티')), h('h3', '3분 데일리 메이크업 전후'), h('p', h('b', '첫 1초 '), '완성된 얼굴 1초 → 맨얼굴로 돌아가서 시작'), h('p', h('b', '왜 '), '지난주 전후 비교 릴스가 평소의 2.1배 도달했어요')),
     h('div.card.feats',
       feat('target', '이번 주 뭘 올릴지 짜 줘요', '내 분야에서 지금 잘되는 영상을 찾아보고, 날짜·시간·첫 장면까지 정해요.'),
       feat('film', '찍은 영상을 먼저 봐 줘요', '첫 2초, 길이, 화질을 재고 몇 초에 뭘 고칠지 짚어요. 캡션도 써 둬요.'),
