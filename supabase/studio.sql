@@ -169,3 +169,78 @@ revoke all on function public.ps_catalog(text), public.ps_join(), public.ps_me(t
 grant execute on function public.ps_catalog(text), public.ps_join(), public.ps_me(text), public.ps_body(text, text), public.ps_bank(),
   public.ps_deposit(text, text), public.ps_admin(text), public.ps_admin_grant(text, text, int, bigint), public.ps_admin_set(text, text, text)
   to anon, authenticated;
+
+-- ── 마이페이지: 보관함·폴더·결제 내역 (2차) ──
+alter table public.ps_customers add column if not exists folders jsonb not null default '[]';
+create table if not exists public.ps_saves (
+  id text primary key,
+  token text not null references public.ps_customers(token) on delete cascade,
+  title text not null default '',
+  template_id text,
+  folder text not null default '',
+  vals jsonb not null default '{}',
+  text text not null default '',
+  pinned boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+create index if not exists ps_saves_token on public.ps_saves(token, updated_at desc);
+alter table public.ps_saves enable row level security;
+revoke all on public.ps_saves from anon, authenticated;
+
+create or replace function public.ps_cust(p_token text)
+returns public.ps_customers language sql stable security definer set search_path = public as $$
+  select * from ps_customers where token = upper(trim(coalesce(p_token, '')));
+$$;
+
+-- 내 보관함 전체 + 폴더 + 결제 내역
+create or replace function public.ps_mine(p_token text)
+returns json language plpgsql stable security definer set search_path = public as $$
+declare c ps_customers := ps_cust(p_token);
+begin
+  if c.token is null then return null; end if;
+  return json_build_object(
+    'folders', c.folders,
+    'saves', (select coalesce(json_agg(s order by s.pinned desc, s.updated_at desc), '[]') from (select id, title, template_id, folder, vals, text, pinned, updated_at from ps_saves where token = c.token order by updated_at desc limit 500) s),
+    'payments', (select coalesce(json_agg(p order by p.created_at desc), '[]') from (select amount, days, created_at from ps_deposits where code = c.code and matched order by created_at desc limit 50) p));
+end $$;
+
+-- 보관하기(새로 또는 고치기). 한 사람에 500개까지
+create or replace function public.ps_save(p_token text, p_item json)
+returns json language plpgsql volatile security definer set search_path = public as $$
+declare c ps_customers := ps_cust(p_token); v_id text := left(coalesce(p_item->>'id', ''), 40);
+begin
+  if c.token is null then raise exception 'token'; end if;
+  if v_id = '' then v_id := replace(gen_random_uuid()::text, '-', ''); end if;
+  if not exists (select 1 from ps_saves where id = v_id) and (select count(*) from ps_saves where token = c.token) >= 500 then raise exception 'full'; end if;
+  insert into ps_saves(id, token, title, template_id, folder, vals, text, pinned, updated_at)
+  values (v_id, c.token, left(coalesce(p_item->>'title', ''), 80), left(p_item->>'template_id', 60), left(coalesce(p_item->>'folder', ''), 30),
+    coalesce((p_item->'vals')::jsonb, '{}'), left(coalesce(p_item->>'text', ''), 20000), coalesce((p_item->>'pinned')::boolean, false), now())
+  on conflict (id) do update set title = excluded.title, folder = excluded.folder, vals = excluded.vals, text = excluded.text, pinned = excluded.pinned, updated_at = now()
+  where ps_saves.token = c.token;
+  return json_build_object('id', v_id);
+end $$;
+
+create or replace function public.ps_unsave(p_token text, p_id text)
+returns boolean language sql volatile security definer set search_path = public as $$
+  with d as (delete from ps_saves where id = p_id and token = upper(trim(coalesce(p_token, ''))) returning 1) select exists (select 1 from d);
+$$;
+
+-- 폴더 목록 통째로 저장(이름 바꾸기·지우기는 화면에서 보관함도 같이 고침)
+create or replace function public.ps_folders(p_token text, p_folders json)
+returns boolean language plpgsql volatile security definer set search_path = public as $$
+declare c ps_customers := ps_cust(p_token);
+begin
+  if c.token is null then return false; end if;
+  if json_typeof(p_folders) <> 'array' or json_array_length(p_folders) > 50 then return false; end if;
+  update ps_customers set folders = p_folders::jsonb where token = c.token;
+  return true;
+end $$;
+
+-- 폴더 이름 바꾸기·지우기(지우면 안의 것은 "폴더 없음"으로)
+create or replace function public.ps_move_folder(p_token text, p_from text, p_to text)
+returns boolean language sql volatile security definer set search_path = public as $$
+  with u as (update ps_saves set folder = left(coalesce(p_to, ''), 30), updated_at = now() where token = upper(trim(coalesce(p_token, ''))) and folder = p_from returning 1) select true;
+$$;
+
+revoke all on function public.ps_cust(text), public.ps_mine(text), public.ps_save(text, json), public.ps_unsave(text, text), public.ps_folders(text, json), public.ps_move_folder(text, text, text) from public;
+grant execute on function public.ps_mine(text), public.ps_save(text, json), public.ps_unsave(text, text), public.ps_folders(text, json), public.ps_move_folder(text, text, text) to anon, authenticated;
