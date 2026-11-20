@@ -199,6 +199,18 @@ export function mountStage({ script: T, limits, needPro, onTake, onSec, onExit, 
   function say(t) { const m = $('msg'); m.textContent = t; m.hidden = !t; if (t) setTimeout(() => { if (m.textContent == t) m.hidden = true; }, 9000); }
 
   /* 카메라 */
+  // 카메라를 못 열었을 때: 왜인지, 어떻게 푸는지, 다시 하기 단추. 대사는 그대로 흘려 볼 수 있다.
+  function camErr(name) {
+    const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const how = name == 'NotAllowedError'
+      ? (ios ? '설정 앱 › 사파리 › 카메라·마이크를 "허용"으로 바꾸거나, 주소창의 「가가」 › 웹 사이트 설정에서 허용해 주세요.' : '주소창 왼쪽 자물쇠(또는 카메라) 아이콘을 눌러 카메라와 마이크를 허용해 주세요.')
+      : name == 'NotReadableError' ? '다른 앱(줌·카메라 앱 등)이 카메라를 쓰고 있어요. 그 앱을 닫아 주세요.'
+      : name == 'NotFoundError' ? '이 기기에서 카메라를 찾지 못했어요.' : '카메라를 열지 못했어요.';
+    const m = $('msg'); m.hidden = false; m.classList.add('err');
+    m.innerHTML = `<b>${name == 'NotAllowedError' ? '카메라 권한이 막혀 있어요' : '카메라를 열 수 없어요'}</b><span>${how}</span><span class="dim">대사는 카메라 없이도 흘려 볼 수 있어요.</span><button type="button" id="camRetry">다시 해 보기</button>`;
+    m.onpointerdown = m.onpointerup = e => e.stopPropagation();
+    $('camRetry').onclick = e => { e.stopPropagation(); m.classList.remove('err'); m.hidden = true; camOn(); };
+  }
   async function camOn() {
     camOff(true);
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { say('이 화면에서는 카메라를 쓸 수 없어요. 크롬이나 사파리에서 주소를 직접 열어 주세요.'); apply(); return; }
@@ -208,10 +220,10 @@ export function mountStage({ script: T, limits, needPro, onTake, onSec, onExit, 
     try { st = await navigator.mediaDevices.getUserMedia({ video, audio: S.mic ? { deviceId: { exact: S.mic } } : true }); }
     catch (e) {
       if (S.dev || S.mic) { S.dev = ''; S.mic = ''; save(); return camOn(); }
-      stream = null; say(e.name == 'NotAllowedError' ? '카메라 권한이 막혀 있어요. 주소창 옆 아이콘에서 카메라와 마이크를 허용한 뒤 다시 눌러 주세요.' : '카메라를 열지 못했어요 (' + e.name + ')'); apply(); return;
+      stream = null; camErr(e.name); apply(); return;
     }
     if (!alive) { st.getTracks().forEach(t => t.stop()); return; }
-    stream = st; cam.srcObject = stream; cam.hidden = false; say('');
+    stream = st; cam.srcObject = stream; cam.hidden = false; $('msg').classList.remove('err'); say('');
     try {
       const ds = await navigator.mediaDevices.enumerateDevices();
       for (const [id, kind, k, first] of [['dev', 'videoinput', 'dev', '기본 (전면)'], ['micS', 'audioinput', 'mic', '기본 마이크']]) {
