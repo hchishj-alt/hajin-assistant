@@ -9,7 +9,7 @@ import { SUPABASE } from './config.js';
 const SHARE_COLS = new Set(['teams', 'events', 'polls', 'pollvotes', 'tasks', 'meetings', 'expenses', 'incomes', 'docs', 'notes', 'figmafiles', 'refs', 'reffolders', 'projects', 'leads', 'leadmarks', 'leadfb', 'vendors', 'grants', 'contacts', 'audit', 'labelsets', 'buys', 'boards', 'bnodes', 'feedback', 'prompts', 'promptlogs']);
 const CHUNK = 200;
 let client = null, session = null, channel = null;
-let pushT = null, pullT = null, busy = null, started = false, pendingAgain = false, wired = false;
+let pushT = null, pullT = null, busy = null, startP = null, pendingAgain = false, wired = false;
 const state = { status: 'off', last: null, error: '', pushed: 0, pulled: 0 };
 const subs = new Set();
 const set = p => { Object.assign(state, p); subs.forEach(f => { try { f({ ...state }); } catch { } }); };
@@ -25,7 +25,7 @@ export async function setConfig(url, key) {
   await db.kvSetRaw('sync:url', (url || '').trim().replace(/\/+$/, ''));
   await db.kvSetRaw('sync:key', (key || '').trim());
   if (channel) { try { await client.removeChannel(channel); } catch { } }
-  client = null; session = null; channel = null; started = false;
+  client = null; session = null; channel = null; startP = null;
   return start();
 }
 
@@ -45,9 +45,10 @@ async function getClient() {
 }
 
 // 앱 시작 때 한 번
-export async function start() {
-  if (started) return state;
-  started = true;
+export function start() { return startP || (startP = start0()); }
+/* 로그인돼 있는지 알게 될 때까지 기다림(길어도 ms). 앱을 메신저·멤버 화면에서 바로 열면 로그인 확인보다 화면이 먼저 그려져 "로그인하러 가기"가 뜨던 것을 막음 */
+export const ready = (ms = 2500) => Promise.race([start().catch(() => state), new Promise(r => setTimeout(() => r(state), ms))]);
+async function start0() {
   const c = await getClient().catch(e => { set({ status: 'error', error: e.message }); return null; });
   if (!c) { set({ status: 'off' }); return state; }
   const { data } = await c.auth.getSession();
@@ -111,7 +112,7 @@ export async function loginWithCode(code) {
   { const nm = await db.kvGet('name', ''); if (!nm || nm === '하진') await db.kvSet('name', info.name.length === 3 ? info.name.slice(1) : info.name); }
   return info;
 }
-export async function me() { return session ? await db.kvGet('me:member', null) : null; }
+export async function me() { if (!session) await ready(); return session ? await db.kvGet('me:member', null) : null; }
 // 내 색·사진: 내 줄만 바꿀 수 있고, 같은 팀 기기들은 바로 다시 받아 감. null은 그대로 두라는 뜻, ''는 지우라는 뜻
 export async function setProfile({ color = null, avatar = null } = {}) {
   if (!session) throw new Error('먼저 멤버 코드로 로그인해 주세요');
@@ -176,7 +177,7 @@ export async function signIn(email, password) {
 }
 async function afterLogin() {
   const { data } = await client.auth.getSession(); session = data.session;
-  started = false; await start();
+  startP = null; await start();
 }
 // ── 팀 공용 AI 키 ──
 // 관리자 기기에 직접 넣은 키는 서버에 올리고(설정에서 끌 수 있음), 다른 기기·팀원은 로그인만 하면 받아서 씀.

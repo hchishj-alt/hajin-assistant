@@ -223,6 +223,8 @@ async function boot() {
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
   db.onChange(col => { if (col === 'drafts') updateBadge(); });
   import('./gcal.js').then(g => g.watch());
+  /* 첫 화면을 그리기 전에 로그인 여부부터 알아 둠(길어도 1.2초). 안 그러면 메신저·멤버·정산 화면을 바로 열었을 때 로그인 안 한 것처럼 그려짐 */
+  let knewLogin = false; try { const s = await import('./sync.js'); await s.ready(1200); knewLogin = s.getState().status !== 'off' && (!!s.user() || s.getState().status === 'signedout'); } catch (e) { store.logError(e, 'sync'); }
   await render();
   updateBadge();
   db.persist();
@@ -231,7 +233,7 @@ async function boot() {
   import('./helper.js').then(H => H.start()).catch(e => store.logError(e, 'helper'));   /* 어느 화면에서든 비서 부르기 */
   import('./alarm.js').then(A => A.start()); import('./push.js').then(P => P.start());   /* 알림: 일정 전, 마감, 아침 브리핑, 닫힌 앱 푸시 */
   // 동기화 (설정에서 로그인했을 때만). 다른 기기·팀원이 바꾼 게 오면 입력 중이 아닐 때 화면 새로 그림
-  import('./sync.js').then(s => { let was = ''; s.onState(async st => { if (st.status === was) return; was = st.status; (await import('./admin.js')).clearCache(); await buildNav(); document.body.classList.toggle('not-admin', !(await (await import('./admin.js')).isAdmin())); }); return s.start(); }).catch(e => store.logError(e, 'sync'));
+  import('./sync.js').then(s => { let was = ''; s.onState(async st => { if (st.status === was) return; was = st.status; (await import('./admin.js')).clearCache(); await buildNav(); document.body.classList.toggle('not-admin', !(await (await import('./admin.js')).isAdmin())); }); return s.start().then(() => { const a = document.activeElement; if (!knewLogin && s.user() && !document.querySelector('.modal-bg') && !(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) && !document.querySelector('[data-live]')) render(); }); })   /* 로그인 확인이 늦게 끝났으면 그때 한 번 다시 그림 */.catch(e => store.logError(e, 'sync'));
   // 피그마 실시간 감시 (토큰 있을 때만, 바뀐 파일만 다시 읽음)
   import('./figma-api.js').then(async F => { if (await F.getToken()) F.watch(f => { toast(`피그마 "${f.name}"이 바뀌어서 다시 정리했어요`, { label: '보기', fn: () => go('figma/' + f.id) }); updateBadge(); }); }).catch(e => store.logError(e, 'figma'));
   window.addEventListener('hajin:dm', async e => {
