@@ -12,7 +12,7 @@ export const FIELDS = {
     { k: 'start', label: '시작', type: 'time' },
     { k: 'end', label: '끝', type: 'time' },
     { k: 'repeat', label: '반복', type: 'select', options: [['', '안 함'], ['daily', '매일'], ['weekdays', '평일'], ['weekly', '매주'], ['biweekly', '격주'], ['monthly', '매월']] },
-    { k: 'remind', label: '알림(분 전)', type: 'number', default: 10 },
+    { k: 'remind', label: '알림 (분 전, 비우면 기본값)', type: 'number' },
     { k: 'label', label: '중요도 색', type: 'label', full: true },
     { k: 'scope', label: '구분', type: 'select', options: [['', '알아서 (내용 보고 정함)'], ['work', '팀 업무 (팀 전체 일정)'], ['personal', '개인 (나만 보기)']], default: '' },
     { k: 'memo', label: '메모', type: 'textarea', rows: 2 },

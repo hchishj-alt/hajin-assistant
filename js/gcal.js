@@ -22,7 +22,10 @@ export function addUrl(e) {
 }
 
 // .ics 글 만들기 (알림 포함). tasks=true면 마감 있는 할 일도 종일 일정으로
+// 알림 시간은 앱의 알림 설정을 따름: 일정은 N분 전, 마감은 그날 정한 시각 (폰 캘린더가 그대로 울림)
 export async function ics({ tasks = true } = {}) {
+  const cfg = await (await import('./alarm.js')).get();
+  const hmDur = hm => { const [a, b] = String(hm || '09:00').split(':').map(Number); return `PT${a || 0}H${b ? b + 'M' : ''}`; };
   const evs = (await db.list('events')).filter(e => e.date && e.kind !== 'focus');
   const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//hajin-assistant//KO', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:하진 비서', 'X-WR-TIMEZONE:' + TZ, 'REFRESH-INTERVAL;VALUE=DURATION:PT1H', 'X-PUBLISHED-TTL:PT1H'];
   const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
@@ -33,11 +36,13 @@ export async function ics({ tasks = true } = {}) {
     if (e.place) L.push('LOCATION:' + esc(e.place));
     if (e.memo) L.push('DESCRIPTION:' + esc(e.memo));
     if (e.repeat && RR[e.repeat]) L.push('RRULE:FREQ=' + RR[e.repeat]);
-    const r = Number(e.remind); if (e.start && r >= 0) L.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + esc(e.title), `TRIGGER:-PT${r}M`, 'END:VALARM');
+    const r = Number(e.remind === '' || e.remind == null ? cfg.lead : e.remind); if (cfg.on && e.start && r >= 0) L.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + esc(e.title), `TRIGGER:-PT${r}M`, 'END:VALARM');
     L.push('END:VEVENT');
   }
   if (tasks) for (const t of (await db.list('tasks')).filter(t => !t.done && t.due)) {
-    L.push('BEGIN:VEVENT', 'UID:' + t.id + '@hajin', 'DTSTAMP:' + stamp, 'SUMMARY:' + esc('마감 · ' + t.title), 'DTSTART;VALUE=DATE:' + dt(t.due), 'DTEND;VALUE=DATE:' + nextDay(t.due), 'TRANSP:TRANSPARENT', 'END:VEVENT');
+    L.push('BEGIN:VEVENT', 'UID:' + t.id + '@hajin', 'DTSTAMP:' + stamp, 'SUMMARY:' + esc('마감 · ' + t.title), 'DTSTART;VALUE=DATE:' + dt(t.due), 'DTEND;VALUE=DATE:' + nextDay(t.due), 'TRANSP:TRANSPARENT');
+    if (cfg.on && cfg.tasks) L.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + esc('오늘 마감 · ' + t.title), 'TRIGGER:' + hmDur(cfg.taskAt), 'END:VALARM');
+    L.push('END:VEVENT');
   }
   L.push('END:VCALENDAR');
   return L.join('\r\n');
@@ -56,8 +61,13 @@ export async function off() { const st = await state(); if (st.key) { try { awai
 // 구글 캘린더에서 "URL로 추가"가 채워진 채로 열림
 export const subscribeUrl = url => 'https://calendar.google.com/calendar/u/0/r?cid=' + encodeURIComponent(url.replace(/^https:/, 'webcal:'));
 
+// 아이폰·아이패드·맥 기본 캘린더가 바로 '구독' 창을 여는 주소
+export const appleUrl = url => url.replace(/^https?:/, 'webcal:');
+
 // 일정·할 일이 바뀌면 잠깐 뒤에 한 번만 다시 올림
 let timer = 0;
 export function watch() {
-  db.onChange(col => { if (col !== 'events' && col !== 'tasks') return; clearTimeout(timer); timer = setTimeout(() => publish().catch(() => { }), 4000); });
+  const later = () => { clearTimeout(timer); timer = setTimeout(() => publish().catch(() => { }), 4000); };
+  db.onChange(col => { if (col === 'events' || col === 'tasks') later(); });
+  import('./alarm.js').then(A => A.onChange(later)).catch(() => { });   /* 알림 시간을 바꾸면 폰 캘린더 알람도 따라가게 */
 }

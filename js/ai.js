@@ -122,6 +122,19 @@ export async function ask(prompt, { json = false, ms = 25000, temp = 0.2, fast =
   if (!json) return out;
   try { return JSON.parse(out.replace(/^```(?:json)?\s*|\s*```$/g, '')); } catch { throw new Error('AI 답을 읽지 못했어요'); }
 }
+// 녹음한 말을 글로 (AI가 소리를 직접 들음). data = base64, mime = audio/wav 등
+export async function hear(data, mime = 'audio/wav', { ms = 40000 } = {}) {
+  const key = await db.kvGet(KEY, ''); if (!key) throw new Error('AI 키가 없어요');
+  const body = JSON.stringify({ contents: [{ parts: [{ text: '이 녹음에서 사람이 한 말을 한국어로 들리는 그대로 받아 적어. 설명·따옴표·머리말 없이 받아 적은 글만 써. 사람 말이 없으면 아무것도 쓰지 마.' }, { inline_data: { mime_type: mime, data } }] }], generationConfig: { temperature: 0 } });
+  const list = await candidates(key); let last = '';
+  for (const m of list) {
+    let r = null; try { r = await timedG(`models/${m}:generateContent`, key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }, ms); } catch { last = '응답이 너무 늦어요'; continue; }
+    if (r.ok) { const out = ((await r.json()).candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim(); return /^[(\[]?\s*(말|음성|소리|내용)?\s*(이|가)?\s*없/.test(out) ? '' : out.replace(/^["“”']+|["“”']+$/g, ''); }
+    last = r.status === 429 ? '무료 사용량을 잠깐 넘었어요. 조금 뒤에 다시 해 주세요' : r.status === 401 || r.status === 403 ? 'AI 키를 확인해 주세요 (' + r.status + ')' : 'AI가 녹음을 듣지 못했어요 (' + r.status + ')';
+    if (r.status === 401 || r.status === 403) break;   /* 400은 그 모델이 소리를 못 듣는 것일 수 있어 다음 모델로 */
+  }
+  throw new Error(last || 'AI가 녹음을 듣지 못했어요');
+}
 // 요약 3~5줄. 키가 없거나 실패하면 null → 부르는 쪽이 앱 안 요약으로 대신
 export async function summarize(text, title = '') {
   if (!(await enabled())) return null;

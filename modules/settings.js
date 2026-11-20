@@ -1,5 +1,6 @@
 import { h, ic, clear, toast, head, seg, modal, form, confirmBox, download, pickFile, busy } from '../js/ui.js';
 import * as Install from '../js/install.js';
+import { panel as alarmPanel } from '../js/alarmui.js';
 import * as db from '../js/db.js';
 import * as brain from '../js/brain.js';
 import * as store from '../js/store.js';
@@ -26,8 +27,7 @@ export default {
         h('div.row', { style: { marginBottom: '12px' } }, seg([['auto', '시스템 따라'], ['light', '밝게'], ['dark', '어둡게']], theme, async v => { await db.kvSet('theme', v); await applyTheme(v); go('settings'); })),
         await palettePicker()),
       await labelSection(),
-      sec('알림', 'bell', h('p.small.muted', '일정 10분 전(일정마다 바꿀 수 있어요)을 알려요. 폰에서는 홈 화면에 설치한 뒤 켜 주세요.'),
-        h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm', { onclick: async () => { const r = await Notification?.requestPermission?.(); toast(r === 'granted' ? '알림을 켰어요' : '알림이 꺼져 있어요. 브라우저 설정에서 허용해 주세요.'); } }, '알림 켜기'), h('span.chip', 'Notification' in window ? (Notification.permission === 'granted' ? '켜짐' : '꺼짐') : '지원 안 함'))),
+      sec('알림', 'bell', h('p.small.muted', '일정 시작 전, 할 일 마감, 아침 브리핑을 알려요. 멤버 코드로 로그인하고 켜면 앱을 닫아도 와요.'), alarmPanel()),
       await syncSection(params[0] === 'sync'),
       await extSection(params[0] === 'ext'),
       await learnedSection(),

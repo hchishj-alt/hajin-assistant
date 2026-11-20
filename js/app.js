@@ -185,24 +185,6 @@ async function setupSW() {
   } catch (e) { store.logError(e, 'sw'); }
 }
 
-// ── 알림 (오늘 일정 10분 전) ──
-const notified = new Set();
-async function tickReminders() {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const now = new Date();
-  const evs = await store.eventsOn(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
-  for (const e of evs) {
-    const nk = e.id + '|' + now.toDateString(); // 반복 일정은 날마다 다시 알림
-    if (!e.start || notified.has(nk)) continue;
-    const [hh, mm] = e.start.split(':').map(Number);
-    const diff = (hh * 60 + mm) - (now.getHours() * 60 + now.getMinutes());
-    if (diff <= (e.remind ?? 10) && diff >= 0) {
-      notified.add(nk);
-      try { (await navigator.serviceWorker?.getRegistration())?.showNotification(e.title, { body: `${e.start} 시작${e.place ? ' · ' + e.place : ''}`, icon: 'icons/icon-192.png', tag: e.id }) || new Notification(e.title, { body: e.start }); } catch { }
-    }
-  }
-}
-
 // 글꼴은 화면을 막지 않게 나중에 붙임 (CDN이 느려도 첫 화면이 바로 뜸)
 function lateFont() { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css'; document.head.append(l); }
 // 눌러서 여는 줄·칸은 키보드로도 닿게 (Tab으로 가서 Enter)
@@ -234,7 +216,7 @@ async function boot() {
   db.persist();
   setupSW();
   store.repairTitles().catch(() => { }); // 예전 버전이 잘못 만든 제목(“만들어기”)을 한 번 고침
-  setInterval(tickReminders, 60 * 1000); tickReminders();
+  import('./alarm.js').then(A => A.start()); import('./push.js').then(P => P.start());   /* 알림: 일정 전, 마감, 아침 브리핑, 닫힌 앱 푸시 */
   // 동기화 (설정에서 로그인했을 때만). 다른 기기·팀원이 바꾼 게 오면 입력 중이 아닐 때 화면 새로 그림
   import('./sync.js').then(s => { let was = ''; s.onState(async st => { if (st.status === was) return; was = st.status; (await import('./admin.js')).clearCache(); await buildNav(); document.body.classList.toggle('not-admin', !(await (await import('./admin.js')).isAdmin())); }); return s.start(); }).catch(e => store.logError(e, 'sync'));
   // 피그마 실시간 감시 (토큰 있을 때만, 바뀐 파일만 다시 읽음)

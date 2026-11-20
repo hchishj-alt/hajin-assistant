@@ -12,7 +12,8 @@ let labF = '', scopeF = 'mine', peopleF = [];
 let mode = matchMedia('(max-width:900px)').matches ? 'agenda' : 'month', cursor = new Date();
 export default {
   async render(root, params) {
-    if (params[0]) cursor = new Date(params[0]);
+    if (params[0] === 'phone') setTimeout(() => gcalModal(), 400);   /* 알림 설정에서 넘어온 경우: 폰 캘린더 연결 창을 바로 엶 */
+    else if (params[0]) cursor = new Date(params[0]);
     const body = h('div');
     const quick = h('input', { placeholder: '일정 바로 추가: "다음 주 수요일 2시~4시 홍대 촬영"', 'aria-label': '일정 추가', enterkeyhint: 'done' });
     const ctx = { people: await store.peopleNames().catch(() => []), projects: await store.projects().catch(() => []) };
@@ -29,7 +30,7 @@ export default {
     quick.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addQuick(); } });
     root.append(kindPair('event'), head('캘린더', '할 일도 마감 날짜에 체크 표시로 같이 보여요.',
       h('button.btn.sm.ghost', { onclick: importIcs, title: '구글·애플 캘린더에서 내보낸 .ics 파일 가져오기' }, ic('upload', 14), '.ics 가져오기'),
-      h('button.btn.sm.ghost', { onclick: gcalModal, title: '구글 캘린더에서 알림 받기' }, ic('calendar', 14), '구글 캘린더'),
+      h('button.btn.sm.ghost', { onclick: gcalModal, title: '폰 기본 캘린더와 위젯에 내 일정을 보이게 하고 알람을 받아요' }, ic('calendar', 14), '폰 캘린더·위젯'),
       h('button.btn.sm.pri', { onclick: () => edit({ date: ymd(cursor) }) }, ic('plus', 14), '일정')),
       h('div.quick', { style: { marginBottom: '14px' } }, ic('zap'), quick, h('button.btn.icon.ghost', { type: 'button', 'aria-label': '추가', onclick: addQuick }, ic('send'))), body);
     await draw();
@@ -159,19 +160,19 @@ export default {
     }
     async function exportIcs() { download('hajin-calendar.ics', await G.ics(), 'text/calendar'); }
     async function gcalModal() {
-      modal('구글 캘린더 연동', close => {
+      modal('폰 캘린더·위젯에 연결', close => {
         const box = h('div.gcal');
         const paint = async () => {
           const st = await G.state(); clear(box);
-          box.append(h('p.small.faint', '구글 캘린더가 내 일정을 가져가서, 폰의 구글 캘린더 알림으로 울리게 해요. 구글 로그인이나 비용은 필요 없어요.'));
+          box.append(h('p.small.faint', '폰에 원래 있는 캘린더 앱이 내 일정을 가져가요. 그러면 홈 화면의 캘린더 위젯에 일정이 보이고, 앱을 닫아 둬도 폰 알람이 울려요. 무료예요.'));
           const sw = h('button.switch' + (st.on ? '.on' : ''), { role: 'switch', 'aria-checked': String(!!st.on), 'aria-label': '구독 주소 켜기', onclick: async () => { sw.disabled = true; try { if (st.on) await G.off(); else await G.publish(true); } catch (e) { toast(e.message); } paint(); } });
           box.append(h('div.gcal-row', h('div.grow', h('b', '자동 연동 (구독)'), h('div.faint.tiny', st.on ? `마지막으로 보낸 때 ${fmtDate(st.at, { time: true })}. 일정을 고치면 알아서 다시 보내요.` : '한 번만 연결해 두면 새 일정도 알아서 넘어가요.')), sw));
           if (st.on) {
             const inp = h('input.in', { readOnly: true, value: st.url, 'aria-label': '구독 주소', onfocus: e => e.target.select() });
             box.append(h('div.gcal-url', inp, h('button.btn.sm', { onclick: async () => { try { await navigator.clipboard.writeText(st.url); toast('주소를 복사했어요'); } catch { inp.select(); } } }, ic('copy', 14), '복사')),
-              h('a.btn.pri', { href: G.subscribeUrl(st.url), target: '_blank', rel: 'noopener', style: { marginTop: '8px' } }, ic('calendar', 14), '구글 캘린더에 연결하기'),
+              h('div.gcal-go', h('a.btn.pri', { href: G.appleUrl(st.url) }, ic('calendar', 14), '아이폰·아이패드 캘린더에 연결'), h('a.btn', { href: G.subscribeUrl(st.url), target: '_blank', rel: 'noopener' }, ic('calendar', 14), '구글 캘린더에 연결 (안드로이드)')),
               h('label.gcal-row', { style: { marginTop: '10px' } }, h('span.grow.small', '마감 있는 할 일도 함께 보내기'), h('input', { type: 'checkbox', checked: st.tasks !== false, onchange: async e => { await db.kvSet('gcal', { ...st, tasks: e.target.checked }); await G.publish().catch(x => toast(x.message)); paint(); } })),
-              h('ul.gcal-note', h('li', '구글이 이 주소를 다시 읽는 간격은 구글이 정해요. 보통 몇 시간, 길면 하루예요.'), h('li', '알림 시간은 구글 캘린더에서 이 캘린더의 "일정 알림"을 한 번 정해 두면 모든 일정에 적용돼요.'), h('li', '주소를 아는 사람은 일정을 볼 수 있어요. 끄면 주소가 사라져요.')));
+              h('ul.gcal-note', h('li', h('b', '아이폰·아이패드: '), '구독 창에서 "알림 제거"를 꺼야 알람이 울려요. 연결한 뒤 홈 화면을 길게 눌러 캘린더 위젯을 올리면 일정이 보여요.'), h('li', h('b', '안드로이드: '), '구글 캘린더에 연결한 뒤, 그 캘린더의 "일정 알림"을 한 번 정해 두면 모든 일정에 울려요. 홈 화면에 구글 캘린더 위젯을 올리면 일정이 보여요.'), h('li', '폰 캘린더가 새 일정을 가져가는 간격은 애플·구글이 정해요. 아이폰은 보통 한 시간 안, 구글은 몇 시간에서 길면 하루예요. 급한 알림은 이 앱의 알림(설정 › 알림)이 더 빨라요.'), h('li', '주소를 아는 사람은 일정을 볼 수 있어요. 끄면 주소가 사라져요.')));
           }
           box.append(h('div.gcal-row', { style: { marginTop: '14px' } }, h('div.grow', h('b', '급한 일정은 바로 넣기'), h('div.faint.tiny', '일정을 열고 "구글에 추가"를 누르면 그 일정만 바로 들어가요.'))),
             h('div.row', { style: { marginTop: '10px', gap: '8px', flexWrap: 'wrap' } }, h('button.btn.sm.ghost', { onclick: exportIcs }, ic('download', 14), '파일로 내보내기 (.ics)'), h('button.btn.sm.ghost', { onclick: () => { close(); importIcs(); } }, ic('upload', 14), '구글 일정 가져오기')));

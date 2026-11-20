@@ -5,7 +5,7 @@ import * as brain from '../js/brain.js';
 import * as store from '../js/store.js';
 import * as LB from '../js/labels.js';
 import * as FB from '../js/feedback.js';
-import { createRecorder, hasSpeech, waveEl, fmtSec } from '../js/voice.js';
+import { createRecorder, canVoice, toText, waveEl, fmtSec } from '../js/voice.js';
 import { summaryView } from '../js/draftcard.js';
 import { go, updateBadge } from '../js/app.js';
 
@@ -58,7 +58,7 @@ async function canvas(root, id) {
   const board = await db.get(id);
   if (!board || board.deleted) { root.append(head('마인드맵을 찾을 수 없어요', null, h('a.btn', { href: '#/board' }, '목록'))); return; }
   const myName = await me();
-  let nodes = new Map(), msgs = [], sel = null, view = { x: 0, y: 0, k: 1 }, auto = !!board.voiceAuto, lastAuto = null, recorder = null, peers = new Map(), pendingDraw = false;
+  let nodes = new Map(), msgs = [], sel = null, view = { x: 0, y: 0, k: 1 }, auto = !!board.voiceAuto, lastAuto = null, recorder = null, sentVoice = '', peers = new Map(), pendingDraw = false;
   const world = h('div.mm-world'); const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'mm-lines'); world.append(svg);
   const stage = h('div.mm-stage', world);
   const tools = h('div.mm-tools.hide');
@@ -292,9 +292,18 @@ async function canvas(root, id) {
     chatList.scrollTop = chatList.scrollHeight;
   }
   async function toggleVoice() {
-    if (recorder?.running) { await recorder.stop(); recorder = null; micBtn.classList.remove('rec'); live.classList.add('hide'); room?.send({ t: 'live', name: myName, text: '' }); return; }
-    if (!hasSpeech()) { toast('이 브라우저는 실시간 받아쓰기를 지원하지 않아요. 크롬·사파리에서 열거나, 아래 칸에 적어 주세요.'); return; }
-    recorder = createRecorder({ record: false, onInterim: t => { live.classList.toggle('hide', !t); live.textContent = t ? `${myName}: ${t}` : ''; room?.send({ t: 'live', name: myName, text: t.slice(-60) }); }, onText: (_full, piece) => { if (piece) sendChat(piece, 'voice'); } });
+    if (recorder?.running) {
+      const r = await recorder.stop(); recorder = null; micBtn.classList.remove('rec'); live.classList.add('hide'); room?.send({ t: 'live', name: myName, text: '' });
+      if (r.mode === 'rec' && r.blob) {   /* 실시간이 안 되는 기기: 녹음한 것을 글로 바꿔 대화에 넣음 */
+        toast('글로 바꾸는 중이에요…');
+        try { const t = await toText(r.blob); if (t) sendChat(t, 'voice'); else toast('알아들은 말이 없어요.'); }
+        catch (e) { toast(e.code === 'no-engine' ? '이 기기는 실시간 받아쓰기가 안 돼요. AI를 연결하면 말한 걸 글로 바꿔 드려요 (설정 › AI 연결).' : '글로 바꾸지 못했어요: ' + e.message); }
+      } else if (r.mode === 'live' && r.text && r.text !== sentVoice) { const rest = r.text.startsWith(sentVoice) ? r.text.slice(sentVoice.length).trim() : ''; if (rest) sendChat(rest, 'voice'); }
+      return;
+    }
+    if (!canVoice()) { toast('이 브라우저는 말로 입력할 수 없어요. 아래 칸에 적어 주세요.'); return; }
+    sentVoice = '';
+    recorder = createRecorder({ record: false, onState: (s, mode) => { if (s === 'recording' && mode === 'rec') toast('이 기기는 실시간이 안 돼서 녹음해요. 마이크를 다시 누르면 글로 바꿔요.'); else if (s === 'denied') { micBtn.classList.remove('rec'); toast('마이크가 막혀 있어요. 설정에서 마이크를 허용해 주세요.'); } }, onInterim: t => { live.classList.toggle('hide', !t); live.textContent = t ? `${myName}: ${t}` : ''; room?.send({ t: 'live', name: myName, text: t.slice(-60) }); }, onText: (full, piece) => { if (piece) { sentVoice = full; sendChat(piece, 'voice'); } } });
     try { await recorder.start(); micBtn.classList.add('rec'); toast(auto ? '듣고 있어요. 말한 내용이 노드로 그려져요' : '듣고 있어요. 말한 내용이 대화에 쌓여요'); } catch (e) { toast(e.message); recorder = null; }
   }
 
@@ -305,11 +314,11 @@ async function canvas(root, id) {
       const ta = h('textarea.in', { rows: 5, placeholder: '녹음하면 말한 내용이 여기 글로 적혀요. 직접 적어도 돼요.' }, n.note || '');
       const wave = waveEl(26); const tm = h('span.mono.small', '0:00');
       const btn = h('button.btn.pri', { type: 'button', onclick: async () => {
-        if (rec?.running) { const r = await rec.stop(); clearInterval(timer); btn.lastChild.textContent = ' 다시 녹음'; if (r.blob) { await db.putBlob(r.blob, 'bn:' + nid); await save(nodes.get(nid), { hasAudio: true, audioSec: r.seconds, audioBy: myName }); } if (r.text && !ta.value.includes(r.text)) ta.value = (ta.value ? ta.value + '\n' : '') + r.text; if (!r.text && r.blob) toast('녹음은 저장했어요. 이 브라우저는 실시간 받아쓰기가 안 돼서 “글로 바꾸기”를 눌러 주세요'); return; }
+        if (rec?.running) { const r = await rec.stop(); clearInterval(timer); btn.lastChild.textContent = ' 다시 녹음'; if (r.blob) { await db.putBlob(r.blob, 'bn:' + nid); await save(nodes.get(nid), { hasAudio: true, audioSec: r.seconds, audioBy: myName }); } if (r.text && !ta.value.includes(r.text)) ta.value = (ta.value ? ta.value + '\n' : '') + r.text; if (!r.text && r.blob) { try { const t = await toText(r.blob); if (t) ta.value = (ta.value ? ta.value + '\n' : '') + t; } catch (e) { toast(e.code === 'no-engine' ? '녹음은 저장했어요. 글로 바꾸려면 AI를 연결해 주세요 (설정 › AI 연결).' : '녹음은 저장했어요. 글로 바꾸지는 못했어요.'); } } return; }
         const base = ta.value; rec = createRecorder({ onLevel: v => wave.level(v), onInterim: t => { ta.value = (base ? base + '\n' : '') + (rec._full || '') + ' ' + t; }, onText: full => { rec._full = full; ta.value = (base ? base + '\n' : '') + full; } });
         try { await rec.start(); btn.lastChild.textContent = ' 녹음 끝'; sec = 0; timer = setInterval(() => (tm.textContent = fmtSec(++sec)), 1000); } catch (e) { toast(e.message); }
       } }, ic('mic', 14), ' 녹음 시작');
-      const stt = h('button.btn', { type: 'button', onclick: async e => { const b = e.currentTarget; const blob = await db.getBlob('bn:' + nid); if (!blob) return toast('먼저 녹음해 주세요'); const ext = await import('../js/ext.js'); if (!(await ext.isReady('stt'))) { toast('설정 → 확장 두뇌에서 음성인식 모델을 먼저 받아 주세요'); return; } busy(b, true, '글로 바꾸는 중'); try { const r = await ext.transcribe(blob); ta.value = (ta.value ? ta.value + '\n' : '') + r.text; } catch (er) { toast('받아쓰기 실패: ' + er.message); } busy(b, false); } }, ic('wave', 14), '글로 바꾸기');
+      const stt = h('button.btn', { type: 'button', onclick: async e => { const b = e.currentTarget; const blob = await db.getBlob('bn:' + nid); if (!blob) return toast('먼저 녹음해 주세요'); busy(b, true, '글로 바꾸는 중'); try { const t = await toText(blob); if (t) ta.value = (ta.value ? ta.value + '\n' : '') + t; else toast('알아들은 말이 없어요.'); } catch (er) { toast(er.code === 'no-engine' ? '글로 바꾸려면 AI를 연결해 주세요 (설정 › AI 연결).' : '받아쓰기 실패: ' + er.message); } busy(b, false); } }, ic('wave', 14), '글로 바꾸기');
       return h('div.stack', h('div.row', btn, stt, wave, tm), ta, h('div.modal-f', h('button.btn.pri', { onclick: async () => { if (rec?.running) await rec.stop(); clearInterval(timer); await save(nodes.get(nid), { note: ta.value.trim() }); close(); draw(); toast('설명을 달았어요. 노드의 마이크를 누르면 글로 보여요'); } }, '저장')));
     }, { onClose: () => { if (rec?.running) rec.stop(); clearInterval(timer); } });
   }

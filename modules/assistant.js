@@ -6,7 +6,7 @@ import { answer } from '../js/query.js';
 import * as FB from '../js/feedback.js';
 import { draftCard } from '../js/draftcard.js';
 import { describe } from '../js/fields.js';
-import { createRecorder, hasSpeech, waveEl, fmtSec } from '../js/voice.js';
+import { createRecorder, canVoice, toText, waveEl, fmtSec } from '../js/voice.js';
 import { go, updateBadge } from '../js/app.js';
 
 const SUGGEST = ['오늘 일정', '오늘 빈 시간', '이번 주 할 일', '밀린 할 일', '이번 달 지출', '확인 대기함', '내일 오후 3시 팀 회의', '점심 9000원', '금요일까지 포트폴리오 정리'];
@@ -20,6 +20,9 @@ export default {
     const micBtn = h('button.btn.icon.ghost', { title: '말로 입력', 'aria-label': '말로 입력', onclick: () => toggleMic() }, ic('mic', 20));
     const sendBtn = h('button.btn.pri.icon', { 'aria-label': '보내기', onclick: () => send() }, ic('right', 20));
     const recBar = h('div.row.hide', { style: { padding: '6px 4px', gap: '10px' } });
+    let micBusy = false;
+    const botSay = async (text, chips = []) => { await drawMsg(await db.put('chat', { role: 'bot', text, chips }), new Map()); scrollDown(); };
+    const micOff = () => { clearInterval(timer); recBar.classList.add('hide'); micBtn.classList.remove('rec'); };
     const projBar = h('div.chips', { style: { padding: '0 4px 6px' } });
     const aiBar = h('div.chips', { style: { margin: '-6px 0 10px' } });
     const sug = h('div.suggest', SUGGEST.map(s => h('button.chip', { onclick: () => { ta.value = s; send(); } }, s)));
@@ -302,14 +305,35 @@ export default {
 
     // 음성
     async function toggleMic() {
-      if (recorder?.running) { const r = await recorder.stop(); clearInterval(timer); recBar.classList.add('hide'); micBtn.classList.remove('rec'); if (r.text.trim()) send(r.text.trim(), 'voice'); else toast('알아들은 말이 없어요'); return; }
-      if (!hasSpeech()) { toast('이 브라우저는 실시간 받아쓰기를 지원하지 않아요. 회의록 메뉴에서 녹음 후 받아쓰기를 써 주세요.'); return; }
+      if (micBusy) return;
+      if (recorder?.running) {
+        micBusy = true; clearInterval(timer);
+        try {
+          const r = await recorder.stop(); let text = (r.text || '').trim(), told = false;
+          if (!text && r.blob) {   /* 실시간으로 못 받아쓴 경우: 녹음한 것을 글로 바꿈 */
+            clear(recBar).append(h('span.spin'), h('span.small.muted.grow', '글로 바꾸는 중이에요…'));
+            try { text = await toText(r.blob); }
+            catch (e) { told = true; if (e.code === 'no-engine') { micOff(); await botSay('말은 잘 녹음됐는데, 이 기기에는 글로 바꿔 줄 AI가 아직 연결돼 있지 않아요. AI를 연결하면 바로 돼요. 그 전에는 키보드의 마이크(받아쓰기)를 눌러 말해도 돼요.', [{ label: 'AI 연결하기', aiGuide: true }]); } else toast(e.message); }
+          }
+          micOff();
+          if (text) send(text, 'voice'); else if (!told) toast(r.seconds < 2 ? '너무 짧았어요. 마이크를 누르고 말한 뒤 "끝"을 눌러 주세요.' : '알아들은 말이 없어요. 조금 더 크게 말해 주세요.');
+        } finally { micBusy = false; }
+        return;
+      }
+      if (!canVoice()) { toast('이 브라우저는 말로 입력할 수 없어요. 키보드의 마이크(받아쓰기)를 써 주세요.'); ta.focus(); return; }
       const wave = waveEl(28); const live = h('span.small.muted.grow', '듣고 있어요…'); const tm = h('span.mono.small', '0:00');
       clear(recBar).append(h('span.dot', { style: { background: 'var(--bad)' } }), wave, live, tm, h('button.btn.sm', { onclick: toggleMic }, ic('stop', 14), '끝'));
       recBar.classList.remove('hide'); micBtn.classList.add('rec');
-      let sec = 0; timer = setInterval(() => (tm.textContent = fmtSec(++sec)), 1000);
-      recorder = createRecorder({ record: false, onLevel: v => wave.level(v), onInterim: t => (live.textContent = t || '듣고 있어요…'), onText: full => (live.textContent = full.slice(-80)) });
-      try { await recorder.start(); } catch (e) { toast(e.message); recBar.classList.add('hide'); micBtn.classList.remove('rec'); clearInterval(timer); }
+      let sec = 0; clearInterval(timer); timer = setInterval(() => (tm.textContent = fmtSec(++sec)), 1000);
+      recorder = createRecorder({ record: false, onLevel: v => wave.level(v), onInterim: t => { if (t) live.textContent = t.slice(-80); }, onText: full => (live.textContent = full.slice(-80)),
+        onState: (s, mode) => {
+          if (s === 'recording' && mode === 'rec') live.textContent = '녹음하고 있어요. 다 말하면 "끝"을 눌러 주세요.';   /* 실시간 받아쓰기가 안 되는 기기 */
+          else if (s === 'denied') { micOff(); toast('마이크가 막혀 있어요. 폰 설정에서 이 앱의 마이크를 허용해 주세요.'); }
+          else if (s === 'unsupported') { micOff(); toast('이 기기에서는 말로 입력할 수 없어요. 키보드의 마이크(받아쓰기)를 써 주세요.'); }
+          else if (s === 'no-engine') { micOff(); botSay('이 기기에서는 말하는 대로 받아쓰는 기능이 안 켜져요. AI를 연결하면 말을 녹음해서 글로 바꿔 드려요. 그 전에는 키보드의 마이크(받아쓰기)를 눌러 말해도 돼요.', [{ label: 'AI 연결하기', aiGuide: true }]); }
+        } });
+      micBusy = true;
+      try { await recorder.start(); } catch (e) { if (!e.told) toast(e.message); micOff(); } finally { micBusy = false; }
     }
     const onChat = async e => { await drawMsg(e.detail, new Map()); scrollDown(); };
     window.addEventListener('hajin:chat', onChat);

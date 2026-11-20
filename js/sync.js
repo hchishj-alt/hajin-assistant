@@ -353,6 +353,8 @@ export async function leaveTeam(team) {
 }
 
 export const enabled = () => !!session;
+// 로그인돼 있을 때만 서버 연결을 내줌 (푸시 알림 등록 같은 작은 일에 씀)
+export const raw = async () => (session && client ? client : null);
 // 레퍼런스 이미지 → 팀 저장소 (무료 1GB). 로그인 안 했거나 실패하면 null (그땐 기기에만 저장)
 export async function uploadImage(blob) {
   if (!session || !client) return null;

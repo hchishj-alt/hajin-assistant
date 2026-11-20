@@ -53,7 +53,7 @@ export default {
       h('p.faint.small', fmtDate(now, { year: true })),
       h('h1', name ? `${hi}, ${name}님` : hi),
       h('p.sub', brain.briefing({ events, tasks: open, drafts: drafts.length, people: reach }))),
-      h('div.row', h('a.btn.sm', { href: '#/assistant' }, ic('sparkles', 14), '비서'), h('a.btn.sm', { href: '#/meetings/new' }, ic('mic', 14), '회의 녹음')));
+      h('div.row', h('a.btn.sm', { href: '#/assistant' }, ic('sparkles', 14), '비서'), h('a.btn.sm', { href: '#/meetings/new' }, ic('mic', 14), '회의 녹음'), h('button.btn.sm', { type: 'button', 'aria-label': '알림 설정', onclick: async () => (await import('../js/alarmui.js')).open() }, ic('bell', 14), '알림')));
 
     const tiles = h('div.tiles',
       tile('calendar', events.length, '오늘 일정', '', '#/calendar'),

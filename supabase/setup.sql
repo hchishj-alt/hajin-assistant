@@ -410,3 +410,160 @@ grant update (read_at) on public.dms to authenticated;
 -- 함수로만 다루는 표(members, code_tries, team_secrets)는 열지 않음. 쓸 일 없는 권한은 거둠
 revoke truncate, references, trigger on public.items, public.space_items, public.spaces, public.space_members, public.dms, public.members, public.code_tries, public.team_secrets from anon, authenticated;
 
+
+-- ─────────────────────────────────────────────
+-- 13) 앱을 닫아도 울리는 알림 (웹 푸시). 따로 돌리는 서버 없이 이 DB가 1분마다 보냄. 다시 실행해도 안전
+--     · 기기가 자기 서명 키를 만들어 기기 안에만 둠. 여기에는 공개 키와, 미리 만들어 둔 "보내도 됨" 서명(8일 치)만 올라옴
+--     · 앱이 앞으로 울릴 알림 목록을 alarms에 올려 둠
+--     · push_tick()이 때가 된 알림이 있는 사람의 기기로 내용 없는 신호를 보냄. 알림 글은 기기가 push_due()로 가져감
+create extension if not exists http with schema extensions;
+create extension if not exists pg_cron with schema pg_catalog;
+
+create table if not exists public.push_subs (
+  endpoint text primary key,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  pub text not null,
+  tokens jsonb not null default '[]'::jsonb,
+  ua text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  last_status integer,
+  last_at timestamptz,
+  -- 애플·구글·모질라·윈도우의 푸시 주소만 받음 (DB가 아무 주소로나 요청을 보내지 않게)
+  constraint push_subs_host check (endpoint ~ '^https://(fcm\.googleapis\.com|android\.googleapis\.com|([a-z0-9-]+\.)*push\.apple\.com|updates\.push\.services\.mozilla\.com|([a-z0-9-]+\.)*notify\.windows\.com)/' and length(endpoint) < 1200),
+  constraint push_subs_size check (length(pub) between 80 and 100 and pg_column_size(tokens) < 20000)
+);
+create index if not exists push_subs_user on public.push_subs (user_id);
+
+create table if not exists public.alarms (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  id text not null,
+  at timestamptz not null,
+  until timestamptz not null,
+  title text not null default '',
+  body text not null default '',
+  url text not null default '',
+  sent_at timestamptz,
+  primary key (user_id, id)
+);
+create index if not exists alarms_due on public.alarms (at) where sent_at is null;
+
+alter table public.push_subs enable row level security;
+alter table public.alarms enable row level security;
+drop policy if exists push_subs_own on public.push_subs;
+create policy push_subs_own on public.push_subs for select to authenticated using (user_id = auth.uid());
+drop policy if exists alarms_own on public.alarms;
+create policy alarms_own on public.alarms for select to authenticated using (user_id = auth.uid());
+grant select on public.push_subs to authenticated;   -- 쓰기는 아래 함수로만
+grant select on public.alarms to authenticated;
+revoke truncate, references, trigger on public.push_subs, public.alarms from anon, authenticated;
+
+drop trigger if exists push_subs_touch on public.push_subs;
+drop function if exists public.push_subs_touch();
+
+-- 이 기기를 등록(또는 서명을 새로 채움). 같은 기기에서 다른 멤버가 로그인하면 그 멤버 것으로 넘어감
+create or replace function public.push_register(p_endpoint text, p_pub text, p_tokens jsonb, p_ua text default '') returns boolean
+language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid();
+begin
+  if uid is null or not public.is_active() then raise exception 'not allowed'; end if;
+  if jsonb_typeof(p_tokens) <> 'array' or jsonb_array_length(p_tokens) > 40 then raise exception 'bad tokens'; end if;
+  if (select count(*) from public.push_subs where user_id = uid and endpoint <> p_endpoint) >= 12 then   -- 한 사람 기기는 12대까지: 가장 오래된 것부터 지움
+    delete from public.push_subs where endpoint in (select endpoint from public.push_subs where user_id = uid and endpoint <> p_endpoint order by updated_at limit 1);
+  end if;
+  insert into public.push_subs (endpoint, user_id, pub, tokens, ua) values (p_endpoint, uid, p_pub, p_tokens, left(coalesce(p_ua, ''), 180))
+  on conflict (endpoint) do update set user_id = uid, pub = excluded.pub, tokens = excluded.tokens, ua = excluded.ua, updated_at = now();
+  return true;
+end $$;
+revoke all on function public.push_register(text, text, jsonb, text) from public, anon;
+grant execute on function public.push_register(text, text, jsonb, text) to authenticated;
+
+create or replace function public.push_unregister(p_endpoint text) returns boolean
+language sql security definer set search_path = public as $$
+  with d as (delete from public.push_subs where endpoint = p_endpoint and user_id = auth.uid() returning 1) select exists (select 1 from d)
+$$;
+revoke all on function public.push_unregister(text) from public, anon;
+grant execute on function public.push_unregister(text) to authenticated;
+
+-- 앱이 올리는 알림 목록: 아직 안 보낸 것은 통째로 바꿔 끼움. 이미 보낸 것은 시간이 뒤로 옮겨졌을 때만 다시 울림
+create or replace function public.set_alarms(p jsonb) returns integer
+language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); n integer;
+begin
+  if uid is null or not public.is_active() then raise exception 'not allowed'; end if;
+  if jsonb_typeof(p) <> 'array' then raise exception 'bad list'; end if;
+  delete from public.alarms where user_id = uid and (sent_at is null or until < now() - interval '1 day');
+  insert into public.alarms (user_id, id, at, until, title, body, url)
+  select uid, left(x->>'id', 200), (x->>'at')::timestamptz, (x->>'until')::timestamptz,
+         left(coalesce(x->>'title', ''), 120), left(coalesce(x->>'body', ''), 300), left(coalesce(x->>'url', ''), 200)
+  from (select x from jsonb_array_elements(p) x limit 300) q
+  where coalesce(x->>'id', '') <> '' and (x->>'until')::timestamptz > now() and (x->>'at')::timestamptz < now() + interval '9 days'
+  on conflict (user_id, id) do update
+    set title = excluded.title, body = excluded.body, url = excluded.url, until = excluded.until,
+        sent_at = case when excluded.at > alarms.at + interval '1 minute' and excluded.at > now() then null else alarms.sent_at end,
+        at = case when excluded.at > alarms.at + interval '1 minute' and excluded.at > now() then excluded.at else alarms.at end;
+  get diagnostics n = row_count;
+  return n;
+end $$;
+revoke all on function public.set_alarms(jsonb) from public, anon;
+grant execute on function public.set_alarms(jsonb) to authenticated;
+
+-- 닫힌 앱 알림 시험: p_delay초 뒤에 울릴 알림 하나를 넣음 (다음 1분 주기에 나감)
+create or replace function public.push_test(p_delay integer default 15) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid();
+begin
+  if uid is null or not public.is_active() then raise exception 'not allowed'; end if;
+  delete from public.alarms where user_id = uid and id like 'test|%' and at < now() - interval '2 minutes';
+  if (select count(*) from public.alarms where user_id = uid and id like 'test|%') >= 5 then return false; end if;
+  insert into public.alarms (user_id, id, at, until, title, body, url)
+  values (uid, 'test|' || floor(extract(epoch from clock_timestamp()))::text, now() + make_interval(secs => least(greatest(coalesce(p_delay, 15), 0), 300)),
+          now() + interval '15 minutes', '시험 알림', '앱을 닫아도 이렇게 와요.', '#/settings')
+  on conflict do nothing;
+  return true;
+end $$;
+revoke all on function public.push_test(integer) from public, anon;
+grant execute on function public.push_test(integer) to authenticated;
+
+-- 기기의 서비스 워커가 신호를 받고 알림 글을 가져감. 로그인 없이 부르므로, 그 기기만 아는 푸시 주소가 열쇠
+create or replace function public.push_due(p_endpoint text) returns json
+language sql security definer set search_path = public stable as $$
+  select coalesce(json_agg(json_build_object('id', a.id, 'title', a.title, 'body', a.body, 'url', a.url) order by a.at), '[]'::json)
+  from public.alarms a join public.push_subs s on s.user_id = a.user_id
+  where s.endpoint = p_endpoint and length(p_endpoint) > 60
+    and a.sent_at > now() - interval '10 minutes' and a.until > now() - interval '10 minutes'
+$$;
+revoke all on function public.push_due(text) from public;
+grant execute on function public.push_due(text) to anon, authenticated;
+
+-- 1분마다: 때가 된 알림을 보낸 것으로 찍고, 그 사람의 기기마다 신호 하나씩
+create or replace function public.push_tick() returns integer
+language plpgsql security definer set search_path = public, extensions as $$
+declare users uuid[]; s record; tok text; res extensions.http_response; n integer := 0; ep bigint := extract(epoch from now())::bigint;
+begin
+  with due as (update public.alarms set sent_at = now() where sent_at is null and at <= now() returning user_id, until)
+  select array_agg(distinct user_id) into users from due where until >= now();
+  delete from public.alarms where until < now() - interval '2 days';
+  if users is null then return 0; end if;
+  for s in select * from public.push_subs where user_id = any(users) loop
+    -- 만료가 5분 넘게 남았고 24시간 안쪽인 서명 가운데 가장 이른 것
+    select t->>'t' into tok from jsonb_array_elements(s.tokens) t
+      where (t->>'exp')::bigint > ep + 300 and (t->>'exp')::bigint < ep + 86000 order by (t->>'exp')::bigint limit 1;
+    if tok is null then update public.push_subs set last_status = 0, last_at = now() where endpoint = s.endpoint; continue; end if;   -- 서명이 떨어짐: 앱을 열면 다시 채워짐
+    begin
+      res := extensions.http(('POST', s.endpoint, array[
+        extensions.http_header('Authorization', 'vapid t=' || tok || ', k=' || s.pub),
+        extensions.http_header('TTL', '1800'), extensions.http_header('Urgency', 'high')],
+        'application/octet-stream', '')::extensions.http_request);
+      if res.status in (404, 410) then delete from public.push_subs where endpoint = s.endpoint;   -- 폰이 없앤 주소
+      else update public.push_subs set last_status = res.status, last_at = now() where endpoint = s.endpoint; if res.status between 200 and 299 then n := n + 1; end if;
+      end if;
+    exception when others then
+      update public.push_subs set last_status = -1, last_at = now() where endpoint = s.endpoint;
+    end;
+  end loop;
+  return n;
+end $$;
+revoke all on function public.push_tick() from public, anon, authenticated;
+
+select cron.schedule('hajin-push-tick', '* * * * *', $$select public.push_tick()$$);

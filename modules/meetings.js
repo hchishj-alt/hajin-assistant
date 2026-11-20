@@ -2,7 +2,7 @@ import { h, ic, clear, toast, head, modal, form, todayStr, fmtDate, busy, downlo
 import * as db from '../js/db.js';
 import * as store from '../js/store.js';
 import * as brain from '../js/brain.js';
-import { createRecorder, hasSpeech, waveEl, fmtSec } from '../js/voice.js';
+import { createRecorder, isMobile, toText, waveEl, fmtSec } from '../js/voice.js';
 import { draftCard, summaryView } from '../js/draftcard.js';
 import { go, updateBadge } from '../js/app.js';
 
@@ -45,7 +45,7 @@ async function newMeeting(root) {
   const proj = h('input.in', { placeholder: '프로젝트', list: 'pj' });
   const dl = h('datalist#pp', people.map(p => h('option', { value: p.name })));
   const pj = h('datalist#pj', (await store.projects()).map(p => h('option', { value: p })));
-  const ta = h('textarea.in', { rows: 12, placeholder: hasSpeech() ? '녹음을 시작하면 여기에 받아쓴 내용이 실시간으로 쌓여요. 직접 적어도 돼요.' : '이 브라우저는 실시간 받아쓰기가 안 돼요. 녹음은 되고, 끝난 뒤 확장 두뇌로 받아쓸 수 있어요. 직접 메모해도 돼요.' });
+  const ta = h('textarea.in', { rows: 12, placeholder: '녹음을 시작하면 말한 내용이 여기에 글로 쌓여요. 실시간이 안 되는 기기는 녹음한 뒤 AI가 글로 바꿔요. 직접 적어도 돼요.' });
   const interim = h('div.faint.small', { style: { minHeight: '20px', marginTop: '4px' } });
   const wave = waveEl(40);
   const timer = h('span.mono', '0:00');
@@ -57,7 +57,9 @@ async function newMeeting(root) {
   recBtn.onclick = async () => {
     if (rec?.running) { await stopRec(); return; }
     base = ta.value ? ta.value.trimEnd() + '\n' : '';
-    rec = createRecorder({ onLevel: v => wave.level(v), onInterim: t => (interim.textContent = t), onText: (full) => { ta.value = base + full; ta.scrollTop = ta.scrollHeight; } });
+    /* 폰은 마이크를 한 곳만 쓸 수 있어 실시간 받아쓰기를 먼저 하고, 안 되면 녹음으로 넘어감 */
+    rec = createRecorder({ record: !isMobile(), onLevel: v => wave.level(v), onInterim: t => (interim.textContent = t), onText: (full) => { ta.value = base + full; ta.scrollTop = ta.scrollHeight; },
+      onState: (s, mode) => { if (s === 'recording' && mode === 'rec' && isMobile()) interim.textContent = '녹음하고 있어요. 멈추면 글로 바꿔 드려요.'; else if (s === 'denied') toast('마이크가 막혀 있어요. 폰 설정에서 이 앱의 마이크를 허용해 주세요.'); } });
     try { await rec.start(); } catch (e) { toast(e.message); return; }
     recBtn.className = 'btn rec'; recBtn.innerHTML = ''; recBtn.append(ic('stop', 16), '일시정지');
     markBtn.disabled = false;
@@ -68,6 +70,14 @@ async function newMeeting(root) {
     if (r.blob) blob = blob ? new Blob([blob, r.blob], { type: r.blob.type }) : r.blob;
     recBtn.className = 'btn pri'; recBtn.innerHTML = ''; recBtn.append(ic('mic', 16), '이어서 녹음');
     markBtn.disabled = true; interim.textContent = '';
+    if (r.text && r.mode === 'live' && !ta.value.includes(r.text)) { ta.value = base + r.text; }
+    if (!r.text && r.blob && r.mode === 'rec') {   /* 실시간으로 못 받아쓴 녹음: 여기서 글로 바꿈 */
+      if (r.seconds > 900) { toast('녹음이 길어요. 저장한 뒤 회의 화면에서 "녹음 받아쓰기"를 눌러 주세요.'); return; }
+      interim.textContent = '글로 바꾸는 중이에요…'; recBtn.disabled = true;
+      try { const t = await toText(r.blob, p => (interim.textContent = `글로 바꾸는 중이에요… ${Math.round(p * 100)}%`)); if (t) { ta.value = base + t; ta.scrollTop = ta.scrollHeight; } else toast('알아들은 말이 없어요.'); }
+      catch (e) { toast(e.code === 'no-engine' ? '녹음은 됐어요. 글로 바꾸려면 이 기기에 AI를 연결해 주세요 (설정 › AI 연결).' : '글로 바꾸지 못했어요: ' + e.message); }
+      interim.textContent = ''; recBtn.disabled = false;
+    }
   }
   markBtn.onclick = () => { ta.value = ta.value.trimEnd() + ` ★[${fmtSec(sec)} 중요] `; base = ta.value; };
   let saved = false;
@@ -123,11 +133,9 @@ async function detail(root, id) {
   const saveBtn = h('button.btn.sm', { onclick: async () => { await db.patch(id, { transcript: ta.value }); toast('저장했어요'); } }, '저장');
   const reBtn = h('button.btn.sm', { onclick: async () => { busy(reBtn, true); await db.patch(id, { transcript: ta.value }); await analyze({ ...m, transcript: ta.value }); go('meetings/' + id); } }, ic('refresh', 14), '다시 정리');
   const sttBtn = audio ? h('button.btn.sm', { onclick: async () => {
-    const ext = await import('../js/ext.js');
-    if (!(await ext.isReady('stt'))) { toast('설정 → 확장 두뇌에서 음성인식 모델을 먼저 받아 주세요'); go('settings/ext'); return; }
     busy(sttBtn, true, '받아쓰는 중');
-    try { const r = await ext.transcribe(audio, p => (sttBtn.lastChild.textContent = ` ${Math.round(p * 100)}%`)); ta.value = r.text; await db.patch(id, { transcript: r.text, segments: r.chunks }); toast('받아쓰기 끝'); }
-    catch (e) { toast('받아쓰기 실패: ' + e.message); store.logError(e, 'stt'); }
+    try { const t = await toText(audio, p => (sttBtn.lastChild.textContent = ` ${Math.round(p * 100)}%`)); if (t) { ta.value = t; await db.patch(id, { transcript: t }); toast('받아쓰기 끝'); } else toast('알아들은 말이 없어요.'); }
+    catch (e) { if (e.code === 'no-engine') toast('글로 바꾸려면 이 기기에 AI를 연결해 주세요 (설정 › AI 연결).'); else { toast('받아쓰기 실패: ' + e.message); store.logError(e, 'stt'); } }
     busy(sttBtn, false);
   } }, ic('wave', 14), '녹음 받아쓰기') : null;
 
