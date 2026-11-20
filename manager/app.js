@@ -10,7 +10,7 @@ import * as SG from './strategy.js';
 import * as EX from './explore.js';
 import * as W from './web.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.3.0';
+export const VERSION = '1.3.1';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];

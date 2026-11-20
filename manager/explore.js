@@ -13,7 +13,7 @@ export function daily(st, force = false) { return busy ||= run(st, force).finall
 // 내 분야 검색어: 내 캡션에 자주 쓴 해시태그 + 지난 탐색 키워드 + 분위기 낱말
 export function queries(st, ex) {
   const cnt = {};
-  for (const p of st.posts) for (const t of (p.caption || '').match(/#[^\s#]+/g) || []) { const k = t.slice(1); if (!/^(fyp|foryou|shorts|reels|추천|팔로우|ootd)$/i.test(k)) cnt[k] = (cnt[k] || 0) + 1; }
+  for (const p of st.posts) for (const t of (p.caption || '').match(/#[^\s#]+/g) || []) { const k = t.slice(1).replace(/[^\w가-힣]/g, ''); if (k.length >= 2 && !/^\d+$/.test(k) && /[가-힣]/.test(k) && !/^(fyp|foryou|shorts|reels|추천|팔로우|ootd|대구|서울|부산|일상|데일리)$/i.test(k)) cnt[k] = (cnt[k] || 0) + 1; }
   const mine = Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(x => x[0]);
   const fromEx = (ex?.keywords || []).map(k => k.replace(/^#/, ''));
   const vibe = (st.about.vibe || '').split(/[,·\/]+/).map(x => x.trim()).filter(x => x && x.length < 12);
@@ -25,7 +25,8 @@ export async function gatherRefs(st, ex) {
   const lists = await Promise.all(qs.map(q => W.ytShorts(q).catch(() => [])));
   const seen = new Set(), items = [];
   for (const l of lists) for (const v of l) if (!seen.has(v.id)) { seen.add(v.id); items.push(v); }
-  items.sort((a, b) => (b.views || 0) - (a.views || 0));
+  const ko = v => /[가-힣]/.test(v.title) ? 1 : 0;
+  items.sort((a, b) => ko(b) - ko(a) || (b.views || 0) - (a.views || 0));
   const old = await S.get('refs', null); const keep = old?.items?.filter(x => x.saved) || [];
   const out = { day: kdate(), at: Date.now(), qs, items: [...keep, ...items.filter(x => !keep.some(k => k.id === x.id))].slice(0, 60), notes: old?.day === kdate() ? old.notes : {} };
   await S.set('refs', out); return out;
