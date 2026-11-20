@@ -101,12 +101,14 @@ export default {
         const evs = on(ds), tk = tasks.filter(t => t.due === ds);
         const cell = h('div.d' + (d.getMonth() !== cursor.getMonth() ? '.out' : '') + (ds === todayStr() ? '.today' : ''), { onclick: () => dayModal(ds, on) },
           h('div.row.between', h('span.n', d.getDate()), tk.length ? h('span.tiny.faint', `✓${tk.length}`) : null),
-          evs.slice(0, 3).map(e => h('div.ev' + (e._sc === 'personal' ? '.mine' : ''), { style: { background: evColor(e), '--ec': evColor(e) }, title: SC.LABEL[e._sc] }, (e.start ? e.start + ' ' : '') + e.title)),
+          evs.slice(0, 3).map(e => h('div.ev' + (e._sc === 'personal' ? '.mine' : ''), { style: { background: evColor(e), '--ec': evColor(e) }, title: SC.LABEL[e._sc] }, e.start ? h('span.ev-t', e.start + ' ') : null, e.title)),
           evs.length > 3 ? h('div.tiny.faint', `+${evs.length - 3}`) : null);
         g.append(cell);
       }
-      return h('div.card.pad0', { style: { overflow: 'hidden' } }, g);
+      return h('div', h('div.card.pad0', { style: { overflow: 'hidden' } }, g), legend());
     }
+    /* 달력 아래 범례: 팀 업무는 꽉 찬 색, 개인 일정은 옅은 바탕에 왼쪽 줄 */
+    function legend() { return h('div.cal-legend', h('span.lg', h('i.team'), '팀 업무'), h('span.lg', h('i.mine'), '개인 일정'), h('span.lg', '✓', '할 일 마감')); }
     function week(on) {
       const s = startOfWeek(cursor);
       const H0 = 7, H1 = 24, PX = 44;
@@ -127,7 +129,7 @@ export default {
         if (ds === todayStr()) { const n = new Date(); const y = (n.getHours() + n.getMinutes() / 60 - H0) * PX; if (y > 0) col.append(h('div.nowline', { style: { top: y + 'px' } })); }
         g.append(col);
       }
-      return h('div.card.pad0', { style: { overflow: 'auto', maxHeight: '72vh' } }, g);
+      return h('div', h('div.card.pad0', { style: { overflow: 'auto', maxHeight: '72vh' } }, g), legend());
     }
     function agenda(on, tasks) {
       const wrap = h('div.stack');
@@ -177,8 +179,8 @@ export default {
             box.append(h('div.gcal-url', inp, h('button.btn.sm', { onclick: async () => { try { await navigator.clipboard.writeText(st.url); toast('주소를 복사했어요'); } catch { inp.select(); } } }, ic('copy', 14), '복사')),
               h('div.gcal-go', h('a.btn.pri', { href: G.appleUrl(st.url) }, ic('calendar', 14), '아이폰·아이패드 캘린더에 연결'), h('a.btn', { href: G.subscribeUrl(st.url), target: '_blank', rel: 'noopener' }, ic('calendar', 14), '구글 캘린더에 연결 (안드로이드)')),
               h('label.gcal-row', { style: { marginTop: '10px' } }, h('span.grow.small', '마감 있는 할 일도 함께 보내기'), h('input', { type: 'checkbox', checked: st.tasks !== false, onchange: async e => { await db.kvSet('gcal', { ...st, tasks: e.target.checked }); await G.publish().catch(x => toast(x.message)); paint(); } })),
-              h('div.gcal-wd', h('b', ic('grid', 15), '아이폰·아이패드 홈 화면 전용 위젯'), h('p.small.faint', '오늘·내일 일정과 마감만 크게 보여 주는 하진 비서 위젯이에요. 무료 앱 Scriptable이 대신 그려 줘요. 15분쯤마다 새로 고쳐져요.'),
-                h('ol.gcal-steps', h('li', '앱스토어에서 ', h('b', 'Scriptable'), '을 받아요 (무료).'), h('li', '아래 단추로 위젯 코드를 복사해요.'), h('li', 'Scriptable을 열고 오른쪽 위 ', h('b', '+'), '를 눌러 붙여 넣은 뒤, 이름을 "하진 비서"로 바꾸고 완료를 눌러요.'), h('li', '홈 화면을 길게 눌러 ', h('b', '+ › Scriptable'), ' 위젯을 올리고, 위젯을 길게 눌러 ', h('b', '위젯 편집 › Script'), '에서 "하진 비서"를 골라요.')),
+              h('div.gcal-wd', h('b', ic('grid', 15), '아이폰·아이패드 홈 화면 전용 위젯'), h('p.small.faint', '오늘·내일 일정과 마감만 크게 보여 주는 하진 비서 위젯이에요. 일정 위젯과 오늘 할 일 위젯으로 나눠 올릴 수도 있어요. 무료 앱 Scriptable이 대신 그려 줘요. 15분쯤마다 새로 고쳐져요.'),
+                h('ol.gcal-steps', h('li', '앱스토어에서 ', h('b', 'Scriptable'), '을 받아요 (무료).'), h('li', '아래 단추로 위젯 코드를 복사해요.'), h('li', 'Scriptable을 열고 오른쪽 위 ', h('b', '+'), '를 눌러 붙여 넣은 뒤, 이름을 "하진 비서"로 바꾸고 완료를 눌러요.'), h('li', '홈 화면을 길게 눌러 ', h('b', '+ › Scriptable'), ' 위젯을 올리고, 위젯을 길게 눌러 ', h('b', '위젯 편집 › Script'), '에서 "하진 비서"를 골라요.'), h('li', '일정과 할 일을 따로 보고 싶으면 위젯을 두 개 올리고, 같은 위젯 편집의 ', h('b', 'Parameter'), ' 칸에 하나는 ', h('b', '일정'), ', 하나는 ', h('b', '할 일'), '이라고 적어요. 비워 두면 둘 다 보여요.')),
                 h('button.btn', { type: 'button', onclick: async () => { const W = await import('../js/widget.js'); const code = W.script(st.url, location.origin + location.pathname); try { await navigator.clipboard.writeText(code); toast('위젯 코드를 복사했어요. Scriptable에 붙여 넣어 주세요.'); } catch { download('hajin-widget.js', code, 'text/javascript'); toast('복사가 안 돼서 파일로 내려받았어요.'); } } }, ic('copy', 14), '위젯 코드 복사'),
                 h('p.tiny.faint', '코드 안에 내 일정 주소가 들어 있어요. 다른 사람에게 보내지 마세요. 안드로이드는 구글 캘린더 위젯을 써 주세요.')),
               h('ul.gcal-note', h('li', h('b', '아이폰·아이패드: '), '구독 창에서 "알림 제거"를 꺼야 알람이 울려요. 연결한 뒤 홈 화면을 길게 눌러 캘린더 위젯을 올리면 일정이 보여요.'), h('li', h('b', '안드로이드: '), '구글 캘린더에 연결한 뒤, 그 캘린더의 "일정 알림"을 한 번 정해 두면 모든 일정에 울려요. 홈 화면에 구글 캘린더 위젯을 올리면 일정이 보여요.'), h('li', '폰 캘린더가 새 일정을 가져가는 간격은 애플·구글이 정해요. 아이폰은 보통 한 시간 안, 구글은 몇 시간에서 길면 하루예요. 급한 알림은 이 앱의 알림(설정 › 알림)이 더 빨라요.'), h('li', '주소를 아는 사람은 일정을 볼 수 있어요. 끄면 주소가 사라져요.')));

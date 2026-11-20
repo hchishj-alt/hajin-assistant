@@ -38,6 +38,9 @@ function occurs(e, date) {
   if (e.freq === 'MONTHLY') return a.getDate() === b.getDate();
   return false;
 }
+// 위젯을 둘로 나눠 쓰기: Scriptable 위젯 편집의 Parameter에 "일정"이라고 적으면 일정만, "할 일"이라고 적으면 할 일만. 비우면 둘 다
+function modeOf(p) { p = String(p || '').trim(); return /할\\s*일|todo|task/i.test(p) ? 'todo' : /일정|캘린더|달력|cal/i.test(p) ? 'cal' : 'all'; }
+function pick(days, mode) { if (mode === 'all') return days; return days.map(function (d) { return { date: d.date, label: d.label, rows: d.rows.filter(function (r) { return mode === 'todo' ? !!r.task : !r.task; }) }; }); }
 // 오늘부터 며칠 치를 날짜별로: [{ date, label, rows: [{ time, title, task }] }]
 function agenda(events, now, span) {
   const W = ['일', '월', '화', '수', '목', '금', '토'], out = [], hm = pad(now.getHours()) + ':' + pad(now.getMinutes());
@@ -65,16 +68,17 @@ async function load() {
 }
 const fam = config.widgetFamily || 'medium';
 const data = await load(), now = new Date();
-const days = agenda(parse(data.text), now, 7);
+const MODE = modeOf(typeof args !== 'undefined' && args ? args.widgetParameter : '');
+const days = pick(agenda(parse(data.text), now, 7), MODE);
 const ink = Color.dynamic(new Color('#16161a'), new Color('#f4f4f6')), sub = Color.dynamic(new Color('#6b6b76'), new Color('#a0a0ad')), acc = Color.dynamic(new Color('#5b5bf0'), new Color('#8f8fff')), warn = Color.dynamic(new Color('#d9480f'), new Color('#ff9a62'));
 const w = new ListWidget();
 w.backgroundColor = Color.dynamic(new Color('#ffffff'), new Color('#17171c'));
-w.url = APP + '#/today';
+w.url = APP + (MODE === 'todo' ? '#/tasks' : MODE === 'cal' ? '#/calendar' : '#/today');
 w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
 
 if (fam.indexOf('accessory') === 0) {   /* 잠금 화면 위젯: 다음 일정 하나 */
   let next = null; for (const d of days) { if (d.rows.length) { next = { d: d, r: d.rows[0] }; break; } }
-  const a = w.addText(next ? (next.d.label === '오늘' ? '' : next.d.label + ' ') + next.r.time : '일정 없음'); a.font = Font.boldSystemFont(13);
+  const a = w.addText(next ? (next.d.label === '오늘' ? '' : next.d.label + ' ') + next.r.time : MODE === 'todo' ? '할 일 없음' : '일정 없음'); a.font = Font.boldSystemFont(13);
   if (next) { const b = w.addText(next.r.title); b.font = Font.systemFont(12); b.lineLimit = 2; }
 } else {
   const small = fam === 'small', budget = small ? 4 : fam === 'large' || fam === 'extraLarge' ? 13 : 5;
@@ -83,12 +87,12 @@ if (fam.indexOf('accessory') === 0) {   /* 잠금 화면 위젯: 다음 일정 �
   const head = w.addStack(); head.layoutHorizontally(); head.centerAlignContent();
   const t1 = head.addText((now.getMonth() + 1) + '월 ' + now.getDate() + '일 ' + W[now.getDay()] + '요일'); t1.font = Font.boldSystemFont(small ? 13 : 14); t1.textColor = ink;
   head.addSpacer();
-  const n = days[0].rows.length; const t2 = head.addText(small ? String(n) : '오늘 ' + n + '개'); t2.font = Font.semiboldSystemFont(12); t2.textColor = acc;
+  const n = days[0].rows.length; const t2 = head.addText(small ? String(n) : (MODE === 'todo' ? '할 일 ' : MODE === 'cal' ? '일정 ' : '오늘 ') + n + '개'); t2.font = Font.semiboldSystemFont(12); t2.textColor = acc;
   w.addSpacer(small ? 6 : 8);
   let used = 0, any = false;
   for (const d of days) {
     if (used >= budget) break;
-    if (!d.rows.length) { if (d.label === '오늘') { const e = w.addText('오늘 남은 일정이 없어요'); e.font = Font.systemFont(12); e.textColor = sub; w.addSpacer(4); used++; } continue; }
+    if (!d.rows.length) { if (d.label === '오늘') { const e = w.addText(MODE === 'todo' ? '오늘 마감인 할 일이 없어요' : '오늘 남은 일정이 없어요'); e.font = Font.systemFont(12); e.textColor = sub; w.addSpacer(4); used++; } continue; }
     if (d.label !== '오늘') { if (used + 2 > budget) break; const h = w.addText(d.label); h.font = Font.semiboldSystemFont(11); h.textColor = sub; w.addSpacer(2); used++; }
     for (const r of d.rows) {
       if (used >= budget) break;

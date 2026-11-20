@@ -1107,3 +1107,23 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 .face-sw input[type=color]::-webkit-color-swatch-wrapper{padding:0}
 .face-sw input[type=color]::-webkit-color-swatch{border:0;border-radius:50%}
 .face-sw input[type=color]::-moz-color-swatch{border:0;border-radius:50%}
+/* v1.37.0 캘린더: 주말 색, 팀·개인 범례, 폰 월 달력은 시간을 빼고 제목만 */
+.cal .dh:nth-child(6),.cal .d:nth-child(7n+6):not(.today) .n{color:#3b6fe0}
+.cal .dh:nth-child(7),.cal .d:nth-child(7n):not(.today) .n{color:#e0453b}
+.cal .ev .ev-t{opacity:.85;font-variant-numeric:tabular-nums}
+.cal-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:8px 4px 0;font-size:calc(12px*var(--fs,1));color:var(--ink3)}
+.cal-legend .lg{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.cal-legend i{display:inline-block;width:18px;height:10px;border-radius:3px;flex:none}
+.cal-legend i.team{background:var(--acc)}
+.cal-legend i.mine{background:color-mix(in srgb,var(--acc) 14%,transparent);box-shadow:inset 3px 0 0 var(--acc)}
+@media (max-width:600px){
+  .cal .d{min-height:74px;padding:3px 2px}
+  .cal .ev{font-size:calc(10.5px*var(--fs,1));padding:1px 3px;text-overflow:clip;letter-spacing:-.02em}
+  .cal .ev .ev-t{display:none}
+  .cal .dh{padding:6px 4px;text-align:center}
+  .cal .d .row{justify-content:space-between}
+}
+@media (max-width:600px){
+  .week .blk b{display:none}
+  .week .blk{font-size:calc(10.5px*var(--fs,1));padding:2px 3px;line-height:1.2;word-break:break-all;overflow:hidden;letter-spacing:-.02em}
+}
