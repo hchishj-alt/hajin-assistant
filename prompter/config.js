@@ -24,3 +24,16 @@ export const PORTONE = {
 
 // 문의 메일(하진 요청 11/21: 일단 내 메일로)
 export const CONTACT = 'hchis.hj@gmail.com';
+
+// 사이트 주소(검색·공유 미리보기). 주소가 바뀌면 index.html·robots.txt·sitemap.xml도 같이.
+export const SITE = 'https://prompri-edit.pages.dev/';
+
+// 사업자 정보(전자상거래법 표시 의무). 하진이 알려 주면 채운다. 빈 칸은 화면에 안 나온다.
+export const BIZ = {
+  name: '',        // 상호
+  ceo: '',         // 대표자
+  regNo: '',       // 사업자등록번호 000-00-00000
+  mailOrder: '',   // 통신판매업 신고번호 (간이과세자는 면제 → '면제'라고 적기)
+  address: '',     // 사업장 주소
+  phone: '',       // 고객센터 전화(없으면 비워 둠, 메일로 받음)
+};

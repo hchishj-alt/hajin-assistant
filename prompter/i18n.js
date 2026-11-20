@@ -17,6 +17,37 @@ export function lang() {
 
 // [영어, 일본어, 중국어, 스페인어]
 const D = {
+  // 1.5 요금·자주 묻는 것·약관
+  '서버로 가는 영상': ['Videos sent to a server', 'サーバーに送る動画', '上传到服务器的视频', 'Vídeos enviados a un servidor'],
+  '요금': ['Pricing', '料金', '价格', 'Precios'],
+  '가입 없이 바로': ['No sign-up needed', '登録不要ですぐ', '无需注册', 'Sin registro'],
+  '언제든 해지 · {n}일 안 전액 환불': ['Cancel anytime · Full refund within {0} days', 'いつでも解約 · {0}日以内は全額返金', '随时取消 · {0}天内全额退款', 'Cancela cuando quieras · Reembolso total en {0} días'],
+  '자주 묻는 것': ['FAQ', 'よくある質問', '常见问题', 'Preguntas frecuentes'],
+  '찍은 영상이 서버에 올라가나요?': ['Are my videos uploaded to a server?', '撮った動画はサーバーに上がりますか？', '拍的视频会上传到服务器吗？', '¿Se suben mis vídeos a un servidor?'],
+  '아니요. 대본과 영상은 이 기기 브라우저에만 저장돼요. 카메라 화면도 밖으로 나가지 않아요.': ['No. Scripts and videos are saved only in this device’s browser. The camera feed never leaves it either.', 'いいえ。台本と動画はこの端末のブラウザにだけ保存されます。カメラ映像も外に出ません。', '不会。台词和视频只保存在本设备的浏览器里，摄像头画面也不会外传。', 'No. Guiones y vídeos se guardan solo en el navegador de este dispositivo. La cámara tampoco sale de él.'],
+  '가입해야 하나요?': ['Do I need to sign up?', '登録は必要ですか？', '需要注册吗？', '¿Tengo que registrarme?'],
+  '아니요. 열자마자 바로 써요. 프로를 쓰면 이름·메일 대신 {n}자리 복구 코드가 생겨요.': ['No. Just open it and go. With Pro you get a {0}-character recovery code instead of a name or email.', 'いいえ。開いてすぐ使えます。Proでは名前やメールの代わりに{0}桁の復元コードができます。', '不需要，打开即用。开通 Pro 后会生成 {0} 位恢复码，不需要姓名或邮箱。', 'No. Ábrela y listo. Con Pro recibes un código de recuperación de {0} caracteres en lugar de nombre o correo.'],
+  '아이폰에서도 되나요?': ['Does it work on iPhone?', 'iPhoneでも使えますか？', 'iPhone 能用吗？', '¿Funciona en iPhone?'],
+  '사파리에서 돼요. 홈 화면에 추가해 두면 영상이 더 오래 안전하게 보관돼요.': ['Yes, in Safari. Add it to your Home Screen to keep videos safe for longer.', 'Safariで使えます。ホーム画面に追加すると動画がより長く安全に保存されます。', '可以，用 Safari。添加到主屏幕后视频能更长久安全地保存。', 'Sí, en Safari. Añádela a la pantalla de inicio para guardar los vídeos más tiempo.'],
+  '영상은 어떻게 꺼내요?': ['How do I get my videos out?', '動画はどうやって取り出しますか？', '视频怎么导出？', '¿Cómo saco mis vídeos?'],
+  '찍고 나서 저장을 누르면 폰은 사진첩·파일로, PC는 다운로드 폴더로 저장돼요.': ['Tap Save after shooting: phones save to Photos or Files, PCs to the Downloads folder.', '撮影後に保存を押すと、スマホは写真・ファイルに、PCはダウンロードフォルダに保存されます。', '拍完点保存：手机存到相册或文件，电脑存到下载文件夹。', 'Pulsa Guardar: el móvil guarda en Fotos o Archivos, el PC en Descargas.'],
+  '해지는 어떻게 해요?': ['How do I cancel?', '解約はどうしますか？', '怎么取消订阅？', '¿Cómo cancelo?'],
+  '구독 관리에서 해지하기를 두 번 누르면 끝이에요. 남은 기간은 그대로 쓰고, 결제 후 {n}일 안이면 전액 환불해 드려요.': ['Tap Cancel twice in Subscription. You keep the rest of the period, and within {0} days of payment you get a full refund.', 'サブスク管理で解約を2回押せば完了。残り期間はそのまま使え、決済後{0}日以内なら全額返金します。', '在订阅管理里点两次取消即可。剩余时间照常使用，付款后 {0} 天内可全额退款。', 'Pulsa Cancelar dos veces en Suscripción. Conservas el resto del periodo y en {0} días tras el pago te devolvemos todo.'],
+  '인터넷이 없어도 되나요?': ['Does it work offline?', 'ネットがなくても使えますか？', '没网也能用吗？', '¿Funciona sin internet?'],
+  '한 번 열어 두면 비행기 모드에서도 대본 보고 찍을 수 있어요.': ['Once opened, you can read scripts and shoot even in airplane mode.', '一度開いておけば機内モードでも台本を見て撮影できます。', '打开过一次后，飞行模式下也能看台词拍摄。', 'Tras abrirla una vez, puedes leer y grabar incluso en modo avión.'],
+  '이용약관': ['Terms', '利用規約', '使用条款', 'Términos'],
+  '개인정보처리방침': ['Privacy', 'プライバシーポリシー', '隐私政策', 'Privacidad'],
+  '환불 규정': ['Refunds', '返金規定', '退款规定', 'Reembolsos'],
+  '이 문서는 한국어 원문이 기준이에요.': ['The Korean original of this document is the binding version.', 'この文書は韓国語の原文が基準です。', '本文件以韩文原文为准。', 'La versión original en coreano es la vinculante.'],
+  '뒤로': ['Back', '戻る', '返回', 'Atrás'],
+  '매달 {n}원 자동결제 · {n}일마다 · 언제든 해지 · 결제 후 {n}일 안 전액 환불': ['₩{0} auto-charged monthly · every {1} days · cancel anytime · full refund within {2} days', '毎月{0}ウォン自動決済 · {1}日ごと · いつでも解約 · 決済後{2}日以内は全額返金', '每月自动扣款 ₩{0} · 每 {1} 天 · 随时取消 · 付款后 {2} 天内全额退款', '₩{0} al mes automático · cada {1} días · cancela cuando quieras · reembolso total en {2} días'],
+  '구독하면': ['By subscribing you agree to the', '購読すると', '订阅即表示同意', 'Al suscribirte aceptas los'],
+  '에 동의하는 거예요': ['', 'に同意したことになります', '', ''],
+  '복구 코드 · 폰을 바꾸면 이걸로 구독을 되찾아요': ['Recovery code · use it to get your subscription back on a new phone', '復元コード · 機種変更時にこれでサブスクを取り戻せます', '恢复码 · 换手机时用它找回订阅', 'Código de recuperación · recupera tu suscripción en un móvil nuevo'],
+  '복사해 두기': ['Copy it', 'コピーしておく', '复制保存', 'Cópialo'],
+  '{n}일 프로가 열렸어요': ['{0} days of Pro unlocked', 'Proが{0}日間使えるようになりました', '已开通 {0} 天 Pro', 'Pro desbloqueado por {0} días'],
+  '{n}. {n}. {n}.까지 쓸 수 있어요': ['Available until {0}-{1}-{2}', '{0}年{1}月{2}日まで使えます', '可用至 {0}年{1}月{2}日', 'Disponible hasta el {2}/{1}/{0}'],
+  '{n}. {n}. {n}.까지': ['Until {0}-{1}-{2}', '{0}年{1}月{2}日まで', '至 {0}年{1}月{2}日', 'Hasta el {2}/{1}/{0}'],
   // 브랜드·소개
   '프롬프리에딧': ['PROMPRI EDIT', 'プロンプリエディット', 'PROMPRI EDIT', 'PROMPRI EDIT'],
   '프롬프리에딧 소개': ['About PROMPRI EDIT', 'PROMPRI EDITについて', '关于 PROMPRI EDIT', 'Acerca de PROMPRI EDIT'],
@@ -151,7 +182,6 @@ const D = {
   // 테이크·이어 붙이기
   '찍은 테이크 {n}': ['{0} takes', '撮ったテイク {0}', '已拍镜头 {0}', '{0} tomas'],
   '테이크 {n}': ['Take {0}', 'テイク {0}', '镜头 {0}', 'Toma {0}'],
-  '저장': ['Save', '保存', '保存', 'Guardar'],
   '테이크를 지웠어요': ['Take deleted', 'テイクを削除しました', '镜头已删除', 'Toma eliminada'],
   '이 테이크 쓰기': ['Use this take', 'このテイクを使う', '使用这个镜头', 'Usar esta toma'],
   '이어서 한 번에 저장': ['Save all as one', 'まとめて1本に保存', '合并保存为一个', 'Guardar todo en uno'],
@@ -179,7 +209,6 @@ const D = {
   '다음 씬 ·': ['Next scene ·', '次のシーン ·', '下一个场景 ·', 'Siguiente escena ·'],
   '내려받기를 시작했어요': ['Download started', 'ダウンロードを始めました', '已开始下载', 'Descarga iniciada'],
   '저장 공간이 부족해요. 지금 바로 저장해 주세요': ['Storage is low. Save it now', '空き容量が足りません。今すぐ保存してください', '存储空间不足，请立即保存', 'Poco espacio. Guárdalo ahora'],
-  '저장': ['Save', '保存', '保存', 'Guardar'],
 
   // 촬영 화면
   '‹ 나가기': ['‹ Exit', '‹ 戻る', '‹ 退出', '‹ Salir'],
@@ -217,7 +246,6 @@ const D = {
   '읽는 줄 위치': ['Reading line position', '読む線の位置', '阅读线位置', 'Posición de la línea'],
   '카운트다운': ['Countdown', 'カウントダウン', '倒计时', 'Cuenta atrás'],
   '없음': ['Off', 'なし', '无', 'No'],
-  '{n}초': ['{0} s', '{0}秒', '{0} 秒', '{0} s'],
   '시작 신호음·플래시': ['Start beep & flash', '開始音・フラッシュ', '开始提示音和闪光', 'Pitido y flash al empezar'],
   '글자 좌우 반전': ['Mirror text horizontally', '文字を左右反転', '文字左右镜像', 'Espejo horizontal'],
   '글자 상하 반전': ['Flip text vertically', '文字を上下反転', '文字上下翻转', 'Voltear vertical'],
