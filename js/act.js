@@ -152,12 +152,12 @@ export async function tryAct(text, { people = [] } = {}) {
       if (r.one) return run({ ...act, id: r.one.it.id }); if (r.many) return ask(r.many, act, `${to} 님에게 넘길 일이`); return { text: `“${m[1]}”에 맞는 할 일을 못 찾았어요. ${to} 님 할 일로 새로 만들까요?`, chips: [{ label: '새 할 일로', say: `할 일: ${to} ${m[1]}` }, { label: '아니에요', skip: true }] }; }
   }
   // 담당: "포스터 시안 담당 서연" / "포스터 시안은 서연이가 맡아"
-  if ((m = t.match(/^(.+?)\s*(?:은|는)?\s*담당(?:자)?(?:은|는|을|를)?\s*([가-힣A-Za-z]+?)(?:으로|로)?(?:\s+(?:해\s*줘|해줘|바꿔\s*줘|바꿔줘|지정\S*|변경\S*))?$/)) || (m = t.match(/^(.+?)\s+(\S+?)(?:이가|가|이)\s*(?:맡|담당)\S*$/))) {
+  if ((m = t.match(/^(.+?)\s*(?:은|는)?\s*담당(?:자)?(?:은|는|을|를)?\s*([가-힣A-Za-z]+?)(?:으로|로)?(?:\s+(?:해\s*줘|해줘|바꿔\s*줘|바꿔줘|지정\S*|변경\S*))?$/)) || (m = t.match(/^(.+?)(?:은|는)?\s+(\S+?)(?:이가|가|이)\s*(?:맡|담당|하기로|한대|한다고|할\s*거|할게)\S*(?:\s*(?:했\S*|함|했음))?$/))) {
     const to = who(m[2]); if (to) { const r = await find(m[1], ['task']); const act = { op: 'assign', to }; if (r.one) return run({ ...act, id: r.one.it.id }); if (r.many) return ask(r.many, act, `${to} 님이 맡을 일이`); }
   }
   // 옮기기·미루기·마감 바꾸기: "내일 미팅 4시로 옮겨줘", "포스터 시안 마감 금요일로 미뤄줘"
   if ((m = t.match(/^(.+?)(?:으로|로)\s*(?:옮겨|옮길|옮기|옮김|미뤄|미루|당겨|당기|바꿔|바꾸|바뀜|바뀌|변경|연기|밀렸|밀려|잡혔|확정)\S*(?:\s*(?:줘|주세요|줄래))?$/))) {
-    const parts = m[1].split(/\s+/); const tail = []; while (parts.length > 1 && WHENTOK.test(parts.at(-1))) tail.unshift(parts.pop());
+    const parts = m[1].split(/\s+/); const tail = []; while (parts.length > 1 && WHENTOK.test(parts.at(-1))) tail.unshift(parts.pop()); if (parts.length > 2 && parts.at(-1) === '주' && /^(다음|이번|다다음|지난)$/.test(parts.at(-2))) tail.unshift(parts.splice(-2).join(' '));   /* "… 다음 주 수요일로"의 "다음 주"도 때 */
     const nw = brain.parseWhen(tail.join(' ')); const subj = parts.join(' ').replace(/\s*(마감|일정|시간|날짜)(을|를|은|는)?$/, '');
     if (tail.length && (nw.date || nw.time)) { const sw = brain.parseWhen(subj); const due = /마감/.test(m[1]);
       const r = await find(subj, due ? ['task'] : ['event', 'task'], { date: sw.hits.length ? sw.date : null }); const act = { op: 'move', date: nw.hits.some(x => !/^\d{1,2}시|^\d{1,2}:\d|^오전|^오후|^반$/.test(x)) || !nw.time ? nw.date : null, time: nw.time || '' };

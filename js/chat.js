@@ -122,6 +122,8 @@ export async function reply(text, { name = '' } = {}) {
   if (RX.bored.test(t)) return { text: `${await brief()} 가볍게 끝낼 수 있는 것부터 하나 해 볼까요?`, chips: [{ label: '이번 주 할 일', say: '이번 주 할 일' }] };
   if (RX.ok.test(t)) return { text: pick(['네!', '좋아요.', '알겠어요.']) };
   if (RX.no.test(t)) return { text: pick(['네, 그대로 둘게요.', '알겠어요.']) };
+  // 낱자만 있거나(ㅁㄴㅇㄹ) 글자가 거의 없는 말: 적어 둘지 묻지 않고 다시 말해 달라고 함
+  if (!/[가-힣A-Za-z0-9]{2,}/.test(t.replace(/[ㅋㅎㅠㅜ]+/g, ''))) return { text: '무슨 말인지 잘 모르겠어요. 한 번만 다시 말해 줄래요?', chips: [{ label: '뭐 할 수 있어?', say: '뭐 할 수 있어?' }] };
   // 무슨 말인지 딱 잡히지 않을 때: 만들지 않고 물어봄
   return { text: pick(['들었어요.', '그렇군요.', '네, 알겠어요.']) + ' 적어 둘까요?', chips: [{ label: '일정으로', make: 'event' }, { label: '할 일로', make: 'task' }, { label: '메모로', make: 'note' }, { label: '아이디어로', make: 'idea' }, { label: '그냥 넘기기', skip: true }] };
 }

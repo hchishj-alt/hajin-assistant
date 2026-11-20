@@ -9,6 +9,7 @@ const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
 const md = s => s ? s.slice(5).replace('-', '/') : '';
 const key = s => String(s || '').replace(/\s+/g, '').toLowerCase();
 const won = n => Number(n).toLocaleString() + '원';
+const atK = l => (/^(오늘|내일)$/.test(l) ? l + '은' : /^(어제|그제|모레)$/.test(l) ? l + '는' : l + '에는');   // "오늘에는" 대신 "오늘은"
 const num = v => Number(String(v ?? '').replace(/[^\d.]/g, '')) || 0;
 const sameP = (who, name) => !!who && !!name && String(who).split(/[,\s]+/).some(w => w === name || w === name.slice(1) || name === w.slice(1));
 const taskItem = (t, today) => ({ icon: 'check2', title: (t._pend ? '(확인 전) ' : '') + t.title, sub: [t.due && (t.due < today ? '밀림 · ' : '') + '마감 ' + md(t.due), t.who, t.project].filter(Boolean).join(' · '), route: 'tasks' });
@@ -158,15 +159,15 @@ export async function smart(q, base = new Date(), r = null) {
   if (mineQ && /(할\s*일|할일|뭐\s*남|뭐\s*해|뭐\s*하|해야|마감)/.test(q)) { const myN = await store.myNames(); let ts = [...open, ...pTasks].filter(t => !t.who || myN.some(n => store.sameName(n, t.who))); if (r) ts = ts.filter(t => t.due && t.due <= r[1]); ts.sort((a, b) => (a.due || '9').localeCompare(b.due || '9'));
     return { text: ts.length ? `${r ? r[2] + ' ' : ''}내 할 일은 ${ts.length}개예요.${ts.filter(t => t.due && t.due < today).length ? ` 밀린 게 ${ts.filter(t => t.due && t.due < today).length}개 있어요.` : ''}` : `${r ? r[2] + ' ' : ''}내 할 일은 없어요.`, items: ts.slice(0, 20).map(t => taskItem(t, today)) }; }
   // 끝낸 일: "어제 뭐 했지", "이번 주 끝낸 일"
-  if (r && /(뭐\s*했|뭐했|끝낸|완료한|한\s*일|했던)/.test(q) && r[0] <= today) { const dn = tasks.filter(t => t.done && (t.doneAt || t.updatedAt || '').slice(0, 10) >= r[0] && (t.doneAt || t.updatedAt || '').slice(0, 10) <= r[1]); const evs = []; for (const e of await db.list('events')) for (let d = new Date(r[0] + 'T00:00'); ymd(d) <= r[1] && ymd(d) <= today; d.setDate(d.getDate() + 1)) if (store.occursOn(e, ymd(d))) { evs.push({ ...e, date: ymd(d) }); break; }
+  if (r && /(뭐\s*했|뭐했|끝낸|완료한|한\s*일|했던|어땠|하루\s*(정리|돌아|요약)|돌아보)/.test(q) && r[0] <= today) { const dn = tasks.filter(t => t.done && (t.doneAt || t.updatedAt || '').slice(0, 10) >= r[0] && (t.doneAt || t.updatedAt || '').slice(0, 10) <= r[1]); const evs = []; for (const e of await db.list('events')) for (let d = new Date(r[0] + 'T00:00'); ymd(d) <= r[1] && ymd(d) <= today; d.setDate(d.getDate() + 1)) if (store.occursOn(e, ymd(d))) { evs.push({ ...e, date: ymd(d) }); break; }
     const logs = (await db.list('timelogs')).filter(l => l.date >= r[0] && l.date <= r[1]);
-    return { text: dn.length || evs.length || logs.length ? `${r[2]}에는 끝낸 일 ${dn.length}개, 일정 ${evs.length}개${logs.length ? `, 작업 기록 ${logs.length}개` : ''}가 있어요.` : `${r[2]}에 남은 기록이 없어요.`, items: [...dn.slice(0, 8).map(t => ({ icon: 'check', title: t.title, sub: '끝냄' + (t.who ? ' · ' + t.who : ''), route: 'tasks' })), ...evs.slice(0, 6).map(evItem), ...logs.slice(0, 4).map(l => ({ icon: 'timer', title: l.title, sub: `${l.minutes}분`, route: 'tasks' }))] }; }
+    return { text: dn.length || evs.length || logs.length ? `${atK(r[2])} 끝낸 일 ${dn.length}개, 일정 ${evs.length}개${logs.length ? `, 작업 기록 ${logs.length}개` : ''}가 있어요.` : `${atK(r[2])} 남은 기록이 없어요.`, items: [...dn.slice(0, 8).map(t => ({ icon: 'check', title: t.title, sub: '끝냄' + (t.who ? ' · ' + t.who : ''), route: 'tasks' })), ...evs.slice(0, 6).map(evItem), ...logs.slice(0, 4).map(l => ({ icon: 'timer', title: l.title, sub: `${l.minutes}분`, route: 'tasks' }))] }; }
   // 밀린 일
   if (/(밀린|늦은|지난\s*마감|못\s*끝낸)/.test(q)) { const late = (await store.openTasks()).filter(t => t.due && t.due < today).sort((a, b) => a.due.localeCompare(b.due));
     return { text: late.length ? `밀린 일이 ${late.length}개 있어요. 가장 오래된 건 “${late[0].title}” (마감 ${md(late[0].due)})이에요.` : '밀린 일이 없어요. 잘하고 있어요.', items: late.slice(0, 15).map(t => taskItem(t, today)) }; }
 
   // 뭐부터 해야 하는지
-  if (/(뭐\s*부터|뭐부터|뭘\s*먼저|뭐\s*먼저|우선\s*순위|제일\s*급한|가장\s*급한|급한\s*(거|것|일))/.test(q)) {
+  if (/(뭐\s*부터|뭐부터|뭘\s*먼저|뭐\s*먼저|우선\s*순위|제일\s*급(한|해)|가장\s*급(한|해)|급한\s*(거|것|일)|(뭐가|뭐\s*가|어떤\s*게)\s*(제일\s*|가장\s*)?(급|중요))/.test(q)) {
     const mine = await store.openTasks(); const rank = t => (t.due && t.due < today ? 0 : t.due === today ? 1 : 3) + (t.priority === 'high' ? -0.5 : 0) + (t.due && t.due > today ? Math.min(3, (new Date(t.due) - new Date(today)) / 864e5 / 3) : t.due ? 0 : 4);
     const order = mine.slice().sort((a, b) => rank(a) - rank(b) || (a.due || '9').localeCompare(b.due || '9')).slice(0, 5);
     const nextEv = (await store.eventsOn(today)).find(e => e.start && e.start > `${pad(base.getHours())}:${pad(base.getMinutes())}`);
