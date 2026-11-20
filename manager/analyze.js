@@ -54,6 +54,10 @@ export function analyze(st) {
     // 캡션 길이·해시태그 수
     const capLen = sc.filter(x => x.s.er != null).map(x => ({ len: (x.p.caption || '').replace(/#[^\s#]+/g, '').trim().length, tags: ((x.p.caption || '').match(/#[^\s#]+/g) || []).length, er: x.s.er }));
     const shortC = capLen.filter(x => x.len < 60).map(x => x.er), longC = capLen.filter(x => x.len >= 60).map(x => x.er);
+    // 해시태그별: 2번 넘게 쓴 태그가 붙은 게시물의 도달을 평소와 견줌
+    const tagMap = {};
+    for (const x of sc) { if (x.perf == null) continue; for (const t of new Set(((x.p.caption || '').match(/#[^\s#]+/g) || []).map(t => t.toLowerCase()))) (tagMap[t] ||= []).push(x.perf); }
+    const tagsRank = Object.entries(tagMap).filter(([, v]) => v.length >= 2).map(([t, v]) => ({ t, n: v.length, lift: med(v) })).sort((a, b) => b.lift - a.lift);
     // 올리는 박자
     const now = Date.now();
     const last = all[0] ? (now - new Date(all[0].at)) / 864e5 : null;
@@ -66,7 +70,7 @@ export function analyze(st) {
     out.plats[plat] = {
       n: all.length, measured: ps.length, er: med(ers), save: med(sc.map(x => x.s.save).filter(v => v != null)), share: med(sc.map(x => x.s.share).filter(v => v != null)),
       keep: med(sc.map(x => x.s.keep).filter(v => v != null)), reachX: med(sc.map(x => x.s.reachX).filter(v => v != null)),
-      kinds, hours, dayRank, top: top.slice(0, 3), low: top.slice(-3).reverse(),
+      kinds, hours, dayRank, tagsRank, top: top.slice(0, 3), low: top.slice(-3).reverse(),
       cap: { short: med(shortC), long: med(longC), nShort: shortC.length, nLong: longC.length, tagsAvg: avg(capLen.map(x => x.tags)) },
       last, perWeek: w4,
       growth: { now: lastS?.followers ?? (profile[plat]?.followers || null), d7: lastS && s7 && s7 !== lastS ? lastS.followers - s7.followers : null, d30: lastS && s30 && s30 !== lastS ? lastS.followers - s30.followers : null, series: sn.slice(-60) },
@@ -105,7 +109,7 @@ export function brief(st, A) {
     if (a.last == null) add({ lvl: 'now', icon: 'upload', title: `${name} 게시물 기록이 아직 없어요`, body: '인사이트 화면 캡처를 올리면 AI가 숫자를 읽어 와요. 연결하면 자동이에요.', go: '#/data', btn: '숫자 채우기' });
     else if (a.last > (plat === 'tt' ? 2 : 4)) add({ lvl: 'now', icon: 'clock', title: `${name}에 ${Math.floor(a.last)}일째 안 올렸어요`, body: plat === 'tt' ? '틱톡은 자주 올릴수록 새 영상이 시험받을 기회가 늘어요. 짧은 거라도 오늘 하나 올려요.' : '쉬는 기간이 길면 다음 게시물이 처음 닿는 사람 수가 줄어요. 스토리라도 오늘 하나 올려요.', go: '#/coach', btn: '뭐 올릴지 정하기', num: Math.floor(a.last) + '일' });
     const best = a.hours[0];
-    if (best && best.lift > 1.15) add({ lvl: 'today', icon: 'clock', title: `${name}${josa(name)} ${slotName(best.h)}에 올리면 잘 돼요`, body: `그 시간에 올린 ${best.n}개는 평소보다 ${Math.round((best.lift - 1) * 100)}% 더 많은 사람에게 닿았어요.`, num: '+' + Math.round((best.lift - 1) * 100) + '%' });
+    if (best && best.n >= 3 && best.lift > 1.15) add({ lvl: 'today', icon: 'clock', title: `${name}${josa(name)} ${slotName(best.h)}에 올리면 잘 돼요`, body: `그 시간에 올린 ${best.n}개는 평소보다 ${Math.round((best.lift - 1) * 100)}% 더 많은 사람에게 닿았어요.`, num: '+' + Math.round((best.lift - 1) * 100) + '%' });
     const k = a.kinds[0], k2 = a.kinds[1];
     if (k && k2 && k.er != null && k2.er != null && k.n >= 2 && k2.n >= 2 && k.er > k2.er * 1.25) add({ lvl: 'today', icon: 'layers', title: `${KIND[k.k] || k.k}가 ${KIND[k2.k] || k2.k}보다 잘 먹혀요`, body: `반응률 ${pct(k.er)} 대 ${pct(k2.er)}. 이번 주엔 ${KIND[k.k] || k.k}를 하나 더 넣어요.`, num: pct(k.er) });
     const t = a.top[0];
@@ -115,6 +119,15 @@ export function brief(st, A) {
     }
     if (a.keep != null && a.keep < 0.4) add({ lvl: 'tip', icon: 'play', title: `${name} 영상이 끝까지 안 보여져요`, body: `평균 ${pct(a.keep)}만 보고 넘겨요. 첫 1초에 결론·표정·움직임을 먼저 보여 주고, 길이를 줄여 봐요.`, go: '#/coach', btn: '영상 봐 주기', num: pct(a.keep) });
     if (a.growth.d7 != null) add({ lvl: 'tip', icon: 'trend', title: `${name} 이번 주 팔로워 ${a.growth.d7 >= 0 ? '+' : ''}${a.growth.d7}`, body: a.growth.d7 > 0 ? '좋아요. 새로 온 사람들이 본 게시물이 무엇인지 분석에서 확인해 봐요.' : '줄었어요. 떠난 사람 명단을 확인하고, 최근 올린 것 중 평소와 결이 다른 게 있었는지 봐요.', num: (a.growth.d7 >= 0 ? '+' : '') + a.growth.d7 });
+  }
+  for (const plat of plats) {
+    const a = A.plats[plat]; const gt = about.goal || ''; const only = /인스타|insta/i.test(gt) && !/틱톡|tiktok/i.test(gt) ? 'ig' : /틱톡|tiktok/i.test(gt) && !/인스타|insta/i.test(gt) ? 'tt' : null; const pc = only && only !== plat ? null : pace(gt, a, about.goalAt);
+    if (pc && !pc.done && pc.perDay != null) add({ lvl: pc.onTrack === false ? 'today' : 'tip', icon: 'target', title: pc.onTrack === false ? `${PLAT[plat]} 목표까지 하루 ${Math.ceil(pc.need)}명씩 필요해요` : `${PLAT[plat]} 목표까지 ${fmt(pc.left)}명 남았어요`, body: pc.eta ? `지금 속도(하루 ${pc.perDay.toFixed(1)}명)면 ${pc.eta}일 뒤 ${fmt(pc.g.n)}명이에요.${pc.onTrack === false ? ' 속도를 올리려면 잘된 형식을 주 3번 이상, 같은 시간에 꾸준히.' : ''}` : '요즘 팔로워가 늘지 않아요. 잘된 게시물을 변주해서 다시 올려 봐요.', num: fmt(pc.left) + '명' });
+    // 지금이 잘 되는 시간인데 오늘 안 올렸으면
+    const best = a.hours[0], hr = kHour(Date.now());
+    if (best && best.n >= 3 && best.lift > 1.1 && hr >= best.h - 1 && hr < best.h + 3 && (a.last == null || a.last >= 0.8)) add({ lvl: 'now', icon: 'zap', title: `지금이 ${PLAT[plat]} 올리기 좋은 시간이에요`, body: `${slotName(best.h)}에 올린 게 평소보다 ${Math.round((best.lift - 1) * 100)}% 더 닿았어요. 준비된 게 있으면 지금 올려요.`, go: '#/coach/caption', btn: '캡션 받기' });
+    const tg = a.tagsRank;
+    if (tg.length >= 3 && tg[0].lift > 1.3) add({ lvl: 'tip', icon: 'hash', title: `${tg[0].t} 붙인 게 잘 닿아요`, body: `${tg[0].n}번 썼고 평소의 ${tg[0].lift.toFixed(1)}배. ${tg[tg.length - 1].lift < 0.8 ? tg[tg.length - 1].t + '는 빼도 돼요.' : ''}`, num: tg[0].lift.toFixed(1) + '배' });
   }
   // 사람 정리
   for (const plat of ['ig', 'tt']) {
@@ -137,6 +150,24 @@ export function brief(st, A) {
   if (!about.goal) add({ lvl: 'tip', icon: 'target', title: '목표를 정해 두면 더 똑똑해져요', body: '예: "3개월 안에 팔로워 1만, 패션·일상". 캡션·피드백이 목표 쪽으로 맞춰져요.', go: '#/settings', btn: '목표 정하기' });
   const order = { now: 0, today: 1, tip: 2 };
   return cards.sort((a, b) => order[a.lvl] - order[b.lvl]);
+}
+// 목표 글에서 팔로워 숫자·기간 읽기: "3개월 안에 팔로워 1만" → {n:10000, days:90}
+export function goalOf(text = '') {
+  const m = String(text).match(/(\d+(?:\.\d+)?)\s*(만|천|k|K)?\s*(명)?/g); if (!m) return null;
+  let n = null;
+  for (const x of m) { const y = x.match(/(\d+(?:\.\d+)?)\s*(만|천|k|K)?/); const v = +y[1] * (y[2] === '만' ? 10000 : /천|k/i.test(y[2] || '') ? 1000 : 1); if (v >= 100) { n = v; } }
+  if (!n) return null;
+  const per = String(text).match(/(\d+)\s*(개월|달|주|일)/); const days = per ? +per[1] * (/(개월|달)/.test(per[2]) ? 30 : per[2] === '주' ? 7 : 1) : null;
+  return { n, days };
+}
+export function pace(goalText, a, setAt) {
+  const g = goalOf(goalText); if (!g || !a.growth.now) return null;
+  const perDay = a.growth.d30 != null ? a.growth.d30 / 30 : a.growth.d7 != null ? a.growth.d7 / 7 : null;
+  const left = g.n - a.growth.now; if (left <= 0) return { g, done: true };
+  const eta = perDay > 0 ? Math.ceil(left / perDay) : null;
+  const daysLeft = g.days && setAt ? Math.max(1, g.days - Math.floor((Date.now() - setAt) / 864e5)) : g.days;
+  const need = daysLeft ? left / daysLeft : null;
+  return { g, left, perDay, eta, need, daysLeft, onTrack: need != null && perDay != null ? perDay >= need : null };
 }
 // 협찬 단가 대략 (국내 마이크로 인플루언서 흔한 범위로 잡은 어림값, 실제는 협의)
 export function rateGuess(followers, er) {

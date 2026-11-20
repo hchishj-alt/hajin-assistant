@@ -6,16 +6,18 @@ import * as IG from './ig.js';
 import { readFiles } from './importers.js';
 import { inspect, imgB64 } from './video.js';
 import { seed } from './demo.js';
+import * as SG from './strategy.js';
+import * as EX from './explore.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.0.0';
+export const VERSION = '1.2.0';
 
 const view = document.getElementById('view');
-const TABS = [['today', '오늘', 'home'], ['stats', '분석', 'chart'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users'], ['deals', '협찬', 'briefcase']];
+const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users'], ['deals', '협찬', 'briefcase']];
 const $plat = { get: () => localStorage.getItem('mgr:plat') || 'ig', set: v => localStorage.setItem('mgr:plat', v) };
 
 async function state() {
-  const D = { profile: {}, posts: [], snaps: [], people: {}, handled: {}, deals: [], drafts: [], about: {}, ads: [] };
-  const v = Object.fromEntries(await Promise.all(Object.entries(D).map(async ([k, d]) => [k, (await S.get(k, d)) || d])));
+  const D = { profile: {}, posts: [], snaps: [], people: {}, handled: {}, deals: [], drafts: [], about: {}, ads: [], strategy: null, explore: null, routine: {} };
+  const v = Object.fromEntries(await Promise.all(Object.entries(D).map(async ([k, d]) => [k, (await S.get(k, d)) ?? d])));
   v.about = { ig: v.profile.ig?.username, tt: v.profile.tt?.username, ...v.about };
   return v;
 }
@@ -26,6 +28,7 @@ let cleanup = null;
 async function route() {
   const [name, ...rest] = (location.hash.replace(/^#\/?/, '') || 'today').split('/');
   if (cleanup) { try { cleanup(); } catch { } cleanup = null; }
+  document.getElementById('sheet-root').replaceChildren();
   document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.t === name));
   view.classList.remove('in'); void view.offsetWidth;
   const st = await state(); const An = A.analyze(st);
@@ -64,6 +67,12 @@ SCREENS.today = async (root, st, An) => {
     tiles.append(h('button.tile.big', { onclick: () => { $plat.set(p); go('#/stats'); } }, h('div.tl', ic(p, 15), (pr?.username ? '@' + pr.username : A.PLAT[p])), h('div.tv', A.fmt(a.growth.now ?? pr?.followers)), h('div.ts', h('span' + (d7 > 0 ? '.up' : d7 < 0 ? '.down' : ''), d7 == null ? '팔로워' : `7일 ${d7 >= 0 ? '+' : ''}${d7}`), ' · 반응률 ' + A.pct(a.er))));
   }
   if (tiles.children.length) root.append(tiles);
+  // 오늘 미션 (매니저가 짠 계획에서)
+  const items = st.strategy?.cur?.items || []; const td = SG.kdate(), tm = SG.addDays(td, 1);
+  const mission = items.filter(i => (i.date === td || (i.date === tm && i.status === '예정')) && i.status !== '건너뜀').slice(0, 3);
+  if (mission.length) root.append(h('h2.sec', '오늘 미션 ', h('small', st.strategy.cur.focus ? '' : '')), ...mission.map(missionCard));
+  else if (!st.strategy) root.append(h('div.card.center', h('span.spin'), ' 매니저가 이번 주 전략을 짜는 중이에요…'));
+  root.append(routineCard(st, mission));
   // 할 일 카드
   const LV = { now: ['지금', 'now'], today: ['오늘', 'today'], tip: ['참고', 'tip'] };
   const list = h('div.cards');
@@ -72,7 +81,7 @@ SCREENS.today = async (root, st, An) => {
     h('div.bcm', h('div.bct', h('span.lv.' + LV[c.lvl][1], LV[c.lvl][0]), c.title), h('p', c.body), c.go ? h('button.link', { onclick: () => go(c.go) }, c.btn || '열기', ic('right', 14)) : null),
     c.num ? h('div.bcn', c.num) : null)));
   if (!cards.length) list.append(empty('check', '오늘은 급한 게 없어요', '올릴 거 하나 정해 볼까요?', h('button.btn', { onclick: () => go('#/coach') }, '코치 열기')));
-  root.append(h('h2.sec', '오늘 챙길 것 ', h('small', cards.length + '')), list);
+  root.append(h('h2.sec', '매니저가 본 것 ', h('small', cards.length + '')), list);
   // 매니저에게 묻기
   const q = h('input.ask', { placeholder: '매니저에게 물어보기 (예: 이번 주 뭐 올려?)', enterkeyhint: 'send' });
   const send = () => { const t = q.value.trim(); if (!t) return; q.value = ''; openChat(st, An, t); };
@@ -101,12 +110,78 @@ async function openChat(st, An, first) {
 }
 function ruleAnswer(st, An) { const c = A.brief(st, An).slice(0, 3); return c.length ? '지금 가장 중요한 건 ' + c.map((x, i) => `${i + 1}. ${x.title}`).join(' ') : '숫자가 아직 부족해요. 숫자 채우기에서 캡처를 올려 주세요.'; }
 
+const ST = { 예정: ['예정', ''], 찍음: ['찍음', 'today'], 올림: ['올림', 'done'], 건너뜀: ['건너뜀', 'skip'] };
+function missionCard(it) {
+  const verdict = it.verdict ? h('span.lv.' + (it.verdict === '잘됨' ? 'now' : 'tip'), it.verdict) : null;
+  return h('div.card.mission.' + (ST[it.status]?.[1] || ''),
+    h('div.row.sb', h('div.row.gap0', ic(it.plat, 16), h('b', SG.dayLabel(it.date) + ' ' + (it.time || '')), h('span.pk', A.KIND[it.kind] || it.kind), it.pillar ? h('span.chip', it.pillar) : null), h('span.lv.' + (ST[it.status]?.[1] || ''), it.status), verdict),
+    h('div.mi', it.idea), it.hook ? h('p.muted', '첫 1초: ' + it.hook) : null,
+    it.caption ? h('details.capd', h('summary', '캡션 써 뒀어요'), h('pre', it.caption), h('button.ghost.sm', { onclick: () => copy(it.caption) }, ic('copy', 14), '복사')) : null,
+    it.status === '예정' || it.status === '찍음' ? h('div.row.gap', h('button.ghost.sm', { onclick: () => go('#/coach/video') }, ic('film', 14), '영상 봐 주기'), it.status === '예정' ? h('button.ghost.sm', { onclick: async () => { await SG.setItem(it.id, { status: '찍음' }); route(); } }, '찍었어요') : null, h('button.btn.sm', { onclick: async () => { await SG.setItem(it.id, { status: '올림' }); await S.update('routine', {}, r => { (r[SG.kdate()] ||= {}).post = true; return r; }); toast('좋아요! 30분 안에 댓글 답장 가요'); route(); } }, '올렸어요'), h('button.link', { onclick: async () => { await SG.setItem(it.id, { status: '건너뜀' }); route(); } }, '건너뛰기')) : null);
+}
+const ROUTINE = [['post', '오늘 미션 올리기', 'upload'], ['story', '스토리 1개 (근황·투표·질문)', 'camera'], ['reply', '올리고 30분 안에 댓글 전부 답장', 'msg'], ['mingle', '같은 분야 계정 5곳에 진심 댓글 한 문장', 'heart'], ['people', '맞팔 정리 (사람 탭)', 'users']];
+function routineCard(st, mission) {
+  const day = SG.kdate(); const r = st.routine[day] || {};
+  const posting = mission.some(m => m.date === day);
+  const list = ROUTINE.filter(([k]) => k !== 'post' && k !== 'reply' || posting);
+  const done = list.filter(([k]) => r[k]).length;
+  let streak = 0; for (let i = 1; i < 60; i++) { const d = SG.addDays(day, -i); const x = st.routine[d]; if (x && Object.values(x).filter(Boolean).length >= 3) streak++; else break; }
+  const box = h('div.card.routine', h('div.row.sb', h('b', '오늘 루틴 ', h('span.muted', `${done}/${list.length}`)), streak ? h('span.chip', `${streak}일 연속`) : null), h('div.meter', h('i', { style: { width: (done / list.length * 100) + '%' } })),
+    list.map(([k, label, icn]) => h('button.rt' + (r[k] ? '.on' : ''), { onclick: async () => { await S.update('routine', {}, rr => { const d = (rr[day] ||= {}); d[k] = !d[k]; return rr; }); if (k === 'people') go('#/people'); else route(); } }, h('span.cb', r[k] ? ic('check', 14) : null), ic(icn, 16), h('span', label))),
+    h('p.fhint', '뜨는 계정들이 매일 하는 것들이에요. 3개 이상 하면 연속 기록이 이어져요.'));
+  return box;
+}
+
+// ── 전략 (매니저가 굴리고, 하진은 팀원으로 의견) ──
+SCREENS.plan = async (root, st, An) => {
+  const sg = st.strategy, ex = st.explore;
+  root.append(head('전략', '매니저가 짜고, 결과 보고 계속 고쳐요', [demoBadge(), h('button.iconbtn', { 'aria-label': '분석', onclick: () => go('#/stats'), html: icon('chart', 20) })]));
+  if (!sg?.cur) { root.append(h('div.card.center', h('span.spin'), ' 이번 주 전략을 짜는 중…')); SG.tick().then(route); return; }
+  const c = sg.cur; const done = c.items.filter(i => i.status === '올림').length;
+  root.append(h('div.card.focus', h('div.row.sb', h('small.muted', `${SG.dayLabel(c.week)} 시작 주 · ${c.by === 'ai' ? '매니저 AI' : '숫자 규칙'}가 짬`), h('span.chip', `${done}/${c.items.length} 올림`)), h('p.big2', c.focus || '이번 주 전략'), c.experiment ? h('p.muted', '이번 주 실험: ', h('b', c.experiment.hypo), ' → ', c.experiment.metric, '로 확인') : null));
+  // 주간 계획
+  const byDay = {}; c.items.forEach(i => (byDay[i.date] ||= []).push(i));
+  const wk = h('div.week');
+  for (let k = 0; k < 7; k++) {
+    const d = SG.addDays(c.week, k); const its = byDay[d] || []; if (!its.length && d < SG.kdate()) continue;
+    wk.append(h('div.wd' + (d === SG.kdate() ? '.today' : ''), h('div.wl', SG.dayLabel(d)), its.length ? h('div.wis', its.map(it => h('button.wi2.' + (ST[it.status]?.[1] || 'plan'), { onclick: () => itemSheet(it) }, ic(it.plat, 14), h('span', it.idea), it.verdict ? h('em', it.verdict) : h('em', it.time || '')))) : h('span.muted.small', d < SG.kdate() ? '' : '쉬는 날 · 스토리만')));
+  }
+  root.append(h('h2.sec', '이번 주 계획'), wk);
+  // 회의 (팀원 의견)
+  const notes = (sg.notes || []).slice(-6);
+  const inp = h('input.ask', { placeholder: '의견 내기 (예: 금요일엔 졸전이라 못 찍어, 패션 말고 작업 위주로)', enterkeyhint: 'send' });
+  const thread = h('div.chat.mini', notes.map(n => h('div.msg' + (n.by === 'me' ? '.me' : ''), n.text)));
+  const send = async () => { const t = inp.value.trim(); if (!t) return; inp.value = ''; thread.append(h('div.msg.me', t), h('div.msg.wait', '매니저가 계획을 다시 보는 중…')); thread.scrollTop = 1e9; await SG.discuss(t); route(); };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) send(); });
+  root.append(h('h2.sec', '매니저와 회의'), h('div.card', notes.length ? thread : h('p.muted', '계획이 마음에 안 들거나 일정이 있으면 말해 주세요. 매니저가 남은 계획을 바로 고쳐요.'), h('div.askbar.in', inp, h('button.iconbtn.acc', { 'aria-label': '보내기', onclick: send, html: icon('send', 18) }))));
+  // 탐색 결과
+  root.append(h('h2.sec', '매니저가 찾아본 것 ', h('small', ex?.day ? SG.dayLabel(ex.day) : '')));
+  if (ex?.trends) {
+    root.append(h('div.card', ex.niche ? h('p', h('b', '내 분야 '), ex.niche) : null, h('div.trends', (ex.trends || []).map(t => h('div.tr', h('div.row.sb', h('b', t.title), h('span.heat', '●'.repeat(Math.max(1, Math.min(5, t.heat || 3))))), h('p.muted', t.what), h('p', ic('right', 13), ' ', t.forMe))))));
+    if ((ex.series || []).length) root.append(h('div.card', h('b', '시리즈 후보'), (ex.series || []).map(x => h('div.tr', h('b', x.name), h('p.muted', x.format + ' · ' + x.why)))));
+    if ((ex.algo || []).length) root.append(h('div.card', h('b', '알고리즘 소식'), (ex.algo || []).map(x => h('div.tr', h('p', x.news), h('p.muted', '→ ' + x.so)))));
+    if ((ex.keywords || []).length) root.append(h('div.card', h('b', '검색 낱말·태그'), h('div.row.wrap.gap', ex.keywords.map(k => h('button.chip', { onclick: () => copy(k) }, k)))));
+    if ((ex.src || []).length) root.append(h('details.card.why', h('summary', ic('link', 14), ` 출처 ${ex.src.length}곳`), ex.src.map(x => h('a.link.block', { href: x.url, target: '_blank', rel: 'noopener' }, x.title || x.url))));
+  } else root.append(h('div.card.note', ic('search', 18), h('p', (await AI.hasKey()) ? '오늘 탐색을 아직 안 했어요. ' : 'AI를 연결하면 매일 구글 검색으로 내 분야 트렌드를 찾아서 계획에 넣어요. ', (await AI.hasKey()) ? h('button.link', { onclick: async e => { const b = e.currentTarget; busy(b, true, '찾는 중'); try { await EX.daily(st, true); route(); } catch (er) { toast('탐색 실패: ' + er.message, 4000); busy(b, false); } } }, '지금 탐색') : h('button.link', { onclick: () => go('#/settings') }, 'AI 연결'))));
+  root.append(h('h2.sec', '뜨는 계정들이 하는 것'), h('div.card.list', ((ex?.playbook || []).length ? ex.playbook : EX.BASE_PLAYBOOK).map(p => h('div.prow.static', h('span.pk', ic('check', 13)), h('span.pc', p.rule), h('span.pw', p.how)))));
+  // 일지
+  const lg = (sg.log || []).slice(-10).reverse();
+  root.append(h('h2.sec', '매니저 일지'), h('div.card.list', lg.map(l => h('div.prow.static', h('span.pk', new Date(l.at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })), h('span.pc.wrap2', l.text)))));
+  root.append(h('div.row.gap.center', h('button.ghost', { onclick: async e => { const b = e.currentTarget; busy(b, true, '짜는 중'); await SG.replan(); route(); } }, ic('refresh', 15), '처음부터 다시 짜기'), (await AI.hasKey()) ? h('button.ghost', { onclick: async e => { const b = e.currentTarget; busy(b, true, '찾는 중'); try { await EX.daily(st, true); await SG.replan(); route(); } catch (er) { toast('탐색 실패: ' + er.message, 4000); busy(b, false); } } }, ic('search', 15), '새로 탐색하고 다시 짜기') : null));
+};
+function itemSheet(it) {
+  const close = sheet(SG.dayLabel(it.date) + ' ' + (it.time || ''), h('div.form', h('div.row.gap0', ic(it.plat, 16), h('span.pk', A.KIND[it.kind] || it.kind), it.pillar ? h('span.chip', it.pillar) : null, h('span.lv', it.status)), h('h3', it.idea), it.hook ? h('p', h('b', '첫 1초 '), it.hook) : null, it.why ? h('p.muted', '왜: ' + it.why) : null,
+    it.caption ? h('div', h('pre', it.caption), h('button.ghost.sm', { onclick: () => copy(it.caption) }, ic('copy', 14), '캡션 복사')) : h('p.fhint', '올리기 전날 매니저가 캡션을 미리 써 둬요.'),
+    it.verdict ? h('p', h('b', '결과 '), `${it.verdict} (평소의 ${(it.lift || 1).toFixed(1)}배)`) : null,
+    h('div.row.gap.wrap', ['찍음', '올림', '건너뜀', '예정'].filter(x => x !== it.status).map(x => h('button.ghost.sm', { onclick: async () => { await SG.setItem(it.id, { status: x }); close(); route(); } }, x === '예정' ? '되돌리기' : x === '찍음' ? '찍었어요' : x === '올림' ? '올렸어요' : '건너뛰기')), h('button.btn.sm', { onclick: () => { close(); go('#/coach/video'); } }, ic('film', 14), '영상 봐 주기'))));
+}
+
 // ── 분석 ──
 SCREENS.stats = async (root, st, An) => {
   const plat = $plat.get(); const a = An.plats[plat];
   root.append(head('분석', '알고리즘이 보는 숫자로 내 계정 읽기', [demoBadge(), h('button.iconbtn', { 'aria-label': '숫자 채우기', onclick: () => go('#/data'), html: icon('plus', 20) })]), platSeg(plat, v => { $plat.set(v); route(); }));
   if (!a.n) { root.append(empty('chart', `${A.PLAT[plat]} 기록이 없어요`, '캡처를 올리거나 연결하면 여기서 분석해요.', h('button.btn', { onclick: () => go('#/data') }, '숫자 채우기'))); return; }
-  root.append(h('div.card', h('div.row.sb', h('b', '팔로워'), h('span.big', A.fmt(a.growth.now))), spark(a.growth.series.map(s => s.followers)), h('div.row.gap', h('span.chip', '7일 ' + (a.growth.d7 == null ? '–' : (a.growth.d7 >= 0 ? '+' : '') + a.growth.d7)), h('span.chip', '30일 ' + (a.growth.d30 == null ? '–' : (a.growth.d30 >= 0 ? '+' : '') + a.growth.d30)), h('span.chip', `주 ${a.perWeek.toFixed(1)}개 업로드`))));
+  root.append(h('div.card', h('div.row.sb', h('b', '팔로워'), h('span.big', A.fmt(a.growth.now))), spark(a.growth.series.map(s => s.followers)), h('div.row.gap', h('span.chip', '7일 ' + (a.growth.d7 == null ? '–' : (a.growth.d7 >= 0 ? '+' : '') + a.growth.d7)), h('span.chip', '30일 ' + (a.growth.d30 == null ? '–' : (a.growth.d30 >= 0 ? '+' : '') + a.growth.d30)), h('span.chip', `주 ${a.perWeek.toFixed(1)}개 업로드`)), (() => { const pc = A.pace(st.about.goal, a, st.about.goalAt); if (!pc) return null; if (pc.done) return h('p.ok', '목표 ' + A.fmt(pc.g.n) + '명 달성!'); return h('div.goal', h('div.row.sb', h('small', `목표 ${A.fmt(pc.g.n)}명`), h('small.muted', pc.eta ? `지금 속도면 ${pc.eta}일 뒤` : '지금 속도로는 어려워요')), h('div.meter', h('i', { style: { width: Math.min(100, a.growth.now / pc.g.n * 100) + '%' } }))); })()));
   const sig = plat === 'ig'
     ? [['send', '보내기율', A.pct(a.share), '가장 큰 신호'], ['play', '완주율', A.pct(a.keep), '평균 시청/길이'], ['bookmark', '저장률', A.pct(a.save), '다시 볼 가치'], ['heart', '반응률', A.pct(a.er), '도달 대비'], ['globe', '도달 배수', a.reachX == null ? '–' : a.reachX.toFixed(1) + '배', '1배 넘으면 추천 탐색']]
     : [['play', '완주율', A.pct(a.keep), '가장 큰 신호'], ['send', '공유율', A.pct(a.share), ''], ['heart', '반응률', A.pct(a.er), '조회 대비'], ['bookmark', '저장률', A.pct(a.save), ''], ['msg', '숫자 있는 영상', a.measured + '개', '']];
@@ -117,6 +192,7 @@ SCREENS.stats = async (root, st, An) => {
   root.append(h('h2.sec', '잘 되는 시간'), h('div.card', bars(a.hours, r => A.slotName(r.h)), h('div.hr'), bars(a.dayRank, r => A.dayName(r.d))));
   // 형식
   if (a.kinds.length) root.append(h('h2.sec', '형식별'), h('div.card', h('div.bars', a.kinds.map(k => h('div.bar', h('span.bl', (A.KIND[k.k] || k.k) + ' ' + k.n), h('span.bt', h('i', { style: { width: Math.min(100, k.er / (a.kinds[0].er || 1) * 100) + '%' } })), h('span.bv', A.pct(k.er)))))));
+  if (a.tagsRank.length) root.append(h('h2.sec', '해시태그'), h('div.card', h('div.bars', a.tagsRank.slice(0, 6).map(t => h('div.bar', h('span.bl', t.t), h('span.bt', h('i', { style: { width: Math.min(100, t.lift * 50) + '%' } })), h('span.bv', t.lift.toFixed(1) + '배')))), h('p.fhint', '그 태그를 붙인 게시물이 평소보다 몇 배 닿았는지예요. 2번 넘게 쓴 것만.')));
   // 캡션
   if (a.cap.nShort && a.cap.nLong) root.append(h('div.card.note', ic('type', 18), h('p', `짧은 캡션(60자 미만) 반응률 ${A.pct(a.cap.short)}, 긴 캡션 ${A.pct(a.cap.long)}. ${a.cap.short > a.cap.long * 1.15 ? '짧게 쓸 때 더 잘 돼요.' : a.cap.long > a.cap.short * 1.15 ? '이야기가 있는 긴 캡션이 더 잘 돼요.' : '길이 차이는 크지 않아요.'} 해시태그는 평균 ${a.cap.tagsAvg.toFixed(1)}개${a.cap.tagsAvg > 8 ? ' — 너무 많아요, 3~5개로.' : '.'}`)));
   // 잘된 것 / 아쉬운 것
@@ -405,13 +481,26 @@ function dealForm(d) {
   f.status = h('select', [...STAGES, '거절'].map(s => h('option', { selected: (d.status || '문의') === s }, s)));
   f.memo = h('textarea', { rows: 2, value: d.memo || '' });
   const close = sheet(d.id ? d.brand : '새 협찬', h('div.form', inp('brand', '브랜드'), h('div.two', inp('kind', '종류', 'text', '제품 협찬 / 유료 광고'), inp('fee', '받는 돈(원)', 'number')), inp('deliverables', '올릴 것', 'text', '릴스 1 + 스토리 1'), h('div.two', inp('due', '마감', 'date'), field('단계', f.status)), field('메모', f.memo),
-    h('div.row.gap', d.id ? h('button.ghost', { onclick: async () => { await S.update('deals', [], l => l.filter(x => x.id !== d.id)); close(); route(); } }, ic('trash', 16)) : null,
+    d.id ? h('button.ghost.wide', { onclick: () => dealReply(d) }, ic('msg', 16), '브랜드에 보낼 답장 초안') : null,
+    h('div.row.gap', d.id ? h('button.ghost', { 'aria-label': '지우기', onclick: async () => { await S.update('deals', [], l => l.filter(x => x.id !== d.id)); close(); route(); } }, ic('trash', 16)) : null,
       d.status === '업로드' ? h('button.ghost', { onclick: async () => { await S.update('deals', [], l => l.map(x => x.id === d.id ? { ...x, paid: true, status: '정산' } : x)); close(); toast('정산으로 옮겼어요'); route(); } }, '돈 받았어요') : null,
       h('button.btn.grow', { onclick: async () => {
         if (!f.brand.value.trim()) return toast('브랜드 이름을 적어 주세요');
         const n = { ...d, id: d.id || S.uid(), brand: f.brand.value.trim(), kind: f.kind.value, fee: f.fee.value === '' ? 0 : +f.fee.value, deliverables: f.deliverables.value, due: f.due.value, status: f.status.value, memo: f.memo.value };
         await S.update('deals', [], l => { const i = l.findIndex(x => x.id === n.id); if (i >= 0) l[i] = n; else l.unshift(n); return l; }); close(); toast('저장했어요'); route();
       } }, '저장'))));
+}
+async function dealReply(d) {
+  const st = await state(); const An = A.analyze(st); const p = st.profile.ig?.followers ? 'ig' : 'tt'; const a = An.plats[p];
+  const g = A.rateGuess(a.growth.now || st.profile[p]?.followers, a.er);
+  const kind = { 문의: '처음 문의에 답하기(단가·가능 일정)', 협의: '조건 맞추기(올릴 것·마감·2차 활용)', 진행: '촬영 전 확인(가이드·제품 받음·마감)', 업로드: '올렸다고 알리고 링크·인사이트 전달, 정산 요청', 정산: '감사 인사와 다음 협업 제안' }[d.status] || '답장';
+  const out = h('div', h('div.card.center', h('span.spin'), ' 쓰는 중…'));
+  sheet(d.brand + ' 답장', out);
+  const facts = `브랜드 ${d.brand}, 종류 ${d.kind || ''}, 올릴 것 ${d.deliverables || '미정'}, 금액 ${d.fee ? d.fee + '원' : '미정'}, 마감 ${d.due || '미정'}, 메모 ${d.memo || ''}. 내 팔로워 ${a.growth.now || '?'}, 반응률 ${A.pct(a.er)}, 어림 단가 ${g ? g[0] + '~' + g[1] + '원' : '?'}`;
+  let text;
+  if (await AI.hasKey()) { try { text = await AI.gem([`인플루언서 ${st.about.name || '하진'}이 브랜드 담당자에게 인스타 DM이나 메일로 보낼 답장을 써 줘. 목적: ${kind}. 사실: ${facts}. 공손하지만 짧게(5~8줄), 금액·조건은 분명히, 광고 표시("광고" 문구, 유료 파트너십)를 지킨다는 말 한 줄 포함. 지어낸 숫자 금지. 답장 글만.`], { temp: 0.5 }); } catch { } }
+  if (!text) text = d.status === '문의' ? `안녕하세요, ${d.brand} 담당자님! 연락 주셔서 감사해요.\n${d.deliverables || '릴스 1개'} 기준 ${g ? A.fmt(g[1]) + '원' : '○○원'}이고, 스토리 추가는 별도로 협의 가능해요.\n촬영은 제품 받고 1주 안에 가능하고, 게시물에는 "광고" 표시와 유료 파트너십 표시를 함께 넣어요.\n가이드 주시면 일정 맞춰 볼게요. 감사합니다!` : `안녕하세요, ${d.brand} 담당자님! ${d.deliverables || '콘텐츠'} 관련해서 연락드려요.\n마감 ${d.due || '일정'} 맞춰 진행 중이고, 확인 필요한 부분 있으면 말씀 주세요. 감사합니다!`;
+  out.replaceChildren(h('pre', text), h('button.btn.wide', { onclick: () => copy(text) }, ic('copy', 16), '복사'), h('p.fhint', '초안이에요. 금액·날짜는 꼭 확인하고 보내요.'));
 }
 function adForm() {
   const f = {}; const inp = (k, label, type = 'number') => field(label, f[k] = h('input', { type, ...(type === 'number' ? { inputmode: 'numeric' } : {}) }));
@@ -426,7 +515,7 @@ SCREENS.settings = async (root, st) => {
   const f = { name: h('input', { value: ab.name || '' , placeholder: '하진' }), ig: h('input', { value: pr.ig?.username || ab.ig || '', placeholder: 'o.xxin.e', autocapitalize: 'off' }), tt: h('input', { value: pr.tt?.username || ab.tt || '', placeholder: '틱톡 아이디', autocapitalize: 'off' }), goal: h('input', { value: ab.goal || '', placeholder: '3개월 안에 팔로워 1만, 패션·일상' }), vibe: h('input', { value: ab.vibe || '', placeholder: '꾸안꾸, 솔직, 디자인 전공' }) };
   root.append(h('h2.sec', '나'), h('div.card.form', field('부를 이름', f.name), h('div.two', field('인스타 아이디', f.ig), field('틱톡 아이디', f.tt)), field('목표', f.goal), field('분위기·키워드', f.vibe, 'AI가 캡션·피드백을 여기에 맞춰요'), h('button.btn.wide', { onclick: async () => {
     const clean = v => v.trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?(instagram|tiktok)\.com\/@?/, '').replace(/\/.*$/, '').toLowerCase();
-    await S.set('about', { ...ab, name: f.name.value.trim(), ig: clean(f.ig.value), tt: clean(f.tt.value), goal: f.goal.value.trim(), vibe: f.vibe.value.trim() });
+    await S.set('about', { ...ab, name: f.name.value.trim(), ig: clean(f.ig.value), tt: clean(f.tt.value), goal: f.goal.value.trim(), goalAt: f.goal.value.trim() !== (ab.goal || '') ? Date.now() : ab.goalAt, vibe: f.vibe.value.trim() });
     await S.update('profile', {}, p => { if (clean(f.ig.value)) p.ig = { ...(p.ig || {}), username: clean(f.ig.value) }; if (clean(f.tt.value)) p.tt = { ...(p.tt || {}), username: clean(f.tt.value) }; return p; });
     toast('저장했어요');
   } }, '저장')));
@@ -435,15 +524,21 @@ SCREENS.settings = async (root, st) => {
   const key = h('input', { type: 'password', placeholder: 'AIza… 또는 AQ.… 키 붙여넣기', autocomplete: 'off' });
   root.append(h('h2.sec', 'AI 연결'), h('div.card.form', h('p', keyed ? h('span.ok', ic('check', 15), ' 이 기기는 AI 연결됨 (비서 앱과 같은 무료 Gemini 키)') : '연결 안 됨. 무료 키 하나면 캡션·영상 피드백·캡처 읽기·대화가 돼요.'),
     keyed ? null : h('a.link', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener' }, '① Google AI Studio에서 무료 키 만들기', ic('ext', 14)),
-    keyed ? null : field('② 키 붙여넣기', key), keyed ? null : h('button.btn.wide', { onclick: async () => { if (!AI.looksLikeKey(key.value)) return toast('키 모양이 아니에요. 다시 복사해 주세요'); await AI.saveKey(key.value); toast('연결했어요'); route(); } }, '연결')));
+    keyed ? null : field('② 키 붙여넣기', key), keyed ? null : h('button.btn.wide', { onclick: async () => { if (!AI.looksLikeKey(key.value)) return toast('키 모양이 아니에요. 다시 복사해 주세요'); await AI.saveKey(key.value); toast('연결했어요. 매니저가 탐색을 시작해요'); route(); background(true); } }, '연결')));
   // 연습 모드
   const demo = S.getMode() === 'demo';
-  root.append(h('h2.sec', '연습 모드'), h('div.card', h('p', '가상의 초보 인플루언서 "봄이"(인스타 팔로워 860명쯤, 협찬 3건)의 계정으로 모든 기능을 미리 써 봐요. 내 기록과 따로 저장돼요.'), h('button.btn.wide' + (demo ? '.warn' : ''), { onclick: async () => { if (demo) { localStorage.setItem('mgr:mode', 'real'); S.setMode('real'); await S.clearDemo(); toast('연습 모드를 껐어요'); } else { localStorage.setItem('mgr:mode', 'demo'); S.setMode('demo'); await seed(); toast('봄이 계정으로 바꿨어요'); } go('#/today'); } }, demo ? '연습 모드 끄기' : '봄이로 연습하기')));
+  root.append(h('h2.sec', '연습 모드'), h('div.card', h('p', '가상의 초보 인플루언서 "봄이"(인스타 팔로워 860명쯤, 협찬 3건)의 계정으로 모든 기능을 미리 써 봐요. 내 기록과 따로 저장돼요.'), h('button.btn.wide' + (demo ? '.warn' : ''), { onclick: async () => { if (demo) { localStorage.setItem('mgr:mode', 'real'); S.setMode('real'); await S.clearDemo(); toast('연습 모드를 껐어요'); } else { localStorage.setItem('mgr:mode', 'demo'); S.setMode('demo'); await seed(); toast('봄이 계정으로 바꿨어요'); } go('#/today'); background(true); } }, demo ? '연습 모드 끄기' : '봄이로 연습하기')));
   // 설치
   root.append(h('h2.sec', '폰에 설치'), h('div.card', h('p', /iphone|ipad/i.test(navigator.userAgent) ? 'Safari 아래 공유 버튼 › "홈 화면에 추가"' : 'Chrome 메뉴(⋮) › "앱 설치" 또는 "홈 화면에 추가"'), h('p.fhint', '비서 앱과 따로 아이콘이 생겨요. 주소: hchishj-alt.github.io/hajin-assistant/manager/')));
   root.append(h('h2.sec', '데이터'), h('div.card.form', h('p.muted', '모든 기록은 이 기기에만 있어요. 인스타 토큰도 이 기기에만.'), h('div.row.gap', h('button.ghost', { onclick: async () => { const all = {}; for (const k of ['profile', 'posts', 'snaps', 'people', 'handled', 'deals', 'about', 'ads', 'reviews', 'plan']) all[k] = await S.get(k); const b = new Blob([JSON.stringify(all)], { type: 'application/json' }); const a = h('a', { href: URL.createObjectURL(b), download: 'manager-backup.json' }); a.click(); } }, ic('download', 15), '백업 받기'), h('button.ghost', { onclick: () => { const i = h('input', { type: 'file', accept: '.json', onchange: async e => { try { const j = JSON.parse(await e.target.files[0].text()); for (const [k, v] of Object.entries(j)) if (v != null) await S.set(k, v); toast('되살렸어요'); route(); } catch { toast('백업 파일이 아니에요'); } } }); i.click(); } }, ic('upload', 15), '백업 넣기'))), h('p.ver', '매니저 ' + VERSION));
 };
 
+// 매니저가 뒤에서 하는 일: 분야 탐색(하루 한 번) → 이번 주 전략 점검·조정 → 캡션 미리 쓰기
+let bgAt = 0;
+async function background(force) {
+  if (!force && Date.now() - bgAt < 10 * 60e3) return; bgAt = Date.now();
+  try { const st = await state(); const ex = await EX.daily(st).catch(e => { console.warn(e); return null; }); const ch = await SG.tick(); if ((ch || ex?.at > Date.now() - 60e3) && /^(today|plan)?$/.test(location.hash.replace(/^#\/?/, '').split('/')[0])) route(); } catch (e) { console.warn(e); }
+}
 // ── 시작 ──
 async function boot() {
   S.setMode(localStorage.getItem('mgr:mode') === 'demo' ? 'demo' : 'real');
@@ -451,7 +546,11 @@ async function boot() {
   // 처음 열면 인스타 아이디를 넣어 둠 (하진 계정)
   if (S.getMode() === 'real') { const p = await S.get('profile', null); if (!p) await S.set('profile', { ig: { username: 'o.xxin.e' }, tt: { username: 'o.xxin.e' } }); }
   window.addEventListener('hashchange', route);
+  window.addEventListener('mgr:strategy', () => { if (/^(today|plan)?$/.test(location.hash.replace(/^#\/?/, '').split('/')[0])) route(); });
   await route();
+  // 매니저가 뒤에서 하는 일: 분야 탐색(하루 한 번) → 이번 주 전략 점검·조정 → 캡션 미리 쓰기
+  background(true);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') background(); });
   // 인스타가 연결돼 있으면 열 때마다 새 숫자 (30분 간격)
   if (S.getMode() === 'real' && (await IG.tokenInfo()) && Date.now() - (await S.get('g:iglast', 0)) > 30 * 60e3) { try { await IG.sync(); if (/today|stats|^$/.test(location.hash.replace(/^#\/?/, '') || 'today')) route(); } catch (e) { if (e.code === 190) toast('인스타 연결이 끊겼어요. 숫자 채우기에서 다시 연결해 주세요', 5000); } }
   if ('serviceWorker' in navigator && location.hostname !== 'localhost') navigator.serviceWorker.register('./sw.js').catch(() => { });

@@ -35,6 +35,22 @@ export async function gem(parts, { json = false, temp = 0.6, ms = 40000 } = {}) 
   throw new Error(last || 'AI가 답하지 못했어요');
 }
 
+// 구글 검색을 붙여 묻기(최신 트렌드 탐색). 답은 글로 받고 그 안의 JSON을 꺼냄. 출처 링크도 같이
+export async function search(prompt, { ms = 60000 } = {}) {
+  const key = await hdb.kvGet(KEY, ''); if (!key) throw new Error('AI 키가 없어요');
+  const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.5 } });
+  let last = '';
+  for (const m of ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest']) {
+    let r; try { r = await call(m, key, body, ms); } catch { last = '응답이 너무 늦어요'; continue; }
+    if (!r.ok) { last = r.status === 429 ? '무료 사용량을 넘었어요' : 'AI 검색 실패 (' + r.status + ')'; if ([401, 403].includes(r.status)) break; continue; }
+    const j = await r.json(); const c = j.candidates?.[0] || {};
+    const text = (c.content?.parts || []).map(p => p.text || '').join('');
+    const src = (c.groundingMetadata?.groundingChunks || []).map(g => g.web).filter(Boolean).map(w => ({ title: w.title, url: w.uri })).slice(0, 12);
+    const mm = text.match(/\{[\s\S]*\}/); if (!mm) { last = 'AI 답을 읽지 못했어요'; continue; }
+    try { return { data: JSON.parse(mm[0]), src }; } catch { last = 'AI 답을 읽지 못했어요'; }
+  }
+  throw new Error(last || 'AI 검색 실패');
+}
 // 매니저의 성격과 지식. 모든 부탁에 앞에 붙음
 const ROLE = (about, plat) => `너는 ${about.name || '하진'}의 전담 SNS 매니저야. ${about.name || '하진'}은 자기 자신이 콘텐츠인 초보 크리에이터고 ${plat === 'tt' ? '틱톡' : plat === 'ig' ? '인스타그램' : '인스타그램과 틱톡'}에서 인플루언서로 크는 게 목표야.
 계정: 인스타 ${about.ig || '-'} / 틱톡 ${about.tt || '-'}. 목표: ${about.goal || '아직 안 정함'}. 분위기·키워드: ${about.vibe || '-'}.
