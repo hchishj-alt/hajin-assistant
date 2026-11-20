@@ -63,6 +63,7 @@ export async function start() {
     setInterval(() => syncNow(), 5 * 60 * 1000);
   }
   syncNow();
+  teamKey().catch(() => { });
   return state;
 }
 
@@ -101,6 +102,7 @@ export async function loginWithCode(code) {
   if (e2) { await c.auth.signOut(); throw new Error(koErr(e2.message)); }
   const info = Array.isArray(me) ? me[0] : me;
   await db.kvSetRaw('me:member', info);
+  await teamKey().catch(() => { });
   const curName = await db.kvGet('name', '하진');
   await afterLogin();
   // 이름은 다른 기기에서 정해 둔 게 있으면 그걸 따르고, 없을 때만 멤버 이름으로
@@ -150,6 +152,43 @@ async function afterLogin() {
   const { data } = await client.auth.getSession(); session = data.session;
   started = false; await start();
 }
+// ── 팀 공용 AI 키 ──
+// 관리자 기기에 직접 넣은 키는 서버에 올리고(설정에서 끌 수 있음), 다른 기기·팀원은 로그인만 하면 받아서 씀.
+// 이 기기에 직접 넣은 키가 있으면 그 키를 그대로 씀. 키 값은 화면·기록에 남기지 않음.
+const GK = 'secret:gemini';
+export async function teamKey() {
+  if (!session || !client) return { ok: false };
+  try {
+    const mine = (await db.kvGet(GK, '')) || '', fromTeam = !!(await db.kvGet('me:aiteam', false));
+    const { data, error } = await client.rpc('team_secret', { p_k: 'gemini' }); if (error) return { ok: false, error: error.message };
+    const team = typeof data === 'string' ? data : '';
+    if (mine && !fromTeam) {
+      if ((await isAdmin()) && (await db.kvGet('me:aishare', true)) !== false) {
+        if (team !== mine) { const r = await client.rpc('admin_set_team_secret', { p_k: 'gemini', p_v: mine }); if (r.error) return { ok: false, error: r.error.message }; }
+        return { ok: true, shared: true, own: true };
+      }
+      return { ok: true, own: true, team: !!team };
+    }
+    if (team) {
+      if (team !== mine) { await db.kvSetRaw(GK, team); await db.kvSetRaw('ai:model', ''); }
+      await db.kvSetRaw('me:aiteam', true);
+      if (team !== mine) window.dispatchEvent(new CustomEvent('hajin:ai-key'));
+      return { ok: true, team: true, got: team !== mine };
+    }
+    if (fromTeam) { await db.kvSetRaw(GK, ''); await db.kvSetRaw('me:aiteam', false); window.dispatchEvent(new CustomEvent('hajin:ai-key')); } /* 팀 키가 없어지면 받아 둔 것도 지움 */
+    return { ok: true, team: false };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+// 관리자: 내 키를 팀이 같이 쓸지
+export async function setShareKey(on) {
+  await db.kvSetRaw('me:aishare', !!on);
+  if (!session || !client || !(await isAdmin())) return { ok: false };
+  if (on) return teamKey();
+  const r = await client.rpc('admin_set_team_secret', { p_k: 'gemini', p_v: '' });
+  return { ok: !r.error };
+}
+export async function aiKeyInfo() { return { fromTeam: !!(await db.kvGet('me:aiteam', false)), share: (await db.kvGet('me:aishare', true)) !== false, admin: await isAdmin(), signedIn: !!session, hasServer: !!(await config()).url }; }
+
 export async function signOut() {
   if (!client) return;
   await client.auth.signOut(); session = null; await db.kvSetRaw('me:member', null); set({ status: 'signedout' });

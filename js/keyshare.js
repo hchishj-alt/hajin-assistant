@@ -7,7 +7,7 @@ const KEY = 'secret:gemini';
 const link = key => `${location.origin}${location.pathname}#k=${encodeURIComponent(key)}`;
 export const keyFrom = s => { const m = /#k=([\w%.~-]{20,200})$/.exec(String(s || '').trim()); if (!m) return ''; try { return decodeURIComponent(m[1]); } catch { return ''; } };
 
-async function save(key) { await db.kvSet(KEY, key); await db.kvSet('ai:model', ''); await db.kvSet('ai:on', true); window.dispatchEvent(new CustomEvent('hajin:ai-key')); }
+async function save(key) { await db.kvSet(KEY, key); await db.kvSet('ai:model', ''); await db.kvSet('ai:on', true); await db.kvSetRaw('me:aiteam', false); window.dispatchEvent(new CustomEvent('hajin:ai-key')); import('./sync.js').then(S => S.teamKey()).catch(() => { }); }
 
 // 보내는 쪽: 화면에 QR을 띄운다. 60초 뒤 스스로 닫힌다.
 export async function showQR() {
@@ -91,7 +91,19 @@ export function guide(onDone) {
     try { const AI = await import('./ai.js'); await AI.ask('“연결됐어요”라고만 답해.', { ms: 15000 }); out.textContent = '연결됐어요. 이제 이 기기에서도 AI가 답해요.'; toast('AI가 연결됐어요'); onDone && onDone(); setTimeout(() => close(), 900); }
     catch (e) { out.textContent = `키는 넣었는데 시험이 안 됐어요: ${e.message}`; onDone && onDone(); }
   };
+  const team = h('div.stack', { hidden: true });
+  import('./sync.js').then(async S => {
+    const info = await S.aiKeyInfo(); if (!info.hasServer) return;
+    const done = async () => { const r = await S.teamKey(); if (await db.kvGet(KEY, '')) { out.textContent = '팀 AI가 연결됐어요.'; toast('AI가 연결됐어요'); onDone && onDone(); setTimeout(() => close(), 900); } else out.textContent = r.ok ? '로그인은 됐는데 팀에 올라온 AI 키가 아직 없어요. 아래 방법으로 이 기기에 넣으면 팀도 같이 쓰게 돼요.' : '팀 AI 키를 받지 못했어요. 잠시 뒤에 다시 해 주세요.'; };
+    if (info.signedIn) { team.hidden = false; team.append(h('button.btn.pri', { style: { minHeight: '44px' }, onclick: done }, '팀 AI 키 받기')); return; }
+    const code = h('input.in', { placeholder: '멤버 코드', maxlength: 5, autocapitalize: 'characters', autocomplete: 'off', 'aria-label': '멤버 코드', style: { textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700 } });
+    const go = async btn => { btn.disabled = true; out.textContent = '들어가는 중…'; try { await S.loginWithCode(code.value); await done(); } catch (e) { out.textContent = e.message; } btn.disabled = false; };
+    team.hidden = false; team.append(h('p.small', h('b', '멤버 코드가 있으면 이것만 하면 돼요.'), ' 코드로 로그인하면 팀 AI가 바로 연결되고 기록도 기기끼리 맞춰져요.'),
+      h('div.row', { style: { gap: '6px' } }, h('div.grow', code), h('button.btn.pri', { style: { minHeight: '44px' }, onclick: e => go(e.currentTarget) }, '로그인')),
+      h('p.faint.tiny', { style: { marginTop: '6px' } }, '코드가 없거나 팀 키가 아직 없을 때는 아래 방법으로 직접 넣을 수 있어요.'));
+  }).catch(() => { });
   const close = modal('이 기기에 AI 연결하기', h('div.stack',
+    team,
     h('p.small.muted', '연결은 기기마다 한 번만 하면 돼요. 폰 하나로 1분이면 끝나요.'),
     h('a.btn', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener', style: { minHeight: '44px', justifyContent: 'center' } }, '① Google AI Studio 열기'),
     h('p.faint.tiny', '구글에 로그인하면 전에 만든 키가 보여요. 키를 눌러 “복사”를 누르고 이 화면으로 돌아오세요. 키가 없으면 “API 키 만들기”를 누르면 돼요(무료, 카드 등록 없음).'),
@@ -100,7 +112,7 @@ export function guide(onDone) {
     out,
     h('p.faint.tiny', 'PC가 옆에 있으면 PC 앱의 설정 → 외부 AI 연결 → “폰·아이패드로 키 보내기”를 누르고 아래 버튼으로 QR을 비춰도 돼요. 키는 이 기기에만 저장돼요.'),
     h('button.btn.sm', { style: { minHeight: '44px' }, onclick: () => { close(); scan(() => { toast('AI가 연결됐어요'); onDone && onDone(); }); } }, 'QR로 키 받기')));
-  setTimeout(() => { try { inp.blur(); } catch { } }, 80);   /* 폰에서 자판이 먼저 올라와 버튼을 가리지 않게 */
+  setTimeout(() => { try { document.activeElement && document.activeElement.blur(); } catch { } }, 80);   /* 폰에서 자판이 먼저 올라와 버튼을 가리지 않게 */
   return close;
 }
 

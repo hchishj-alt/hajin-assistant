@@ -11,6 +11,7 @@ import { go, updateBadge } from '../js/app.js';
 
 const SUGGEST = ['오늘 일정', '오늘 빈 시간', '이번 주 할 일', '밀린 할 일', '이번 달 지출', '확인 대기함', '내일 오후 3시 팀 회의', '점심 9000원', '금요일까지 포트폴리오 정리'];
 
+let onAiKey = () => { };   // 팀 AI 키가 들어오면 비서 화면의 연결 표시를 바꾸는 손잡이 (화면을 다시 그릴 때 갈아 끼움)
 export default {
   async render(root) {
     const list = h('div.chat');
@@ -58,7 +59,7 @@ export default {
     // 이 기기에 AI가 연결됐는지 한눈에 (연결은 기기마다 따로라서, 폰에서는 안 돼 있을 수 있음)
     const drawAiBar = () => import('../js/ai.js').then(async AI => { clear(aiBar); if (await AI.enabled()) aiBar.append(h('span.chip.ok', { title: '말 읽기·질문 답하기·요약을 Gemini가 해요' }, ic('sparkles', 12), 'AI 연결됨'));
       else aiBar.append(h('button.chip.warn', { style: { minHeight: '36px' }, onclick: async () => { if (await AI.keyed()) { await db.kvSet('ai:on', true); toast('AI를 켰어요'); drawAiBar(); } else (await import('../js/keyshare.js')).guide(drawAiBar); } }, ic('sparkles', 12), (await AI.keyed()) ? 'AI가 꺼져 있어요 · 켜기' : '이 기기는 AI 미연결 (앱 규칙으로만 읽는 중) · 연결하기')); }).catch(() => { });
-    drawAiBar();
+    drawAiBar(); window.removeEventListener('hajin:ai-key', onAiKey); onAiKey = drawAiBar; window.addEventListener('hajin:ai-key', onAiKey);
     // 기존 대화
     const msgs = (await db.list('chat')).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-60);
     if (!msgs.length) list.append(botBubble(h('div', h('p', '안녕하세요 하진님. 이렇게 말해 보세요.'), h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, ['"다음 주 화요일 2시 홍대 촬영"', '"어도비 구독 3만7천원 결제"', '"홍길동 010-1234-5678 디자이너"', '"오늘 일정 보여줘"', '회의나 생각을 길게 말하면 요약·키워드·할 일로 정리해요'].map(x => h('li.small', x))))));
