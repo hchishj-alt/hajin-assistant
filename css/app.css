@@ -881,3 +881,15 @@ html,body{touch-action:manipulation}
 .draft .why button{border:0;background:none;padding:6px 4px;min-height:44px;font:inherit;font-weight:650;color:var(--acc);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .card-h h3 small{font-weight:500;font-size:calc(12px*var(--fs,1));color:var(--ink3);margin-left:6px}
 
+/* 홈 화면에 설치: 오늘 화면의 한 줄 권유와 순서 안내 */
+.inst-nudge{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:12px 12px 12px 14px;border-color:color-mix(in srgb,var(--acc) 35%,var(--line));background:color-mix(in srgb,var(--acc) 6%,var(--card))}
+.inst-nudge>.ic{flex:none;color:var(--acc)}
+.inst-nudge .grow{flex:1;min-width:0}
+.inst-nudge b{display:block;font-size:calc(14px*var(--fs,1));line-height:1.3}
+.inst-nudge small{display:block;font-size:calc(12px*var(--fs,1));color:var(--ink3);line-height:1.35;margin-top:2px}
+.inst-nudge .btn{flex:none}
+.inst-steps{list-style:none;margin:4px 0;padding:0;display:grid;gap:10px}
+.inst-steps li{display:flex;align-items:flex-start;gap:10px;font-size:calc(14.5px*var(--fs,1));line-height:1.5}
+.inst-steps .n{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--acc);color:#fff;font-weight:700;font-size:13px}
+.inst-steps .ic{display:inline-block;vertical-align:-3px;color:var(--acc)}
+

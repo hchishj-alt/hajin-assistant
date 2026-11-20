@@ -1,4 +1,5 @@
 import { h, ic, clear, toast, head, seg, modal, form, confirmBox, download, pickFile, busy } from '../js/ui.js';
+import * as Install from '../js/install.js';
 import * as db from '../js/db.js';
 import * as brain from '../js/brain.js';
 import * as store from '../js/store.js';
@@ -60,7 +61,9 @@ export default {
         h('p.faint.tiny', { style: { marginTop: '8px' } }, '동기화를 켜면 폰과 PC가 자동으로 맞춰져요. 백업 파일은 만약을 위한 사본이에요.')),
       sec('업데이트', 'refresh', h('p.small.muted', '새 버전이 올라오면 앱이 스스로 받아 두고 "업데이트" 알림을 띄워요. 기록은 그대로 남아요.'),
         h('div.row', { style: { marginTop: '8px' } }, h('span.chip', `현재 v${VERSION}`), h('button.btn.sm', { onclick: async () => { const r = await navigator.serviceWorker?.getRegistration(); if (!r) { toast('오프라인 모드가 아직 준비 안 됐어요'); return; } await r.update().catch(() => { }); if (r.waiting) { toast('새 버전으로 바꾸는 중이에요'); r.waiting.postMessage('skip'); return; } if (r.installing) { const w = r.installing; toast('새 버전을 받는 중이에요'); w.addEventListener('statechange', () => { if (w.state === 'installed') w.postMessage('skip'); }); return; } toast('최신 버전이에요'); } }, '지금 확인'))),
-      sec('폰에 설치', 'phone', h('div.list',
+      sec('앱으로 설치', 'phone', h('p.small.muted', '스토어 없이 무료로 홈 화면에 설치해요. 아이폰·아이패드·안드로이드·PC 모두 돼요.'),
+        h('div.row', { style: { margin: '8px 0 10px' } }, Install.where().installed ? h('span.chip.ok', ic('check', 14), '앱으로 설치돼 있어요') : h('button.btn.pri', { type: 'button', style: { minHeight: '44px' }, onclick: () => Install.guide() }, ic('download', 16), '설치하기')),
+        h('div.list',
         h('div.li', h('b.small', { style: { width: '70px' } }, '아이폰'), h('span.small', 'Safari로 열기 → 공유 버튼 → "홈 화면에 추가"')),
         h('div.li', h('b.small', { style: { width: '70px' } }, '안드로이드'), h('span.small', 'Chrome으로 열기 → 메뉴 ⋮ → "앱 설치" 또는 "홈 화면에 추가"')),
         h('div.li', h('b.small', { style: { width: '70px' } }, 'PC'), h('span.small', 'Chrome·Edge 주소창 오른쪽 설치 아이콘')))),

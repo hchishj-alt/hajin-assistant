@@ -7,6 +7,7 @@ import { taskRow, sortTasks } from './tasks.js';
 import { go, updateBadge } from '../js/app.js';
 import { draftCard } from '../js/draftcard.js';
 import * as F from '../js/follow.js';
+import * as Install from '../js/install.js';
 
 export default {
   async render(root) {
@@ -97,6 +98,7 @@ export default {
     const grid = h('div.home-grid');
     for (const id of homeOrder(L)) if (!L.homeOff?.includes(id) && blocks[id]) { const el = await blocks[id](); if (el) grid.append(el); }
     root.append(hdr);
+    { const nd = await Install.nudge().catch(() => null); if (nd) root.append(nd); }
     if (askName && !name) {
       const ni = h('input.in', { placeholder: '이름 (예: 민서)', 'aria-label': '내 이름', style: { maxWidth: '200px' } });
       const saveName = async () => { const v = ni.value.trim(); if (!v) return toast('이름을 적어 주세요'); await db.kvSet('name', v); await db.kvSet('askName', false); this.render(clear(root)); };

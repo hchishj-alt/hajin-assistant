@@ -2,6 +2,7 @@ import { h, ic, clear, toast, modal } from './ui.js';
 import * as db from './db.js';
 import * as store from './store.js';
 import { VERSION } from './version.js';
+import './install.js';
 
 // 메뉴 구성 (모듈은 필요할 때 불러옴)
 export const MODULES = [
