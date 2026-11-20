@@ -31,11 +31,15 @@ export async function ics({ tasks = true } = {}) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
   for (const e of evs) {
     L.push('BEGIN:VEVENT', 'UID:' + e.id + '@hajin', 'DTSTAMP:' + stamp, 'SUMMARY:' + esc(e.title));
-    if (e.start) L.push(`DTSTART;TZID=${TZ}:` + dt(e.date, e.start), `DTEND;TZID=${TZ}:` + dt(e.date, e.end || store.addMins(e.start, 60)));
-    else L.push('DTSTART;VALUE=DATE:' + dt(e.date), 'DTEND;VALUE=DATE:' + nextDay(e.date));
+    const last = e.endDate && e.endDate > e.date ? e.endDate : e.date;   /* 여러 날 이어지는 일정 */
+    if (e.start) L.push(`DTSTART;TZID=${TZ}:` + dt(e.date, e.start), `DTEND;TZID=${TZ}:` + dt(last, e.end || (last > e.date ? '23:59' : store.addMins(e.start, 60))));
+    else L.push('DTSTART;VALUE=DATE:' + dt(e.date), 'DTEND;VALUE=DATE:' + nextDay(last));
     if (e.place) L.push('LOCATION:' + esc(e.place));
     if (e.memo) L.push('DESCRIPTION:' + esc(e.memo));
-    if (e.repeat && RR[e.repeat]) L.push('RRULE:FREQ=' + RR[e.repeat]);
+    if (e.repeat && RR[e.repeat]) {
+      L.push('RRULE:FREQ=' + RR[e.repeat] + (e.until ? ';UNTIL=' + (e.start ? dt(e.until) + 'T145959Z' : dt(e.until)) : ''));   /* 끝나는 날 (한국 시간 그날 밤까지) */
+      for (const d of e.skip || []) L.push(e.start ? `EXDATE;TZID=${TZ}:` + dt(d, e.start) : 'EXDATE;VALUE=DATE:' + dt(d));   /* 건너뛴 날 */
+    }
     const r = Number(e.remind === '' || e.remind == null ? cfg.lead : e.remind); if (cfg.on && e.start && r >= 0) L.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + esc(e.title), `TRIGGER:-PT${r}M`, 'END:VALARM');
     L.push('END:VEVENT');
   }
