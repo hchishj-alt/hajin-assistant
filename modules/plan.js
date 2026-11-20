@@ -77,7 +77,7 @@ export default {
             st.nextEv ? h('div.small', { style: { marginTop: '4px' } }, ic('calendar', 14), ` 다음 일정 ${md2(st.nextEv.date)}${st.nextEv.endDate && st.nextEv.endDate > st.nextEv.date ? '~' + md2(st.nextEv.endDate) : ''} · ${st.nextEv.title}`) : null,
             st.got || st.due ? h('div.small', { style: { marginTop: '4px' } }, ic('receipt', 14), ` 받은 돈 ${sw(st.got)} · 받을 돈 ${sw(st.due)} · 남는 돈 ${sw(st.got + st.due - st.out)}`) : null,
             st.who && st.who.length ? h('div.chips', { style: { marginTop: '6px' } }, st.who.slice(0, 5).map(([n, c]) => h('span.chip', `${n} ${c}`))) : null,
-            h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm', { onclick: () => { projF = p.name; tab = 'docs'; draw(); } }, '문서'), h('button.btn.sm.ghost', { onclick: () => newProject(p) }, ic('edit', 14)))));
+            h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm', { onclick: () => { projF = p.name; tab = 'docs'; draw(); } }, '문서'), h('button.btn.sm.ghost', { 'aria-label': '프로젝트 고치기', onclick: () => newProject(p) }, ic('edit', 14)), h('button.btn.sm.ghost.danger', { 'aria-label': '프로젝트 지우기', onclick: async () => { if (await confirmBox(`“${p.name}” 프로젝트를 지울까요? 이 프로젝트에 적어 둔 할 일·지출·문서는 지워지지 않아요.`, '지우기')) { await db.remove(p.id); if (projF === p.name) projF = ''; toast('프로젝트를 지웠어요'); draw(); } } }, ic('trash', 14)))));
         }
         if (!projects.length) g.append(h('div.card', h('div.empty', '프로젝트를 만들면 할 일·지출·작업 시간이 프로젝트별로 모여요')));
         body.append(g);
