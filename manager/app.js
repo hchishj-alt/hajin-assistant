@@ -11,7 +11,7 @@ import * as EX from './explore.js';
 import * as W from './web.js';
 import { FIELDS } from './fields.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.4.5';
+export const VERSION = '1.4.6';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
@@ -307,13 +307,14 @@ SCREENS.data = async (root, st) => {
   const way = (icn, title, body, ...btns) => h('div.card.way', h('div.wi', ic(icn, 20)), h('div.grow', h('b', title), h('p', body), h('div.row.gap.wrap', btns)));
   const shotIn = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: e => readShots([...e.target.files]) });
   const zipIn = h('input', { type: 'file', accept: '.zip,.json,.html,.txt,application/zip', multiple: true, hidden: true, onchange: e => importExport([...e.target.files]) });
+  const keyed = await AI.hasKey();
   root.append(shotIn, zipIn,
-    way('ig', '인스타 자동 연결', tk ? `연결됨 · 마지막으로 받은 때 ${last ? new Date(last).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '아직'}. 앱을 열 때마다 새 숫자를 받아요.` : '프로(크리에이터) 계정이면 게시물 숫자를 앱이 알아서 받아요. 처음 한 번만 연결하면 돼요.',
-      S.getMode() === 'demo' ? h('p.fhint', '연습 모드에서는 연결을 쓰지 않아요.') : tk ? h('button.btn', { onclick: async e => { const btn = e.currentTarget; const b = e.currentTarget; busy(b, true, '받는 중'); try { const r = await IG.sync(); toast(`게시물 ${r.n}개 받았어요`); route(); } catch (er) { toast('못 받았어요: ' + er.message, 4000); busy(b, false); } } }, ic('refresh', 16), '지금 받기') : h('button.btn', { onclick: igGuide }, '연결하기'),
-      tk ? h('button.ghost', { onclick: async () => { await IG.disconnect(); toast('연결을 끊었어요'); route(); } }, '끊기') : null),
-    way('image', '캡처 올리기 (인스타·틱톡)', '인사이트·프로필·틱톡 분석 화면을 찍어 올리면 AI가 숫자를 읽어요. 여러 장 한 번에 돼요. 읽은 건 확인해야 들어가요.', h('button.btn', { onclick: () => shotIn.click() }, ic('upload', 16), '캡처 고르기')),
+    way('edit', '직접 적기 (제일 쉬워요)', '숫자 몇 개만 알아도 돼요. 좋아요·조회만 적어도 분석돼요.', h('button.btn', { onclick: () => postForm({}) }, '적기')),
+    way('image', '캡처 올리기 (인스타·틱톡)', '인사이트·프로필·틱톡 분석 화면을 찍어 올리면 AI가 숫자를 읽어요. 여러 장 한 번에 돼요. 읽은 건 확인해야 들어가요.', keyed ? h('button.btn', { onclick: () => shotIn.click() }, ic('upload', 16), '캡처 고르기') : h('button.ghost', { onclick: () => go('#/settings') }, 'AI 연결하면 쓸 수 있어요 (무료)')),
     way('folder', '내 정보 다운로드 파일', '팔로워·팔로잉 명단과 예전 게시물 캡션을 한 번에 가져와요. 맞팔 정리에 꼭 필요해요.', h('button.btn', { onclick: () => zipIn.click() }, ic('upload', 16), '파일 고르기'), h('button.ghost', { onclick: exportGuide }, '받는 법')),
-    way('edit', '직접 적기', '숫자 몇 개만 알아도 돼요. 좋아요·조회만 적어도 분석돼요.', h('button.btn', { onclick: () => postForm({}) }, '적기')),
+    USE.includes('ig') ? way('ig', '인스타 자동 연결 (고급)', tk ? `연결됨 · 마지막으로 받은 때 ${last ? new Date(last).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '아직'}. 앱을 열 때마다 새 숫자를 받아요.` : '프로(크리에이터) 계정이면 게시물 숫자를 앱이 알아서 받아요. 인스타 개발자 설정을 직접 해야 해서 15분쯤 걸려요. 어려우면 위 방법만 써도 충분해요.',
+      S.getMode() === 'demo' ? h('p.fhint', '연습 모드에서는 연결을 쓰지 않아요.') : tk ? h('button.btn', { onclick: async e => { const btn = e.currentTarget; const b = e.currentTarget; busy(b, true, '받는 중'); try { const r = await IG.sync(); toast(`게시물 ${r.n}개 받았어요`); route(); } catch (er) { toast('못 받았어요: ' + er.message, 4000); busy(b, false); } } }, ic('refresh', 16), '지금 받기') : h('button.btn', { onclick: igGuide }, '연결하기'),
+      tk ? h('button.ghost', { onclick: async () => { await IG.disconnect(); toast('연결을 끊었어요'); route(); } }, '끊기') : null) : null,
   );
   const pend = st.drafts.filter(d => d.status === '임시');
   if (pend.length) root.append(h('button.btn.wide', { onclick: () => go('#/inbox') }, `확인 기다리는 것 ${pend.length}개`));
@@ -326,7 +327,7 @@ function igGuide() {
     h('ol.steps',
       step('1', '인스타 앱 › 설정 › 계정 유형 › 프로페셔널(크리에이터)로 바꾸기 (무료, 언제든 되돌릴 수 있어요)'),
       step('2', 'developers.facebook.com 에 페이스북 계정으로 들어가 "앱 만들기" › 사용 사례 "Instagram에서 메시지 및 콘텐츠 관리" 고르기', h('a.link', { href: 'https://developers.facebook.com/apps/creation/', target: '_blank', rel: 'noopener' }, '열기', ic('ext', 14))),
-      step('3', '앱 › Instagram › "Instagram 로그인을 통한 API 설정" › 2단계 "계정 추가"로 o.xxin.e 로그인'),
+      step('3', '앱 › Instagram › "Instagram 로그인을 통한 API 설정" › 2단계 "계정 추가"로 내 인스타 계정 로그인'),
       step('4', '같은 화면에서 "토큰 생성"을 눌러 나온 긴 글자를 복사'),
       step('5', '아래에 붙여넣고 연결')),
     field('토큰', tok), h('button.btn.wide', { onclick: async e => { const btn = e.currentTarget; if (!tok.value.trim()) return toast('토큰을 붙여넣어 주세요'); busy(btn, true, '확인 중'); try { const me = await IG.connect(tok.value); close(); toast('@' + me.username + ' 연결됐어요'); await IG.sync(); route(); } catch (er) { busy(btn, false); toast('연결 안 됐어요: ' + er.message, 5000); } } }, '연결'),
@@ -492,7 +493,7 @@ SCREENS.people = async (root, st, An, [tab = 'fans']) => {
   const zipIn = h('input', { type: 'file', accept: '.zip,.json,.html,.txt,application/zip', multiple: true, hidden: true, onchange: e => importExport([...e.target.files]) });
   root.append(zipIn);
   if (!pp) {
-    root.append(empty('users', `${A.PLAT[plat]} 팔로우 명단이 없어요`, '"내 정보 다운로드" 파일을 올리면 맞팔 안 한 사람, 나만 팔로우하는 사람, 새로 온·떠난 사람을 정리해요.', h('div.row.gap.center', h('button.btn', { onclick: () => zipIn.click() }, ic('upload', 16), '파일 올리기'), h('button.ghost', { onclick: exportGuide }, '받는 법'))));
+    root.append(empty('users', `${A.PLAT[plat]} 팔로우 명단이 없어요`, '"내 정보 다운로드" 파일을 올리면 맞팔 안 한 사람, 나만 팔로우하는 사람, 새로 온·떠난 사람을 정리해요. 신청하고 파일이 오기까지 몇 분에서 몇 시간 걸리니 지금 신청해 두세요.', h('div.row.gap.center', h('button.btn', { onclick: () => zipIn.click() }, ic('upload', 16), '파일 올리기'), h('button.ghost', { onclick: exportGuide }, '받는 법'))));
     root.append(whyManual());
     return;
   }
