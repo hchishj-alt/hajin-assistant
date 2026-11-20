@@ -359,3 +359,38 @@ begin
   return r;
 end $$;
 grant execute on function public.check_code(text) to anon, authenticated;
+
+-- ─────────────────────────────────────────────
+-- 11) 팀 공용 AI 키 (관리자 기기의 키를 여기 두면, 로그인한 멤버 기기가 받아 씀. 기기마다 넣을 필요 없음)
+--     표는 직접 읽기·쓰기 금지. 활성 멤버만 함수로 읽고, 관리자만 바꿈. 다시 실행해도 안전
+create table if not exists public.team_secrets (
+  k text primary key,
+  v text not null,
+  updated_at timestamptz not null default now(),
+  updated_by uuid
+);
+alter table public.team_secrets enable row level security;
+
+create or replace function public.team_secret(p_k text) returns text
+language sql security definer set search_path = public stable as $$
+  select v from public.team_secrets where k = p_k and public.is_active()
+$$;
+
+create or replace function public.admin_set_team_secret(p_k text, p_v text) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception '관리자만 할 수 있어요'; end if;
+  if p_k is null or p_k !~ '^[a-z0-9_]{2,30}$' then raise exception '이름을 확인해 주세요'; end if;
+  if coalesce(p_v, '') = '' then delete from public.team_secrets where k = p_k;
+  else
+    if length(p_v) > 300 then raise exception '값이 너무 길어요'; end if;
+    insert into public.team_secrets (k, v, updated_by) values (p_k, p_v, auth.uid())
+      on conflict (k) do update set v = excluded.v, updated_at = now(), updated_by = auth.uid();
+  end if;
+  return true;
+end $$;
+
+revoke all on function public.team_secret(text) from public, anon;
+revoke all on function public.admin_set_team_secret(text, text) from public, anon;
+grant execute on function public.team_secret(text) to authenticated;
+grant execute on function public.admin_set_team_secret(text, text) to authenticated;
