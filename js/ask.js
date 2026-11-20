@@ -98,6 +98,14 @@ export async function smart(q, base = new Date(), r = null) {
     if (hit) { const late = hit.date && hit.date < today ? Math.round((new Date(today) - new Date(hit.date)) / 864e5) : 0;
       return { text: `“${hit.title}” ${won(hit.amount)}은 아직 받을 돈으로 남아 있어요. ${hit.date ? (late ? `받기로 한 날(${md(hit.date)})에서 ${late}일 지났어요.` : `받기로 한 날은 ${md(hit.date)}이에요.`) : '받기로 한 날은 안 적혀 있어요.'}${late ? ' 정중하게 묻는 말을 만들어 드릴까요?' : ''}`, items: [{ icon: 'wallet', title: hit.title, sub: [won(hit.amount), hit.date ? '받는 날 ' + md(hit.date) : '날짜 미정', hit.from].filter(Boolean).join(' · '), route: 'money' }], chips: [{ label: '묻는 말 만들기', go: 'prompts/use/builtin:biz-dunning' }, { label: '들어왔어요', say: `${hit.title} 들어왔어` }] }; }
   }
+  // "이번 달 얼마 벌었어?", "이번 달 수입": 그 기간에 실제로 들어온 돈
+  if (/(벌었|번\s*돈|수입|들어온\s*돈|매출)/.test(q) && !/(받을|미수|안\s*들어|못\s*받|예정|언제)/.test(q)) {
+    const xs = await db.list('incomes'); const sum = a2 => a2.reduce((s2, x) => s2 + (Number(x.amount) || 0), 0);
+    const a0 = r ? r[0] : ymd(new Date(base.getFullYear(), base.getMonth(), 1)), b0 = r ? r[1] : ymd(new Date(base.getFullYear(), base.getMonth() + 1, 0)), label = r ? r[2] : '이번 달';
+    const got = xs.filter(x => x.status === 'got' && (x.gotAt || x.date || '') >= a0 && (x.gotAt || x.date || '') <= b0).sort((x, y) => (y.gotAt || y.date || '').localeCompare(x.gotAt || x.date || '')); const due = xs.filter(x => x.status !== 'got');
+    return { text: `${got.length ? `${label}에 들어온 돈은 ${won(sum(got))} (${got.length}건)이에요.` : `${label}에 들어온 돈은 아직 없어요.`}${due.length ? ` 받을 돈은 ${won(sum(due))} (${due.length}건) 남아 있어요.` : ''}`,
+      items: got.slice(0, 12).map(x => ({ icon: 'wallet', title: x.title, sub: [won(x.amount), md(x.gotAt || x.date), x.from].filter(Boolean).join(' · '), go: 'money' })), chips: due.length ? [{ label: '받을 돈 보기', say: '받을 돈 얼마야?' }] : [] };
+  }
   if (/(받을\s*돈|미수금|입금\s*(안|예정|언제|됐|들어)|안\s*들어온|들어올\s*돈|수금|매출)/.test(q)) {
     let xs = await db.list('incomes'); if (proj) xs = xs.filter(x => x.project === proj || key(x.title).includes(key(proj))); const due = xs.filter(x => x.status !== 'got').sort((x, y) => (x.date || '9').localeCompare(y.date || '9')), got = xs.filter(x => x.status === 'got');
     const sum = a => a.reduce((s2, x) => s2 + (Number(x.amount) || 0), 0);

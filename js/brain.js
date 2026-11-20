@@ -640,7 +640,7 @@ function interpretOne(s, base, ctx) {
     if (t.length <= 16 && /(번호|연락처|전화번호|가격|단가)$/.test(t)) return true;
     if (t.length <= 30 && !w.time) {
       if (/^(주간|이번\s*주|금주|지난\s*주)\s*(점검|보고|리포트|결산|회고)(\s*(해\s*줘|보여\s*줘|뽑아\s*줘))?$/.test(t)) return true;
-      const m = t.match(/^(.*?)\s*(할\s*일|할일|마감|일정|스케줄|지출|지출\s*내역|진행\s*상황|진행상황|진행\s*현황|현황|회의\s*내용|휴가자?|빈\s*시간|작업\s*시간|대기함|확인할\s*것)\s*(은|는|좀)?$/);
+      const m = t.match(/^(.*?)\s*(할\s*일|할일|마감|일정|스케줄|지출|지출\s*내역|수입|매출|받을\s*돈|들어온\s*돈|진행\s*상황|진행상황|진행\s*현황|현황|회의\s*내용|휴가자?|빈\s*시간|작업\s*시간|대기함|확인할\s*것)\s*(은|는|좀)?$/);
       if (m) { const rest = m[1].trim().split(/\s+/).filter(Boolean); const bare = x => x.replace(/(이|의|님)$/, '');
         const okW = x => /^(오늘|내일|모레|어제|이번|다음|지난|주|달|이번주|다음주|지난주|이번달|금주|담주|팀|팀원|개인|내|우리|전체|남은|밀린|끝난|나|저|프로젝트|프로젝트별)$/.test(x) || known(bare(x), ctx) || isName(bare(x));
         if (rest.length <= 4 && (rest.every(okW) || (rest.length && (g => !!(g.name || g.many))(projectGuess(m[1], ctx.projects || [])) && !w.date))) return true; }

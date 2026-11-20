@@ -77,7 +77,7 @@ export async function run(a) {
   if (a.op === 'got') { await db.patch(it.id, { status: 'got', gotAt: today(), ...(it.date && it.date !== today() ? { date: today(), planned: it.date } : {}) }); const left = (await db.list('incomes')).filter(x => x.status !== 'got'); return { text: `“${it.title}” ${Number(it.amount || 0).toLocaleString()}원 받은 것으로 바꿨어요.${left.length ? ` 아직 받을 돈은 ${left.reduce((s, x) => s + (Number(x.amount) || 0), 0).toLocaleString()}원(${left.length}건)이에요.` : ' 이제 받을 돈이 없어요.'}`, chips: [undo(prev)] }; }
   if (a.op === 'handoff') { await handoff(it, a.to, a.note || ''); return { text: `“${it.title}”${eul(it.title)} ${a.to} 님에게 넘겼어요.${a.note ? ` 메모: ${a.note}` : ''} 넘긴 기록은 할 일을 열면 보여요.`, chips: [undo(prev)] }; }
   if (a.op === 'assign') { await db.patch(it.id, { who: a.to }); return { text: `“${it.title}” 담당을 ${a.to} 님으로 했어요.`, chips: [undo(prev)] }; }
-  if (a.op === 'prio') { await db.patch(it.id, { priority: a.v }); return { text: `“${it.title}”${eul(it.title)} ${a.v === 'high' ? '중요' : '보통'}으로 표시했어요.`, chips: [undo(prev)] }; }
+  if (a.op === 'prio') { await db.patch(it.id, { priority: a.v }); return { text: `“${it.title}”${eul(it.title)} ${a.v === 'high' ? '중요로' : '보통으로'} 표시했어요.`, chips: [undo(prev)] }; }
   return null;
 }
 
@@ -94,7 +94,7 @@ async function runDraft(a, d, prev) {
 
 // 말에서 고치기 명령을 알아봄. 해당 없으면 null (→ 평소처럼 새로 만들기·대화로 넘어감)
 export async function tryAct(text, { people = [] } = {}) {
-  const t = text.trim().replace(/[.!~]+$/, ''); if (t.length < 4 || t.length > 90 || /\n/.test(t)) return null;
+  let t = text.trim().replace(/[.!~]+$/, ''); if (t.length < 4 || t.length > 90 || /\n/.test(t)) return null;
   const names = [...new Set([...people, ...(await teammateNames())].filter(Boolean))];
   const who = s => names.find(n => s === n || s === n.slice(1) || s.replace(/(이|님|씨)$/, '') === n || s.replace(/(이|님|씨)$/, '') === n.slice(1));
   let m;
@@ -140,6 +140,7 @@ export async function tryAct(text, { people = [] } = {}) {
     if (!/^(방금|아까|그거|이거)/.test(subj)) return { text: `“${subj}”에 맞는 일정이나 할 일을 못 찾았어요. 이름을 조금 더 정확히 말해 주세요.` };
   }
   // 넘기기: "포스터 시안 민서한테 넘겨줘 (메모)"
+  { const m2 = t.match(/^(\S{1,6}?)(?:이)?\s*(?:한테|에게|께)\s+(.+?)\s*(?:을|를|은|는)?\s*(?:넘겨|넘길|넘김|인계|토스)\S*(?:\s*(?:줘|주세요))?$/); if (m2 && who(m2[1]) && !/(한테|에게|께)/.test(m2[2])) t = `${m2[2]} ${m2[1]}한테 넘겨줘`; }   /* "민서한테 로고 시안 넘겨줘"처럼 사람을 먼저 말해도 */
   if ((m = t.match(/^(.+?)\s+(\S+?)\s*(?:한테|에게|께)\s*(?:넘겨|넘길|넘김|인계|토스)\S*\s*(.*)$/))) {
     const to = who(m[2]); if (to) { const r = await find(m[1], ['task']); const act = { op: 'handoff', to, note: m[3].replace(/^[,\s]+/, '') };
       if (r.one) return run({ ...act, id: r.one.it.id }); if (r.many) return ask(r.many, act, `${to} 님에게 넘길 일이`); return { text: `“${m[1]}”에 맞는 할 일을 못 찾았어요. ${to} 님 할 일로 새로 만들까요?`, chips: [{ label: '새 할 일로', say: `할 일: ${to} ${m[1]}` }, { label: '아니에요', skip: true }] }; }
@@ -156,7 +157,7 @@ export async function tryAct(text, { people = [] } = {}) {
       const r = await find(subj, due ? ['task'] : ['event', 'task'], { date: sw.hits.length ? sw.date : null }); const act = { op: 'move', date: nw.hits.some(x => !/^\d{1,2}시|^\d{1,2}:\d|^오전|^오후|^반$/.test(x)) || !nw.time ? nw.date : null, time: nw.time || '' };
       if (r.one && r.one.it.repeat && !r.one.it._draft && !/(앞으로|계속|매주|매번|전부|다\s)/.test(t)) { const from = sw.hits.length && sw.date ? sw.date : null; return { text: `“${r.one.it.title}”은 반복 일정이에요. 이번 한 번만 옮길까요, 앞으로 계속 옮길까요?`, chips: [{ label: '이번만', act: { ...act, op: 'moveOnce', id: r.one.it.id, from } }, { label: '앞으로 계속', act: { ...act, id: r.one.it.id } }, { label: '그냥 두기', skip: true }] }; }
       if (r.one && act.date && /(미뤄|미루|연기|밀렸|밀려)/.test(t) && tail.every(x => /^[월화수목금토일](요일|욜)$/.test(x) || !/[월화수목금토일](요일|욜)/.test(x)) && !/(주|달|월|일$)/.test(tail.filter(x => !/(요일|욜)$/.test(x)).join('')) && tail.some(x => /(요일|욜)$/.test(x))) { const cur = r.one.it.due || r.one.it.date || ''; let d = new Date(act.date + 'T00:00'); let k = 0; const f = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; while (cur && f(d) <= cur && k++ < 8) d.setDate(d.getDate() + 7); act.date = f(d); } // 미루는 건 지금 날짜보다 뒤로
-      if (r.one) return run({ ...act, id: r.one.it.id }); if (r.many) return ask(r.many, act, '옮길 게'); return { text: `“${subj}”에 맞는 일정이나 할 일을 못 찾았어요. 새로 만들까요?`, chips: [{ label: '새 일정으로', say: `일정: ${subj} ${tail.join(' ')}` }, { label: '아니에요', skip: true }] }; }
+      if (r.one) return run({ ...act, id: r.one.it.id }); if (r.many) return ask(r.many, act, '옮길 게'); return { text: `“${subj.replace(/\s*(다다음\s*주|다음\s*주|이번\s*주|담주|오늘|내일|모레)\s*$/, '') || subj}”에 맞는 일정이나 할 일을 못 찾았어요. 새로 만들까요?`, chips: [{ label: '새 일정으로', say: `일정: ${subj} ${tail.join(' ')}` }, { label: '아니에요', skip: true }] }; }
   }
   // 취소·지우기 (항상 확인)
   if ((m = t.match(/^(.+?)\s*(?:은|는|을|를)?\s*(?:취소|지워|삭제|없애|빼)\S*(?:\s*(?:줘|주세요|해줘|해 줘|됐어|됐대|됨))?$/)) && !/(기억|별명|배운|취향)/.test(t)) {
@@ -173,7 +174,11 @@ export async function tryAct(text, { people = [] } = {}) {
   // 입금 확인: "루미에 잔금 들어왔어", "제일기획 계약금 입금됐어" → 받기로 한 돈을 받은 것으로
   if ((m = t.match(/^(.+?)\s*(?:이|가|은|는|도)?\s*(?:오늘\s*)?(?:다\s*)?(?:들어왔|들어옴|입금\s*됐|입금\s*됨|입금\s*완료|입금\s*확인|받았|받음|수금했|수금함)\S*$/)) && !/(해야|까지|언제|\?|아직|(?<![가-힣\d])안\s|(?<![가-힣\d])못\s)/.test(t)) {
     const amt = brain.parseMoney(m[1]); const ms = (await money(m[1], ['incomes'])).filter(x => x.status !== 'got');
-    if (ms.length === 1 || (ms.length > 1 && amt != null && ms.filter(x => Number(x.amount) === amt).length === 1)) { const x = amt != null ? (ms.find(y => Number(y.amount) === amt) || ms[0]) : ms[0]; return run({ op: 'got', id: x.id }); }
+    if (ms.length === 1 || (ms.length > 1 && amt != null && ms.filter(x => Number(x.amount) === amt).length === 1)) { const x = amt != null ? (ms.find(y => Number(y.amount) === amt) || ms[0]) : ms[0];
+      // 말한 낱말이 다 들어맞지 않으면("오로라 잔금"인데 있는 건 "오로라 계약금") 돈을 바로 받은 것으로 바꾸지 않고 한 번 물음
+      const hay = `${x.title || ''} ${x.from || ''} ${x.project || ''}`.replace(/\s/g, ''); const ws = m[1].replace(/\d[\d,.]*\s*(만|천|백)?\s*원?/g, ' ').split(/\s+/).map(w => w.replace(/(이|가|은|는|도|에서|한테서)$/, '')).filter(w => w.length >= 2);
+      if (amt == null && ws.some(w => !hay.includes(w))) return { text: `“${x.title}” ${Number(x.amount || 0).toLocaleString()}원이 들어온 건가요? 말씀하신 것과 이름이 조금 달라서 여쭤봐요.`, chips: [{ label: '맞아요', act: { op: 'got', id: x.id } }, { label: '아니에요', skip: true }] };
+      return run({ op: 'got', id: x.id }); }
     if (ms.length > 1) return { text: '어느 돈이 들어왔나요?', chips: [...ms.slice(0, 4).map(x => ({ label: `${x.title} ${Number(x.amount || 0).toLocaleString()}원`.slice(0, 34), act: { op: 'got', id: x.id } })), { label: '아니에요', skip: true }] };
   }
   // 완료: "포스터 시안 끝냈어", "견적 요청 보냈어"
@@ -183,6 +188,7 @@ export async function tryAct(text, { people = [] } = {}) {
     if (r.one || r.many) return ask(r.many || [r.one], { op: 'done' }, '끝낸 일이');
   }
   // 중요 표시
+  if ((m = t.match(/^(.+?)\s*(?:은|는|이|가|을|를)?\s*(?:제일\s*|진짜\s*|좀\s*|엄청\s*)?(?:급해요?|급함|급하다|급한\s*거야|급합니다|먼저\s*(?:해야\s*(?:해|돼|함)|해\s*줘|하자))$/))) { const r = await find(m[1], ['task']); if (r.one) return run({ op: 'prio', v: 'high', id: r.one.it.id }); if (r.many) return ask(r.many, { op: 'prio', v: 'high' }, '중요로 올릴 게'); }   /* "로고 시안 급해": 있는 할 일이면 중요로 */
   if ((m = t.match(/^(.+?)\s*(?:은|는|을|를)?\s*(?:중요|급한\s*일|우선)\s*(?:표시|으로|로)?\s*(?:해\s*줘|해줘|올려\s*줘|해)?$/))) { const r = await find(m[1], ['task']); if (r.one) return run({ op: 'prio', v: 'high', id: r.one.it.id }); if (r.many) return ask(r.many, { op: 'prio', v: 'high' }, '중요로 올릴 게'); }
   return null;
 }

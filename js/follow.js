@@ -55,7 +55,7 @@ function readChange(body, { people = [] } = {}) {
   s = s.replace(/^(시간|시각|날짜|날|금액|가격|마감)(?:은|는|이|가)?\s*[:：]?\s*/, '');
   const money = brain.parseMoney(s); const rest0 = s.replace(new RegExp(brain.MONEY_SRC, 'g'), ' ').trim();
   if (money != null && !rest0) { out.amount = money; return out; }
-  const w = brain.parseWhen(s); const rest = w.hits.reduce((x, hh) => x.replace(hh, ' '), s).replace(/(쯤|경|정도|부터|까지|에|으로|로|이|가|은|는)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+  const w = brain.parseWhen(s); const rest = w.hits.reduce((x, hh) => x.replace(hh, ' '), s).replace(/(^|\s)(쯤|경|정도|부터|까지|에|으로|로|이|가|은|는)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
   if (w.hits.length && rest.length <= 1) { out.when = w; return out; }
   // 이름 하나만 말함 → 담당/같이
   const nm = people.find(n => n && (s === n || s === n.slice(1) || s.replace(/(이|님|씨)$/, '') === n.slice(1)));
