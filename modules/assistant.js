@@ -13,9 +13,10 @@ const SUGGEST = ['오늘 일정', '오늘 빈 시간', '이번 주 할 일', '�
 
 let onAiKey = () => { };   // 팀 AI 키가 들어오면 비서 화면의 연결 표시를 바꾸는 손잡이 (화면을 다시 그릴 때 갈아 끼움)
 export default {
-  async render(root) {
+  async render(root, params, opts) {
+    const sheet = (opts && opts.sheet) || null;   /* 다른 화면 위에 띄운 비서 창이면: 그 화면에 맞는 말, 화면 이름 */
     const list = h('div.chat');
-    const ta = h('textarea', { rows: 1, placeholder: '무엇이든 말하거나 적어 주세요. 여러 줄이면 하나씩 처리해요.', 'aria-label': '비서에게 입력' });
+    const ta = h('textarea', { rows: 1, placeholder: sheet ? '말하거나 적어 주세요' : '무엇이든 말하거나 적어 주세요. 여러 줄이면 하나씩 처리해요.', 'aria-label': '비서에게 입력' });
     const preview = h('div.chips', { style: { minHeight: '22px', padding: '0 4px 6px' } });
     const micBtn = h('button.btn.icon.ghost', { title: '말로 입력', 'aria-label': '말로 입력', onclick: () => toggleMic() }, ic('mic', 20));
     const sendBtn = h('button.btn.pri.icon', { 'aria-label': '보내기', onclick: () => send() }, ic('right', 20));
@@ -25,15 +26,15 @@ export default {
     const micOff = () => { clearInterval(timer); recBar.classList.add('hide'); micBtn.classList.remove('rec'); };
     const projBar = h('div.chips', { style: { padding: '0 4px 6px' } });
     const aiBar = h('div.chips', { style: { margin: '-6px 0 10px' } });
-    const sug = h('div.suggest', SUGGEST.map(s => h('button.chip', { onclick: () => { ta.value = s; send(); } }, s)));
+    const sug = h('div.suggest', (sheet && sheet.suggest && sheet.suggest.length ? sheet.suggest : SUGGEST).map(s => h('button.chip', { onclick: () => { ta.value = s; send(); } }, s)));
 
     const page = h('div.chatpage');
     root.append(page);
-    page.append(
-      h('div.page-head', h('div', h('h1', '비서'), h('p.sub', '한 줄로 일정·할 일·지출·연락처·메모 무엇이든. 결과는 확정 전까지 임시예요.')),
+    page.append(...[
+      sheet ? null : h('div.page-head', h('div', h('h1', '비서'), h('p.sub', '한 줄로 일정·할 일·지출·연락처·메모 무엇이든. 결과는 확정 전까지 임시예요.')),
         h('div.row', h('button.btn.sm.ghost', { onclick: clearChat }, ic('trash', 14), '대화 지우기'))),
       aiBar, list,
-      h('div.composer', sug, projBar, recBar, h('div.box', ta, micBtn, sendBtn), preview));
+      h('div.composer', sug, projBar, recBar, h('div.box', ta, micBtn, sendBtn), preview)].filter(Boolean));
 
     // 아래 값들은 지난 대화를 그리는 동안에도 쓰이므로, 기다리는 일(await)보다 먼저 만들어 둠
     // 일정에 빠진 필수 정보(날짜·시간)와 누구랑·어디서를 되물어 채움
@@ -75,7 +76,7 @@ export default {
 
     ta.addEventListener('input', () => { autoGrow(); livePreview(); });
     ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
-    setTimeout(() => ta.focus(), 50);
+    if (!sheet || !matchMedia('(pointer:coarse)').matches) setTimeout(() => ta.focus(), 50);   /* 폰에서 띄운 창은 키보드가 권하는 말을 가리지 않게 */
     const pre = sessionStorage.getItem('assistant:prefill');
     if (pre) { sessionStorage.removeItem('assistant:prefill'); send(pre); }
 
@@ -99,7 +100,7 @@ export default {
         if (desc) preview.append(h('span.chip', desc));
       }
     }
-    function scrollDown() { requestAnimationFrame(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })); }
+    function scrollDown() { requestAnimationFrame(() => { const sc = sheet && page.closest('.modal'); if (sc) sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' }); else window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }); }
 
     async function send(text = ta.value.trim(), origin = 'chat') {
       if (!text) return;
@@ -151,7 +152,7 @@ export default {
       let aiAdd = false;
       const aiSay = async (src, hint = '', extra = {}) => { const AI = await import('../js/ai.js'); if (!(await AI.enabled())) return false;
         const wait = h('div.bubble.bot.faint', h('span.spin'), ' 기록을 보고 답하는 중이에요'); list.append(wait); wait.scrollIntoView({ block: 'end' });
-        let r = null, map = new Map(); try { const CX = await import('../js/context.js'); const snap = await CX.snapshot(); map = snap.map; r = await AI.converse(src, { snapshot: snap.text, history: await CX.recentTalk(), name: (await db.kvGet('name', '')) || '', hint }); } catch (e) { store.logError(e, 'ai-talk'); r = null; } wait.remove();
+        let r = null, map = new Map(); try { const CX = await import('../js/context.js'); const snap = await CX.snapshot(); map = snap.map; r = await AI.converse(src, { snapshot: snap.text, history: await CX.recentTalk(), name: (await db.kvGet('name', '')) || '', hint, screen: sheet ? sheet.screen : '' }); } catch (e) { store.logError(e, 'ai-talk'); r = null; } wait.remove();
         if (!r) return false; if (r.intent === 'add' && !extra.noAdd) { aiAdd = true; return 'add'; }
         const items = r.ids.map(c => map.get(c)).filter(Boolean).map(x => ({ icon: x.icon, title: x.title, sub: x.sub, route: x.route }));
         if (r.intent === 'edit') { const ACT = await import('../js/act.js'); const a = await ACT.tryAct(src, { people }); if (a) { await refreshCards(a.refresh); await drawMsg(await db.put('chat', { role: 'bot', q: src, text: a.text, chips: a.chips }), new Map()); updateBadge(); return true; }

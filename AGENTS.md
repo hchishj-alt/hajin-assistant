@@ -35,6 +35,8 @@
 | 관리자 | modules/admin.js, js/admin.js |
 | 자동 분류, 피드백 학습 | js/auto.js, js/feedback.js |
 | 앱 개선 요청 | modules/dev.js, js/codex.js |
+| 프롬프트 스튜디오 | modules/prompts.js, js/prompts.js |
+| 어디서나 비서(비서 창), 메뉴 줄이기 | js/helper.js, modules/menu.js |
 | 피그마 플러그인 | figma-plugin/ |
 
 ## 새 화면을 추가할 때

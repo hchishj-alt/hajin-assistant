@@ -276,7 +276,7 @@ export async function polishSaved(kind, text, rule, saved, { patch, add, fix = d
 // ── 대화·질문 답하기 ──
 // 사용자의 말과 "앱 기록 한눈에"(js/context.js)를 같이 주고, 뜻(질문·잡담 / 새로 적기 / 있는 것 고치기)을 고르게 한 뒤 질문이면 기록을 근거로 답하게 함.
 // 키가 없거나 늦거나 실패하면 null → 부르는 쪽이 앱 안 규칙으로 대신 답함
-export async function converse(text, { snapshot = '', history = '', name = '', now = new Date(), hint = '', ms = 15000 } = {}) {
+export async function converse(text, { snapshot = '', history = '', name = '', now = new Date(), hint = '', screen = '', ms = 15000 } = {}) {
   if (!(await enabled()) || !text || text.length > 600) return null;
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const prompt = `너는 작은 콘텐츠 기획 팀이 쓰는 업무 앱 "하진 비서" 안의 비서야. 사용자${name ? '(' + name + ')' : ''}의 말을 읽고 JSON 하나로만 답해.
@@ -305,7 +305,7 @@ intent 가 "answer"일 때 say 쓰는 법:
 앱 규칙: 비서가 말에서 읽어 만든 항목은 '임시'로 대기함에 들어가고, 확정을 눌러야 목록·캘린더에 들어가. 할 일 화면에서 직접 적은 건 바로 들어가. 할 일의 오늘 탭은 마감이 오늘까지거나 마감이 없는 일, 예정 탭은 마감이 내일 이후인 일.
 
 intent 가 "answer"면 next 에는 사용자가 이어서 보낼 만한 짧은 말을 0~2개(예: "오늘 할 일 보여줘", "그거 금요일로 미뤄줘").
-${hint ? '\n앱 규칙이 먼저 만든 답(참고만, 틀렸으면 고쳐): ' + hint + '\n' : ''}
+${screen ? '\n사용자가 지금 보고 있는 화면: ' + screen + '. "이거", "여기", "이 화면"처럼 가리키는 말이나 여러 뜻으로 읽히는 말은 이 화면에 맞는 쪽으로 읽어.\n' : ''}${hint ? '\n앱 규칙이 먼저 만든 답(참고만, 틀렸으면 고쳐): ' + hint + '\n' : ''}
 [앱 기록]
 ${snapshot || '(비어 있음)'}
 

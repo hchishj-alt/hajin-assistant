@@ -14,6 +14,7 @@ export const MODULES = [
   { id: 'meetings', title: '회의록', icon: 'mic', group: '작업' },
   { id: 'board', title: '마인드맵 회의', icon: 'share', group: '작업', short: '마인드맵' },
   { id: 'plan', title: '기획 보드', icon: 'bulb', group: '작업', short: '기획' },
+  { id: 'prompts', title: '프롬프트 스튜디오', icon: 'type', group: '작업', short: '프롬프트' },
   { id: 'studio', title: 'SNS 스튜디오', icon: 'film', group: '작업', short: 'SNS' },
   { id: 'archive', title: '레퍼런스', icon: 'image', group: '작업', short: '레퍼런스' },
   { id: 'figma', title: '피그마 정리', icon: 'layers', group: '작업', short: '피그마' },
@@ -65,6 +66,7 @@ async function render() {
   if (!sameView) { view.classList.remove('enter'); void view.offsetWidth; view.classList.add('enter'); }
   if (!mod) { page.append(h('div.empty', '화면을 불러오지 못했어요. 새로고침해 주세요.')); return; }
   current = id;
+  import('./helper.js').then(H => H.visit(id)).then(up => { if (up) buildNav(); }).catch(() => { });   /* 자주 여는 화면은 메뉴 앞쪽으로 */
   try { const c = (await mod.render(page, params)) || null; if (my === seq) cleanup = c; else { try { c && c(); } catch { } } }
   catch (e) { console.error(e); store.logError(e, 'render:' + id); page.append(h('div.card', h('h3', '이 화면에서 문제가 생겼어요'), h('p.muted.small', String(e.message)), h('p.faint.tiny', '자가 점검 메뉴에 기록해 뒀어요.'))); }
   if (my !== seq) return;
@@ -89,10 +91,14 @@ export async function buildNav() {
   const hid = (await db.kvGet('look', null))?.hidden || [];
   // 카테고리별로 접기: 하루는 늘 펼침, 나머지는 접어 두고 지금 보는 화면의 묶음만 열림 (누르면 기억)
   const fold = await db.kvGet('nav:fold', {}); navFold = fold; const cur = (location.hash.replace(/^#\//, '').split('/')[0]) || 'today';
-  const curGroup = MODULES.find(m => m.id === cur)?.group;
-  for (const m of MODULES.filter(m => !m.hidden && !hid.includes(m.id) && (!m.adminOnly || adm))) {
+  let curGroup = '';
+  // 메뉴 줄이기: 하루·시간은 그대로, 나머지는 내 역할에서 주로 쓰는 것 + 자주 연 것만 "자주 쓰는 것"으로, 그 밖은 "더보기"로 접음
+  const pins = await (await import('./helper.js')).pinned();
+  const shown = MODULES.filter(m => !m.hidden && !hid.includes(m.id) && (!m.adminOnly || adm)).map(m => ({ ...m, group: ['하루', '시간'].includes(m.group) ? m.group : pins.has(m.id) ? '자주 쓰는 것' : '더보기' }));
+  const ORDER = ['하루', '시간', '자주 쓰는 것', '더보기']; shown.sort((x, y) => ORDER.indexOf(x.group) - ORDER.indexOf(y.group)); curGroup = shown.find(m => m.id === cur)?.group;
+  for (const m of shown) {
     if (m.group !== g) {
-      g = m.group; const name = g; const open = fold[name] === false || (fold[name] !== true && (name === '하루' || name === curGroup)); /* 직접 접거나 편 건 그대로 기억 */
+      g = m.group; const name = g; const open = fold[name] === false || (fold[name] !== true && (name === '하루' || name === '자주 쓰는 것' || name === curGroup)); /* 직접 접거나 편 건 그대로 기억 */
       const outer = h('div.navg' + (open ? '.open' : ''), { 'data-g': name }); box = h('div.navg-in'); outer.append(box); /* 안쪽 한 겹이 있어야 접었을 때 높이가 0이 됨 */
       const head = h('button.grp', { 'aria-expanded': String(open), onclick: async () => { const b2 = head.nextElementSibling; const now = !b2.classList.contains('open'); b2.classList.toggle('open', now); head.setAttribute('aria-expanded', String(now)); const f = await db.kvGet('nav:fold', {}); f[name] = !now; navFold = f; await db.kvSet('nav:fold', f); } }, h('span', name), ic('down', 12));
       nav.append(head, outer);
@@ -216,6 +222,7 @@ async function boot() {
   db.persist();
   setupSW();
   store.repairTitles().catch(() => { }); // 예전 버전이 잘못 만든 제목(“만들어기”)을 한 번 고침
+  import('./helper.js').then(H => H.start()).catch(e => store.logError(e, 'helper'));   /* 어느 화면에서든 비서 부르기 */
   import('./alarm.js').then(A => A.start()); import('./push.js').then(P => P.start());   /* 알림: 일정 전, 마감, 아침 브리핑, 닫힌 앱 푸시 */
   // 동기화 (설정에서 로그인했을 때만). 다른 기기·팀원이 바꾼 게 오면 입력 중이 아닐 때 화면 새로 그림
   import('./sync.js').then(s => { let was = ''; s.onState(async st => { if (st.status === was) return; was = st.status; (await import('./admin.js')).clearCache(); await buildNav(); document.body.classList.toggle('not-admin', !(await (await import('./admin.js')).isAdmin())); }); return s.start(); }).catch(e => store.logError(e, 'sync'));

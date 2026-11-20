@@ -2,6 +2,7 @@
 // 기준일: 2026-11-19 (목) 오전 10시
 import * as B from './brain.js';
 import { isWhere } from './where.js';
+import * as PS from './prompts.js';
 export const BASE = new Date(2026, 10, 19, 10, 0, 0);
 
 export const CASES = [
@@ -61,6 +62,24 @@ export function run() {
       const bad = [...yes.filter(x => !isWhere(x)), ...no.filter(x => isWhere(x))];
       results.push({ group: '어디 갔는지 묻기', name: '“왜 할 일에 없어?”를 알아듣고, 평범한 말과 헷갈리지 않음', ok: !bad.length, detail: bad.length ? '틀림: ' + bad.join(' / ') : `${yes.length + no.length}문장` }); }
   const refs = B.recommendRefs('게임 UI 파스텔 미니멀 인벤토리 화면');
+  { // 프롬프트 스튜디오
+    const body = '우리 팀: {{팀 소개}}\n팀원: {{팀}}\n\n{{고객사}}에 낼 제안서 목차를 잡아 줘.\n예산: {{예산}}';
+    const vs = PS.vars(body), f1 = PS.fill(body, { '팀': '김하진(PM), 최민서(아트디렉터)', '고객사': '아모레' });
+    results.push({ group: '프롬프트 스튜디오', name: '빈칸 찾고 채우기 (모르는 팀 소개 줄은 빼고, 안 채운 칸은 표시)', ok: vs.join() === '팀 소개,팀,고객사,예산' && !/팀 소개|우리 팀/.test(f1) && f1.startsWith('팀원: 김하진(PM), 최민서(아트디렉터)') && f1.includes('아모레에 낼') && f1.includes('예산: [예산]'), detail: f1.replace(/\n/g, ' / ') });
+    const weak = PS.review('로고 만들어줘'), good = PS.review(PS.BUILTIN.find(t => t.id === 'builtin:pm-mail').body);
+    results.push({ group: '프롬프트 스튜디오', name: '점검: 짧은 말은 낮게, 잘 짠 말은 높게', ok: weak.score < 40 && weak.missing.some(i => i.id === 'format') && good.score >= 80, detail: `${weak.score}점 / ${good.score}점` });
+    const c = PS.compose({ role: '콘텐츠 기획사의 PM', goal: '팝업 제안서 목차를 잡아 줘', format: '표로', ask: true });
+    results.push({ group: '프롬프트 스튜디오', name: '칸을 채우면 한 편으로 조립', ok: c.startsWith('너는 콘텐츠 기획사의 PM야.') && c.includes('해 줄 일: 팝업 제안서 목차를 잡아 줘') && c.includes('형식: 표로') && /먼저 질문/.test(c), detail: c.replace(/\n+/g, ' / ') });
+    const cls = [['견적서 항목 뽑아줘', '돈·계약'], ['회의록 정리해줘', '회의·정리'], ['포스터 무드 세 가지', '디자인·이미지'], ['고객 메일 답장 써줘', '글쓰기'], ['팝업 제안서 목차', '기획'], ['경쟁사 사례 조사', '조사']].filter(([t, want]) => PS.classify(t) !== want);
+    results.push({ group: '프롬프트 스튜디오', name: '분야 알아서 나누기', ok: !cls.length, detail: cls.length ? '틀림: ' + cls.map(x => x[0]).join(' / ') : '6/6' });
+    const rk = [PS.roleKeys('리더·PM·UX/UI').join(), PS.roleKeys('아트디렉터').join(), PS.roleKeys('경영').join()];
+    results.push({ group: '프롬프트 스튜디오', name: '역할 글에서 맡은 일 읽기', ok: rk[0] === 'pm,art' && rk[1] === 'art' && rk[2] === 'biz' && PS.byRole(['biz'])[0].role === 'biz', detail: rk.join(' | ') });
+    const at = new Date().toISOString(), lg = (by, cat, len, sig) => ({ by, cat, tool: 'Claude', title: cat + ' 틀', len, sig, at });
+    const st = PS.style([lg('최민서', '디자인·이미지', 420, { format: true, material: true, context: true }), lg('최민서', '디자인·이미지', 380, { format: true, material: true, context: true }), lg('최민서', '글쓰기', 350, { format: true, context: true }), lg('안서연', '돈·계약', 60, {})], [{ by: '안서연' }], ['김하진', '최민서', '안서연']);
+    results.push({ group: '프롬프트 스튜디오', name: '팀원별 작업 방식 요약', ok: st[0].name === '최민서' && st[0].uses === 3 && st[0].cats[0][0] === '디자인·이미지' && st[0].habits.includes('길고 자세하게 시키는 편') && st[0].habits.includes('받을 모양을 꼭 정함') && st.find(x => x.name === '안서연').made === 1 && st.find(x => x.name === '김하진').uses === 0, detail: st.map(x => `${x.name} ${x.uses}번 [${x.habits.join(', ')}]`).join(' / ') });
+    const bad = PS.BUILTIN.filter(t => !t.title || t.body.length < 60 || !PS.CATS.includes(t.cat) || !PS.ROLES[t.role] || PS.review(t.body).score < 60);
+    results.push({ group: '프롬프트 스튜디오', name: `기본 틀 ${PS.BUILTIN.length}개가 모두 점검을 통과`, ok: !bad.length && PS.BUILTIN.length >= 20 && new Set(PS.BUILTIN.map(t => t.id)).size === PS.BUILTIN.length, detail: bad.length ? '모자람: ' + bad.map(t => `${t.title}(${PS.review(t.body).score})`).join(', ') : '역할별 ' + ['pm', 'art', 'biz', 'all'].map(r => PS.BUILTIN.filter(t => t.role === r).length).join('/') });
+  }
   results.push({ group: '레퍼런스', name: '게임 UI 추천', ok: refs.links.length >= 3 && refs.moods.includes('pastel'), detail: refs.links.map(l => l.site).join(', ') });
   const sim = B.similar('협찬 초대장', [{ id: 1, text: '이터니아 협찬사 초대장 디자인' }, { id: 2, text: '점심 메뉴' }]);
   results.push({ group: '검색', name: '비슷한 기록 찾기', ok: sim[0]?.id === 1, detail: sim.map(s => s.id).join(',') });

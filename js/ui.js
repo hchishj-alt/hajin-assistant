@@ -70,7 +70,7 @@ if (typeof window !== 'undefined') {
     else if (!e.shiftKey && cur === last) { e.preventDefault(); first.focus(); }
   }, true);
 }
-export function modal(title, content, { wide = false, onClose } = {}) {
+export function modal(title, content, { wide = false, onClose, nofocus = false } = {}) {
   const root = document.getElementById('modal-root');
   const id = Date.now() * 100 + (mseq++ % 100);
   const prev = document.activeElement;
@@ -99,7 +99,7 @@ export function modal(title, content, { wide = false, onClose } = {}) {
   root.append(bg); stack.push(me);
   try { const st = hstate(); if (st.modalDone || (st.modal && stack.length === 1)) history.replaceState({ modal: id }, ''); else history.pushState({ modal: id }, ''); noteState(); } catch { }
   const app = document.getElementById('app'); if (app) app.inert = true;
-  setTimeout(() => { if (gone) return; const f = dlg.querySelector('input:not([type=hidden]):not([type=checkbox]),textarea,select'); try { (f || dlg).focus({ preventScroll: !f }); } catch { } }, 30);
+  setTimeout(() => { if (gone) return; const f = nofocus ? null : dlg.querySelector('input:not([type=hidden]):not([type=checkbox]),textarea,select'); try { (f || dlg).focus({ preventScroll: !f }); } catch { } }, 30);
   return close;
 }
 export function confirmBox(msg, okLabel = '확인') {
