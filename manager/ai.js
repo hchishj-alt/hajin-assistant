@@ -78,7 +78,8 @@ export async function video({ about, plat, frames, meta, rules, idea }) {
 }
 export async function readShot(images) {
   const prompt = `이 사진들은 인스타그램이나 틱톡의 인사이트(통계)·프로필 화면 캡처야. 보이는 숫자만 읽어서 JSON으로. 안 보이는 값은 null. 한국어 '만'·'천'·'K'·'M'은 숫자로 바꿔.
-{"plat":"ig"|"tt","profile":{"followers":숫자,"following":숫자,"posts":숫자}|null,"posts":[{"kind":"reels"|"carousel"|"photo"|"video"|"story","date":"YYYY-MM-DD 또는 null","caption":"보이면 앞부분","views":n,"reach":n,"likes":n,"comments":n,"saves":n,"shares":n,"avgWatch":초,"dur":초,"follows":n}]}`;
+프로필 화면이면 격자에 보이는 조회수는 날짜를 모르니 posts에 넣지 마.
+{"plat":"ig"|"tt","profile":{"followers":숫자,"following":숫자,"posts":숫자,"views30":"최근 30일 조회 숫자(보이면)"}|null,"posts":[{"kind":"reels"|"carousel"|"photo"|"video"|"story","date":"YYYY-MM-DD 또는 null","caption":"보이면 앞부분","views":n,"reach":n,"likes":n,"comments":n,"saves":n,"shares":n,"avgWatch":초,"dur":초,"follows":n}]}`;
   return gem([prompt, ...images.map(i => ({ img: i.b64, mime: i.mime }))], { json: true, temp: 0 });
 }
 export async function talk({ about, q, snapshot, history = [] }) {

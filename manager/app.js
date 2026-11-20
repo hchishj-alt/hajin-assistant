@@ -10,7 +10,7 @@ import * as SG from './strategy.js';
 import * as EX from './explore.js';
 import * as W from './web.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.3.1';
+export const VERSION = '1.3.2';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
@@ -183,7 +183,9 @@ function quickCount(p) {
   const f = h('input', { type: 'number', inputmode: 'numeric', placeholder: '예: 412' }), g = h('input', { type: 'number', inputmode: 'numeric', placeholder: '예: 380' });
   const close = sheet(`${A.PLAT[p]} 숫자 넣기`, h('div.form', h('p.muted', p === 'ig' ? '인스타는 로그인해야 보이는 곳이라 앱이 혼자 못 읽어요. 지금 숫자만 적어 주면 그날부터 추이를 재요. 자동으로 받으려면 숫자 채우기 › 인스타 자동 연결.' : '틱톡은 앱이 공개 프로필에서 자동으로 읽어요. 안 될 때만 적어 주세요.'), h('div.two', field('팔로워', f), field('팔로잉', g)),
     h('button.btn.wide', { onclick: async () => { if (!f.value) return toast('팔로워 수를 적어 주세요'); await S.update('profile', {}, pr => { pr[p] = { ...(pr[p] || {}), followers: +f.value, following: g.value ? +g.value : pr[p]?.following }; return pr; }); await S.snap(p, +f.value, g.value ? +g.value : null); close(); toast('넣었어요'); route(); } }, '저장'),
-    p === 'ig' ? h('button.ghost.wide', { onclick: () => { close(); go('#/data'); } }, '캡처로 넣기 · 자동 연결') : null));
+    h('input', { type: 'file', accept: 'image/*', hidden: true, id: 'qcshot', onchange: e => { close(); readShots([...e.target.files]); } }),
+    h('button.ghost.wide', { onclick: () => document.getElementById('qcshot').click() }, ic('image', 15), '프로필 캡처 올리기 (AI가 읽음)'),
+    p === 'ig' ? h('button.link', { onclick: () => { close(); go('#/data'); } }, '자동 연결 방법 보기') : null));
 }
 // 틱톡 공개 프로필 자동 읽기: 팔로워·팔로잉·좋아요·영상별 조회수
 async function syncTT(force) {
@@ -366,11 +368,11 @@ SCREENS.inbox = async (root, st) => {
     const r = d.data || {}; const plat = r.plat === 'tt' ? 'tt' : 'ig';
     const rows = (r.posts || []).map(p => h('div.prow.static', h('span.pk', A.KIND[p.kind] || p.kind || '게시물'), h('span.pc', p.caption || p.date || ''), h('span.pw', ['views', 'reach', 'likes', 'comments', 'saves', 'shares'].filter(k => p[k] != null).map(k => ({ views: '조회', reach: '도달', likes: '좋아요', comments: '댓글', saves: '저장', shares: '공유' })[k] + ' ' + A.fmt(p[k])).join(' · '))));
     root.append(h('div.card', h('div.row.sb', h('b', ic(plat, 15), ' ', A.PLAT[plat], ' 캡처에서 읽은 것'), h('small.muted', new Date(d.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }))),
-      r.profile ? h('p', `팔로워 ${A.fmt(r.profile.followers)} · 팔로잉 ${A.fmt(r.profile.following)} · 게시물 ${A.fmt(r.profile.posts)}`) : null, rows,
+      r.profile ? h('p', `팔로워 ${A.fmt(r.profile.followers)} · 팔로잉 ${A.fmt(r.profile.following)} · 게시물 ${A.fmt(r.profile.posts)}${r.profile.views30 ? ' · 30일 조회 ' + A.fmt(r.profile.views30) : ''}`) : null, rows,
       h('div.row.gap', h('button.ghost', { onclick: async () => { await S.update('drafts', [], l => l.map(x => x.id === d.id ? { ...x, status: '버림' } : x)); route(); } }, '버리기'),
         h('button.btn.grow', { onclick: async () => {
-          if (r.profile?.followers) { await S.update('profile', {}, pr => { pr[plat] = { ...(pr[plat] || {}), followers: r.profile.followers, following: r.profile.following ?? pr[plat]?.following }; return pr; }); await S.snap(plat, r.profile.followers, r.profile.following); }
-          const ps = (r.posts || []).map(p => ({ plat, kind: p.kind || (plat === 'tt' ? 'video' : 'reels'), at: p.date ? new Date(p.date + 'T20:00:00+09:00').toISOString() : new Date().toISOString(), caption: p.caption || '', views: p.views ?? undefined, reach: p.reach ?? undefined, likes: p.likes ?? undefined, comments: p.comments ?? undefined, saves: p.saves ?? undefined, shares: p.shares ?? undefined, avgWatch: p.avgWatch ?? undefined, dur: p.dur ?? undefined, src: 'shot' }));
+          if (r.profile?.followers) { await S.update('profile', {}, pr => { pr[plat] = { ...(pr[plat] || {}), followers: r.profile.followers, following: r.profile.following ?? pr[plat]?.following, media: r.profile.posts ?? pr[plat]?.media, views30: r.profile.views30 ?? pr[plat]?.views30 }; return pr; }); await S.snap(plat, r.profile.followers, r.profile.following); }
+          const ps = (r.posts || []).filter(p => p.date || p.caption).map(p => ({ plat, kind: p.kind || (plat === 'tt' ? 'video' : 'reels'), at: p.date ? new Date(p.date + 'T20:00:00+09:00').toISOString() : new Date().toISOString(), caption: p.caption || '', views: p.views ?? undefined, reach: p.reach ?? undefined, likes: p.likes ?? undefined, comments: p.comments ?? undefined, saves: p.saves ?? undefined, shares: p.shares ?? undefined, avgWatch: p.avgWatch ?? undefined, dur: p.dur ?? undefined, src: 'shot' }));
           if (ps.length) await S.addPosts(ps);
           await S.update('drafts', [], l => l.map(x => x.id === d.id ? { ...x, status: '확정' } : x)); toast('기록에 넣었어요'); route();
         } }, '맞아요, 넣기'))));
