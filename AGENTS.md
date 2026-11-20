@@ -38,7 +38,9 @@
 | 프롬프트 스튜디오 | modules/prompts.js, js/prompts.js |
 | 어디서나 비서(비서 창), 메뉴 줄이기 | js/helper.js, modules/menu.js |
 | 내 역할(바로가기·메뉴·프롬프트가 역할에 맞춰짐) | js/prompts.js `myRole`·`roleKeys`, js/helper.js `who`·`rolePicker` |
-| 비서가 말을 읽는 순서 | modules/assistant.js: 메신저 전달(js/dm.js) → 잡담(js/chat.js) → 고치기(js/act.js) → 읽기(js/brain.js) → 묻는 말 답(js/query.js, js/ask.js) |
+| 비서가 말을 읽는 순서 | modules/assistant.js: 되묻던 것의 답(`answerAsk`, 딴 말인지는 `looksNew`) → 방금 만든 것 고치기(js/follow.js) → 메신저 전달(js/dm.js) → 회의록 붙여넣기(js/brain.js `minutes`) → 잡담(js/chat.js) → 고치기(js/act.js) → 읽기(js/brain.js) → 묻는 말 답(js/query.js, js/ask.js) |
+| 한 말을 여러 건으로 나누기 | js/brain.js `interpret`: 때 말 다듬기(한글 금액 `korMoney`, 기념일·"다음 주 내내"·"평일") → `splitCommands`(줄, 그리고, 번호, 화살표) → `splitChain`("~하고 ~까지", "오전에 … 오후에 …") → `splitList`(쉼표로 늘어놓은 것, 금액 여러 개, "할 일: A, B") → `splitPeople`("대본은 민서가 쓰고 편집은 서연이") → 조각마다 `interpretOne` |
+| 곳으로 읽는 낱말 | js/brain.js `PLACE_RE`(끝 글자)와 `NOTPLACE`(편집·번역처럼 끝 글자만 같은 낱말). 새로 잘못 읽는 낱말이 나오면 `NOTPLACE`에 더함 |
 | 피그마 플러그인 | figma-plugin/ |
 
 ## 새 화면을 추가할 때
@@ -52,6 +54,7 @@
 - 넓은 화면과 폰 폭(390px)에서 바꾼 화면을 열어 콘솔 오류와 가로 넘침이 없는지 본다. 누르는 곳은 44px 이상.
 - 앱의 "자가 점검" 화면이 모두 통과해야 한다.
 - `node tests/run.mjs`(규칙 시험)와 `node tests/order.cjs`(화면 코드 순서 점검)를 돌린다. 말 읽기를 고쳤으면 `js/selftest.js`에 시험을 하나 더 넣는다.
+- 말을 여러 건으로 나누는 규칙을 고쳤으면 나누면 안 되는 말도 같이 시험한다. 예: "민서랑 미팅 준비", "내일 3시 미팅하고 회식", 수량이 있는 가격표, "할 일: 포스터 수정, 금요일까지".
 - 말 읽기는 규칙 시험만으로는 부족하다. 잡담·고치기 쪽이 먼저 받아 가는 말이 있으므로 실제 비서 화면에 넣어서도 본다.
 - 로그인한 상태만 보지 말고, 이름·명단·역할이 없는 맨 기기 상태로도 연다. 역할은 로그인한 멤버면 서버 값, 아니면 이 기기에서 고른 값(kv `me:role`)이다.
 - 화면 시험 스크립트(Playwright)는 저장소 밖에 따로 둔다. 저장소에는 설치할 것을 넣지 않는다.

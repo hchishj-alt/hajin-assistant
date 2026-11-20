@@ -51,7 +51,11 @@ function readChange(body, { people = [] } = {}) {
   // "장소는 X", "담당은 X", "제목은 X", "금액은 X", "시간은 X", "날짜는 X"
   if ((m = s.match(/^(장소|위치|곳|어디)(?:는|은|가|이)?\s*[:：]?\s*(.+)$/))) { out.place = m[2].replace(/(에서|에)$/, '').trim(); return out; }
   if ((m = s.match(/^(담당자?|누구랑|같이|참석자?)(?:는|은|가|이)?\s*[:：]?\s*(.+)$/))) { out.who = m[2].replace(/(이랑|랑|하고|이가|가|님)$/, '').trim(); return out; }
-  if ((m = s.match(/^(제목|이름)(?:은|는|이|가)?\s*[:：]?\s*(.+)$/))) { out.title = m[2].trim(); return out; }
+  if ((m = s.match(/^(제목|이름)(?:은|는|이|가|을|를)?\s*[:：]?\s*(.+)$/))) { out.title = m[2].trim(); return out; }
+  // "민서도 같이 가", "서연이도 와": 같이 하는 사람을 더함
+  if ((m = body.trim().match(/^([가-힣]{2,4}?)(?:이)?(?:도|랑|이랑|하고)\s*(?:같이|함께)?\s*(?:가|가요|간대|갈\s*거야|와|와요|온대|올\s*거야|참석\S*|해|해요|한대|껴|끼워\s*줘|추가\S*)?$/)) && people.some(n => n && (n === m[1] || n.slice(1) === m[1]))) { out.whoAdd = people.find(n => n === m[1] || n.slice(1) === m[1]); return out; }
+  // "법카로 썼어", "현금으로 냈어": 결제 수단
+  if ((m = body.trim().match(/^(법카|법인\s*카드|회사\s*카드|개카|개인\s*카드|내\s*카드|현금|계좌\s*이체|이체)(?:으로|로)?\s*(?:썼어요?|씀|냈어요?|냄|결제\S*|긁었\S*|했어요?|함|이야|야|예요|임)?$/))) { out.pay = /법|회사/.test(m[1]) ? '법인카드' : /현금/.test(m[1]) ? '현금' : /이체/.test(m[1]) ? '계좌이체' : '개인카드'; return out; }
   s = s.replace(/^(시간|시각|날짜|날|금액|가격|마감)(?:은|는|이|가)?\s*[:：]?\s*/, '');
   const money = brain.parseMoney(s); const rest0 = s.replace(new RegExp(brain.MONEY_SRC, 'g'), ' ').trim();
   if (money != null && !rest0) { out.amount = money; return out; }
@@ -86,11 +90,11 @@ export async function tryFollow(text, { people = [] } = {}) {
   const lead = t.match(/^(?:아니|아니야|아냐|아니다|아\s*맞다|아\s*참|참|정정|수정|앗|아)[,.\s]+(?=\S)/) || t.match(/^(?:방금\s*(?:거|건|것|꺼)|아까\s*(?:거|건|것)|이거|그거|이건|그건)\s*(?:은|는|을|를)?\s+(?=\S)/);
   let body = lead ? t.slice(lead[0].length) : t; body = body.replace(/^(?:방금\s*(?:거|건|것|꺼)|이거|그거|이건|그건)\s*(?:은|는|을|를)?\s+/, '');
   const ch = readChange(body, { people }); if (!ch) return null;
-  const labeled = /^(장소|위치|담당자?|제목|시간|시각|날짜|금액|가격|마감|누구랑|참석자?)(?:은|는|이|가)?\s/.test(body) || ch.from != null || ch.shift;
+  const labeled = /^(장소|위치|담당자?|제목|시간|시각|날짜|금액|가격|마감|누구랑|참석자?)(?:은|는|이|가|을|를)?\s/.test(body) || ch.from != null || ch.shift || ch.whoAdd || ch.pay;
   if (!lead && !labeled && !(ch.when || ch.amount != null)) return null;
   const xs = await lastItems(lead || labeled ? FRESH : NEAR);
   if (!xs.length) { if (lead || (ch.when && !ch.when.time && body.length <= 6)) return { text: '방금 만든 게 없어서 무엇을 바꿀지 모르겠어요. “내일 미팅 4시로 옮겨줘”처럼 어떤 건지 같이 말해 주세요.' }; return null; }
-  const want = ch.when || ch.shift ? ['event', 'task', 'expense', 'income', 'sns'] : ch.amount != null ? ['expense', 'income', 'buy'] : ch.place ? ['event'] : ch.who ? ['task', 'event'] : null;
+  const want = ch.whoAdd ? ['event'] : ch.pay ? ['expense'] : ch.when || ch.shift ? ['event', 'task', 'expense', 'income', 'sns'] : ch.amount != null ? ['expense', 'income', 'buy'] : ch.place ? ['event'] : ch.who ? ['task', 'event'] : null;
   let cs = want ? xs.filter(x => want.includes(x.kind)) : xs;
   if (ch.from && cs.length > 1) { const f = cs.filter(x => JSON.stringify(x.data).includes(ch.from)); if (f.length) cs = f; }
   if (!cs.length) return null;
@@ -106,6 +110,8 @@ export async function tryFollow(text, { people = [] } = {}) {
     if (!Object.keys(fields).length) return null;
     say = `“${title(x)}” ${[fields.date || fields.due ? '날짜를 ' + fmtD(fields.date || fields.due) : '', fields.start || fields.time ? '시간을 ' + (fields.start || fields.time) : ''].filter(Boolean).join(', ')}${fields.start || fields.time ? '으로' : '로'} 바꿨어요.`; }
   else if (ch.amount != null) { fields = k === 'buy' ? { price: ch.amount } : { amount: ch.amount }; say = `“${title(x)}” 금액을 ${ch.amount.toLocaleString()}원으로 바꿨어요.`; }
+  else if (ch.whoAdd) { const had = String(cur.who || '').split(/\s*,\s*/).filter(Boolean); if (had.includes(ch.whoAdd)) return { text: `“${title(x)}”에는 이미 ${ch.whoAdd} 님이 들어 있어요.` }; fields = { who: [...had, ch.whoAdd].join(', '), scope: 'work' }; say = `“${title(x)}”에 ${ch.whoAdd} 님도 같이 가는 것으로 넣었어요.`; }
+  else if (ch.pay) { fields = { pay: ch.pay }; say = `“${title(x)}” 결제 수단을 ${ch.pay}${ro(ch.pay)} 바꿨어요.`; }
   else if (ch.place) { fields = { place: ch.place, addr: '', mapUrl: '' }; say = `“${title(x)}” 장소를 ${ch.place}${ro(ch.place)} 바꿨어요.`; }
   else if (ch.who) { const nm = people.find(n => n && (n === ch.who || n.slice(1) === ch.who)) || ch.who; fields = { who: nm }; say = `“${title(x)}” ${k === 'task' ? '담당을' : '같이 하는 사람을'} ${nm}${ro(nm)} 바꿨어요.`; }
   else if (ch.title) { fields = k === 'contact' || k === 'vendor' ? { name: ch.title } : { title: ch.title }; say = `제목을 “${ch.title}”${ro(ch.title)} 바꿨어요.`; }
