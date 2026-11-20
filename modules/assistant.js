@@ -57,6 +57,7 @@ export default {
     const looksNew = (text, k, ctx) => { const ps = brain.interpret(text, ctx); if (!ps.length) return false; if (ps.length > 1) return true; const p = ps[0];
       if (['expense', 'income', 'contact', 'vendor', 'query', 'reference', 'buy', 'nav', 'timelog'].includes(p.kind)) return true;
       const w = brain.parseWhen(text); const rest = w.hits.reduce((x, hh) => x.replace(hh, ' '), text).replace(/(쯤|경|정도|일\s*듯|인\s*듯|같아요?|이요|부터|까지|으로|로|에|이야|야|예요|이에요|요|해|하자|할게|일걸|쯤이야)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+      if ((k === 'date' || k === 'time') && p.kind === 'talk' && rest.replace(/\s/g, '').length >= 3 && !/^(아직|몰라|미정|나중에|종일|하루\s*종일|글쎄|아마|음)/.test(rest)) return true;   // "내일 비 온대"는 답이 아니라 다른 말
       if (k === 'date' || k === 'time') return (p.kind === 'task' || p.kind === 'event' || p.kind === 'note') && rest.length >= 5 && !/^(아직|몰라|미정|나중에|종일|하루\s*종일)/.test(rest);
       return (p.kind === 'task' || p.kind === 'event') && w.hits.length > 0 && rest.length >= 4; };
     const missing = (data, src) => { if (data.endDate && data.endDate > (data.date || '')) return []; const w = brain.parseWhen(src || ''); const need = []; if ((!w.date || w.vague) && !data._dated) need.push('date'); if (!data.start && !data._allday && !/(오전|오후|아침|저녁|밤|점심|새벽|종일|하루\s*종일)/.test(src || '')) need.push('time'); if (!data._asked && ((!data.who && !data.place && !data.area) || (!data.who && /(방문|관람|구경|저녁|점심|식사|약속|영화|여행|나들이|데이트|모임)/.test(data.title || '')))) need.push(data.place || data.area ? 'who' : 'more'); return need; };

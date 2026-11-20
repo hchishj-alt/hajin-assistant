@@ -392,7 +392,17 @@ const NAV_RE = new RegExp('^(' + Object.keys(NAV).sort((a, b) => b.length - a.le
 const NAV_SHY = /^(오늘|홈|비서|메뉴|구매|업체|랭킹|지원사업)$/;   // 이름만으로는 다른 뜻일 수 있어서 "열어 줘" 같은 말이 붙어야 이동
 export function navTo(to) { const k = String(to || '').replace(/\s+/g, ' ').trim(); const hit = Object.keys(NAV).find(x => x.replace(/ /g, '').toLowerCase() === k.replace(/ /g, '').toLowerCase()); return hit ? NAV[hit] : 'today'; }
 export function interpret(input, ctx = {}) {
-  input = String(input == null ? '' : input).replace(/[ \t]{3,}/g, '  '); input = korMoney(input); input = input.replace(/([월화수목금토일]요일)(?:하고|이랑|랑|과|와)\s*(?=[월화수목금토일]요일)/g, '$1 '); ctx = { ...ctx, people: (ctx.people || []).filter(x => typeof x === 'string' && x) };
+  input = String(input == null ? '' : input).replace(/[ \t]{3,}/g, '  '); input = korMoney(input); input = input.replace(/([월화수목금토일]요일)(?:하고|이랑|랑|과|와)\s*(?=[월화수목금토일]요일)/g, '$1 ');
+  { const b0 = ctx.base || new Date(); const nm = (b0.getMonth() + 1) % 12 + 1, tm = b0.getMonth() + 1;   // 때를 가리키는 말 가운데 날짜 읽기가 모르는 것들을 아는 꼴로
+    input = input.replace(/다음\s*달\s*(?=(첫|둘|셋|넷|다섯|마지막)\s*째?\s*주)/g, nm + '월 ').replace(/이번\s*달\s*(?=(첫|둘|셋|넷|다섯|마지막)\s*째?\s*주)/g, tm + '월 ').replace(/(달|월)\s*말일/g, '$1 말'); if (!/\d\s*월|\d{1,2}[/.]\d{1,2}|\d\s*일(?![가-힣])/.test(input)) { const HD = [['크리스마스\\s*이브|성탄절\\s*전날', '12월 24일'], ['크리스마스|성탄절', '12월 25일'], ['새해\\s*첫날|신정', '1월 1일'], ['삼일절', '3월 1일'], ['어린이날', '5월 5일'], ['현충일', '6월 6일'], ['광복절', '8월 15일'], ['개천절', '10월 3일'], ['한글날', '10월 9일']];
+      // 때로 쓴 것만 날짜로 ("크리스마스에 …", "크리스마스 이브 7시 …"). "크리스마스 파티"·"크리스마스 선물"은 그대로
+      for (const [k, d] of HD) { const re = new RegExp('(^|\\s)(' + k + ')(?=(에|에는|날|당일|까지)(\\s|$)|\\s+(오전|오후|아침|점심|저녁|밤|낮|\\d{1,2}\\s*시))'); if (re.test(input)) { const [mm, dd] = d.match(/\d+/g).map(Number); const past = mm < b0.getMonth() + 1 || (mm === b0.getMonth() + 1 && dd < b0.getDate()); input = input.replace(re, '$1' + (past ? (b0.getFullYear() + 1) + '년 ' : '') + d); break; } } }
+    { const md = n => { const d = new Date(b0); d.setDate(d.getDate() + n); return `${d.getMonth() + 1}월 ${d.getDate()}일`; }; const OFF = { 오늘: 0, 내일: 1, 모레: 2, 글피: 3 };
+      input = input.replace(/(^|\s)(오늘|내일|모레)부터\s*(내일|모레|글피)까지(?=\s|$)/g, (m0, pre, a1, b1) => (OFF[b1] > OFF[a1] ? `${pre}${md(OFF[a1])}부터 ${md(OFF[b1])}까지` : m0));   // "내일부터 모레까지 워크숍"
+      const dow = (b0.getDay() + 6) % 7;   // 월=0
+      input = input.replace(/(^|\s)다음\s*주\s*내내(?=\s|$)/g, (m0, pre) => `${pre}${md(7 - dow)}부터 ${md(11 - dow)}까지`).replace(/(^|\s)이번\s*주\s*내내(?=\s|$)/g, (m0, pre) => (dow < 4 ? `${pre}${md(0)}부터 ${md(4 - dow)}까지` : m0));
+      if (/\d{1,2}\s*시|오전|오후|아침|저녁|마다|매주/.test(input)) input = input.replace(/(^|\s)(평일|주중)(마다|에|엔)?(?=\s)/g, '$1월화수목금').replace(/(^|\s)주말(마다|에도)(?=\s)/g, '$1매주 토일'); }
+    input = input.replace(/(^|\s)내년\s*(?=\d{1,2}\s*월)/g, '$1' + (b0.getFullYear() + 1) + '년 ').replace(/(^|\s)(올해|금년)\s*(?=\d{1,2}\s*월)/g, '$1'); }   // 올해 것이 지났으면 내년
   const base = ctx.base || new Date();
   const blk = noticeBlock(input, base, ctx) || bulletBlock(input, base, ctx); if (blk) return blk.map(r => polish({ src: input, ...r }, ctx));
   const parts = splitCommands(input).flatMap(p => splitChain(p, base, ctx)).flatMap(p => splitList(p, base, ctx)).flatMap(p => splitPeople(p, base, ctx));
@@ -638,6 +648,9 @@ function interpretOne(s, base, ctx) {
   // "서연이한테 견적서 보내달라고 해줘": (메신저로 못 전하는 상태면) 서연 담당 할 일로
   { const rq = s.trim().match(/^([가-힣]{2,4}?)(?:이)?(?:님|씨)?\s*(?:한테|에게|께)\s+(.+?)\s*달라고\s*(?:좀\s*)?(?:전해|말해|해|부탁해|얘기해)\s*(?:줘|주세요|줄래|주라)?\s*[.!]?$/);
     if (rq && rq[2].trim().length >= 2) s = `${rq[1]} ${rq[2].trim()}${/(해|내|써|봐|둬|놔|워|려|겨|쳐|춰|꿔|켜|들어|올려|바꿔|고쳐|넣어|찾아|잡아|뽑아)$/.test(rq[2].trim()) ? '줘' : ' 주기'}`; }
+  // "민서야 내일까지 시안 좀 부탁해": 부른 사람의 할 일로
+  { const vq = s.trim().match(/^([가-힣]{2,3})(아|야)[,\s]+(.{2,50}?(?:부탁\s*(?:해요?|할게요?|드려요?)?|줘요?|줄래요?|주라|놔|둬))((?:\s+\S+){0,2}?\s+\S+까지)?\s*[.!~]*$/);
+    if (vq && (known(vq[1], ctx) || isName(vq[1], true))) s = `할일: ${vq[1]}${(vq[1].charCodeAt(vq[1].length - 1) - 0xac00) % 28 ? '이' : ''}는 ${vq[3].trim().replace(/(^|\s)좀(?=\s)/g, '$1').replace(/\s*부탁\s*(해요?|할게요?|드려요?)?$/, '').replace(/\s+/g, ' ').trim().replace(/(을|를)$/, '')}${vq[4] || ''}`; }
   // "서연이한테 견적서 부탁해줘": 그 사람 할 일로
   { const bq = s.trim().match(/^([가-힣]{2,4}?)(?:이)?(?:님|씨)?\s*(?:한테|에게|께)\s+(.{2,40}?)\s*(?:좀\s*)?부탁\s*(?:해\s*(?:줘|주세요|줄래)|할게요?|드려요?|한다고\s*(?:해|전해)\s*줘)\s*[.!]?$/);
     if (bq && (known(bq[1], ctx) || isName(bq[1], true)) && !/[?？]/.test(bq[2])) s = `할일: ${bq[1]}${/[가-힣]/.test(bq[1].slice(-1)) && (bq[1].charCodeAt(bq[1].length - 1) - 0xac00) % 28 ? '이' : ''}는 ${bq[2].trim().replace(/(을|를)$/, '')}`; }
@@ -734,6 +747,10 @@ function interpretOne(s, base, ctx) {
   // 제목에 남은 군말 다듬기: "영수증 정리 하자" → "영수증 정리", "사무실 월세 매달" → "사무실 월세", "깨워줘" → "일어나기"
   if (made.data && typeof made.data.title === 'string') { let tt = made.data.title;
     if ((made.kind === 'task' || made.kind === 'event') && !/(같이|함께)\s+(하자|합시다)$/.test(tt)) tt = tt.replace(/\s+(하자|합시다|할게|할래|해야지)$/, '');
+    if (made.kind === 'event') { tt = tt.replace(/^우리\s+(?=\S)/, '').replace(/([가-힣]{2,})(하자|합시다|할까요?|하기로\s*함)$/, '$1');   // "우리 회식하자" → "회식"
+      const lead = tt.match(/^([가-힣]{2,3}?)(이가|가|이|는|은)\s+(.+?)\s*(감|간다|가요|가기로\s*함|참석|참석함)?$/); const lw = lead && (ctx.people || []).find(n => n === lead[1] || n.slice(1) === lead[1]);   // "하진이 내일 3시 오로라 미팅 감" → 누구: 하진, 제목: 오로라 미팅
+      if (lw && lead[3].length >= 2 && (lead[4] || !made.data.who)) { tt = lead[3]; if (!made.data.who) made.data.who = lw; }
+      if (made.data.place) { const pl = made.data.place.match(/^([가-힣]{2,3}?)(이가|가|이|는|은)\s+(.+)$/); const pw = pl && (ctx.people || []).find(n => n === pl[1] || n.slice(1) === pl[1]); if (pw) { made.data.place = pl[3]; if (!made.data.who) made.data.who = pw; } } }   // "민서가 내일 2시 치과"의 곳은 "치과"
     for (const pn of (ctx.projects || [])) if (typeof pn === 'string' && pn.length >= 3 && t.includes(pn) && !tt.includes(pn) && tt.includes(pn.slice(0, -1))) tt = tt.replace(pn.slice(0, -1), pn);   /* "루미에"처럼 조사로 끝나는 프로젝트 이름이 잘린 것 되살림 */
     if (made.kind === 'expense') tt = tt.replace(/\s*(매달|매월|매주|매년)\s*$/, '');
     if (made.kind === 'expense') { const pm = tt.match(/^(.+?)\s+(\S{2,4}?)(이가|가|이)$/); const who = pm && (ctx.people || []).find(n => n === pm[2] || n.slice(1) === pm[2]);   /* "굿즈 샘플비 15만원 서연이가 냄": 낸 사람은 제목이 아니라 메모로 */
@@ -749,6 +766,7 @@ function interpretOne(s, base, ctx) {
     const vsig = phone || urls.length || bareUrl(t) || money != null || /\b1[5-9]\d{2}[-\s]?\d{4}\b/.test(t);
     const dl = isDeadline(t), biz = BIZ.test(t);
     const OBLIG = /(해야|야\s*(함|해|돼|됨|한다|겠|지)|하기로|줘야|필요|부탁)/;
+    if (/(^|\s)(비|눈|소나기|태풍|황사|미세먼지)\s*(가\s*)?(온대|온다|온대요|올\s*듯|와요?|많대|심하대|심하다)\s*[.!~]*$/.test(t) || /(덥대|춥대|덥다|춥다|더워|추워)\s*[.!~]*$/.test(t)) { if (money == null && !w.time) return 'talk'; }   // "내일 비 온대"는 그냥 하는 말
     // 일정 낱말로 세면 안 되는 것: 회의록·발표 자료 같은 '물건', 때를 가리키는 저녁·점심
     const T = t.replace(/(회의록|회의\s*자료|회의\s*준비|미팅\s*자료|미팅\s*준비|발표\s*자료|발표\s*준비|촬영\s*콘티|촬영본|촬영분|행사\s*준비|전시\s*준비|촬영\s*준비|촬영\s*허가|촬영\s*소품|촬영\s*장비|촬영\s*순서)/g, '□').replace(/(오늘|내일|모레|요일|욜)\s*(저녁|점심|아침)(에)?(?=\s|$)/g, '$1');
     if (/(뵙겠습니다|수고하셨습니다|고생하셨습니다|수고했어요?|고생했어요?|감사합니다|고마워요?|들어가세요)\s*[.!~ㅎㅋ^]*$/.test(t) && money == null && !dl) return 'talk';
@@ -969,7 +987,8 @@ export function polish(r, ctx = {}) {
   const d = r && r.data; if (!d) return r; const src = String(r.src || '');
   if (['event', 'income', 'expense', 'task', 'buy'].includes(r.kind) && typeof d.title === 'string' && d.title) {
     let t = d.title.replace(/^[-*•·▪◦]\s+/, '').replace(/(?<=\S)\s+(까지|부터|에|으로|로|은|는|이랑|랑)(?=\s|$)/g, ' ');
-    if (/\d\s*일|\d{1,2}[/.]\d{1,2}/.test(src)) t = t.replace(/(^|\s)\(?[월화수목금토일]요일\)?(이랑|랑|에)?(?=\s|$)/g, ' '); // 날짜를 말했으면 요일은 제목에서 뺌
+    if (/\d\s*일|\d{1,2}[/.]\d{1,2}/.test(src)) t = t.replace(/(^|\s)(내년|올해|금년)(에)?(?=\s|$)/, ' ');   // "내년 1월 2일 시무식" → "시무식"
+    if (/\d\s*일|\d{1,2}[/.]\d{1,2}|\d\s*주\s*(뒤|후)/.test(src)) t = t.replace(/(^|\s)\(?[월화수목금토일]요일\)?(이랑|랑|에)?(?=\s|$)/g, ' '); // 날짜를 말했으면 요일은 제목에서 뺌
     if (r.kind === 'event' || r.kind === 'income') t = t.replace(/^(\S{1,12}?)(은|는)(?=\s|$)/, (m0, a, j) => (new RegExp('^\\s*' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + j + '\\s+(\\d|오늘|내일|모레|다음|이번|팝업|[월화수목금토일]요일)').test(src) ? a : m0)); // "PT는 12월 9일 …" → "PT"
     t = t.replace(/^(까지|부터)(?=[가-힣A-Za-z])/, '');   // 붙여 쓴 "수욜까지시안"
     if (r.kind === 'task') t = t.replace(/^(.{2,}?)(은|는)\s+(하기|맡기|담당하기|담당)$/, '$1').replace(/^([가-힣A-Za-z0-9]{2,10})(은|는)\s+([가-힣]{1,4}기)$/, '$1 $3');   // "포스터는 … 민서가 하기로 했어" → "포스터"
