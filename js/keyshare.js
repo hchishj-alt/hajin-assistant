@@ -84,7 +84,7 @@ export async function takeFromHash() {
 export function guide(onDone) {
   const inp = h('input.in', { type: 'password', placeholder: '여기에 키 붙여넣기', autocomplete: 'off', 'aria-label': 'Gemini API 키' });
   const out = h('p.small', { style: { minHeight: '1.4em' } });
-  const looksKey = k => /^[\w-]{30,80}$/.test(k);
+  const looksKey = k => /^[\w.~-]{20,200}$/.test(k);   /* 새 형식 키는 가운데 점이 들어감 (AQ.…) */
   const connect = async k => {
     k = String(k || '').trim(); if (!looksKey(k)) { out.textContent = '키처럼 보이지 않아요. AI Studio에서 키 옆의 복사를 누른 뒤 다시 해 주세요.'; inp.focus(); return; }
     out.textContent = '연결을 시험하는 중…'; await save(k);

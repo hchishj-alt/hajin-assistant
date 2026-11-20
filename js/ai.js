@@ -51,10 +51,30 @@ export function fromHtml(html, url) {
 
 // ── Gemini (무료 키) ──
 // 모델 고르기: 가볍고 빠른 "lite" 별칭을 먼저 쓰고(무료 등급에서 가장 잘 돌아감), 막히거나 느리면 다음 후보로 넘어감. 되는 걸 기억해 둠
+// 키 보내는 법: 예전 키(AIza…)는 주소 뒤 ?key= 로, 새 형식 키(AQ.…)는 머리말 x-goog-api-key 로 먼저 보냄.
+// 그 방법이 인증 오류(400·401·403)로 막히거나 아예 못 나가면 다른 방법으로 한 번 더 해 보고, 된 방법을 기억함.
+const GAPI = 'https://generativelanguage.googleapis.com/v1beta/';
+let authWay = '';
+async function gfetch(path, key, init = {}) {
+  const ways = authWay ? [authWay, authWay === 'q' ? 'h' : 'q'] : /^AIza/.test(key) ? ['q', 'h'] : ['h', 'q'];
+  let r = null;
+  for (const [i, w] of ways.entries()) {
+    const url = GAPI + path + (w === 'q' ? (path.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key) : '');
+    try { r = await fetch(url, w === 'h' ? { ...init, headers: { ...(init.headers || {}), 'x-goog-api-key': key } } : init); }
+    catch (e) { if ((e && e.name === 'AbortError') || i === ways.length - 1) throw e; continue; }
+    if (r.ok) { authWay = w; return r; }
+    if (![400, 401, 403].includes(r.status)) return r;
+  }
+  return r;
+}
+async function timedG(path, key, opt = {}, ms = 20000) {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
+  try { return await gfetch(path, key, { ...opt, signal: c.signal }); } finally { clearTimeout(t); }
+}
 const FALLBACK = ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
 async function candidates(key) {
   const saved = await db.kvGet('ai:model', ''); let listed = [];
-  if (!saved) { try { const j = await (await timed(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(key)}`, {}, 8000)).json();
+  if (!saved) { try { const j = await (await timedG('models?pageSize=200', key, {}, 8000)).json();
     const ms = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent') && /^models\/gemini-[\d.]+-flash(-lite)?$/.test(m.name)).map(m => m.name.replace('models/', ''));
     const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0);
     listed = ms.sort((a, b) => (/lite/.test(b) ? 1 : 0) - (/lite/.test(a) ? 1 : 0) || ver(b) - ver(a)).slice(0, 3); } catch { } }
@@ -63,14 +83,14 @@ async function candidates(key) {
 // 무료 등급은 같은 모델도 때에 따라 1초~10초로 속도가 크게 달라진다.
 // 짧은 문장 읽기처럼 빨라야 하는 일은, 첫 모델이 hedge(ms) 안에 답이 없으면 다음 가벼운 모델에도 같이 물어 먼저 온 답을 쓴다.
 function raceCall(list, key, body, ms, hedge = 2500) {
-  const errOf = st => st === 429 ? '무료 사용량을 잠깐 넘었어요. 조금 뒤에 다시 해 주세요' : st === 400 || st === 403 ? 'AI 키를 확인해 주세요' : 'AI가 답하지 못했어요 (' + st + ')';
+  const errOf = st => st === 429 ? '무료 사용량을 잠깐 넘었어요. 조금 뒤에 다시 해 주세요' : st === 400 || st === 401 || st === 403 ? 'AI 키를 확인해 주세요 (' + st + ')' : 'AI가 답하지 못했어요 (' + st + ')';
   return new Promise((resolve, reject) => {
     const acs = [], timers = []; let done = false, started = 0, pending = 0, last = '';
     const finish = (fn, v) => { if (done) return; done = true; timers.forEach(clearTimeout); fn(v); acs.forEach(a => { try { a.abort(); } catch {} }); };
     const start = i => {
       if (done || i >= list.length || started > i) return; started = i + 1; pending++;
       const m = list[i], ac = new AbortController(); acs.push(ac);
-      fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', signal: ac.signal, headers: { 'Content-Type': 'application/json' }, body })
+      gfetch(`models/${m}:generateContent`, key, { method: 'POST', signal: ac.signal, headers: { 'Content-Type': 'application/json' }, body })
         .then(async r => { if (!r.ok) { last = errOf(r.status); throw 0; } const j = await r.json(); finish(resolve, { m, j }); })
         .catch(() => { pending--; if (done) return; if (started < list.length) start(started); else if (!pending) finish(reject, new Error(last || 'AI가 답하지 못했어요')); });
       if (i + 1 < list.length) timers.push(setTimeout(() => start(i + 1), hedge));
@@ -89,13 +109,13 @@ export async function ask(prompt, { json = false, ms = 25000, temp = 0.2, fast =
     if (!json) return out;
     try { return JSON.parse(out.replace(/^```(?:json)?\s*|\s*```$/g, '')); } catch { throw new Error('AI 답을 읽지 못했어요'); }
   }
-  const call = (m, t) => timed(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: temp, ...(json ? { responseMimeType: 'application/json' } : {}) } }) }, t);
+  const call = (m, t) => timedG(`models/${m}:generateContent`, key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: temp, ...(json ? { responseMimeType: 'application/json' } : {}) } }) }, t);
   const list = await candidates(key); let r = null, last = '';
   for (const [i, m] of list.entries()) {
     try { r = await call(m, i < list.length - 1 ? Math.min(ms, 14000) : ms); } catch { last = '응답이 너무 늦어요'; r = null; continue; } // 늦으면 다음 후보
     if (r.ok) { if ((await db.kvGet('ai:model', '')) !== m) await db.kvSet('ai:model', m); break; }
-    last = r.status === 429 ? '무료 사용량을 잠깐 넘었어요. 조금 뒤에 다시 해 주세요' : r.status === 400 || r.status === 403 ? 'AI 키를 확인해 주세요' : 'AI가 답하지 못했어요 (' + r.status + ')';
-    if (r.status === 400 || r.status === 403) break; r = null;
+    last = r.status === 429 ? '무료 사용량을 잠깐 넘었어요. 조금 뒤에 다시 해 주세요' : r.status === 400 || r.status === 401 || r.status === 403 ? 'AI 키를 확인해 주세요 (' + r.status + ')' : 'AI가 답하지 못했어요 (' + r.status + ')';
+    if (r.status === 400 || r.status === 401 || r.status === 403) break; r = null;
   }
   if (!r || !r.ok) { await db.kvSet('ai:model', ''); throw new Error(last || 'AI가 답하지 못했어요'); }
   const out = ((await r.json()).candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
