@@ -7,7 +7,7 @@ import * as LB from '../js/labels.js';
 import * as G from '../js/gcal.js';
 import * as SC from '../js/scope.js';
 const evColor = e => LB.colorOf(e.label) || e.color || colorFor((e.title || '').replace(/^◆ /, ''));
-let labF = '', scopeF = 'mine', peopleF = [];
+let labF = '', scopeF = 'mine', peopleF = [], fOpen = false;   /* fOpen: 폰에서 보기 설정(사람·범위·중요도)을 펼쳤는지 */
 
 let mode = matchMedia('(max-width:900px)').matches ? 'agenda' : 'month', cursor = new Date();
 export default {
@@ -50,8 +50,13 @@ export default {
       const nav = h('div.row.between', { style: { marginBottom: '12px' } },
         h('div.row', h('button.btn.icon.ghost', { 'aria-label': '이전', onclick: () => move(-1) }, ic('left')), h('h2', { style: { minWidth: '150px', textAlign: 'center' } }, title()), h('button.btn.icon.ghost', { 'aria-label': '다음', onclick: () => move(1) }, ic('right')), h('button.btn.sm', { onclick: () => { cursor = new Date(); draw(); } }, '오늘')),
         seg([['month', '월'], ['week', '주'], ['agenda', '목록'], ['people', '사람별']], mode, v => { mode = v; draw(); }));
-      if (members.length > 1) body.append(h('div.chips.cal-people', h('span.faint.tiny', '사람'), ...members.map(n => h('button.chip' + (peopleF.includes(n) ? '.acc' : ''), { onclick: () => { peopleF = peopleF.includes(n) ? peopleF.filter(x => x !== n) : [...peopleF, n]; draw(); } }, h('span.avatar.xs', { style: { background: colorFor(n) } }, n[0]), n === me ? n + ' (나)' : n)), peopleF.length ? h('button.chip', { onclick: () => { peopleF = []; draw(); } }, '모두 보기') : null));
-      body.append(nav, h('div.row.between', { style: { marginBottom: '10px', gap: '8px', flexWrap: 'wrap' } }, seg([['mine', '내 일정'], ['work', '팀 업무'], ['personal', '개인만'], ['all', '전체']], scopeF, v => { scopeF = v; draw(); }), h('span.faint.tiny', { mine: '개인 일정과 내가 낀 팀 업무를 같이 봐요', work: '팀 전체가 보는 업무 일정이에요', personal: '나만 보는 일정이에요', all: '개인과 팀 업무 전부예요' }[scopeF])), h('div.labels', { style: { marginBottom: '10px' } }, [{ id: '', name: '전체', color: 'var(--line2)' }, ...LB.all()].map(l => h('button.lab' + (labF === l.id ? '.on' : ''), { style: { '--lc': l.color }, onclick: () => { labF = l.id; draw(); } }, h('i'), l.name))));
+      // 폰에서는 사람·범위·중요도 고르기를 "보기 설정" 한 줄로 접어 둠 (일정이 바로 보이게). 넓은 화면은 늘 펼침
+      const scopeName = { mine: '내 일정', work: '팀 업무', personal: '개인만', all: '전체' }; const labName = labF ? ((LB.all().find(l => l.id === labF) || {}).name || '') : '';
+      const fbtn = h('button.btn.sm.ghost.cal-fbtn', { type: 'button', 'aria-expanded': String(fOpen), onclick: () => { fOpen = !fOpen; draw(); } }, ic('sliders', 14), `보기 설정 · ${[scopeName[scopeF], labName, peopleF.length ? peopleF.length + '명' : ''].filter(Boolean).join(' · ')}`, ic(fOpen ? 'up' : 'down', 14));
+      body.append(nav, fbtn, h('div.cal-filters' + (fOpen ? '.open' : ''),
+        members.length > 1 ? h('div.chips.cal-people', h('span.faint.tiny', '사람'), ...members.map(n => h('button.chip' + (peopleF.includes(n) ? '.acc' : ''), { onclick: () => { peopleF = peopleF.includes(n) ? peopleF.filter(x => x !== n) : [...peopleF, n]; draw(); } }, h('span.avatar.xs', { style: { background: colorFor(n) } }, n[0]), n === me ? n + ' (나)' : n)), peopleF.length ? h('button.chip', { onclick: () => { peopleF = []; draw(); } }, '모두 보기') : null) : null,
+        h('div.row.between', { style: { marginBottom: '10px', gap: '8px', flexWrap: 'wrap' } }, seg([['mine', '내 일정'], ['work', '팀 업무'], ['personal', '개인만'], ['all', '전체']], scopeF, v => { scopeF = v; draw(); }), h('span.faint.tiny', { mine: '개인 일정과 내가 낀 팀 업무를 같이 봐요', work: '팀 전체가 보는 업무 일정이에요', personal: '나만 보는 일정이에요', all: '개인과 팀 업무 전부예요' }[scopeF])),
+        h('div.labels', { style: { marginBottom: '10px' } }, [{ id: '', name: '전체', color: 'var(--line2)' }, ...LB.all()].map(l => h('button.lab' + (labF === l.id ? '.on' : ''), { style: { '--lc': l.color }, onclick: () => { labF = l.id; draw(); } }, h('i'), l.name)))));
       const on = d => events.filter(e => (!labF || e.label === labF) && store.occursOn(e, d)).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
       if (mode === 'month') body.append(month(on, tasks));
       else if (mode === 'week') body.append(week(on));

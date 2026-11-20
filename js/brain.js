@@ -310,7 +310,7 @@ export function cleanTask(s, who = '') {
   let r = tidy(s).replace(/(^|\s)(급하게|급히|빨리|꼭|반드시|무조건)(?=\s)/g, ' ').replace(/(이번\s*주|금주|오늘|내일|월말|말일|이번\s*달\s*말)\s*(안에|안으로|중으로|중에|내로|내에|까지)/g, ' ');
   { const end = { 겨: '기기', 려: '리기', 봐: '보기', 워: '우기', 와: '오기', 써: '쓰기', 줘: '주기', 꿔: '꾸기', 춰: '추기', 내: '내기', 해: '하기', 쳐: '치기', 져: '지기', 켜: '키기', 여: '이기', 둬: '두기', 놔: '놓기', 돼: '되기' }; r = r.replace(/(겨|려|봐|워|와|써|줘|꿔|춰|내|해|쳐|져|켜|여|둬|놔|돼)야\s*(해|돼|함|됨|겠다|한다|하는데|되는데|지)\S*\s*$/, (m0, a) => end[a]).replace(/([받찾닫믿얻])아야\s*(해|돼|함|됨|겠다|한다|지)\S*\s*$/, '$1기'); }
   r = r.replace(/^(나|저)(는|도)?\s+(?=\S)/, '').replace(/\s*(아직|여태|결국)?\s*(못|안)\s*(함|했어요?|했음|했다|끝냄|끝냈어요?|보냄|보냈어요?|한\s*상태)\s*$/, '').replace(/(봐|와|써|꿔|춰|겨|려|워|져|쳐|여|켜)\s*(주세요|줘|주라|줄래)\s*$/, (m0, a) => ({ 봐: '보', 와: '오', 써: '쓰', 꿔: '꾸', 춰: '추', 겨: '기', 려: '리', 워: '우', 져: '지', 쳐: '치', 여: '이', 켜: '키' }[a]) + '기');
-  if (who && who !== '나') r = r.replace(new RegExp('(^|\\s)' + who.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(팀장|실장|선배|후배|대리|과장|피디|PD|대표|감독|작가)?(님|씨)?(이가|이|가|은|는|께서|한테|에게|께)?\\s*[:：]?\\s*'), ' ').trim().replace(/([가-힣])(은|는)\s+(하기로\S*|하기|맡기로\S*|담당)\s*$/, '$1');
+  if (who && who !== '나') r = r.replace(new RegExp('(^|\\s)' + who.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(팀장|실장|선배|후배|대리|과장|피디|PD|대표|감독|작가)?(님|씨)?(이가|이는|이|가|은|는|께서|한테|에게|께)?\\s*[:：]?\\s*'), ' ').trim().replace(/([가-힣])(은|는)\s+(하기로\S*|하기|맡기로\S*|담당)\s*$/, '$1');
   r = r.replace(/(다음\s*주|이번\s*주|담주|다담주|다다음\s*주)?\s*[월화수목금토일](요일|욜)(까지|에|부터)?/g, ' ')
     .replace(/(?<![가-힣])(오늘|내일|모레|글피|오전|오후|저녁|아침)(까지|에|부터)?(?![가-힣])(?!\s*(?:먹|식사))|(다음\s*주|이번\s*주|\d+월\s*\d+일|\d{1,2}\/\d{1,2}|\d+시(\s*반|\s*\d+분)?)(까지|에|부터)?/g, ' ')
     .replace(/(^|\s)(밤|새벽|낮|점심)(까지|부터)(?=\s|$)/g, ' ')
@@ -392,10 +392,10 @@ const NAV_RE = new RegExp('^(' + Object.keys(NAV).sort((a, b) => b.length - a.le
 const NAV_SHY = /^(오늘|홈|비서|메뉴|구매|업체|랭킹|지원사업)$/;   // 이름만으로는 다른 뜻일 수 있어서 "열어 줘" 같은 말이 붙어야 이동
 export function navTo(to) { const k = String(to || '').replace(/\s+/g, ' ').trim(); const hit = Object.keys(NAV).find(x => x.replace(/ /g, '').toLowerCase() === k.replace(/ /g, '').toLowerCase()); return hit ? NAV[hit] : 'today'; }
 export function interpret(input, ctx = {}) {
-  input = String(input == null ? '' : input).replace(/[ \t]{3,}/g, '  '); ctx = { ...ctx, people: (ctx.people || []).filter(x => typeof x === 'string' && x) };
+  input = String(input == null ? '' : input).replace(/[ \t]{3,}/g, '  '); input = korMoney(input); input = input.replace(/([월화수목금토일]요일)(?:하고|이랑|랑|과|와)\s*(?=[월화수목금토일]요일)/g, '$1 '); ctx = { ...ctx, people: (ctx.people || []).filter(x => typeof x === 'string' && x) };
   const base = ctx.base || new Date();
   const blk = noticeBlock(input, base, ctx) || bulletBlock(input, base, ctx); if (blk) return blk.map(r => polish({ src: input, ...r }, ctx));
-  const parts = splitCommands(input).flatMap(p => splitList(p, base, ctx)).flatMap(p => splitPeople(p, base, ctx));
+  const parts = splitCommands(input).flatMap(p => splitChain(p, base, ctx)).flatMap(p => splitList(p, base, ctx)).flatMap(p => splitPeople(p, base, ctx));
   const out = [];
   for (const p of parts) {
     const pre = (p.match(/^\s*(할\s*일|할일|투두|todo)\s*[:：]\s*/i) || [''])[0];
@@ -421,18 +421,58 @@ export function interpret(input, ctx = {}) {
   return out.map(r => polish(r, ctx));
 }
 // 뒤 조각에 시각만 있으면 앞 조각의 날짜를 물려줌: "내일 10시 미팅하고 3시에 답사" → 답사도 내일
-function carryDate(prev, cur, base) { const cw = parseWhen(cur, base); if (!cw.hits.length || !cw.hits.every(isTimeHit)) return cur; const dh = parseWhen(prev, base).hits.find(x => !isTimeHit(x)); return dh ? `${dh} ${cur}` : cur; }
+// 시각만 있는 조각, 날짜 없는 금액 조각("어제 점심 9000원, 커피 4500원")은 앞 조각의 날짜를 따라감
+function carryDate(prev, cur, base) { const cw = parseWhen(cur, base); if (cw.hits.length ? !cw.hits.every(isTimeHit) : parseMoney(cur) == null) return cur; const dh = parseWhen(prev, base).hits.find(x => !isTimeHit(x)); return dh ? `${dh} ${cur}` : cur; }
 const known = (w, ctx) => (ctx.people || []).some(n => n && (n === w || n.slice(1) === w));
 // 쉼표로 늘어놓은 여러 건: 조각마다 날짜·시각·금액이 있거나, 조각마다 사람으로 시작할 때만 나눔
 function splitList(p, base, ctx) {
   if (p.length > 200 || /https?:\/\//.test(p) || /^\s*(업체|거래처)\s*[:：]/.test(p)) return [p];
+  p = p.replace(/(\d\s*원)\s*(?:썼고|냈고|샀고|긁었고|결제했고|결제하고|쓰고|내고)\s+(?=[^,]{1,24}?\d[\d,]*\s*(?:만\s*)?(?:천\s*)?원)/g, '$1 결제, ').replace(/(\d\s*원)(?:이랑|하고|이고)\s+(?=[^,]{1,20}?\d[\d,]*\s*(?:만\s*)?(?:천\s*)?원)/g, '$1, ');   // "점심 9000원이랑 커피 4500원"
   const segs = p.split(/\s*,\s+|\s+\/\s+/).map(x => x.trim()).filter(Boolean); if (segs.length < 2 || segs.length > 6) return [p];
   const lead = x => /^(나|저|내가|제가)(는|은)?\s+\S/.test(x) || (() => { const m = x.match(/^([가-힣]{2,3}?)(이는|는|은|이가|가|이)\s+\S/); return !!m && (known(m[1], ctx) || isName(m[1])); })();
-  if (segs.every(lead)) return segs.map(x => '할일: ' + x);
+  if (segs.every(lead)) { // 마지막에만 붙은 마감("…, 서연이는 견적서 금요일까지")은 앞사람 것에도
+    const dl = segs[segs.length - 1].match(/(?:\S+\s+)?\S+까지\s*$/); const dh = dl && parseWhen(dl[0], base).date ? parseWhen(dl[0], base).hits.join(' ') + '까지' : '';
+    return segs.map(x => '할일: ' + (dh && !parseWhen(x, base).hits.length ? x + ' ' + dh : x)); }
+  // "점심 9000원, 커피 4500원"처럼 수량·업체 말이 없는 짧은 것들은 따로 쓴 돈 (가격표는 한 업체의 품목들이라 그대로 둠)
+  { const MR = () => new RegExp(MONEY_SRC, 'g'); const bare = x => x.replace(MR(), ' ').trim(); const SPENT = /(썼|결제|샀|냈|긁|지출)/, INC = /받기로|입금|들어올|계약금|잔금|선금|착수금/;
+    let ss = segs; const payer = segs[segs.length - 1].match(/\s([가-힣]{2,4}(?:이가|가|이)\s*(?:냄|냈어요?|냈음|결제|계산|결제함|결제했어요?|계산함|계산했어요?))$/);
+    if (payer) ss = segs.map((x, k) => (k < segs.length - 1 && !/(냄|냈|결제|계산)/.test(x) ? x + ' ' + payer[1] : x));           // "…서연이가 냄"은 앞의 것에도
+    if (INC.test(p) && bare(ss[0]).split(/\s+/).length >= 2) { const cl = bare(ss[0]).split(/\s+/)[0]; ss = ss.map((x, k) => (k && bare(x).split(/\s+/).length === 1 && INC.test(x) ? cl + ' ' + x : x)); } // "오로라 계약금 300만원, 잔금 200만원"
+    if (ss.every(x => x.length <= 24 && (x.match(MR()) || []).filter(z => /\d/.test(z)).length === 1 && !parseWhen(bare(x), base).hits.length)
+      && !/\d\s*(장|개|부|매|권|세트|박스|롤|통|ea)(?![가-힣])|업체|거래처|견적|단가|인쇄|제작|예산/i.test(p) && (!INC.test(p) || ss.every(x => bare(x).split(/\s+/).length >= 2)))
+      return ss.map(x => x.replace(/\s*(썼어요?|썼음|씀)$/, '') + (SPENT.test(p) && !SPENT.test(x) ? ' 결제' : '')); }
   const sig = x => parseWhen(x, base).hits.length > 0 || parseMoney(x) != null;
   if (!segs.every(x => sig(x) && x.replace(/\s/g, '').length >= 3) || segs.filter(x => parseWhen(x, base).hits.length).length < 1) return [p];
   if (segs.every(x => parseMoney(x) != null && !parseWhen(x, base).hits.length) && !/(썼|결제|샀|냈|긁|지출)/.test(p)) return [p]; // 가격표는 한 업체의 품목들
   return segs.map((x, i) => (i ? carryDate(segs.slice(0, i).reverse().find(y => parseWhen(y, base).hits.some(h => !isTimeHit(h))) || '', x, base) : x));
+}
+// "만이천원", "오천원", "삼만원"처럼 한글로 적은 금액을 숫자로 ("사원"·"병원" 같은 낱말은 단위 글자가 없어서 그대로)
+const KD = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 }, KU = { 십: 10, 백: 100, 천: 1000 };
+export function korMoney(text) {
+  const sec = x => { let tot = 0, cur = 0; for (const ch of x) { if (KD[ch]) cur = KD[ch]; else { tot += (cur || 1) * KU[ch]; cur = 0; } } return tot + cur; };
+  return String(text).replace(/(^|[\s(])([일이삼사오육칠팔구십백천만억]{1,12})\s?원(?![가-힣]{2})/g, (m0, pre, k) => {
+    if (!/[십백천만억]/.test(k) || /(억.*억|만.*만|만.*억)/.test(k) || /[일이삼사오육칠팔구]{2}/.test(k)) return m0;
+    const [eok, rest] = k.includes('억') ? k.split('억') : ['', k]; const [man, low] = rest.includes('만') ? rest.split('만') : ['', rest];
+    const v = (k.includes('억') ? (sec(eok) || 1) * 1e8 : 0) + (rest.includes('만') ? (sec(man) || 1) * 1e4 : 0) + sec(low);
+    return v >= 100 ? `${pre}${v.toLocaleString('en-US')}원` : m0; });
+}
+// "내일 3시에 미팅 있고 금요일까지 견적서 보내야 해", "민서한테 … 달라고 하고 서연이한테는 …": '~고'로 이은 두 건
+function splitChain(p, base, ctx) {
+  if (p.length > 120 || /https?:\/\//.test(p)) return [p];
+  const toks = p.trim().split(/\s+/); if (toks.length < 4) return [p];
+  const nm = x => { const y = x.replace(/이$/, ''); return known(x, ctx) || known(y, ctx) || isName(x, true) || isName(y, true); };
+  for (let k = 1; k < toks.length - 1; k++) {
+    const tk = toks[k]; let tail;
+    if (/^(있고|하고|잡혔고|잡혀있고)$/.test(tk)) tail = '';
+    else if (/^[가-힣]{2,}(하고|있고)$/.test(tk) && !nm(tk.replace(/(하고|있고)$/, '')) && !/^(광고|참고|보고|경고)/.test(tk.slice(-4))) tail = tk.replace(/(하고|있고)$/, '');
+    else continue;
+    let left = [...toks.slice(0, k), tail].filter(Boolean).join(' '); const right = toks.slice(k + 1).join(' ');
+    const lw = parseWhen(left, base), rw = parseWhen(right, base); let rest = left; for (const hh of lw.hits) rest = rest.replace(hh, ' ');
+    const to = /^([가-힣]{2,4}?)(이)?(한테|에게)(는|도)?$/.exec(toks[k + 1]);
+    if (to && nm(to[1]) && /[가-힣](한테|에게)(\s|$)/.test(left)) { if (/(달라고|라고)$/.test(left)) left += ' 해줘'; return [left, ...splitChain(right.replace(/^(\S+?(?:한테|에게))(는|도)(?=\s)/, '$1'), base, ctx)]; }
+    if (lw.hits.length && rest.replace(/[\s에은는]/g, '').length >= 2 && rw.hits.some(h => !isTimeHit(h)) && right.replace(/\s/g, '').length >= 4 && parseMoney(p) == null) return [left, ...splitChain(right, base, ctx)];
+  }
+  return [p];
 }
 // "대본은 민서가 쓰고 편집은 서연이 금요일까지" → 사람마다 하나씩, 마감은 같이
 function splitPeople(p, base, ctx) {
@@ -581,6 +621,9 @@ function interpretOne(s, base, ctx) {
   // "서연이한테 견적서 보내달라고 해줘": (메신저로 못 전하는 상태면) 서연 담당 할 일로
   { const rq = s.trim().match(/^([가-힣]{2,4}?)(?:이)?(?:님|씨)?\s*(?:한테|에게|께)\s+(.+?)\s*달라고\s*(?:좀\s*)?(?:전해|말해|해|부탁해|얘기해)\s*(?:줘|주세요|줄래|주라)?\s*[.!]?$/);
     if (rq && rq[2].trim().length >= 2) s = `${rq[1]} ${rq[2].trim()}${/(해|내|써|봐|둬|놔|워|려|겨|쳐|춰|꿔|켜|들어|올려|바꿔|고쳐|넣어|찾아|잡아|뽑아)$/.test(rq[2].trim()) ? '줘' : ' 주기'}`; }
+  // "서연이한테 견적서 부탁해줘": 그 사람 할 일로
+  { const bq = s.trim().match(/^([가-힣]{2,4}?)(?:이)?(?:님|씨)?\s*(?:한테|에게|께)\s+(.{2,40}?)\s*(?:좀\s*)?부탁\s*(?:해\s*(?:줘|주세요|줄래)|할게요?|드려요?|한다고\s*(?:해|전해)\s*줘)\s*[.!]?$/);
+    if (bq && (known(bq[1], ctx) || isName(bq[1], true)) && !/[?？]/.test(bq[2])) s = `할일: ${bq[1]}${/[가-힣]/.test(bq[1].slice(-1)) && (bq[1].charCodeAt(bq[1].length - 1) - 0xac00) % 28 ? '이' : ''}는 ${bq[2].trim().replace(/(을|를)$/, '')}`; }
   const t = s.trim();
   const w = parseWhen(t, base);
   const money = parseMoney(t);
@@ -598,6 +641,15 @@ function interpretOne(s, base, ctx) {
     if (tm && money == null && !phone && !urls.length) { const at = new Date(base.getTime() + (Number(tm[1]) * (tm[2] === '시간' ? 60 : 1) + (tm[3] ? 30 : 0)) * 60000);
       const title = tm[4].replace(/\s*(하라고|라고|하기|을|를|좀)$/, '').trim();
       return [{ kind: 'event', label: '일정', confidence: 0.85, data: { title: title || '알림', date: ymd(at), start: `${pad(at.getHours())}:${pad(at.getMinutes())}`, remind: 0, scope: 'personal', _dated: true } }]; } }
+  // "회의록 정리해야 되는데 까먹지 않게 내일 아침에 알려줘", "내일 9시에 약 먹으라고 알려줘": 그때 울리는 알림
+  { const dm = w.date && t.length <= 60 && t.match(/^(.*?)\s*(?:알려|알림|알람|리마인드|깨워|말해)\s*(?:해\s*)?(?:줘|주세요|줄래|주라)[.!]*$/);
+    const mark = /(까먹|잊어버리|잊지|잊으|해야\s*(?:되|하|돼)는데|해야\s*(?:돼|해|됨|함)|(?:으라고|하라고|라고)(?=\s|$))/;
+    if (dm && mark.test(dm[1]) && money == null && !phone && !urls.length && !/[?？]|(뭐|뭘|어디|언제|누가|누구|얼마|몇)/.test(dm[1])) {
+      let ttl = dm[1]; for (const hh of w.hits) ttl = ttl.replace(hh, ' ');
+      const part = /(아침)/.test(dm[1]) ? '09:00' : /(점심)/.test(dm[1]) ? '12:00' : /(저녁)/.test(dm[1]) ? '18:00' : /(밤)/.test(dm[1]) ? '21:00' : '09:00';
+      ttl = ttl.replace(/(안\s*)?(까먹|잊어버리|잊)(지\s*않게|지\s*않도록|지\s*말라고|으면\s*안\s*되니까|을까\s*봐|으니까|지\s*말고)/g, ' ').replace(/(^|\s)(아침|점심|저녁|밤|오전|오후)(에|엔)?(?=\s|$)/g, ' ').replace(/(^|\s)에(?=\s|$)/g, ' ')
+        .replace(/([가-힣])으라고(?=\s|$)/g, '$1기').replace(/\s*(해야\s*(되|하|돼)는데|해야\s*(돼|해|됨|함)|하라고|라고|좀|꼭|나한테|저한테)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim().replace(/(을|를)$/, '');
+      if (ttl.length >= 2) return [{ kind: 'event', label: '일정', confidence: 0.8, data: { title: ttl, date: w.date, start: w.time || part, remind: 0, scope: 'personal', _dated: true } }]; } }
   // "10분 뒤 미팅", "30분 뒤에 출발": 지금부터 그만큼 뒤의 일정 (곧이라 알림은 정각에)
   { const rm = t.length <= 40 && t.match(/^(\d{1,3})\s*(분|시간)(\s*반)?\s*(?:뒤|후|있다가?|이따가?)(?:에)?\s+(.{2,})$/);
     if (rm && money == null && !phone && !urls.length && !/[?？]$|(뭐|뭘|어디|언제|누구|있어|없어|될까|할까)/.test(rm[4])) { const at = new Date(base.getTime() + (Number(rm[1]) * (rm[2] === '시간' ? 60 : 1) + (rm[3] ? 30 : 0)) * 60000);
@@ -771,7 +823,7 @@ function interpretOne(s, base, ctx) {
       case 'expense': { const X = moneyParts(body, bw); return { kind, label: '지출', confidence: X.amount ? 0.85 : 0.6, data: { title: X.title.replace(/\s*(내가|제가|우리가)?\s*(결제|샀다|샀어|샀음|삼|썼다|썼어|썼음|씀|지출|냈다|냈어|냈음|냄|했다|입금함|입금했어|입금|결제함|결제했어|긁음|긁었어|송금함|송금했어|보냄|보냈어)\s*$/, '').trim() || '지출', amount: X.amount, date: bw.date || ymd(base), category: guessCategory(body), project: projectOf(body, ctx), pay: /(법인|회사|팀)\s*카드|법카/.test(body) ? '법인카드' : /현금/.test(body) ? '현금' : /(계좌\s*이체|이체|송금|입금)/.test(body) ? '계좌이체' : '개인카드', ...(X.memo ? { memo: X.memo } : {}) } }; }
       case 'income': { const X = moneyParts(body, bw); const got = /(입금\s*(됨|됐|받|확인|완료)|들어옴|들어왔|받음|받았|수금\s*(함|완료))/.test(body) && !/(안\s*들어|아직|예정|받기로|받을)/.test(body);
         const from = (ctx.vendors || []).find(n => n && body.includes(n)) || (X.title.match(/^([가-힣A-Za-z0-9]{2,12}?)(?:에서|한테서|에게서|한테|이|가)?\s+(?:.*\s)?(?:계약금|선금|착수금|잔금|중도금|미수금|매출|대금|제작비|입금)/) || [])[1] || '';
-        return { kind, label: got ? '받은 돈' : '받을 돈', confidence: X.amount ? 0.8 : 0.6, data: { title: X.title.replace(/\s*(입금\s*(됨|됐어요?|됐음|받음|받았어요?|예정|확인|완료)|들어옴|들어왔어요?|받기로\s*(함|했어요?|했음)?|받음|받았어요?|받을\s*(돈|거|예정)|안\s*들어왔?\S*|아직)\s*$/, '').replace(/\s+/g, ' ').trim() || '받을 돈', amount: X.amount, date: bw.date || (got ? ymd(base) : ''), from, project: projectOf(body, ctx), status: got ? 'got' : 'due', ...(X.memo ? { memo: X.memo } : {}) } }; }
+        return { kind, label: got ? '받은 돈' : '받을 돈', confidence: X.amount ? 0.8 : 0.6, data: { title: X.title.replace(/\s*(입금\s*(됨|됐어요?|됐음|받음|받았어요?|예정|확인|완료)|들어옴|들어왔어요?|받기로\s*(함|했어요?|했음)?|받음|받았어요?|받을\s*(돈|거|예정)|안\s*들어왔?\S*|아직)\s*$/, '').replace(from ? new RegExp('^' + esc(from) + '(에서|한테서|에게서|한테)(?=\\s)') : /$^/, from).replace(/\s+/g, ' ').trim() || '받을 돈', amount: X.amount, date: bw.date || (got ? ymd(base) : ''), from, project: projectOf(body, ctx), status: got ? 'got' : 'due', ...(X.memo ? { memo: X.memo } : {}) } }; }
       case 'contact': { const ph = parsePhone(body), em = parseEmail(body); const raw = body.replace(ph ? /(01[016789]|02|0[3-6]\d)[\s.-]?\d{3,4}[\s.-]?\d{4}/ : /$^/, ' ').replace(em || /$^/, ' ').replace(/(명함\s*(받음|받았어|받았음|교환)?|번호|전화|연락처|이메일|메일|저장|추가|해줘|해 줘|받음|받았어|알게\s*됨|소개\s*받음)/g, ' ').replace(/#[\p{L}\p{N}_]+/gu, ' ').replace(/\s+/g, ' ').trim();
         const ROLE = /^(.*?)(대표|이사|팀장|실장|부장|차장|과장|대리|주임|사원|주무관|매니저|PD|피디|교수|작가|감독|디자이너|개발자|기획자|마케터|에디터|사장|선생님|쌤|원장|담당자?)(님)?$/; const ws = raw.split(' ').filter(Boolean); let nm = '', role = '', org = '';
         const ti = ws.findIndex(x => ROLE.test(x) && x.match(ROLE)[1].length >= 1 && x.match(ROLE)[1].length <= 3); // "김대리", "박대표님"
@@ -788,7 +840,7 @@ function interpretOne(s, base, ctx) {
       case 'vendor': { const v = vendorParts(body, ctx.vendors || []); return { kind, label: '업체', confidence: v.name && (v.phone || v.link || v.prices.length) ? 0.8 : 0.6, data: v }; }
       case 'buy': { const u = parseUrls(body)[0] || ''; return { kind, label: '살 것', confidence: 0.75, data: { title: strip(body.replace(/https?:\/\/\S+/g, '').replace(/\d[\d,]*\s*(만\s*)?(\d+\s*천\s*)?원/g, ' ').replace(/(사야\s*(돼|해|함|겠다)?|살\s*거|살\s*것|구매\s*(목록|예정|할\s*것)?(에)?\s*(추가|넣어)?(해\s*줘|줘)?|장바구니(에)?\s*(추가|넣어)?(해\s*줘|줘)?|주문해야\s*(돼|해)?)/g, ' '), []) || '(상품명을 적어 주세요)', url: u, price: parseMoney(body) || 0, qty: 1, need: 'must' } }; }
       case 'idea': return { kind, label: '아이디어', confidence: 0.7, data: { title: summarize(body, 1)[0]?.slice(0, 60) || body.slice(0, 60), body, tags: tags.length ? tags : keywords(body, 5) } };
-      case 'note': { const dec = DECIDED.test(' ' + body.trim()); return { kind, label: '메모', confidence: dec ? 0.75 : 0.6, data: { title: dec ? '결정: ' + body.trim().replace(/\s*(으로|로)\s*(최종\s*)?(확정|결정|정함|정했어요?|정했음|가기로\s*(함|했\S*)|하기로\s*(함|했\S*))\s*[.!]*\s*$/, '').replace(/(은|는)\s+/, ' → ').slice(0, 60) : (summarize(body, 1)[0] || body).slice(0, 60), body, tags: tags.length ? tags : [...(dec ? ['결정'] : []), ...keywords(body, 6)].slice(0, 6) } }; }
+      case 'note': { const dec = DECIDED.test(' ' + body.trim()); return { kind, label: '메모', confidence: dec ? 0.75 : 0.6, data: { title: dec ? '결정: ' + body.trim().replace(/\s*(으로|로)\s*(최종\s*)?(확정|결정|정함|정했어요?|정했음|가기로\s*(함|했\S*)|하기로\s*(함|했\S*))\s*[.!]*\s*$/, '').replace(/(은|는)\s+/, ' → ').slice(0, 60) : (/^\d[\d,.]*\s*(만|천|억|원|개|명|장|시|분|%|년|월|일|주|번|차)/.test(body.trim()) ? body.trim() : summarize(body, 1)[0] || body).slice(0, 60), body, tags: tags.length ? tags : [...(dec ? ['결정'] : []), ...keywords(body, 6)].slice(0, 6) } }; }
       case 'timelog': { const tw = parseWhen(body, base); const span = tw.time && tw.end ? (+tw.end.slice(0, 2) * 60 + +tw.end.slice(3)) - (+tw.time.slice(0, 2) * 60 + +tw.time.slice(3)) : 0; const m = span > 0 ? span : tw.mins || 60; body = span > 0 ? strip(body, tw.hits).replace(/^(부터|까지)\s*/, '') : body; return { kind, label: '작업 기록', confidence: 0.8, data: { title: strip(body, []).replace(/\d+\s*(시간|분)\s*(동안)?/g, '').replace(/\s*(작업)?\s*(했음|했다|했어|함|완료)$/, '').trim() || '작업', minutes: m, date: tw.date && tw.date <= ymd(base) ? tw.date : ymd(base), project: projectOf(body, ctx) } }; }
       case 'sns': return { kind, label: 'SNS 아이디어', confidence: 0.75, data: { title: cleanTitle, platform: /(릴스|인스타)/.test(body) ? '인스타그램' : /(쇼츠|유튜브)/.test(body) ? '유튜브' : /틱톡/.test(body) ? '틱톡' : '인스타그램', status: '아이디어', date: bw.date || '', tags } };
       case 'okr': return { kind, label: '목표', confidence: 0.7, data: { title: cleanTitle.replace(/^(이번|다음|올해|\d분기)?\s*(분기|달|연도)?\s*(목표|OKR|okr)\s*(는|은|:|：)?\s*/, '').trim() || cleanTitle, quarter: quarterOf(base), krs: [] } };
@@ -837,7 +889,7 @@ const TOPIC_RE = new RegExp(`((?:${MEET}|행사|발표|마감|리허설|답사|�
 const SHOP = /^(스타벅스|스벅|투썸|투썸플레이스|이디야|할리스|메가커피|컴포즈|폴바셋|블루보틀|커피빈|파스쿠찌|빽다방|탐앤탐스|엔제리너스)$/;
 const esc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export function eventParts(title, people = []) {
-  let t = String(title || '').replace(/\s+/g, ' ').trim(); if (!t) return null; let who = '', area = '', place = '';
+  let t = String(title || '').replace(/\s+/g, ' ').trim().replace(/\s*하기로\s*(했어요?|했음|함|했다|했습니다|했지|했거든)[.!]*$/, '').replace(/([가-힣])기로\s*(했어요?|했음|함|했다|했습니다|했지|했거든)[.!]*$/, '$1기').trim(); if (!t) return null; let who = '', area = '', place = '';
   const cut = (m, keep = '') => { t = (t.slice(0, m.index) + ' ' + keep + ' ' + t.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim(); };
   // 누구랑: 아는 이름(성 빼고 불러도), 호칭(오빠·대표님…), 가족
   const names = [...new Set(people.filter(Boolean).flatMap(n => /^[가-힣]{3,4}$/.test(n) ? [n, n.slice(1)] : [n]))].sort((a, b) => b.length - a.length).map(esc).join('|');

@@ -1025,6 +1025,7 @@ a.as-row.as-link{color:inherit;text-decoration:none}
 .aisheet .suggest .chip{min-height:44px;padding:8px 14px}
 .aisheet button.chip.warn{min-height:44px!important;white-space:normal;text-align:left}
 #ai-fab{position:fixed;right:22px;bottom:22px;z-index:30;display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 18px 0 16px;border:0;border-radius:99px;background:var(--acc);color:var(--acc-ink,#fff);font:inherit;font-weight:700;font-size:calc(14px*var(--fs,1));cursor:pointer;box-shadow:0 8px 24px color-mix(in srgb,var(--acc) 38%,transparent);transition:transform .35s var(--spring),box-shadow .2s}
+#ai-fab>span:last-child{max-width:0;overflow:hidden;white-space:nowrap;opacity:0;transition:max-width .25s ease,opacity .2s ease}#ai-fab{padding:0 15px;gap:0}#ai-fab:hover,#ai-fab:focus-visible{gap:8px;padding:0 18px 0 16px}#ai-fab:hover>span:last-child,#ai-fab:focus-visible>span:last-child{max-width:60px;opacity:1}
 #ai-fab:hover{transform:translateY(-2px) scale(1.03)}#ai-fab:active{transform:scale(.94)}
 #ai-fab.hide{display:none}
 @media (max-width:900px){#ai-fab{display:none}}   /* 폰은 아래 가운데 "비서" 탭이 같은 일을 함 */
@@ -1054,3 +1055,7 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 /* 화면 머리의 가끔 쓰는 단추: 폰에서는 "더보기"로 접음 */
 .page-head .fold-more{display:none}
 @media (max-width:900px){.page-head .row>.fold{display:none}.page-head .row.unfold>.fold{display:inline-flex}.page-head .fold-more{display:inline-flex}}
+/* 캘린더: 폰에서는 보기 설정(사람·범위·중요도)을 접어 둠 */
+.cal-fbtn{display:none;margin:0 0 10px;min-height:44px}
+@media (max-width:900px){.cal-fbtn{display:inline-flex}.cal-filters:not(.open){display:none}}
+@media (pointer:coarse),(max-width:900px){#view .draft select{min-height:40px}}
