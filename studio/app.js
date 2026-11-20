@@ -20,7 +20,7 @@ function h(tag, attrs, ...kids) {
     if (v == null || v === false) continue;
     if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else if (k === 'html') el.innerHTML = v;
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'style' && typeof v === 'object') for (const [sk, sv] of Object.entries(v)) sk.startsWith('--') ? el.style.setProperty(sk, sv) : (el.style[sk] = sv);
     else el.setAttribute(k, v === true ? '' : v);
   }
   for (const k of kids.flat(9)) if (k != null && k !== false) el.append(k.nodeType ? k : document.createTextNode(String(k)));
@@ -57,6 +57,15 @@ const ICON = {
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.4-3.6 4.2-5.2 7.5-5.2s6.1 1.6 7.5 5.2"/></svg>',
   stack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5" stroke-linecap="round"/></svg>',
   gift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="11" rx="2"/><path d="M12 9v11M3.5 13h17M12 9c-2-4-6-4-6-1.5S9 9 12 9zm0 0c2-4 6-4 6-1.5S15 9 12 9z"/></svg>',
+  bookmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6.5 4h11v16l-5.5-4-5.5 4z"/></svg>',
+  folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>',
+  help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.8v.2"/></svg>',
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3" stroke-linecap="round"/><path d="M12 7v6M9 10h6" stroke-linecap="round"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  card: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4" stroke-linecap="round"/></svg>',
   coin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M9 9.5l1.5 5 1.5-4 1.5 4 1.5-5"/></svg>',
 };
 const ic = (n, cls = '') => h('span.ic' + (cls ? '.' + cls : ''), { html: ICON[n], 'aria-hidden': 'true' });
@@ -69,7 +78,7 @@ export function isLong(body, name) { return String(body || '').split('\n').some(
 export function fill(body, vals = {}) { return String(body || '').replace(VAR, (_, k) => String(vals[k] ?? '').trim() || `[${k}]`); }
 
 // ── 상태 ──
-const S = { list: [], me: null, bank: null, cat: '전체', q: '', loaded: false, error: '' };
+const S = { list: [], me: null, bank: null, cat: '전체', q: '', loaded: false, error: '', mine: null, folder: '전체' };
 const vals = store.get('vals', {});
 const saveVals = () => store.set('vals', vals);
 const active = () => !!(S.me && S.me.active);
@@ -115,8 +124,7 @@ function sheet(build, { wide = false, onClose } = {}) {
 // ── 화면 ──
 function statusPill() {
   const on = active();
-  return h('button.pill' + (on ? '.on' : ''), { onclick: accountSheet },
-    ic(on ? 'check' : 'user'), on ? `구독 중 · ${ymd(S.me.paid_until)}까지` : '무료로 쓰는 중');
+  return h('a.pill' + (on ? '.on' : ''), { href: '#me' }, ic('user'), '마이페이지', h('i.state' + (on ? '.on' : ''), { title: on ? '구독 중' : '무료' }));
 }
 function cats() { return ['전체', ...new Set(S.list.map(t => t.cat)), '무료']; }
 function shown() {
@@ -142,6 +150,7 @@ function renderChips() {
 }
 function render() {
   if (location.hash === '#admin') return renderAdmin();
+  if (location.hash.startsWith('#me')) return renderMe(location.hash.split('/')[1] || 'saves');
   const app = $('#app');
   const total = S.list.length, free = S.list.filter(t => t.free).length;
   app.replaceChildren(
@@ -160,14 +169,14 @@ function render() {
     S.error ? h('p.error', {}, S.error) : h('section.grid#grid'),
     h('footer.foot', {},
       h('div', {}, h('b', {}, '결제는 어떻게 하나요?'), h('p', {}, '계좌 이체로 받아요. 입금자명에 내 입금 코드를 적으면 보통 1분 안에 자동으로 열려요. 카드 결제는 준비 중이에요.')),
-      h('div', {}, h('b', {}, '다른 기기에서도 쓸 수 있나요?'), h('p', {}, '오른쪽 위 내 정보에서 복구 코드를 복사해 다른 기기에 넣으면 같이 열려요. 로그인은 따로 없어요.')),
+      h('div', {}, h('b', {}, '다른 기기에서도 쓸 수 있나요?'), h('p', {}, '마이페이지 › 구독에서 복구 코드를 복사해 다른 기기에 넣으면 보관함까지 그대로 이어져요. 로그인은 따로 없어요.')),
       h('div', {}, h('b', {}, '자동으로 다시 결제되나요?'), h('p', {}, '아니요. 이체한 기간만큼만 열리고, 끝나기 전에 다시 이체하면 그 뒤로 이어 붙어요.')),
       h('p.fine', {}, '© 프롬프트 스튜디오')));
   renderChips(); renderGrid();
 }
 
 // 틀 열기
-async function openTemplate(t) {
+async function openTemplate(t, save = null) {
   if (!t.free && !active()) return lockedSheet(t);
   let body = t.body;
   if (body == null) {
@@ -175,9 +184,10 @@ async function openTemplate(t) {
     if (body == null) { await loadMe(); render(); return lockedSheet(t); }
     t.body = body;
   }
-  const v = vals[t.id] || (vals[t.id] = {});
+  const v = save ? { ...(save.vals || {}) } : (vals[t.id] || (vals[t.id] = {}));
+  const keep = () => { if (!save) saveVals(); };
   const names = vars(body);
-  sheet(() => {
+  sheet(close => {
     const pre = h('pre.preview');
     const paint = () => {
       pre.replaceChildren(...String(body).split(VAR).map((part, i) => i % 2 ? (String(v[part] ?? '').trim() ? h('mark.filled', {}, v[part].trim()) : h('mark.blank', {}, part)) : part));
@@ -186,24 +196,27 @@ async function openTemplate(t) {
     };
     const fields = names.map(n => {
       const long = isLong(body, n);
-      const input = h(long ? 'textarea' : 'input', { id: 'f-' + n, rows: long ? 4 : null, placeholder: long ? '여기에 붙여 넣어요' : '', oninput: e => { v[n] = e.target.value; saveVals(); paint(); } });
+      const input = h(long ? 'textarea' : 'input', { id: 'f-' + n, rows: long ? 4 : null, placeholder: long ? '여기에 붙여 넣어요' : '', oninput: e => { v[n] = e.target.value; keep(); paint(); } });
       input.value = v[n] || '';
       return h('label.field', {}, h('span', {}, n), input);
     });
     const doCopy = () => copy(fill(body, v), '프롬프트를 복사했어요');
     const open = (url, name) => { copy(fill(body, v), `복사했어요. ${name}에 붙여 넣으세요`); window.open(url, '_blank', 'noopener'); };
+    const box = saveBox(t, body, v, save, close);
     paint();
     return [
-      h('div.sheet-head', {}, h('span.cat', {}, t.cat), h('h2', {}, t.title), h('p.muted', {}, t.summary)),
+      h('div.sheet-head', {}, h('span.cat', {}, save ? `보관함 · ${save.folder || '폴더 없음'}` : t.cat), h('h2', {}, save ? save.title : t.title), h('p.muted', {}, save ? t.title : t.summary)),
       h('div.tpl', {},
         h('div.fields', {}, h('div.fields-head', {}, h('b', {}, '빈칸 채우기'), h('span.muted#left')), ...fields,
-          names.length ? h('button.link', { onclick: () => { for (const n of names) v[n] = ''; saveVals(); for (const el of document.querySelectorAll('.field input, .field textarea')) el.value = ''; paint(); } }, '모두 지우기') : null),
+          names.length ? h('button.link', { onclick: () => { for (const n of names) v[n] = ''; keep(); for (const el of document.querySelectorAll('.field input, .field textarea')) el.value = ''; paint(); } }, '모두 지우기') : null),
         h('div.prev', {}, h('b', {}, '미리 보기'), pre)),
       h('div.actions', {},
         h('button.btn.primary', { onclick: doCopy }, ic('copy'), '복사'),
+        h('button.btn', { onclick: () => box.toggle() }, ic('bookmark'), save ? '저장' : '보관'),
         h('button.btn', { onclick: () => open('https://claude.ai/new', 'Claude') }, ic('out'), 'Claude'),
         h('button.btn', { onclick: () => open('https://chatgpt.com/', 'ChatGPT') }, ic('out'), 'ChatGPT'),
         h('button.btn', { onclick: () => open('https://gemini.google.com/app', 'Gemini') }, ic('out'), 'Gemini')),
+      box.el,
     ];
   }, { wide: true });
 }
@@ -256,28 +269,227 @@ async function paySheet(planId = store.get('plan', 'm1')) {
   }, { onClose: () => clearInterval(poll) });
 }
 
-// 내 정보
-function accountSheet() {
-  sheet(close => {
-    const input = h('input', { placeholder: '복구 코드 16자리', autocapitalize: 'characters', spellcheck: 'false' });
-    const use = async () => {
-      const tok = input.value.replace(/\s/g, '').toUpperCase();
-      if (tok.length < 12) return toast('복구 코드를 확인해 주세요');
-      try { const me = await rpc('ps_me', { p_token: tok }); if (!me) return toast('맞는 코드가 없어요'); store.set('token', tok); S.me = me; close(); render(); toast(me.active ? '구독이 이어졌어요' : '코드를 넣었어요'); }
-      catch { toast('잠시 후 다시 해 주세요'); }
+// ── 보관함 ──
+async function loadMine(force = false) {
+  if (S.mine && !force) return S.mine;
+  const tok = store.get('token', '');
+  if (!tok) return (S.mine = { folders: [], saves: [], payments: [] });
+  try { S.mine = (await rpc('ps_mine', { p_token: tok })) || { folders: [], saves: [], payments: [] }; } catch { S.mine = S.mine || { folders: [], saves: [], payments: [] }; }
+  return S.mine;
+}
+const tname = id => (S.list.find(t => t.id === id) || {}).title || '';
+const today = () => { const d = new Date(); return `${d.getMonth() + 1}/${d.getDate()}`; };
+
+// 틀 창 안의 "보관" 칸: 이름과 폴더를 고르고 보관함에 넣음
+function saveBox(t, body, v, save, closeSheet) {
+  const el = h('div.savebox');
+  let open = false, folder = save ? save.folder : (S.folder !== '전체' && S.folder !== '폴더 없음' ? S.folder : '');
+  const paint = async () => {
+    if (!open) return el.replaceChildren();
+    const mine = await loadMine();
+    const title = h('input', { value: save ? save.title : `${t.title} ${today()}`, maxlength: 80 });
+    const newF = h('input', { placeholder: '새 폴더 이름', maxlength: 30 });
+    const chips = h('div.chips.wrap');
+    const paintChips = () => chips.replaceChildren(...['', ...mine.folders].map(f => h('button.chip' + (f === folder ? '.on' : ''), { onclick: () => { folder = f; paintChips(); } }, f ? [ic('folder'), f] : '폴더 없음')));
+    paintChips();
+    const addF = async () => {
+      const name = newF.value.trim(); if (!name) return;
+      if (!mine.folders.includes(name)) { await ensureMe(); mine.folders.push(name); await rpc('ps_folders', { p_token: S.me.token, p_folders: mine.folders }); }
+      folder = name; newF.value = ''; paintChips();
     };
-    const me = S.me;
-    return [
-      h('div.sheet-head', {}, h('h2', {}, '내 정보')),
-      h('div.me', {},
-        h('div.me-row', {}, h('span.muted', {}, '상태'), h('b', {}, active() ? `구독 중 · ${ymd(me.paid_until)}까지` : me && me.paid_until ? `${ymd(me.paid_until)}에 끝났어요` : '무료로 쓰는 중')),
-        me ? h('div.me-row', {}, h('span.muted', {}, '입금 코드'), h('b.mono', {}, me.code)) : null,
-        me ? h('div.me-row', {}, h('span.muted', {}, '복구 코드'), h('button.code.small', { onclick: () => copy(me.token, '복구 코드를 복사했어요') }, h('span', {}, group4(me.token)), ic('copy'))) : null,
-        me ? h('p.muted.small', {}, '복구 코드가 있으면 다른 기기나 브라우저에서도 그대로 이어서 쓸 수 있어요. 남에게 알려 주지 마세요.') : null),
-      h('button.cta', { onclick: () => { close(true); paySheet(); } }, active() ? '기간 늘리기' : '구독하기'),
-      h('div.restore', {}, h('b', {}, '다른 기기에서 받은 복구 코드가 있나요?'), h('div.row', {}, input, h('button.btn', { onclick: use }, '넣기'))),
-    ];
-  });
+    const doSave = async () => {
+      try {
+        await ensureMe();
+        const r = await rpc('ps_save', { p_token: S.me.token, p_item: { id: save?.id, title: title.value.trim() || t.title, template_id: t.id, folder, vals: v, text: fill(body, v), pinned: save?.pinned || false } });
+        await loadMine(true); toast(folder ? `"${folder}" 폴더에 보관했어요` : '보관함에 넣었어요');
+        if (save) { save.title = title.value.trim(); save.folder = folder; save.vals = { ...v }; closeSheet(); if (location.hash.startsWith('#me')) render(); }
+        else { open = false; paint(); }
+        return r;
+      } catch (e) { toast(/full/.test(e.message) ? '보관함이 가득 찼어요 (500개)' : '잠시 후 다시 해 주세요'); }
+    };
+    el.replaceChildren(h('div.savebox-in', {},
+      h('label.field', {}, h('span', {}, '이름'), title),
+      h('div.field', {}, h('span', {}, '폴더'), chips, h('div.row', {}, newF, h('button.btn', { onclick: addF }, ic('plus'), '만들기'))),
+      h('button.btn.primary', { onclick: doSave }, ic('bookmark'), save ? '바꾼 내용 저장' : '보관함에 넣기')));
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+  return { el, toggle() { open = !open; paint(); } };
+}
+
+// ── 마이페이지 (#me/saves · #me/plan · #me/help) ──
+const TABS = [['saves', '보관함', 'bookmark'], ['plan', '구독', 'card'], ['help', '도움말', 'help']];
+async function renderMe(tab) {
+  const app = $('#app');
+  const top = h('header.top', {}, h('a.back', { href: '#', 'aria-label': '틀 목록으로' }, ic('back'), h('span', {}, '틀 목록')), h('b.top-title', {}, '마이페이지'), h('span.top-gap'));
+  const tabs = h('nav.tabs', {}, ...TABS.map(([id, label, icon]) => h('a.tab' + (id === tab ? '.on' : ''), { href: '#me/' + id }, ic(icon), label)));
+  const body = h('section.me-body');
+  app.replaceChildren(top, tabs, body);
+  if (!S.loaded) await loadAll();
+  if (tab === 'plan') return renderPlan(body);
+  if (tab === 'help') return renderHelp(body);
+  return renderSaves(body);
+}
+
+async function renderSaves(root) {
+  const mine = await loadMine(true);
+  const folders = ['전체', ...mine.folders, '폴더 없음'];
+  if (!folders.includes(S.folder)) S.folder = '전체';
+  const count = f => f === '전체' ? mine.saves.length : mine.saves.filter(x => (f === '폴더 없음' ? !x.folder : x.folder === f)).length;
+  const list = mine.saves.filter(x => S.folder === '전체' || (S.folder === '폴더 없음' ? !x.folder : x.folder === S.folder));
+  const newF = h('input', { placeholder: '새 폴더 이름', maxlength: 30 });
+  const saveFolders = async () => { await ensureMe(); await rpc('ps_folders', { p_token: S.me.token, p_folders: mine.folders }); };
+  const addFolder = async () => {
+    const name = newF.value.trim(); if (!name) return newF.focus();
+    if (mine.folders.includes(name) || name === '전체' || name === '폴더 없음') return toast('같은 이름의 폴더가 있어요');
+    mine.folders.push(name); await saveFolders(); S.folder = name; renderSaves(root);
+  };
+  // 고른 폴더 손보기: 이름 바꾸기·지우기
+  let tools = null;
+  if (mine.folders.includes(S.folder)) {
+    const rn = h('input', { value: S.folder, maxlength: 30 });
+    let armed = false;
+    const del = h('button.btn.ghost', { onclick: async () => {
+      if (!armed) { armed = true; del.lastChild.textContent = '한 번 더 누르면 지워요'; return; }
+      const f = S.folder; mine.folders = mine.folders.filter(x => x !== f); await saveFolders(); await rpc('ps_move_folder', { p_token: S.me.token, p_from: f, p_to: '' });
+      S.folder = '전체'; toast(`"${f}" 폴더를 지웠어요. 안의 것은 폴더 없음으로 옮겼어요`); renderSaves(root);
+    } }, ic('trash'), h('span', {}, '폴더 지우기'));
+    tools = h('div.ftools', {}, h('div.row', {}, rn, h('button.btn', { onclick: async () => {
+      const to = rn.value.trim(), from = S.folder; if (!to || to === from) return;
+      if (mine.folders.includes(to)) return toast('같은 이름의 폴더가 있어요');
+      mine.folders = mine.folders.map(x => x === from ? to : x); await saveFolders(); await rpc('ps_move_folder', { p_token: S.me.token, p_from: from, p_to: to });
+      S.folder = to; toast('폴더 이름을 바꿨어요'); renderSaves(root);
+    } }, '이름 바꾸기')), del);
+  }
+  const item = x => {
+    const t = S.list.find(y => y.id === x.template_id);
+    const move = h('select', { 'aria-label': '폴더 옮기기', onchange: async e => { x.folder = e.target.value; await rpc('ps_save', { p_token: S.me.token, p_item: x }); toast(x.folder ? `"${x.folder}"로 옮겼어요` : '폴더에서 뺐어요'); renderSaves(root); } },
+      ...['', ...mine.folders].map(f => h('option', { value: f, selected: f === (x.folder || '') }, f || '폴더 없음')));
+    let armed = false;
+    const del = h('button.icon-btn', { 'aria-label': '지우기', onclick: async () => {
+      if (!armed) { armed = true; del.classList.add('armed'); toast('한 번 더 누르면 지워요'); setTimeout(() => { armed = false; del.classList.remove('armed'); }, 2500); return; }
+      await rpc('ps_unsave', { p_token: S.me.token, p_id: x.id }); toast('지웠어요'); renderSaves(root);
+    } }, ic('trash'));
+    return h('article.save' + (x.pinned ? '.pinned' : ''), {},
+      h('button.save-main', { onclick: () => t ? openTemplate(t, x) : copy(x.text, '복사했어요') },
+        h('div.save-top', {}, h('span.cat', {}, x.folder ? [ic('folder'), x.folder] : '폴더 없음'), h('span.muted.small', {}, ymd(x.updated_at))),
+        h('strong', {}, x.title), h('span.save-sub', {}, t ? t.title : '틀이 없어진 보관본'), h('p.save-text', {}, x.text.replace(/\s+/g, ' ').slice(0, 140))),
+      h('div.save-acts', {},
+        h('button.icon-btn', { 'aria-label': '복사', onclick: () => copy(x.text, '프롬프트를 복사했어요') }, ic('copy')),
+        h('button.icon-btn' + (x.pinned ? '.on' : ''), { 'aria-label': '위에 고정', onclick: async () => { x.pinned = !x.pinned; await rpc('ps_save', { p_token: S.me.token, p_item: x }); renderSaves(root); } }, ic('pin')),
+        h('label.move', {}, ic('folder'), move), del));
+  };
+  root.replaceChildren(...[
+    h('div.stats', {},
+      h('div.stat', {}, ic('bookmark'), h('b', {}, mine.saves.length), h('span', {}, '보관')),
+      h('div.stat', {}, ic('folder'), h('b', {}, mine.folders.length), h('span', {}, '폴더')),
+      h('div.stat', {}, ic(active() ? 'check' : 'lock'), h('b', {}, active() ? daysLeft() + '일' : '무료'), h('span', {}, active() ? '남음' : '이용 중'))),
+    h('div.chips.folders', {}, ...folders.map(f => h('button.chip' + (f === S.folder ? '.on' : ''), { onclick: () => { S.folder = f; renderSaves(root); } }, f, h('em', {}, count(f))))),
+    h('div.row.newf', {}, newF, h('button.btn', { onclick: addFolder }, ic('plus'), '폴더')),
+    tools,
+    list.length ? h('div.saves', {}, ...list.map(item))
+      : h('div.empty-box', {}, ic('bookmark'), h('b', {}, mine.saves.length ? '이 폴더는 비어 있어요' : '아직 보관한 프롬프트가 없어요'),
+        h('p.muted', {}, '틀을 열고 빈칸을 채운 뒤 "보관"을 누르면 여기에 모여요. 폴더로 나눠 둘 수 있어요.'), h('a.cta', { href: '#' }, '틀 고르러 가기'))].filter(Boolean));
+}
+
+const daysLeft = () => S.me && S.me.paid_until ? Math.max(0, Math.ceil((new Date(S.me.paid_until) - Date.now()) / 864e5)) : 0;
+async function renderPlan(root) {
+  await loadMe();
+  const mine = await loadMine(true), me = S.me, on = active(), left = daysLeft();
+  const total = left > 31 ? 365 : 31, pct = on ? Math.min(100, Math.round(left / total * 100)) : 0;
+  const input = h('input', { placeholder: '복구 코드 16자리', autocapitalize: 'characters', spellcheck: 'false' });
+  const use = async () => {
+    const tok = input.value.replace(/\s/g, '').toUpperCase();
+    if (tok.length < 12) return toast('복구 코드를 확인해 주세요');
+    try { const m = await rpc('ps_me', { p_token: tok }); if (!m) return toast('맞는 코드가 없어요'); store.set('token', tok); S.me = m; S.mine = null; toast(m.active ? '구독과 보관함을 이어 왔어요' : '코드를 넣었어요'); renderPlan(root); }
+    catch { toast('잠시 후 다시 해 주세요'); }
+  };
+  root.replaceChildren(...[
+    h('div.plan-card' + (on ? '.on' : ''), {},
+      h('div.ring', { style: { '--p': pct } }, h('b', {}, on ? left : 0), h('span', {}, '일 남음')),
+      h('div', {},
+        h('b.plan-state', {}, on ? '구독 중' : me && me.paid_until ? '구독이 끝났어요' : '무료로 쓰는 중'),
+        h('p.muted', {}, on ? `${ymd(me.paid_until)}까지 틀 ${S.list.length}개를 전부 쓸 수 있어요.` : `무료 틀 ${S.list.filter(t => t.free).length}개를 쓸 수 있어요. 구독하면 ${S.list.length}개 전부 열려요.`),
+        h('button.cta.small', { onclick: () => paySheet() }, on ? '기간 늘리기' : '월 990원 구독하기'))),
+    h('p.muted.small.note', {}, '자동으로 다시 빠져나가지 않아요. 끝나기 전에 늘리면 남은 기간 뒤에 이어 붙어요.'),
+    me ? h('div.me', {},
+      h('div.me-row', {}, h('span.muted', {}, '입금 코드'), h('button.code.small', { onclick: () => copy(me.code, '입금 코드를 복사했어요') }, h('span', {}, me.code), ic('copy'))),
+      h('div.me-row', {}, h('span.muted', {}, '복구 코드'), h('button.code.small', { onclick: () => copy(me.token, '복구 코드를 복사했어요') }, h('span', {}, group4(me.token)), ic('copy'))),
+      h('p.muted.small', {}, '복구 코드를 다른 기기에 넣으면 구독과 보관함이 그대로 이어져요. 남에게 알려 주지 마세요.')) : null,
+    h('h3', {}, '결제 내역'),
+    mine.payments.length ? h('div.pays', {}, ...mine.payments.map(p => h('div.pay', {}, h('span', {}, ymd(p.created_at)), h('b', {}, won(p.amount)), h('span.muted', {}, `+${p.days}일`))))
+      : h('p.muted', {}, '아직 결제 내역이 없어요.'),
+    h('h3', {}, '다른 기기에서 쓰던 게 있나요?'),
+    h('div.row', {}, input, h('button.btn', { onclick: use }, '넣기'))].filter(Boolean));
+}
+
+// ── 도움말 · 첫 방문 안내 · 홈 화면에 추가 ──
+const GUIDE = [
+  ['stack', '틀 고르기', '하고 싶은 일을 검색하거나 분류를 눌러 틀을 골라요. 무료 틀은 바로 열려요.'],
+  ['help', '빈칸 채우기', '왼쪽 칸만 채우면 오른쪽 미리 보기에 바로 들어가요. 채운 내용은 이 기기에 남아 있어요.'],
+  ['copy', '복사하고 붙여 넣기', '"복사"를 누르거나 Claude·ChatGPT·Gemini 단추를 누르면 복사된 채로 그 사이트가 열려요. 붙여 넣기만 하면 돼요.'],
+  ['bookmark', '보관하고 폴더로 정리', '"보관"을 누르면 마이페이지 보관함에 모여요. 폴더를 만들어 나눠 두고, 다시 열어 고쳐 쓸 수 있어요.'],
+];
+function device() {
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
+  if (/Android/.test(ua)) return 'android';
+  return 'pc';
+}
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let deferredInstall = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
+const INSTALL = {
+  ios: ['아이폰·아이패드', ['Safari로 이 주소를 열어요 (카카오톡·인스타 안에서는 안 돼요)', '아래 가운데 공유 단추(네모에 위 화살표)를 눌러요', '"홈 화면에 추가"를 누르고 오른쪽 위 "추가"를 눌러요']],
+  android: ['안드로이드', ['Chrome으로 이 주소를 열어요', '오른쪽 위 점 세 개 메뉴를 눌러요', '"앱 설치" 또는 "홈 화면에 추가"를 눌러요']],
+  pc: ['PC (Chrome·Edge)', ['주소창 오른쪽 끝의 설치 단추(모니터에 화살표)를 눌러요', '없으면 오른쪽 위 메뉴 › "앱 설치" 또는 "앱 › 이 사이트를 앱으로 설치"', '바탕화면·작업 표시줄에서 앱처럼 열려요']],
+};
+function installBlock(compact = false) {
+  const d = device();
+  const order = [d, ...Object.keys(INSTALL).filter(k => k !== d)];
+  const one = (k, open) => h('details.install' + (open ? '.mine' : ''), { open: open || null },
+    h('summary', {}, ic('home'), INSTALL[k][0], open ? h('em', {}, '지금 기기') : null),
+    h('ol', {}, ...INSTALL[k][1].map(s => h('li', {}, s))));
+  return h('div.installs', {},
+    standalone() ? h('p.okline', {}, ic('check'), '지금 앱으로 쓰고 있어요.') : null,
+    deferredInstall ? h('button.cta.small', { onclick: async () => { deferredInstall.prompt(); const r = await deferredInstall.userChoice; deferredInstall = null; toast(r.outcome === 'accepted' ? '설치했어요' : '나중에 언제든 할 수 있어요'); } }, ic('home'), '바로 설치하기') : null,
+    ...(compact ? [one(d, true)] : order.map((k, i) => one(k, i === 0))));
+}
+function renderHelp(root) {
+  root.replaceChildren(
+    h('h3', {}, '이렇게 써요'),
+    h('ol.guide-steps', {}, ...GUIDE.map(([icon, t, d]) => h('li', {}, h('span.gico', {}, ic(icon)), h('div', {}, h('b', {}, t), h('p.muted', {}, d))))),
+    h('button.btn', { onclick: () => onboarding(true) }, '처음 안내 다시 보기'),
+    h('h3', {}, '홈 화면에 추가해서 앱처럼 쓰기'),
+    h('p.muted', {}, '설치는 무료이고, 앱 스토어를 거치지 않아요. 홈 화면 아이콘으로 바로 열려요.'),
+    installBlock(),
+    h('h3', {}, '자주 묻는 것'),
+    ...[
+      ['결제는 어떻게 하나요?', '계좌 이체로 받아요. 입금자명에 내 입금 코드를 적으면 보통 1분 안에 자동으로 열려요.'],
+      ['자동으로 다시 결제되나요?', '아니요. 이체한 기간만큼만 열리고, 끝나기 전에 늘리면 남은 기간 뒤에 이어 붙어요.'],
+      ['폰과 PC에서 같이 쓰고 싶어요', '마이페이지 › 구독에서 복구 코드를 복사해 다른 기기의 같은 칸에 넣으면 구독과 보관함이 이어져요.'],
+      ['코드를 빼먹고 입금했어요', '걱정 마세요. 입금 내역을 보고 확인해서 열어 드려요.'],
+      ['보관한 건 어디에 저장되나요?', '서버에 복구 코드 기준으로 저장돼요. 복구 코드만 있으면 기기를 바꿔도 남아 있어요.'],
+    ].map(([q, a]) => h('details.faq', {}, h('summary', {}, q), h('p', {}, a))));
+}
+
+// 처음 온 사람에게 한 번 보여 주는 안내
+function onboarding(force = false) {
+  if (!force && store.get('onboarded', false)) return;
+  const slides = [...GUIDE.map(([icon, t, d]) => ({ icon, t, d })), { icon: 'home', t: '홈 화면에 추가하면 앱처럼', d: '설치는 무료예요. 지금 기기에 맞는 방법이에요.', install: true }];
+  let i = 0;
+  sheet(close => {
+    const stage = h('div.ob-stage'), dots = h('div.ob-dots'), next = h('button.cta'), skip = h('button.link', { onclick: () => close() }, '건너뛰기');
+    const paint = () => {
+      const s = slides[i];
+      stage.replaceChildren(h('div.ob-slide', { key: i },
+        h('span.ob-ico', {}, ic(s.icon)), h('span.muted.small', {}, `${i + 1} / ${slides.length}`), h('h2', {}, s.t), h('p.muted', {}, s.d), s.install ? installBlock(true) : null));
+      dots.replaceChildren(...slides.map((_, k) => h('i' + (k === i ? '.on' : ''))));
+      next.textContent = i === slides.length - 1 ? '시작하기' : '다음';
+    };
+    next.onclick = () => { if (i < slides.length - 1) { i++; paint(); } else close(); };
+    paint();
+    return [stage, h('div.ob-foot', {}, dots, h('div.row', {}, skip, next))];
+  }, { onClose: () => store.set('onboarded', true) });
 }
 
 // ── 관리 화면 (#admin): 하진만. 입금 알림 비밀키로 들어감 ──
@@ -331,8 +543,8 @@ async function renderAdmin() {
 }
 
 // ── 시작 ──
-addEventListener('hashchange', render);
+addEventListener('hashchange', () => { if (closeSheet) closeSheet(true); render(); scrollTo(0, 0); });
 addEventListener('visibilitychange', async () => { if (!document.hidden && location.hash !== '#admin' && S.loaded) { const was = active(); await loadMe(); if (was !== active()) render(); } });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => { });
 render();
-loadAll().then(render);
+loadAll().then(() => { render(); if (!location.hash) setTimeout(() => onboarding(), 400); });
