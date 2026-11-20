@@ -34,6 +34,27 @@ export async function autoValues(now = new Date()) {
   } catch { }
   return out;
 }
+// 사람이 채우는 빈칸 중에 앱 기록으로 미리 적어 줄 수 있는 것 (고칠 수 있게 칸에 넣어 줌): { 빈칸 이름: 값 }
+export async function seeds(now = new Date()) {
+  const pad = n => String(n).padStart(2, '0'), ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, md = s => `${+s.slice(5, 7)}/${+s.slice(8, 10)}`;
+  const today = ymd(now), mon = new Date(now); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7)); const from = ymd(mon), month = today.slice(0, 7);
+  const out = {};
+  try {
+    const roster = await db.kvGet('sync:roster', []); if (roster.length) out['나눌 사람'] = roster.map(r => r.name).filter(Boolean).join(', ');
+    const cur = await db.kvGet('chat:project', null); if (cur && (cur.name || cur.project)) out['프로젝트 이름'] = cur.name || cur.project;
+    const tasks = (await db.list('tasks')).filter(t => !t.deleted);
+    const done = tasks.filter(t => t.done && (t.doneAt || t.updatedAt || '').slice(0, 10) >= from).slice(0, 20);
+    if (done.length) out['한 일'] = done.map(t => t.title + (t.project ? ` (${t.project})` : '')).join(', ');
+    const open = tasks.filter(t => !t.done).sort((a, b) => (a.due || '9').localeCompare(b.due || '9')).slice(0, 20);
+    if (open.length) out['해야 할 일 목록'] = open.map(t => '- ' + t.title + (t.due ? ` (${md(t.due)}까지)` : '')).join('\n');
+    const late = open.filter(t => t.due && t.due < today).slice(0, 5); if (late.length) out['막힌 것'] = '마감이 지난 일: ' + late.map(t => t.title).join(', ');
+    const ex = (await db.list('expenses')).filter(e => !e.deleted && (e.date || '').startsWith(month)).sort((a, b) => (a.date || '').localeCompare(b.date || '')).slice(0, 60);
+    if (ex.length) out['지출 내역'] = ex.map(e => `${md(e.date)} ${e.title} ${Number(e.amount || 0).toLocaleString()}원${e.category ? ' (' + e.category + ')' : ''}${e.by || e.who ? ' · ' + (e.by || e.who) : ''}`).join('\n');
+    const due = (await db.list('incomes')).filter(i => !i.deleted && i.status !== 'got' && Number(i.amount) > 0).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'))[0];   /* 가장 오래 기다린 받을 돈 */
+    if (due) { out['어떤 일'] = due.title || ''; out['금액'] = Number(due.amount).toLocaleString() + '원'; if (due.from) out['받는 사람'] = due.from; if (due.date) out['지급 약속일'] = `${+due.date.slice(0, 4)}년 ${+due.date.slice(5, 7)}월 ${+due.date.slice(8, 10)}일`; }
+  } catch { }
+  return out;
+}
 // 빈칸을 채움. 알아서 채우는 빈칸이 비어 있으면 그 줄을 통째로 뺌(예: "우리 팀: {{팀 소개}}"). 사람이 채울 빈칸이 비면 [이름]으로 남김
 export function fill(body, values = {}) {
   const out = [];

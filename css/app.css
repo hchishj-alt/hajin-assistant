@@ -1045,3 +1045,7 @@ a.as-row.as-link{color:inherit;text-decoration:none}
 .role-tag{flex:none;font-size:calc(11.5px*var(--fs,1));font-weight:700;color:var(--acc);background:var(--acc-soft);border-radius:99px;padding:4px 10px;white-space:nowrap}
 .ps-tips{margin-bottom:14px}
 @media (max-width:900px){.only-wide{display:none!important}}   /* 폰에서는 아래 탭이 같은 일을 하는 단추를 숨김 */
+.ps-auto{font-style:normal;font-weight:500;color:var(--acc);margin-left:6px;font-size:calc(11px*var(--fs,1))}
+/* 화면 머리의 가끔 쓰는 단추: 폰에서는 "더보기"로 접음 */
+.page-head .fold-more{display:none}
+@media (max-width:900px){.page-head .row>.fold{display:none}.page-head .row.unfold>.fold{display:inline-flex}.page-head .fold-more{display:inline-flex}}

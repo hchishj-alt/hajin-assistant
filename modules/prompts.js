@@ -24,6 +24,11 @@ export default {
     hasTeam = !!(await db.get('team-main')); aiOn = await (await import('../js/ai.js')).enabled().catch(() => false);
     if (!F.role && me.keys.length) F.role = me.keys[0];
     await draw();
+    if (params[0] === 'use' && params[1]) {   /* 다른 화면에서 "프롬프트로" 넘어온 경우: 그 틀을 바로 열고, 들고 온 내용을 칸에 넣음 */
+      let pre = {}; try { pre = JSON.parse(sessionStorage.getItem('ps:prefill') || '{}'); sessionStorage.removeItem('ps:prefill'); } catch { }
+      const p = P.BUILTIN.find(t => t.id === params[1]) || (await db.get(params[1]));
+      if (p && p.body) { history.replaceState(history.state, '', '#/prompts'); use(p, pre); }
+    }
     const off = db.onChange(col => { if ((col === 'prompts' || col === 'promptlogs') && !document.querySelector('.modal')) drawSoon(); });
     return () => off && off();
 
@@ -70,15 +75,16 @@ export default {
     }
 
     /* 쓰기: 빈칸 채우기 → 복사 / Claude 열기 / 여기서 돌리기 */
-    async function use(p) {
-      const auto = await P.autoValues(), keep = await db.kvGet('prompts:vals', {}), names = P.vars(p.body), mine = names.filter(n => !P.AUTO.includes(n) || (n === '프로젝트' && !auto[n]));
-      const vals = { ...auto }; for (const n of mine) vals[n] = (keep[p.id] || {})[n] || '';
+    async function use(p, pre = {}) {
+      const auto = await P.autoValues(), keep = await db.kvGet('prompts:vals', {}), seed = await P.seeds(), names = P.vars(p.body), mine = names.filter(n => !P.AUTO.includes(n) || (n === '프로젝트' && !auto[n]));
+      /* 칸에 미리 넣는 순서: 다른 화면에서 들고 온 것 → 앱 기록으로 아는 것 → 지난번에 쓴 값 */
+      const vals = { ...auto }, from = {}; for (const n of mine) { vals[n] = pre[n] || seed[n] || (keep[p.id] || {})[n] || ''; if (pre[n] || seed[n]) from[n] = true; }
       let logged = {}, text = '';
       modal(p.title, close => {
         const out = h('textarea.in.ps-out', { rows: 9, 'aria-label': '완성된 프롬프트' });
         const meter = h('div.ps-fillnote');
         const refresh = () => { text = P.fill(p.body, vals); out.value = text; const left = mine.filter(n => !String(vals[n] || '').trim()).length; clear(meter).append(left ? h('span.chip.warn', `빈칸 ${left}개 남음`) : h('span.chip.ok', ic('check', 13), '다 채웠어요'), names.some(n => P.AUTO.includes(n) && auto[n]) ? h('span.chip', ic('sparkles', 13), '팀·일정은 앱이 채움') : null); };
-        const fields = mine.map(n => { const long = /내용|원문|글$|^글|계획|내역|조항|공고|목록|설명|피드백|자료/.test(n); const el = h(long ? 'textarea.in' : 'input.in', { rows: long ? 4 : undefined, placeholder: n, 'aria-label': n, value: long ? undefined : vals[n], oninput: e => { vals[n] = e.target.value; refresh(); } }, long ? vals[n] : null); return h('label.ps-f', h('span', n), el); });
+        const fields = mine.map(n => { const long = /내용|원문|글$|^글|계획|내역|조항|공고|목록|설명|피드백|자료/.test(n); const el = h(long ? 'textarea.in' : 'input.in', { rows: long ? 4 : undefined, placeholder: n, 'aria-label': n, value: long ? undefined : vals[n], oninput: e => { vals[n] = e.target.value; refresh(); } }, long ? vals[n] : null); return h('label.ps-f', h('span', n, from[n] ? h('em.ps-auto', '앱 기록에서 채움 · 고쳐도 돼요') : null), el); });
         const log = async tool => { if (logged[tool]) return; logged[tool] = true; const kv = await db.kvGet('prompts:vals', {}); kv[p.id] = Object.fromEntries(mine.filter(n => String(vals[n] || '').length <= 200).map(n => [n, vals[n]])); await db.kvSet('prompts:vals', kv);
           const r = P.review(out.value); await db.put('promptlogs', { pid: p.id, title: p.title, cat: p.cat || P.classify(p.body), tool, len: out.value.length, sig: Object.fromEntries(r.items.map(i => [i.id, i.ok])), by: me.name || '나', at: new Date().toISOString(), team: hasTeam ? 'team-main' : '' }); };
         const result = h('div.ps-result.hide');

@@ -29,7 +29,7 @@ export default {
     };
     quick.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addQuick(); } });
     root.append(kindPair('event'), head('캘린더', '할 일도 마감 날짜에 체크 표시로 같이 보여요.',
-      h('button.btn.sm.ghost', { onclick: importIcs, title: '구글·애플 캘린더에서 내보낸 .ics 파일 가져오기' }, ic('upload', 14), '.ics 가져오기'),
+      h('button.btn.sm.ghost.fold', { onclick: importIcs, title: '구글·애플 캘린더에서 내보낸 .ics 파일 가져오기' }, ic('upload', 14), '.ics 가져오기'),
       h('button.btn.sm.ghost', { onclick: gcalModal, title: '폰 기본 캘린더와 위젯에 내 일정을 보이게 하고 알람을 받아요' }, ic('calendar', 14), '폰 캘린더·위젯'),
       h('button.btn.sm.pri', { onclick: () => edit({ date: ymd(cursor) }) }, ic('plus', 14), '일정')),
       h('div.quick', { style: { marginBottom: '14px' } }, ic('zap'), quick, h('button.btn.icon.ghost', { type: 'button', 'aria-label': '추가', onclick: addQuick }, ic('send'))), body);

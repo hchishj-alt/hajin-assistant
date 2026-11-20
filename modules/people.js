@@ -13,8 +13,8 @@ export default {
     const search = h('input', { placeholder: '이름·소속·메모로 찾기', value: q, 'aria-label': '사람 찾기' });
     search.addEventListener('input', () => { q = search.value; draw(); });
     root.append(head('인맥 · 연락처', '사람과의 기록을 쌓고, 연락할 때를 놓치지 않게.',
-      h('button.btn.sm.ghost', { onclick: importVcf, title: '폰 연락처에서 내보낸 .vcf 가져오기' }, ic('upload', 14), '.vcf 가져오기'),
-      h('button.btn.sm.ghost', { onclick: exportVcf }, ic('download', 14), '내보내기'),
+      h('button.btn.sm.ghost.fold', { onclick: importVcf, title: '폰 연락처에서 내보낸 .vcf 가져오기' }, ic('upload', 14), '.vcf 가져오기'),
+      h('button.btn.sm.ghost.fold', { onclick: exportVcf }, ic('download', 14), '내보내기'),
       h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '사람')),
       h('div.quick', { style: { marginBottom: '12px' } }, ic('search'), search), body);
     await draw();

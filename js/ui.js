@@ -218,8 +218,11 @@ export function busy(btn, on, label) {
   if (on) { btn._l = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> ${esc(label || '처리 중')}`; }
   else { btn.disabled = false; if (btn._l) btn.innerHTML = btn._l; }
 }
+// 화면 머리. 단추에 .fold 를 붙이면 폰에서는 "더보기" 안으로 접힘 (가끔 쓰는 것들: 내보내기, 가져오기 등)
 export function head(title, sub, ...actions) {
-  return h('div.page-head', h('div', h('h1', title), sub ? h('p.sub', sub) : null), h('div.row', actions));
+  const row = h('div.row', actions);
+  if (row.querySelector(':scope > .fold')) { const more = h('button.btn.sm.ghost.fold-more', { type: 'button', 'aria-expanded': 'false', onclick: () => { const on = row.classList.toggle('unfold'); more.setAttribute('aria-expanded', String(on)); more.lastChild.textContent = on ? '접기' : '더보기'; } }, ic('more', 14), '더보기'); row.append(more); }
+  return h('div.page-head', h('div', h('h1', title), sub ? h('p.sub', sub) : null), row);
 }
 export function card(title, iconName, body, ...actions) {
   return h('div.card', h('div.card-h', h('h3', iconName ? ic(iconName) : null, title), h('div.row', actions)), body);

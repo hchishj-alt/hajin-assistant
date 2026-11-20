@@ -148,13 +148,13 @@ async function detail(root, id) {
   const dCard = drafts.filter(d => d.kind !== 'summary').length ? h('div.card', h('div.card-h', h('h3', ic('inbox'), '이 회의에서 나온 임시 항목'), h('span.chip.warn', drafts.filter(d => d.kind !== 'summary').length)), drafts.filter(d => d.kind !== 'summary').map(d => draftCard(d, () => updateBadge()))) : null;
 
   root.append(head(m.title, [fmtDate(m.date || m.createdAt), m.attendees, m.project, m.seconds ? fmtSec(m.seconds) : ''].filter(Boolean).join(' · '),
-    h('button.btn.sm.ghost', { onclick: () => modal('중요도 색', close => form([{ k: 'title', label: '회의 이름', full: true }, { k: 'label', label: '중요도 색', type: 'label', full: true }], m, async v => { await db.patch(id, v); close(); go('meetings/' + id); })) }, h('span.dot', { style: { background: LB.colorOf(m.label) || 'var(--line2)' } }), LB.find(m.label)?.name || '중요도'),
+    h('button.btn.sm.ghost.fold', { onclick: () => modal('중요도 색', close => form([{ k: 'title', label: '회의 이름', full: true }, { k: 'label', label: '중요도 색', type: 'label', full: true }], m, async v => { await db.patch(id, v); close(); go('meetings/' + id); })) }, h('span.dot', { style: { background: LB.colorOf(m.label) || 'var(--line2)' } }), LB.find(m.label)?.name || '중요도'),
     m.boardId ? h('a.btn.sm', { href: '#/board/' + m.boardId }, ic('share', 14), '마인드맵 열기') : null,
-    h('button.btn.sm.ghost', { onclick: exportMd }, ic('download', 14), '내보내기'),
-    h('button.btn.sm.ghost', { onclick: copyShare }, ic('copy', 14), '공유용 복사'),
+    h('button.btn.sm.ghost.fold', { onclick: exportMd }, ic('download', 14), '내보내기'),
+    h('button.btn.sm.ghost.fold', { onclick: copyShare }, ic('copy', 14), '공유용 복사'),
     (await db.get('team-main')) ? h('button.btn.sm' + (m.team ? '.pri' : '.ghost'), { title: '팀원도 이 회의록을 봐요 (녹음 원본은 기기에만)', onclick: async () => { if (m.team) await (await import('../js/sync.js')).unshare(m).catch(() => { }); await db.patch(id, { team: m.team ? '' : 'team-main', by: m.by || (await db.kvGet('name', '')) }); toast(m.team ? '나만 보기로 바꿨어요' : '팀에 공유했어요'); go('meetings/' + id); } }, ic('users', 14), m.team ? '팀 공유 중' : '팀에 공유') : null,
     h('button.btn.sm.ghost.danger', { onclick: async () => { if (await confirmBox('회의록을 지울까요?', '지우기')) { await db.remove(id); go('meetings'); } } }, ic('trash', 14))),
-    h('div.grid.g2', h('div.stack', sumCard, dCard), h('div.card', h('div.card-h', h('h3', ic('file'), '받아쓴 내용'), h('div.row', sttBtn, reBtn, saveBtn)), audio ? h('audio', { controls: true, src: URL.createObjectURL(audio), style: { width: '100%', marginBottom: '10px' } }) : null, ta)));
+    h('div.grid.g2', h('div.stack', sumCard, dCard), h('div.card', h('div.card-h', h('h3', ic('file'), '받아쓴 내용'), h('div.row', sttBtn, reBtn, saveBtn, h('button.btn.sm.ghost', { title: '이 회의 내용을 넣은 프롬프트를 만들어 Claude에 시킬 수 있어요', onclick: async () => { if ((ta.value || '').trim().length < 10) return toast('받아쓴 내용이 있어야 해요'); (await import('../js/helper.js')).toStudio('builtin:pm-minutes', { '회의 내용': ta.value.trim() }); } }, ic('type', 14), '프롬프트로'))), audio ? h('audio', { controls: true, src: URL.createObjectURL(audio), style: { width: '100%', marginBottom: '10px' } }) : null, ta)));
 
   function editSummary() {
     const cur = s;

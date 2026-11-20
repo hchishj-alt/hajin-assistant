@@ -23,9 +23,10 @@ export default {
     };
     quick.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) addQuick(); });
     root.append(head('비용 처리', '쓰자마자 적고, 정산 상태까지 한눈에.',
-      h('button.btn.sm.ghost', { onclick: setBudget }, ic('target', 14), '예산'),
-      h('button.btn.sm.ghost', { onclick: exportCsv }, ic('download', 14), '엑셀(CSV)'),
-      h('button.btn.sm.ghost', { onclick: printReport }, ic('file', 14), '지출결의서'),
+      h('button.btn.sm.ghost.fold', { onclick: setBudget }, ic('target', 14), '예산'),
+      h('button.btn.sm.ghost.fold', { onclick: exportCsv }, ic('download', 14), '엑셀(CSV)'),
+      h('button.btn.sm.ghost.fold', { onclick: printReport }, ic('file', 14), '지출결의서'),
+      h('button.btn.sm.ghost.fold', { title: '이번 달 지출을 넣은 정산 프롬프트를 만들어요', onclick: async () => (await import('../js/helper.js')).toStudio('builtin:biz-settle', {}) }, ic('type', 14), '정산 프롬프트'),
       h('button.btn.sm', { onclick: () => editIncome() }, ic('plus', 14), '받을 돈'),
       h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '지출')),
       h('div.quick', { style: { marginBottom: '12px' } }, ic('receipt'), quick, h('button.btn.icon.ghost', { 'aria-label': '추가', onclick: addQuick }, ic('right', 18))), body);

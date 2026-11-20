@@ -88,6 +88,12 @@ export async function shortcutRow() {
     qs.map(q => h('button.chip', { type: 'button', onclick: () => (q.say ? openSheet('today', q.say) : go(q.to)) }, ic(q.icon, 14), q.label)));
 }
 
+// 다른 화면에서 프롬프트 스튜디오로 넘기기: 그 화면의 내용을 들고 가서 빈칸에 넣어 줌
+export async function toStudio(id, values = {}) {
+  try { sessionStorage.setItem('ps:prefill', JSON.stringify(values)); } catch { }
+  (await import('./app.js')).go('prompts/use/' + id);
+}
+
 // ── 메뉴 줄이기 ──
 const CORE = { all: ['plan', 'meetings', 'talk', 'prompts', 'team', 'settings'], pm: ['board', 'people'], art: ['archive', 'studio', 'figma'], biz: ['money', 'shop', 'vendors', 'radar'], none: ['money', 'archive', 'people'] };
 // 앞에 둘 메뉴: 역할 기본 + 최근 3주 안에 3번 넘게 연 것, 그리고 직접 고정한 것(끄면 뺌)
