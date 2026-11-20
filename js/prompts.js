@@ -6,13 +6,18 @@ export const ROLES = { pm: 'PM·리더', art: '아트·디자인', biz: '경영�
 export const CATS = ['기획', '글쓰기', '디자인·이미지', '회의·정리', '돈·계약', '조사', '일정', '기타'];
 export const TOOLS = ['Claude', '앱 AI', '이미지 생성', '기타'];
 
-// 멤버의 역할 글("리더·PM·UX/UI", "아트디렉터", "경영")에서 어느 쪽 일인지 읽음. 여러 개일 수 있음
+// 멤버의 역할 글("리더·PM·UX/UI", "아트디렉터", "경영")에서 어느 쪽 일인지 읽음. 여러 개일 수 있음.
+// 관리자가 새로 만든 파트(예: "3D", "개발")는 그 파트가 닮았다고 고른 쪽을 따름 (setParts).
+let PARTS = [];   /* [{ name, about, keys: ['art', …] }] 팀 기록(team-main.parts)에서 옴 */
+export function setParts(list) { PARTS = (Array.isArray(list) ? list : []).filter(p => p && p.name).map(p => ({ name: String(p.name).trim(), about: String(p.about || ''), keys: (p.keys || []).filter(k => ['pm', 'art', 'make', 'biz'].includes(k)) })); }
+export const parts = () => PARTS.slice();
 export function roleKeys(role) {
   const r = String(role || ''), out = [];
   if (/PM|피엠|리더|기획|매니저|팀장|대표/i.test(r)) out.push('pm');
   if (/아트|디자인|디렉|UX|UI|일러/i.test(r)) out.push('art');
   if (/콘텐츠|제작|영상|촬영|편집|SNS|마케팅|에디터/i.test(r)) out.push('make');
   if (/경영|회계|정산|재무|서기|총무|운영|세무/i.test(r)) out.push('biz');
+  for (const p of PARTS) if (r.includes(p.name)) for (const k of p.keys) if (!out.includes(k)) out.push(k);
   return out;
 }
 
@@ -23,6 +28,8 @@ export function vars(body) { const out = []; for (const m of String(body || '').
 // 팀 역할은 이 네 가지로 고정. 관리자가 멤버를 넣을 때 하나를 고르고, 바로가기·앞에 두는 메뉴·권하는 말이 역할을 따라감 (helper.js QUICK·CORE·BY_ROLE)
 export const TEAM_ROLES = [{ key: 'pm', name: 'PM·리더', about: '일정, 팀, 회의, 진행 상황' }, { key: 'art', name: '아트·디자인', about: '시안, 레퍼런스, 피그마' }, { key: 'make', name: '콘텐츠 제작', about: '촬영, 편집, SNS 게시' }, { key: 'biz', name: '경영·운영', about: '비용, 구매, 업체, 정산' }];
 export const MY_ROLES = TEAM_ROLES.map(r => r.name);
+// 고를 수 있는 역할 전부: 기본 네 가지 + 관리자가 만든 파트
+export const teamRoles = () => [...TEAM_ROLES, ...PARTS.filter(p => !TEAM_ROLES.some(r => r.name === p.name)).map(p => ({ key: 'part', name: p.name, about: p.about || TEAM_ROLES.filter(r => p.keys.includes(r.key)).map(r => r.name).join(', ') + ' 쪽', keys: p.keys, custom: true }))];
 export async function myRole() { const m = await db.kvGet('me:member', null); return (m && m.role) || await db.kvGet('me:role', '') || ''; }
 // 앱이 알아서 채울 수 있는 빈칸
 export const AUTO = ['오늘', '내 이름', '내 역할', '팀', '팀 소개', '프로젝트', '오늘 일정', '남은 할 일'];

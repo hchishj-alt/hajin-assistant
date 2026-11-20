@@ -98,7 +98,7 @@ export default {
     const grid = h('div.home-grid');
     for (const id of homeOrder(L)) if (!L.homeOff?.includes(id) && blocks[id]) { const el = await blocks[id](); if (el) grid.append(el); }
     root.append(hdr);
-    { const row = await (await import('../js/helper.js')).shortcutRow().catch(() => null); if (row) root.append(row); }   /* 내 역할 바로가기 */
+    { const H = await import('../js/helper.js'); const strip = await H.memberStrip().catch(() => null); if (strip) root.append(strip); const row = await H.shortcutRow().catch(() => null); if (row) root.append(row); }   /* 단기 작업자 안내, 내 역할 바로가기 */
     { const nd = await Install.nudge().catch(() => null); if (nd) root.append(nd); }
     if (askName && !name) {
       const ni = h('input.in', { placeholder: '이름 (예: 민서)', 'aria-label': '내 이름', style: { maxWidth: '200px' } });

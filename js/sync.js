@@ -54,6 +54,7 @@ export async function start() {
   session = data.session;
   if (!session) { set({ status: 'signedout' }); return state; }
   set({ status: 'idle' });
+  await loadGuest();
   listen();
   if (!wired) {
     wired = true;
@@ -101,7 +102,7 @@ export async function loginWithCode(code) {
   const { data: me, error: e2 } = await c.rpc('claim_member', { p_code: code });
   if (e2) { await c.auth.signOut(); throw new Error(koErr(e2.message)); }
   const info = Array.isArray(me) ? me[0] : me;
-  await db.kvSetRaw('me:member', info);
+  await db.kvSetRaw('me:member', info); await db.kvSetRaw('me:ended', false); await loadGuest();
   await teamKey().catch(() => { });
   const curName = await db.kvGet('name', '하진');
   await afterLogin();
@@ -126,7 +127,13 @@ export async function listMembers() {
   return (data || []).map(x => (typeof x === 'string' ? JSON.parse(x) : x));
 }
 export async function saveMember(m) {
-  const { data, error } = await client.rpc('admin_save_member', { p_id: m.id || null, p_code: m.code, p_name: m.name, p_role: m.role || '', p_gmail: m.gmail || '', p_is_admin: !!m.is_admin, p_active: m.active !== false });
+  const base = { p_id: m.id || null, p_code: m.code, p_name: m.name, p_role: m.role || '', p_gmail: m.gmail || '', p_is_admin: !!m.is_admin, p_active: m.active !== false };
+  const guest = m.kind === 'guest';
+  let { data, error } = await client.rpc('admin_save_member', { ...base, p_kind: guest ? 'guest' : 'member', p_until: m.until || null, p_projects: guest ? (m.projects || []) : [] });
+  if (error && /Could not find the function|schema cache|does not exist/i.test(error.message)) {   /* 서버에 16번이 아직 없음 */
+    if (guest || m.until) throw new Error('서버에 단기 작업자 기능이 아직 없어요. 설정의 서버 설치문(16번)을 Supabase에서 한 번 실행해 주세요.');
+    ({ data, error } = await client.rpc('admin_save_member', base));
+  }
   if (error) throw new Error(/duplicate|unique/i.test(error.message) ? '이미 쓰는 코드예요' : koErr(error.message));
   return data;
 }
@@ -200,7 +207,7 @@ export async function aiKeyInfo() { return { fromTeam: !!(await db.kvGet('me:ait
 
 export async function signOut() {
   if (!client) return;
-  await client.auth.signOut(); session = null; await db.kvSetRaw('me:member', null); set({ status: 'signedout' });
+  await client.auth.signOut(); session = null; await db.kvSetRaw('me:member', null); await db.kvSetRaw('me:ended', false); GUEST = null; set({ status: 'signedout' });
 }
 function koErr(m = '') {
   if (/Invalid login/i.test(m)) return '이메일이나 비밀번호가 맞지 않아요';
@@ -246,8 +253,15 @@ async function teamSpaces() {
   return m;
 }
 // 이 항목이 어느 팀 공간으로 가야 하는지 (없으면 개인)
+const GUEST_COLS = new Set(['tasks', 'events', 'meetings', 'notes', 'docs', 'refs', 'figmafiles']);
+let GUEST = null;   /* 단기 작업자면 { projects: [...] } */
+export async function loadGuest() { const m = await db.kvGet('me:member', null); GUEST = m && m.kind === 'guest' ? { projects: m.projects || [] } : null; return GUEST; }
+export const guestCanShare = (it, g = GUEST) => !g || (GUEST_COLS.has(it.col) && !!it.project && g.projects.includes(it.project));
+/* 기간이 끝난 단기 작업자 기기에서는 받아 둔 팀 기록을 지움 (내가 따로 적은 내 기록은 그대로) */
+async function dropTeamCopies() { for (const it of await db.allItems()) if (SHARE_COLS.has(it.col) && (it.team || it.space) && it.col !== '_kv') await db.purge(it.id); await db.kvSetRaw('sync:roster', []); }
 export function spaceFor(it, tmap) {
   if (!SHARE_COLS.has(it.col)) return null;
+  if (GUEST && !guestCanShare(it)) return null;
   if (it.col === 'teams') return it.space || null;
   return (it.team && tmap[it.team]) || null;
 }
@@ -320,11 +334,18 @@ async function pull() {
   const spaces = {};
   for (const m of mem) { const s = spaces[m.space] ||= { id: m.space, name: m.spaces?.name, code: m.spaces?.code, members: [] }; s.members.push({ user: m.user_id, name: m.name || '팀원' }); }
   await db.kvSetRaw('sync:spaces', Object.values(spaces));
-  try { const { data: ros } = await client.rpc('list_members'); if (ros) { const next = ros.map(x => (typeof x === 'string' ? JSON.parse(x) : x)).filter(x => x.active).map(x => ({ id: x.id, name: x.name, role: x.role, gmail: x.gmail, user: x.user_id, color: x.color || '', avatar: x.avatar || '' }));
-      const before = JSON.stringify(await db.kvGet('sync:roster', [])); await db.kvSetRaw('sync:roster', next);
-      if (before !== JSON.stringify(next)) { n++;   /* 이름·역할·색·사진이 바뀌면 화면을 다시 그림. 이름과 역할은 관리자가 정한 것을 따름 */
-        const meM = await db.kvGet('me:member', null), mine = meM && next.find(x => x.id === meM.id);
-        if (mine && (mine.name !== meM.name || mine.role !== meM.role)) { await db.kvSetRaw('me:member', { ...meM, name: mine.name, role: mine.role }); if (mine.name !== meM.name) await db.kvSet('name', mine.name.length === 3 ? mine.name.slice(1) : mine.name); } } } } catch { }
+  try { const { data: ros, error: rerr } = await client.rpc('list_members'); if (ros && !rerr) { const all = ros.map(x => (typeof x === 'string' ? JSON.parse(x) : x));
+      const next = all.filter(x => x.active && !x.ended).map(x => ({ id: x.id, name: x.name, role: x.role, gmail: x.gmail, user: x.user_id, color: x.color || '', avatar: x.avatar || '', ...(x.kind === 'guest' ? { kind: 'guest' } : {}), ...(x.until ? { until: x.until } : {}) }));
+      const meM = await db.kvGet('me:member', null);
+      /* 로그인했는데 명단이 비어서 오면: 코드가 멈췄거나 쓸 수 있는 기간이 끝난 것 */
+      const ended = !!meM && !all.length; if (ended !== !!(await db.kvGet('me:ended', false))) { await db.kvSetRaw('me:ended', ended); n++; if (ended && meM.kind === 'guest') await dropTeamCopies().catch(() => { }); }
+      if (!ended) {
+        const before = JSON.stringify(await db.kvGet('sync:roster', [])); await db.kvSetRaw('sync:roster', next);
+        const mine = meM && all.find(x => x.id === meM.id);
+        if (mine) { const want = { name: mine.name, role: mine.role, is_admin: !!mine.is_admin, kind: mine.kind || 'member', until: mine.until || null, projects: mine.projects || [] }, had = { name: meM.name, role: meM.role, is_admin: !!meM.is_admin, kind: meM.kind || 'member', until: meM.until || null, projects: meM.projects || [] };
+          if (JSON.stringify(want) !== JSON.stringify(had)) { await db.kvSetRaw('me:member', { ...meM, ...want }); if (mine.name !== meM.name) await db.kvSet('name', mine.name.length === 3 ? mine.name.slice(1) : mine.name); await loadGuest(); try { (await import('./admin.js')).clearCache(); } catch { } n++; } }
+        if (before !== JSON.stringify(next)) n++;   /* 이름·역할·색·사진이 바뀌면 화면을 다시 그림. 이름과 역할은 관리자가 정한 것을 따름 */
+      } } } catch { }
   for (const s of Object.values(spaces)) {
     if (!s.members.some(m => m.user === session.user.id)) continue;
     n += await pullTable('space_items', 'space', s.id, 'sync:cur:space:' + s.id, s.id);

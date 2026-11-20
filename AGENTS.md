@@ -83,3 +83,12 @@
 - 이 기기에서 못 여는 파일(아이폰 고효율 영상, HEIC)은 넣을 때 알려 주고 빼요. 다른 기기에서 넣은 클립은 `ghosts`에 두었다가 저장할 때 제자리에 다시 끼워요. 지우지 마세요.
 - 만드는 형식은 `recType()`이 골라요: 크롬은 H.264 mp4를 먼저(그냥 `video/mp4`는 속이 VP9이라 맨 뒤), 애플 엔진은 그냥 `video/mp4`도 괜찮음. 어디서나 열리는지는 `plays(type)`.
 - 실제 영상으로 하는 시험: `/mnt/project-files/hajin-assistant-dev/video/` (`vid1.js`, `vid2.js`, 영상은 ffmpeg로 만들어 씀). 시험 크롬은 HEVC를 못 열고 mp4 소리가 Opus로 나와요. 실제 아이폰 사파리에서의 내보내기는 기기로만 확인할 수 있어요.
+
+## 단기 작업자와 새 파트 (v1.39.0)
+- 멤버 종류는 둘: 정식(`member`)과 단기 작업자(`guest`). 서버 `members.kind`·`until`(마지막 날, 한국 날짜)·`projects`(맡긴 프로젝트 이름). 관리자 화면 › 멤버에서 넣고 고침.
+- 기간이 지나면 서버의 `is_active()`가 거짓이 되어 읽기·쓰기가 모두 막혀요. 새 정책이나 함수를 만들 때 `active`만 보지 말고 `public.member_live(active, until)`이나 `is_active()`를 쓰세요.
+- 단기 작업자는 맡은 프로젝트의 할 일·일정·회의록·메모·문서·레퍼런스만 팀과 나눠요(서버 `guest_sees`, 앱 `sync.guestCanShare`). 비용·업체·연락처·팀 공용 AI 키는 내려가지 않아요. 새 공유 종류를 만들면 단기 작업자에게 보일지 두 곳에서 같이 정하세요.
+- 단기 작업자에게 보이는 화면은 `app.js`의 `GUEST_OK`. 화면을 새로 만들면 여기에 넣을지 정하세요. 메뉴·검색·주소 이동이 모두 `canOpen`을 거쳐요.
+- 파트(역할)는 기본 네 가지(`prompts.TEAM_ROLES`) + 관리자가 만든 것(`team-main.parts`, 팀이 없는 기기는 `team:parts`). 새 파트는 기본 네 가지 중 닮은 쪽(`keys`)을 따라 화면이 맞춰져요. 역할 목록이 필요하면 `TEAM_ROLES` 말고 `teamRoles()`를 쓰세요.
+- 서버 트리거에서 `by` 칸은 꼭 `"by"`로 쓰세요. 이 언어의 예약어라 따옴표 없이 쓰면 고칠 때마다 오류가 나요 (v1.39.0 전까지 팀 기록 고치기가 서버에서 전부 막혀 있었음).
+- 서버 설치문은 로컬 Postgres에서 먼저 돌려 볼 수 있어요: `/mnt/project-files/hajin-assistant-dev/server-test/` (Supabase 흉내 틀 `stub.sql`, 사람 넷으로 권한을 보는 `t2.sql`).

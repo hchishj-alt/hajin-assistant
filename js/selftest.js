@@ -6,6 +6,7 @@ import * as PS from './prompts.js';
 import * as DM from './dm.js';
 import { dayOf } from './db.js';
 import * as V from './video.js';
+import * as SY from './sync.js';
 export const BASE = new Date(2026, 10, 19, 10, 0, 0);
 
 export const CASES = [
@@ -151,6 +152,13 @@ export function run() {
     const rk = [PS.roleKeys('리더·PM·UX/UI').join(), PS.roleKeys('아트디렉터').join(), PS.roleKeys('경영').join()];
     results.push({ group: '프롬프트 스튜디오', name: '역할 글에서 맡은 일 읽기', ok: rk[0] === 'pm,art' && rk[1] === 'art' && rk[2] === 'biz' && PS.byRole(['biz'])[0].role === 'biz', detail: rk.join(' | ') });
     { const mk = PS.MY_ROLES.map(r => PS.roleKeys(r).join()); results.push({ group: '프롬프트 스튜디오', name: '역할은 네 가지로 고정(PM·리더, 아트·디자인, 콘텐츠 제작, 경영·운영), 예전 역할 글도 같은 쪽으로 읽음', ok: mk.join('|') === 'pm|art|make|biz' && PS.roleKeys(PS.MY_ROLES.join(', ')).length === 4 && PS.roleKeys('리더·PM·UX/UI').join() === 'pm,art' && PS.roleKeys('아트디렉터').join() === 'art' && PS.roleKeys('경영').join() === 'biz' && PS.roleKeys('PM·기획').join() === 'pm', detail: mk.join(' | ') }); }
+    { /* 새 파트: 관리자가 만든 파트는 닮았다고 고른 쪽을 따르고, 지우면 다시 모름. 단기 작업자는 맡은 프로젝트 것만 팀과 나눔 */
+      PS.setParts([{ name: '3D', about: '모델링', keys: ['art', 'make'] }, { name: '개발', keys: ['pm', '없는쪽'] }]);
+      const a = PS.roleKeys('3D').join(), b = PS.roleKeys('개발').join(), c = PS.roleKeys('아트·디자인, 3D').join(), names = PS.teamRoles().map(r => r.name).join();
+      PS.setParts([]); const d = PS.roleKeys('3D').join();
+      const g = { projects: ['루미에 팝업'] }, can = (col, project) => SY.guestCanShare({ col, project }, g);
+      results.push({ group: '역할과 단기 작업자', name: '새 파트는 닮은 쪽 화면을 따르고, 단기 작업자는 맡은 프로젝트의 할 일·일정만 팀과 나눔(비용·다른 프로젝트는 나만)', ok: a === 'art,make' && b === 'pm' && c === 'art,make' && d === '' && /콘텐츠 제작,경영·운영,3D,개발$/.test(names) && can('tasks', '루미에 팝업') && can('events', '루미에 팝업') && !can('tasks', '다른 일') && !can('tasks', '') && !can('expenses', '루미에 팝업') && !can('contacts', '루미에 팝업') && SY.guestCanShare({ col: 'expenses' }, null), detail: `${a} / ${b} / ${c} / ${names}` });
+    }
     const at = new Date().toISOString(), lg = (by, cat, len, sig) => ({ by, cat, tool: 'Claude', title: cat + ' 틀', len, sig, at });
     const st = PS.style([lg('최민서', '디자인·이미지', 420, { format: true, material: true, context: true }), lg('최민서', '디자인·이미지', 380, { format: true, material: true, context: true }), lg('최민서', '글쓰기', 350, { format: true, context: true }), lg('안서연', '돈·계약', 60, {})], [{ by: '안서연' }], ['김하진', '최민서', '안서연']);
     results.push({ group: '프롬프트 스튜디오', name: '팀원별 작업 방식 요약', ok: st[0].name === '최민서' && st[0].uses === 3 && st[0].cats[0][0] === '디자인·이미지' && st[0].habits.includes('길고 자세하게 시키는 편') && st[0].habits.includes('받을 모양을 꼭 정함') && st.find(x => x.name === '안서연').made === 1 && st.find(x => x.name === '김하진').uses === 0, detail: st.map(x => `${x.name} ${x.uses}번 [${x.habits.join(', ')}]`).join(' / ') });

@@ -304,9 +304,9 @@ create policy sitems_del on public.space_items for delete to authenticated
 -- 올린 사람은 서버가 찍고, 수정 기록(audit)은 한 번 올라가면 바뀌지 않음
 create or replace function public.space_items_guard() returns trigger language plpgsql as $$
 begin
-  if tg_op = 'INSERT' then new.by := auth.uid(); return new; end if;
+  if tg_op = 'INSERT' then new."by" := auth.uid(); return new; end if;
   if old.col = 'audit' then return old; end if;
-  new.by := old.by; new.col := old.col;
+  new."by" := old."by"; new.col := old.col;   -- by는 이 언어의 예약어라 꼭 따옴표로. 안 그러면 고칠 때마다 'record "old" has no field "by"' 오류가 남 (16번 참고)
   return new;
 end $$;
 drop trigger if exists space_items_guard on public.space_items;
@@ -622,3 +622,168 @@ grant execute on function public.set_my_profile(text, text) to authenticated;
 -- 이름을 스스로 고치는 길을 막음 (관리자의 멤버 수정만 이름을 바꿈)
 drop policy if exists members_self_update on public.space_members;
 revoke update on public.space_members from authenticated;
+
+-- ============================================================
+-- 16. 단기 작업자와 기간 (v1.39.0). 다시 실행해도 안전
+-- ============================================================
+-- 멤버 종류: member(정식) / guest(단기 작업자). until = 이 날까지만 쓸 수 있음(비우면 끝 없음, 한국 날짜 기준).
+-- projects = 단기 작업자가 볼 프로젝트 이름들. 단기 작업자는 그 프로젝트의 할 일·일정·회의록·메모·문서·레퍼런스만 보고 씀.
+-- 돈(비용·받을 돈), 업체, 연락처, 지원사업, 구매 목록, 수정 기록, 팀 공용 AI 키는 단기 작업자에게 내려가지 않음.
+alter table public.members add column if not exists kind text not null default 'member';
+alter table public.members add column if not exists until date;
+alter table public.members add column if not exists projects text[] not null default '{}';
+do $$ begin
+  alter table public.members add constraint members_kind_ok check (kind in ('member', 'guest'));
+exception when duplicate_object then null; end $$;
+
+-- 지금 쓸 수 있는 멤버인지: 사용 중이고 기간이 안 지났는지
+create or replace function public.member_live(p_active boolean, p_until date) returns boolean
+language sql stable as $$
+  select coalesce(p_active, false) and (p_until is null or p_until >= (now() at time zone 'Asia/Seoul')::date)
+$$;
+
+create or replace function public.is_active() returns boolean
+language sql security definer set search_path = public stable as $$
+  select exists (select 1 from public.members where user_id = auth.uid() and public.member_live(active, until))
+$$;
+create or replace function public.is_admin() returns boolean
+language sql security definer set search_path = public stable as $$
+  select exists (select 1 from public.members where user_id = auth.uid() and is_admin and kind = 'member' and public.member_live(active, until))
+$$;
+create or replace function public.my_member() returns uuid
+language sql stable security definer set search_path = public as $$
+  select id from public.members where user_id = auth.uid() and public.member_live(active, until) limit 1
+$$;
+create or replace function public.is_guest() returns boolean
+language sql security definer set search_path = public stable as $$
+  select exists (select 1 from public.members where user_id = auth.uid() and kind = 'guest')
+$$;
+-- 단기 작업자가 이 줄을 볼 수 있는지 (맡은 프로젝트의 것만)
+create or replace function public.guest_sees(p_col text, p_data jsonb) returns boolean
+language sql security definer set search_path = public stable as $$
+  select case
+    when p_col in ('teams', 'labelsets') then true
+    when p_col = 'projects' then coalesce(p_data->>'name', '') = any (coalesce((select projects from public.members where user_id = auth.uid()), '{}'))
+    when p_col in ('tasks', 'events', 'meetings', 'notes', 'docs', 'refs', 'reffolders', 'figmafiles')
+      then coalesce(p_data->>'project', '') <> '' and (p_data->>'project') = any (coalesce((select projects from public.members where user_id = auth.uid()), '{}'))
+    else false end
+$$;
+revoke all on function public.is_guest() from public, anon;
+revoke all on function public.guest_sees(text, jsonb) from public, anon;
+grant execute on function public.is_guest() to authenticated;
+grant execute on function public.guest_sees(text, jsonb) to authenticated;
+grant execute on function public.member_live(boolean, date) to anon, authenticated;
+
+-- 팀 기록: 정식 멤버는 그대로, 단기 작업자는 맡은 프로젝트 것만
+drop policy if exists sitems_read on public.space_items;
+create policy sitems_read on public.space_items for select to authenticated
+  using (public.is_member(space) and public.is_active() and (not public.is_guest() or public.guest_sees(col, data)));
+drop policy if exists sitems_ins on public.space_items;
+create policy sitems_ins on public.space_items for insert to authenticated
+  with check (public.is_member(space) and public.is_active() and col <> '_kv'
+    and (col not in ('teams', 'projects', 'reffolders', 'labelsets') or public.is_admin())
+    and (not public.is_guest() or public.guest_sees(col, data)));
+drop policy if exists sitems_upd on public.space_items;
+create policy sitems_upd on public.space_items for update to authenticated
+  using (public.is_member(space) and public.is_active()
+    and (col not in ('teams', 'projects', 'reffolders', 'labelsets') or public.is_admin())
+    and (not public.is_guest() or public.guest_sees(col, data)))
+  with check (public.is_member(space) and public.is_active() and col <> '_kv'
+    and (col not in ('teams', 'projects', 'reffolders', 'labelsets') or public.is_admin())
+    and (not public.is_guest() or public.guest_sees(col, data)));
+
+-- 팀 공용 AI 키는 정식 멤버에게만
+create or replace function public.team_secret(p_k text) returns text
+language sql security definer set search_path = public stable as $$
+  select v from public.team_secrets where k = p_k and public.is_active() and not public.is_guest()
+$$;
+
+-- 로그인 전 코드 확인: 기간이 지난 코드는 안 됨
+create or replace function public.check_code(p_code text) returns json
+language plpgsql security definer set search_path = public as $$
+declare v_ip text := coalesce(split_part(coalesce(current_setting('request.headers', true), '{}')::json ->> 'x-forwarded-for', ',', 1), '');
+  r json; n_ip int; n_all int; ended boolean;
+begin
+  delete from public.code_tries where at < now() - interval '1 day';
+  select count(*) filter (where ip = v_ip), count(*) into n_ip, n_all from public.code_tries where at > now() - interval '10 minutes' and not ok;
+  if n_ip >= 10 or n_all >= 80 then raise exception '코드를 여러 번 틀렸어요. 10분 뒤에 다시 해 주세요'; end if;
+  select json_build_object('id', id, 'name', name) into r from public.members where code = upper(trim(p_code)) and public.member_live(active, until);
+  if r is null then select true into ended from public.members where code = upper(trim(p_code)) and active and until is not null; end if;
+  insert into public.code_tries (ip, ok) values (v_ip, r is not null or coalesce(ended, false));
+  if coalesce(ended, false) then raise exception '이 코드는 쓸 수 있는 기간이 끝났어요. 관리자에게 물어봐 주세요'; end if;
+  if r is null then perform pg_sleep(0.4); end if;
+  return r;
+end $$;
+grant execute on function public.check_code(text) to anon, authenticated;
+
+create or replace function public.claim_member(p_code text) returns json
+language plpgsql security definer set search_path = public as $$
+declare m public.members; s record;
+begin
+  if auth.uid() is null then raise exception '로그인이 필요해요'; end if;
+  select * into m from public.members where code = upper(trim(p_code)) and public.member_live(active, until);
+  if m.id is null then raise exception '멤버 코드가 맞지 않아요'; end if;
+  if m.user_id is not null and m.user_id <> auth.uid() then raise exception '이미 다른 계정에 연결된 코드예요'; end if;
+  update public.members set user_id = auth.uid() where id = m.id;
+  for s in select id from public.spaces where is_main loop
+    insert into public.space_members (space, user_id, name) values (s.id, auth.uid(), m.name)
+      on conflict (space, user_id) do update set name = excluded.name;
+  end loop;
+  return json_build_object('id', m.id, 'name', m.name, 'role', m.role, 'is_admin', m.is_admin and m.kind = 'member', 'gmail', m.gmail,
+    'kind', m.kind, 'until', m.until, 'projects', to_json(m.projects));
+end $$;
+
+-- 명단: 종류·기간·맡은 프로젝트를 같이. 코드는 관리자에게만, 지메일은 단기 작업자에게 안 보임
+create or replace function public.list_members() returns setof json
+language sql security definer set search_path = public stable as $$
+  select json_build_object('id', id, 'name', name, 'role', role, 'gmail', case when public.is_guest() then '' else gmail end,
+    'is_admin', is_admin and kind = 'member', 'active', active,
+    'joined', user_id is not null, 'user_id', user_id, 'code', case when public.is_admin() then code else null end,
+    'color', color, 'avatar', avatar, 'kind', kind, 'until', until, 'projects', to_json(projects),
+    'ended', not public.member_live(active, until))
+  from public.members
+  where public.is_active()
+  order by is_admin desc, kind desc, created_at
+$$;
+
+-- 관리자: 멤버 추가·수정 (종류·기간·맡길 프로젝트까지). 예전 7칸짜리는 없애고 이것만 씀(뒤의 세 칸은 비워도 됨)
+drop function if exists public.admin_save_member(uuid, text, text, text, text, boolean, boolean);
+drop function if exists public.admin_save_member(uuid, text, text, text, text, boolean, boolean, text, date, text[], boolean);
+create or replace function public.admin_save_member(p_id uuid, p_code text, p_name text, p_role text, p_gmail text, p_is_admin boolean, p_active boolean,
+  p_kind text default null, p_until date default null, p_projects text[] default null)
+returns json language plpgsql security definer set search_path = public, extensions as $$
+declare m public.members; c text := upper(trim(p_code)); k text;
+begin
+  if not public.is_admin() then raise exception '관리자만 할 수 있어요'; end if;
+  if p_id is null then
+    k := coalesce(p_kind, 'member');
+    insert into public.members (code, name, role, gmail, is_admin, active, kind, until, projects)
+      values (c, p_name, coalesce(p_role,''), coalesce(p_gmail,''), coalesce(p_is_admin,false) and k = 'member', coalesce(p_active,true), k, p_until, coalesce(p_projects, '{}')) returning * into m;
+  else
+    select kind into k from public.members where id = p_id; k := coalesce(p_kind, k, 'member');
+    update public.members set code = c, name = p_name, role = coalesce(p_role,''), gmail = coalesce(p_gmail,''),
+        is_admin = coalesce(p_is_admin,false) and k = 'member', active = coalesce(p_active,true), kind = k,
+        until = case when p_kind is null then until else p_until end,   -- 예전 앱(종류를 안 보냄)이 고치면 기간은 그대로
+        projects = coalesce(p_projects, projects)
+      where id = p_id returning * into m;
+    -- 코드가 바뀌면 로그인 비밀번호도 같이 바꿈
+    if m.user_id is not null then
+      update auth.users set encrypted_password = extensions.crypt('hj-' || m.code || '-' || substr(m.id::text, 1, 8), extensions.gen_salt('bf')) where id = m.user_id;
+      update public.space_members set name = m.name where user_id = m.user_id;
+    end if;
+    if not m.active and m.user_id is not null then delete from public.space_members where user_id = m.user_id; end if;
+  end if;
+  return json_build_object('id', m.id, 'code', m.code, 'name', m.name);
+end $$;
+revoke all on function public.admin_save_member(uuid, text, text, text, text, boolean, boolean, text, date, text[]) from public, anon;
+grant execute on function public.admin_save_member(uuid, text, text, text, text, boolean, boolean, text, date, text[]) to authenticated;
+
+-- (v1.39.0) 팀 기록을 고칠 때마다 서버가 'record "old" has no field "by"'로 막던 것을 고침.
+-- 올린 사람 칸 이름(by)이 예약어라 따옴표 없이 쓰면 새로 넣기는 되는데 고치기가 전부 실패했음 (할 일 끝내기, 일정 옮기기 등이 팀에 안 올라감).
+create or replace function public.space_items_guard() returns trigger language plpgsql as $$
+begin
+  if tg_op = 'INSERT' then new."by" := auth.uid(); return new; end if;
+  if old.col = 'audit' then return old; end if;
+  new."by" := old."by"; new.col := old.col;
+  return new;
+end $$;

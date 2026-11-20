@@ -5,6 +5,7 @@
 import * as db from './db.js';
 
 const FREE = new Set(['tasks', 'pollvotes', 'polls', 'leadmarks', 'leadfb', 'vendors', 'events', 'audit', 'drafts', '_kv', 'buys', 'boards', 'dms', 'feedback', 'accts', 'posts', 'devreqs', 'promptlogs']); // 누구나 고칠 수 있는 공유 항목
+const GUEST_COLS = new Set(['tasks', 'events', 'meetings', 'notes', 'docs', 'refs']);   // 단기 작업자가 팀과 나눌 수 있는 것 (맡은 프로젝트의 것만)
 const ADMIN_ONLY_COLS = new Set(['teams', 'projects', 'reffolders', 'labelsets']);                                   // 만들기부터 관리자만
 const SKIP = new Set(['updatedAt', 'createdAt', 'dirty', 'id', 'col', 'sharedMembers', 'code', 'space']);
 const BIG = new Set(['snap', 'comments', 'versions', 'history', 'transcript', 'body', 'avail', 'summary', 'summaryDraft', 'pages']);
@@ -15,7 +16,8 @@ export async function who() {
   if (cache && Date.now() - cache.at < 3000) return cache;
   const m = await db.kvGet('me:member', null);
   const loggedIn = !!m;
-  cache = { at: Date.now(), name: await db.kvGet('name', '하진'), loggedIn, admin: !loggedIn || !!m.is_admin };
+  const guest = !!(m && m.kind === 'guest');
+  cache = { at: Date.now(), name: await db.kvGet('name', '하진'), loggedIn, admin: !loggedIn || (!!m.is_admin && !guest), guest, projects: guest ? (m.projects || []) : [], until: (m && m.until) || '' };
   return cache;
 }
 export const isAdmin = async () => (await who()).admin;
@@ -37,8 +39,13 @@ async function guard(prev, item) {
   if (item.col === 'audit' || item.col === '_kv' || item.col === 'drafts') return;
   if (prev && item.team === 'auto') item.team = prev.team || '';
   if (!item.deleted) { const A = await import('./auto.js'); if (!prev) await A.fill(item, { hasTeam: !!(await db.get('team-main')), projects: (await db.list('projects')).map(p => p.name), teamNames: (await db.kvGet('sync:roster', [])).map(r => r.name).filter(Boolean) }); else await A.learn(prev, item); }
-  const shared = !!(item.team || prev?.team || item.space || prev?.space);
   const me = await who();
+  /* 단기 작업자: 맡은 프로젝트가 하나면 새로 적는 것에 그 프로젝트를 붙이고, 맡은 프로젝트 것만 팀에 공유. 그 밖은 나만 보는 기록 */
+  if (me.guest && !item.deleted && GUEST_COLS.has(item.col)) {
+    if (!prev && !item.project && me.projects.length === 1) item.project = me.projects[0];
+    if (item.project && me.projects.includes(item.project)) { if (!prev && (await db.get('team-main'))) item.team = 'team-main'; } else if (!prev?.team) item.team = '';
+  } else if (me.guest && !prev && item.team) item.team = '';
+  const shared = !!(item.team || prev?.team || item.space || prev?.space);
   if (!prev && shared && !item.by) item.by = me.name;
   if (me.loggedIn && !me.admin) {
     if (ADMIN_ONLY_COLS.has(item.col) && (shared || !prev)) throw new Error('폴더·팀 관리는 관리자만 할 수 있어요');

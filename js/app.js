@@ -33,6 +33,11 @@ export const MODULES = [
   { id: 'health', title: '자가 점검', icon: 'shield', group: '시스템' },
   { id: 'menu', title: '메뉴', icon: 'menu', hidden: true, tab: 5 },
 ];
+// 단기 작업자에게 보이는 화면: 맡은 프로젝트 일을 하는 데 필요한 것만. 돈·업체·연락처·팀 관리 쪽은 메뉴에서 빼고 주소로 가도 오늘 화면으로 돌림
+export const GUEST_OK = new Set(['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'prompts', 'studio', 'archive', 'talk', 'look', 'settings', 'health', 'menu']);
+let guestOn = false;
+export const isGuest = () => guestOn;
+export const canOpen = (m, adm = true) => !!m && (!m.adminOnly || adm) && (!guestOn || GUEST_OK.has(m.id));
 const cache = {};
 async function load(id) {
   if (!cache[id]) cache[id] = (await import(`../modules/${id}.js`)).default;
@@ -43,7 +48,7 @@ let current = null, cleanup = null, lastHash = '';
 export function go(route) { const h = '#/' + route; if (location.hash === h) render(); else location.hash = h; }
 function parse() {
   const [id, ...rest] = (location.hash.replace(/^#\/?/, '') || 'today').split('/');
-  return { id: MODULES.some(m => m.id === id) ? id : 'today', params: rest.map(s => { try { return decodeURIComponent(s); } catch { return s; } }) };
+  return { id: MODULES.some(m => m.id === id) && (!guestOn || GUEST_OK.has(id)) ? id : 'today', params: rest.map(s => { try { return decodeURIComponent(s); } catch { return s; } }) };
 }
 
 let seq = 0;
@@ -82,7 +87,7 @@ function markNav(id) {
 
 let navFold = {};
 export async function buildNav() {
-  const adm = await (await import('./admin.js')).isAdmin();
+  const meW = await (await import('./admin.js')).who(), adm = meW.admin; guestOn = !!meW.guest; document.body.classList.toggle('is-guest', guestOn);
   const nav = document.getElementById('nav');
   clear(nav);
   nav.append(h('div.brand', h('img', { src: 'icons/icon.svg', alt: '' }), '하진 비서'));
@@ -94,7 +99,7 @@ export async function buildNav() {
   let curGroup = '';
   // 메뉴 줄이기: 하루·시간은 그대로, 나머지는 내 역할에서 주로 쓰는 것 + 자주 연 것만 "자주 쓰는 것"으로, 그 밖은 "더보기"로 접음
   const pins = await (await import('./helper.js')).pinned();
-  const shown = MODULES.filter(m => !m.hidden && !hid.includes(m.id) && (!m.adminOnly || adm)).map(m => ({ ...m, group: ['하루', '시간'].includes(m.group) ? m.group : pins.has(m.id) ? '자주 쓰는 것' : '더보기' }));
+  const shown = MODULES.filter(m => !m.hidden && !hid.includes(m.id) && canOpen(m, adm)).map(m => ({ ...m, group: ['하루', '시간'].includes(m.group) ? m.group : pins.has(m.id) ? '자주 쓰는 것' : '더보기' }));
   const ORDER = ['하루', '시간', '자주 쓰는 것', '더보기']; shown.sort((x, y) => ORDER.indexOf(x.group) - ORDER.indexOf(y.group)); curGroup = shown.find(m => m.id === cur)?.group;
   for (const m of shown) {
     if (m.group !== g) {
@@ -149,7 +154,7 @@ export async function openPalette() {
       if (parsed.length) made = { icon: 'zap', title: `적어 두기: ${parsed.map(p => p.label).join(', ')}`, sub: parsed.map(p => p.data.title || p.data.name).join(' / '), run: async () => { for (const p of parsed) await store.draft(p.kind, p.data, { source: p.src || q, confidence: p.confidence, origin: 'palette' }); updateBadge(); toast('확인 대기함에 넣었어요', { label: '보기', fn: () => go('inbox') }); } };
     }
     const ql = q.toLowerCase();
-    for (const m of MODULES.filter(m => !m.hidden && (!m.adminOnly || !document.body.classList.contains('not-admin')) && (!q || m.title.includes(q) || m.title.replace(/\s/g, '').includes(q.replace(/\s/g, '')) || m.id.includes(ql)))) items.push({ icon: m.icon, title: m.title, sub: '메뉴로 이동', run: () => go(m.id) });
+    for (const m of MODULES.filter(m => !m.hidden && canOpen(m, !document.body.classList.contains('not-admin')) && (!q || m.title.includes(q) || m.title.replace(/\s/g, '').includes(q.replace(/\s/g, '')) || m.id.includes(ql)))) items.push({ icon: m.icon, title: m.title, sub: '메뉴로 이동', run: () => go(m.id) });
     if (made) { if (items.length && q.length <= 6) items.push(made); else items.unshift(made); } /* 메뉴 이름을 친 거면 이동이 먼저 */
     if (q) for (const d of brain.similar(q, docs, 8)) items.push({ icon: store.KINDS[Object.keys(store.KINDS).find(k => store.KINDS[k].col === d.col)]?.icon || 'file', title: d.title || '(제목 없음)', sub: d.text.slice(0, 70), run: () => go(d.route + '/' + d.id) });
     sel = Math.min(sel, Math.max(0, items.length - 1));
@@ -212,7 +217,7 @@ async function boot() {
   if (!location.hash || location.hash === '#/') { const st = (await db.kvGet('look', null))?.start; if (st && st !== 'today' && MODULES.some(m => m.id === st)) history.replaceState(null, '', '#/' + st); }
   if (/^#k=/.test(location.hash) || sessionStorage.getItem('hajin:pk')) await (await import('./keyshare.js')).takeFromHash();
   await store.loadLearned();
-  await loadFaces();
+  await loadFaces(); await loadParts();
   await buildNav();
   window.addEventListener('hashchange', async () => { if (/^#k=/.test(location.hash)) await (await import('./keyshare.js')).takeFromHash(); render(); });
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
@@ -239,7 +244,7 @@ async function boot() {
     try { if (document.visibilityState !== 'visible' && Notification?.permission === 'granted') (await navigator.serviceWorker?.ready)?.showNotification(`${d.otherName} 님의 메시지`, { body: d.body.slice(0, 120), tag: 'dm-' + d.other, icon: 'icons/icon-192.png', data: { route: 'talk/' + d.other } }); } catch { }
   });
   window.addEventListener('hajin:remote', async () => {
-    updateBadge(); applyTheme(); await loadFaces();
+    updateBadge(); applyTheme(); await loadFaces(); await loadParts();
     const a = document.activeElement;
     if (document.querySelector('.modal-bg') || (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || document.querySelector('.avail.painting') || document.querySelector('[data-live]')) return; // 녹음·작성 중인 화면은 건드리지 않음
     render();
@@ -248,6 +253,10 @@ async function boot() {
 }
 boot().catch(e => { console.error(e); const v = document.getElementById('view') || document.body; const box = document.createElement('div'); box.style.cssText = 'padding:24px;line-height:1.7'; box.textContent = '앱을 열지 못했어요. 사생활 보호(시크릿) 창이거나 브라우저가 기기 저장소를 막아 둔 것 같아요. 일반 창에서 다시 열어 주세요. (' + (e && e.message || e) + ')'; v.append(box); });
 
+// 관리자가 만든 새 파트(역할)를 읽어 둠. 팀 기록(team-main.parts)에 있어 모든 기기가 같이 받음. 팀이 없는 기기는 이 기기에 적은 것(team:parts)
+export async function loadParts() {
+  try { const t = await db.get('team-main'); (await import('./prompts.js')).setParts((t && t.parts) || await db.kvGet('team:parts', [])); } catch (e) { console.error(e); }
+}
 // 멤버가 정한 색·사진을 이름표에 쓰도록 읽어 둠. 로그인하지 않은 기기는 이 기기에서 고른 것(me:face)만
 export async function loadFaces() {
   try { const list = [...(await db.kvGet('sync:roster', []))]; const mine = await db.kvGet('me:face', null), nm = await db.kvGet('name', ''), meM = await db.kvGet('me:member', null);

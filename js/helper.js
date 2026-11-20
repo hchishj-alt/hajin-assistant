@@ -3,7 +3,7 @@
 //  · 메뉴: 내 역할에서 주로 쓰는 것 + 실제로 자주 연 것만 앞에 두고, 나머지는 "더보기"로 접음 (없애지 않음. 직접 고정·해제 가능)
 import { h, ic, modal } from './ui.js';
 import * as db from './db.js';
-import { roleKeys, myRole, MY_ROLES, TEAM_ROLES } from './prompts.js';
+import { roleKeys, myRole, teamRoles } from './prompts.js';
 
 // 화면마다: say = 그 화면에서 바로 통하는 말(앱 규칙만으로도 답함), about = AI에게 알려 줄 화면 설명
 export const SCREENS = {
@@ -79,16 +79,27 @@ const QUICK = {
 };
 export async function shortcuts(me) {
   me = me || await who(); const out = [], seen = new Set();
-  for (const k of me.keys) for (const q of (QUICK[k] || [])) { if (seen.has(q.label)) continue; seen.add(q.label); out.push(q); }
+  const { isGuest, GUEST_OK } = await import('./app.js'); const g = isGuest();
+  for (const k of me.keys) for (const q of (QUICK[k] || [])) { if (seen.has(q.label)) continue; if (g && (q.to ? !GUEST_OK.has(q.to.split('/')[0]) : /지출|받을 돈|누가 바빠/.test(q.say || ''))) continue; seen.add(q.label); out.push(q); }   /* 단기 작업자에게는 못 여는 화면·돈 이야기를 권하지 않음 */
   return out.slice(0, me.keys.length > 1 ? 6 : 4);
 }
 // 로그인하지 않았거나 멤버에 역할이 안 적혀 있으면 이 기기에서 직접 고름 (여러 개 가능). 고르면 바로가기·메뉴·프롬프트가 그 역할에 맞춰짐
 export function rolePicker(me, done, { later = false } = {}) {
-  const had = roleKeys(me.role || ''); const picked = new Set(TEAM_ROLES.filter(r => had.includes(r.key)).map(r => r.name));
+  const had = roleKeys(me.role || ''), all = teamRoles(); const picked = new Set(all.filter(r => (r.custom ? String(me.role || '').includes(r.name) : had.includes(r.key) && !all.some(c => c.custom && String(me.role || '').includes(c.name) && c.keys.includes(r.key)))).map(r => r.name));
   const chip = r => { const b = h('button.chip' + (picked.has(r) ? '.on' : ''), { type: 'button', 'aria-pressed': String(picked.has(r)), onclick: () => { picked.has(r) ? picked.delete(r) : picked.add(r); b.classList.toggle('on', picked.has(r)); b.setAttribute('aria-pressed', String(picked.has(r))); } }, r); return b; };
-  return h('div.role-row.pick', { 'aria-label': '내 역할 고르기' }, h('span.role-tag', '내 역할은?'), MY_ROLES.map(chip),
+  return h('div.role-row.pick', { 'aria-label': '내 역할 고르기' }, h('span.role-tag', '내 역할은?'), all.map(r => chip(r.name)),
     h('button.chip.go', { type: 'button', onclick: async () => { await db.kvSet('me:role', [...picked].join(', ')); await db.kvSet('me:roleskip', !picked.size); await done(); } }, ic('check', 14), '완료'),
     later ? h('button.chip.ghost', { type: 'button', onclick: async () => { await db.kvSet('me:roleskip', true); await done(); } }, '나중에') : null);
+}
+// 오늘 화면 맨 위 한 줄: 단기 작업자에게는 맡은 프로젝트와 남은 날, 기간이 끝났거나 멈춘 코드면 그 사실
+export async function memberStrip() {
+  const m = await db.kvGet('me:member', null); if (!m) return null;
+  if (await db.kvGet('me:ended', false)) return h('div.guest-strip.end', ic('clock', 16), h('div.grow', h('b', '이 코드는 지금 쓸 수 없어요'), h('span', '쓸 수 있는 기간이 끝났거나 멈춘 코드예요. 팀 기록은 더 받아 오지 않아요. 관리자에게 물어봐 주세요.')));
+  if (m.kind !== 'guest') return null;
+  const left = m.until ? Math.round((new Date(m.until + 'T00:00') - new Date(db.dayOf(new Date()) + 'T00:00')) / 864e5) : null;
+  const ps = m.projects || [];
+  return h('div.guest-strip' + (left != null && left <= 3 ? '.soon' : ''), ic('briefcase', 16), h('div.grow', h('b', ps.length ? ps.join(', ') : '맡은 프로젝트가 아직 없어요'),
+    h('span', [ps.length ? '이 프로젝트의 할 일·일정·회의록·레퍼런스를 팀과 같이 봐요. 그 밖에 적는 것은 나만 봐요.' : '관리자가 프로젝트를 맡기면 그 일이 여기 보여요.', m.until ? `${m.until.slice(5).replace('-', '/')}까지${left === 0 ? ' (오늘까지)' : left > 0 ? ` (${left}일 남음)` : ''}` : ''].filter(Boolean).join(' '))));
 }
 export async function shortcutRow() {
   const me = await who(); const { go, refresh, buildNav } = await import('./app.js');

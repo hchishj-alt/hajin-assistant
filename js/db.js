@@ -82,6 +82,8 @@ export async function putRaw(item) {
   await tx('items', 'readwrite', s => req(s.put(item)));
   emit(item.col, item);
 }
+// 이 기기에서만 아예 없앰 (서버에는 알리지 않음). 기간이 끝난 단기 작업자 기기에서 받아 둔 팀 기록을 치울 때만 씀
+export async function purge(id) { await tx('items', 'readwrite', s => req(s.delete(id))); }
 export async function dirtyItems() {
   const all = await tx('items', 'readonly', s => req(s.getAll()));
   return all.filter(x => x.dirty);

@@ -1,6 +1,6 @@
 import { h, ic, head, clear, toast } from '../js/ui.js';
 import * as db from '../js/db.js';
-import { MODULES, openPalette, buildNav } from '../js/app.js';
+import { MODULES, openPalette, buildNav, canOpen } from '../js/app.js';
 import { pinned, setPin, who, rolePicker } from '../js/helper.js';
 // 메뉴: 내 역할에서 주로 쓰는 것과 자주 연 것만 먼저. 나머지는 "더보기"에 접어 둠. "고르기"로 직접 넣고 뺄 수 있음
 export default {
@@ -12,7 +12,7 @@ export default {
     async function draw() {
       const adm = await (await import('../js/admin.js')).isAdmin(); const hid = (await db.kvGet('look', null))?.hidden || [];
       const pins = await pinned(); const more = await db.kvGet('menu:more', false);
-      const all = MODULES.filter(m => !m.hidden && !m.tab && !hid.includes(m.id) && (!m.adminOnly || adm));
+      const all = MODULES.filter(m => !m.hidden && !m.tab && !hid.includes(m.id) && canOpen(m, adm));
       const top = all.filter(m => pins.has(m.id)), rest = all.filter(m => !pins.has(m.id));
       const cell = (m, on) => edit
         ? h('button.menu-pick' + (on ? '.on' : ''), { type: 'button', 'aria-pressed': String(on), 'aria-label': `${m.title} ${on ? '빼기' : '넣기'}`, onclick: async () => { await setPin(m.id, !on); await buildNav(); draw(); } }, ic(m.icon, 26), m.short || m.title, h('i', ic(on ? 'check' : 'plus', 12)))

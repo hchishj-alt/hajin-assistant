@@ -2,9 +2,8 @@
 import { h, ic, clear, toast, head, modal, form, tile, seg, rel, fmtDate, confirmBox, colorFor, won } from '../js/ui.js';
 import * as db from '../js/db.js';
 import * as A from '../js/admin.js';
-import { go } from '../js/app.js';
-import { TEAM_ROLES } from '../js/prompts.js';
-const ROLE_NAMES = TEAM_ROLES.map(r => r.name);
+import { go, loadParts, buildNav } from '../js/app.js';
+import { TEAM_ROLES, teamRoles, parts as customParts } from '../js/prompts.js';
 
 let tab = 'log';
 const F = { by: '', col: '', q: '' };
@@ -135,15 +134,75 @@ export default {
     // ── 멤버 ──
     async function member() {
       const sync = await import('../js/sync.js');
-      if (!(await sync.me())) { box.append(h('div.card', h('div.empty', ic('users', 28), h('p', '멤버 코드로 로그인하면 여기서 멤버를 추가하고 코드를 관리할 수 있어요.'), h('a.btn.pri', { href: '#/settings' }, '설정에서 로그인')))); return; }
+      if (!(await sync.me())) { box.append(h('div.card', h('div.empty', ic('users', 28), h('p', '멤버 코드로 로그인하면 여기서 멤버를 추가하고 코드를 관리할 수 있어요.'), h('a.btn.pri', { href: '#/settings' }, '설정에서 로그인')))); box.append(await partsCard()); return; }
       let ms = []; try { ms = await sync.listMembers(); } catch (e) { box.append(h('p.faint.small', '멤버 목록을 못 불러왔어요: ' + e.message)); return; }
-      const edit = (m = { active: true }) => modal(m.id ? '멤버 고치기' : '멤버 추가', close => form([{ k: 'name', label: '이름' }, { k: 'code', label: '멤버 코드 (5자 이내)', default: m.code || sync.newCode() }, { k: 'role', label: '역할 (화면 구성이 역할을 따라가요)', type: 'select', options: [...(m.role && !ROLE_NAMES.includes(m.role) ? [[m.role, m.role + ' (지금 값)']] : []), ...(m.role ? [] : [['', '고르기']]), ...TEAM_ROLES.map(r => [r.name, `${r.name} · ${r.about}`])], default: m.role || '' }, { k: 'email', label: '지메일 (선택)', default: m.gmail || '' }, { k: 'is_admin', label: '권한', type: 'select', options: [['', '멤버'], ['1', '관리자']], default: m.is_admin ? '1' : '' }, { k: 'active', label: '상태', type: 'select', options: [['1', '사용 중'], ['', '정지']], default: m.active === false ? '' : '1' }], { ...m, is_admin: m.is_admin ? '1' : '', active: m.active === false ? '' : '1', email: m.gmail || '', code: m.code || sync.newCode() }, async v => {
-        if (!v.role) { toast('역할을 골라 주세요'); return; }
-        try { await sync.saveMember({ id: m.id, name: v.name, code: String(v.code || '').toUpperCase().slice(0, 5), gmail: v.email || '', role: v.role, is_admin: !!v.is_admin, active: !!v.active }); close(); toast('저장했어요'); go('admin/member'); } catch (e) { toast(e.message); }
-      }));
-      box.append(h('div.card', h('div.card-h', h('h3', ic('users'), `멤버 ${ms.length}`), h('div.row', h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '멤버 추가'))),
-        ms.map(m => h('div.li', h('span.av', { style: { background: colorFor(m.name) } }, m.name.slice(-2, -1) || m.name[0]), h('div.grow', h('div.t', m.name, m.is_admin ? h('span.chip', { style: { marginLeft: '6px' } }, '관리자') : null, m.active === false ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '정지') : null), h('div.faint.small', [m.role || '역할 없음', m.gmail, m.joined ? '로그인함' : '아직 로그인 안 함'].filter(Boolean).join(' · '))),
-          h('code.code', m.code || '•••••'), h('button.btn.sm', { 'aria-label': '코드 복사', onclick: () => { navigator.clipboard?.writeText(m.code || ''); toast('코드를 복사했어요'); } }, ic('copy', 14)), h('button.btn.sm', { 'aria-label': '고치기', onclick: () => edit(m) }, ic('edit', 14))))));
+      const today = db.dayOf(new Date()), plus = d => { const x = new Date(today + 'T00:00'); x.setDate(x.getDate() + d); return db.dayOf(x); };
+      const leftOf = u => Math.round((new Date(u + 'T00:00') - new Date(today + 'T00:00')) / 864e5);
+      const projs = (await db.list('projects')).map(p => p.name);
+      const edit = (m = { active: true }) => modal(m.id ? '멤버 고치기' : '멤버 추가', close => {
+        const roles = teamRoles(), names = roles.map(r => r.name), picked = new Set(m.projects || []);
+        const f = form([{ k: 'name', label: '이름' }, { k: 'code', label: '멤버 코드 (5자 이내)', default: m.code || sync.newCode() },
+          { k: 'kind', label: '종류', type: 'select', options: [['member', '정식 멤버'], ['guest', '단기 작업자 · 맡은 프로젝트만 봄']], default: m.kind || 'member' },
+          { k: 'role', label: '역할 (화면 구성이 역할을 따라가요)', type: 'select', options: [...(m.role && !names.includes(m.role) ? [[m.role, m.role + ' (지금 값)']] : []), ...(m.role ? [] : [['', '고르기']]), ...roles.map(r => [r.name, `${r.name} · ${r.about}`])], default: m.role || '' },
+          { k: 'until', label: '쓸 수 있는 마지막 날 (비우면 끝 없음)', type: 'date', default: m.until || '', full: true },
+          { k: 'email', label: '지메일 (선택)', default: m.gmail || '' }, { k: 'is_admin', label: '권한', type: 'select', options: [['', '멤버'], ['1', '관리자']], default: m.is_admin ? '1' : '' }, { k: 'active', label: '상태', type: 'select', options: [['1', '사용 중'], ['', '정지']], default: m.active === false ? '' : '1' }],
+        { ...m, kind: m.kind || 'member', until: m.until || '', is_admin: m.is_admin ? '1' : '', active: m.active === false ? '' : '1', email: m.gmail || '', code: m.code || sync.newCode() }, async v => {
+          if (!v.role) { toast('역할을 골라 주세요'); return; }
+          const guest = v.kind === 'guest';
+          if (guest && !picked.size) { toast(projs.length ? '맡길 프로젝트를 하나 이상 골라 주세요' : '먼저 폴더 탭에서 프로젝트를 만들어 주세요'); return; }
+          if (v.until && v.until < today && !(await confirmBox('마지막 날이 이미 지났어요. 이대로 저장하면 이 코드는 바로 못 쓰게 돼요.', '그대로 저장'))) return;
+          try { await sync.saveMember({ id: m.id, name: v.name, code: String(v.code || '').toUpperCase().slice(0, 5), gmail: v.email || '', role: v.role, is_admin: !guest && !!v.is_admin, active: !!v.active, kind: guest ? 'guest' : 'member', until: v.until || '', projects: guest ? [...picked] : [] }); close(); toast('저장했어요'); go('admin/member'); } catch (e) { toast(e.message); }
+        });
+        const q = n => f.querySelector(`[name=${n}]`), kindSel = q('kind'), untilIn = q('until'), adminWrap = q('is_admin').closest('label');
+        const chip = n => { const c = h('button.chip' + (picked.has(n) ? '.on' : ''), { type: 'button', 'aria-pressed': String(picked.has(n)), onclick: () => { picked.has(n) ? picked.delete(n) : picked.add(n); c.classList.toggle('on', picked.has(n)); c.setAttribute('aria-pressed', String(picked.has(n))); } }, n); return c; };
+        const gone = (m.projects || []).filter(n => !projs.includes(n));
+        const projBox = h('div.f.part-row', { style: { gridColumn: '1/-1' } }, '맡길 프로젝트', h('div.chips', [...projs, ...gone].map(chip), projs.length || gone.length ? null : h('span.faint.small', '프로젝트가 없어요. 폴더 탭에서 먼저 만들어 주세요.')),
+          h('span.faint.tiny', '이 프로젝트의 할 일·일정·회의록·메모·레퍼런스만 같이 봐요. 비용·업체·연락처·다른 프로젝트는 보이지 않아요.'));
+        const quick = h('div.chips', { style: { marginTop: '6px' } }, [['1주', 7], ['2주', 14], ['한 달', 30], ['석 달', 90]].map(([l, d]) => h('button.chip', { type: 'button', onclick: () => { untilIn.value = plus(d); } }, l)), h('button.chip', { type: 'button', onclick: () => { untilIn.value = ''; } }, '끝 없음'));
+        untilIn.after(quick); untilIn.closest('label').after(projBox);
+        const paint = () => { const g = kindSel.value === 'guest'; projBox.style.display = g ? '' : 'none'; adminWrap.style.display = g ? 'none' : ''; if (g) { q('is_admin').value = ''; if (!m.id && !untilIn.value) untilIn.value = plus(14); } };   /* 단기 작업자는 관리자가 될 수 없고, 새로 넣을 때는 2주를 먼저 채워 둠 */
+        kindSel.addEventListener('change', paint); paint();
+        return f;
+      });
+      const sub = m => { const g = m.kind === 'guest', l = m.until ? leftOf(m.until) : null;
+        return [m.role || '역할 없음', g ? '맡은 프로젝트: ' + ((m.projects || []).join(', ') || '없음') : '', m.until ? `${m.until.slice(5).replace('-', '/')}까지${l < 0 ? '' : l === 0 ? ' (오늘까지)' : ` (${l}일 남음)`}` : '', g ? '' : m.gmail, m.joined ? '로그인함' : '아직 로그인 안 함'].filter(Boolean).join(' · '); };
+      const row = m => h('div.li', { style: { flexWrap: 'wrap' } }, h('span.av', { style: { background: colorFor(m.name) } }, m.name.slice(-2, -1) || m.name[0]),
+        h('div.grow', { style: { minWidth: '150px' } }, h('div.t', m.name, m.is_admin ? h('span.chip', { style: { marginLeft: '6px' } }, '관리자') : null, m.kind === 'guest' ? h('span.chip.acc', { style: { marginLeft: '6px' } }, '단기') : null, m.active === false ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '정지') : m.ended ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '기간 끝남') : m.until && leftOf(m.until) <= 3 ? h('span.chip.warn', { style: { marginLeft: '6px' } }, '곧 끝남') : null), h('div.faint.small', sub(m))),
+        h('code.code', m.code || '•••••'), h('button.btn.sm', { 'aria-label': '코드 복사', onclick: () => { navigator.clipboard?.writeText(m.code || ''); toast('코드를 복사했어요'); } }, ic('copy', 14)),
+        m.ended && m.active !== false ? h('button.btn.sm', { title: '오늘부터 2주 더 쓰게 해요', onclick: async () => { try { await sync.saveMember({ ...m, until: plus(14) }); toast('2주 늘렸어요'); go('admin/member'); } catch (e) { toast(e.message); } } }, '2주 더') : null,
+        h('button.btn.sm', { 'aria-label': '고치기', onclick: () => edit(m) }, ic('edit', 14)));
+      const regular = ms.filter(m => m.kind !== 'guest'), guests = ms.filter(m => m.kind === 'guest');
+      box.append(h('div.card', h('div.card-h', h('h3', ic('users'), `멤버 ${regular.length}`), h('div.row', h('button.btn.sm', { onclick: () => edit({ active: true, kind: 'guest' }) }, ic('plus', 14), '단기 작업자'), h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '멤버 추가'))),
+        regular.map(row)));
+      box.append(h('div.card', h('div.card-h', h('h3', ic('briefcase'), `단기 작업자 ${guests.length}`)),
+        h('p.faint.small', { style: { margin: '0 0 6px' } }, '잠깐 같이 일하는 사람에게 주는 코드예요. 맡긴 프로젝트만 보이고, 정한 날이 지나면 코드가 저절로 멈추고 그 사람 기기에 받아 둔 팀 기록도 지워져요.'),
+        guests.length ? guests.map(row) : h('div.empty', '아직 없어요. 위의 “단기 작업자”로 넣을 수 있어요.')));
+      box.append(await partsCard());
+    }
+
+    // ── 파트(역할): 기본 네 가지 + 새로 생긴 파트. 새 파트는 기본 네 가지 중 어느 쪽과 닮았는지 골라 두면 화면 구성·바로가기·권하는 말이 그쪽을 따라감 ──
+    async function partsCard() {
+      const team = await db.get('team-main'); let list = customParts();
+      const saveAll = async next => { if (team) await db.patch('team-main', { parts: next }); else await db.kvSet('team:parts', next); await loadParts(); await buildNav(); go('admin/member'); };
+      const edit = (p0 = null) => modal(p0 ? '파트 고치기' : '새 파트', close => {
+        const p = p0 ? { ...p0, keys: [...p0.keys] } : { name: '', about: '', keys: [] }; const keys = new Set(p.keys);
+        const nameIn = h('input.in', { value: p.name, placeholder: '예: 3D, 개발, 음악', maxLength: 12, 'aria-label': '파트 이름' }), aboutIn = h('input.in', { value: p.about, placeholder: '하는 일 한 줄 (예: 모델링, 렌더)', maxLength: 40, 'aria-label': '하는 일' });
+        const chip = r => { const c = h('button.chip' + (keys.has(r.key) ? '.on' : ''), { type: 'button', 'aria-pressed': String(keys.has(r.key)), onclick: () => { keys.has(r.key) ? keys.delete(r.key) : keys.add(r.key); c.classList.toggle('on', keys.has(r.key)); c.setAttribute('aria-pressed', String(keys.has(r.key))); } }, r.name); return c; };
+        return h('div.stack', h('label.f', '파트 이름', nameIn), h('label.f', '하는 일', aboutIn),
+          h('div.f.part-row', '어느 쪽 일과 닮았나요? (여러 개 가능)', h('div.chips', TEAM_ROLES.map(chip)), h('span.faint.tiny', '고른 쪽의 메뉴·바로가기·프롬프트가 이 파트 사람에게 먼저 보여요. 나중에 바꿀 수 있어요.')),
+          h('div.modal-f', p0 ? h('button.btn.danger', { type: 'button', onclick: async () => { if (!(await confirmBox(`“${p0.name}” 파트를 지울까요? 이 파트인 멤버의 역할 글은 그대로 남아요.`, '지우기'))) return; close(); await saveAll(list.filter(x => x.name !== p0.name)); toast('지웠어요'); } }, ic('trash', 14)) : null,
+            h('button.btn.pri', { type: 'button', onclick: async () => {
+              const name = nameIn.value.trim(); if (!name) return toast('파트 이름을 적어 주세요'); if (!keys.size) return toast('닮은 쪽을 하나 이상 골라 주세요');
+              if (TEAM_ROLES.some(r => r.name === name) || list.some(x => x.name === name && x.name !== p0?.name)) return toast('이미 있는 이름이에요');
+              const item = { name, about: aboutIn.value.trim(), keys: TEAM_ROLES.map(r => r.key).filter(k => keys.has(k)) };
+              close(); await saveAll(p0 ? list.map(x => (x.name === p0.name ? item : x)) : [...list, item]); toast(p0 ? '고쳤어요' : `“${name}” 파트를 만들었어요. 멤버를 넣거나 고칠 때 역할에서 고를 수 있어요`);
+            } }, '저장')));
+      });
+      const adm = await A.isAdmin();
+      return h('div.card', h('div.card-h', h('h3', ic('grid'), `파트 ${TEAM_ROLES.length + list.length}`), adm ? h('button.btn.sm', { onclick: () => edit() }, ic('plus', 14), '새 파트') : null),
+        h('p.faint.small', { style: { margin: '0 0 6px' } }, '기본 네 가지에 새로 생긴 파트를 더할 수 있어요. 멤버의 역할에서 고르면 그 사람 화면이 파트에 맞춰져요.'),
+        TEAM_ROLES.map(r => h('div.li', h('div.grow', h('div.t', r.name, h('span.chip', { style: { marginLeft: '6px' } }, '기본')), h('div.faint.small', r.about)))),
+        list.map(p => h('div.li', h('div.grow', h('div.t', p.name), h('div.faint.small', [p.about, TEAM_ROLES.filter(r => p.keys.includes(r.key)).map(r => r.name).join(', ') + ' 쪽'].filter(Boolean).join(' · '))), adm ? h('button.btn.sm', { 'aria-label': `${p.name} 고치기`, onclick: () => edit(p) }, ic('edit', 14)) : null)));
     }
   },
 };
