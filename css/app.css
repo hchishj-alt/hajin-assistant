@@ -1095,3 +1095,5 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 .composer>.chips:last-child .chip{flex:none;white-space:nowrap}
 .composer:has(textarea:not(:placeholder-shown)) .suggest{display:none}
 @media (max-width:900px){.chatpage .composer{background:var(--bg);box-shadow:0 -8px 12px -8px rgba(0,0,0,.08)}}
+/* 320 너비에서 이름 옆 짧은 칩("관리자")이 끊기던 것 */
+.li .t>.chip,.li .chip.acc,.li .chip.bad{white-space:nowrap}
