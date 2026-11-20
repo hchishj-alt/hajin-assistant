@@ -62,6 +62,14 @@ export function run() {
       const bad = [...yes.filter(x => !isWhere(x)), ...no.filter(x => isWhere(x))];
       results.push({ group: '어디 갔는지 묻기', name: '“왜 할 일에 없어?”를 알아듣고, 평범한 말과 헷갈리지 않음', ok: !bad.length, detail: bad.length ? '틀림: ' + bad.join(' / ') : `${yes.length + no.length}문장` }); }
   const refs = B.recommendRefs('게임 UI 파스텔 미니멀 인벤토리 화면');
+  { // 말로 화면 이동
+    const nv = t => { const r = B.interpret(t, {}); return r.length === 1 && r[0].kind === 'nav' ? (r[0].data.q ? 'prompts?' + r[0].data.q : r[0].data.make ? 'prompts/make' : B.navTo(r[0].data.to)) : r.map(x => x.kind).join('+') || '-'; };
+    const cases = [['회의록', 'meetings'], ['기획 보드', 'plan'], ['자가 점검', 'health'], ['메신저 열어줘', 'talk'], ['프롬프트 스튜디오 열어 줘', 'prompts'], ['구매 목록', 'shop'], ['설정으로 가줘', 'settings'], ['오늘 화면으로', 'today'], ['견적 프롬프트 보여줘', 'prompts?견적'], ['시안 피드백 프롬프트 쓸래', 'prompts?시안 피드백'], ['프롬프트 만들어줘', 'prompts/make']];
+    const bad = cases.filter(([t, want]) => nv(t) !== want);
+    results.push({ group: '화면 이동', name: '메뉴 이름을 말하면 그 화면으로 (예전엔 "회의록"이 오늘 화면으로 갔음)', ok: !bad.length, detail: bad.length ? '틀림: ' + bad.map(([t, w]) => `${t} → ${nv(t)} (기대 ${w})`).join(' / ') : `${cases.length}/${cases.length}` });
+    const keep = [['오늘', 'nav'], ['구매', 'nav'], ['점심 9000원', 'nav'], ['내일 3시 회의', 'nav'], ['프롬프트 스튜디오에 견적 틀 저장', 'nav'], ['일정 보여줘', 'nav']].filter(([t]) => B.interpret(t, {}).some(x => x.kind === 'nav'));
+    results.push({ group: '화면 이동', name: '평범한 말을 이동으로 잘못 읽지 않음', ok: !keep.length, detail: keep.length ? '틀림: ' + keep.map(x => x[0]).join(' / ') : '6/6' });
+  }
   { // 프롬프트 스튜디오
     const body = '우리 팀: {{팀 소개}}\n팀원: {{팀}}\n\n{{고객사}}에 낼 제안서 목차를 잡아 줘.\n예산: {{예산}}';
     const vs = PS.vars(body), f1 = PS.fill(body, { '팀': '김하진(PM), 최민서(아트디렉터)', '고객사': '아모레' });

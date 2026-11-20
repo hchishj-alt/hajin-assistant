@@ -15,6 +15,8 @@ export default {
     /* 값은 맨 위에서 (첫 await 앞) */
     const body = h('div.ps-page'); let me = { name: '', role: '', keys: [] }, hasTeam = false, aiOn = false;
     if (['lib', 'make', 'style'].includes(params[0])) F.tab = params[0];
+    if (params[0] === 'find') { F.tab = 'lib'; F.q = params[1] || ''; F.cat = ''; }   /* 비서에게 "견적 프롬프트"라고 하면 여기로 옴 */
+    let seed = '';   /* 찾는 게 없어서 새로 만들 때, 만들기 칸에 미리 넣을 말 */
     root.append(head('프롬프트 스튜디오', 'AI에게 일 시키는 말을 모아 두고, 빈칸만 채워 바로 써요. 팀이 같이 써요.',
       h('button.btn.sm.ghost.ps-tap', { type: 'button', onclick: () => about() }, ic('users', 14), '우리 팀 소개'),
       h('button.btn.sm.pri.ps-tap', { type: 'button', onclick: () => { F.tab = 'make'; draw(); } }, ic('plus', 14), '새 프롬프트')), body);
@@ -50,7 +52,9 @@ export default {
       if (saved.length) body.append(h('div.ps-h', ic('users', 15), '우리가 모아 둔 것', h('small', `${saved.length}개`)), h('div.ps-grid', saved.map(p => card(p, uses, fav))));
       else if (!mine.length) body.append(h('div.card.ps-first', ic('bulb', 22), h('div.grow', h('b', '자주 시키는 말을 여기 모아 두세요'), h('p.small.muted', 'Claude에서 잘 통했던 말을 붙여 넣으면 다음부터 빈칸만 바꿔 다시 쓸 수 있어요. 팀원도 같이 봐요.')), h('button.btn.sm.pri', { type: 'button', onclick: () => importOne() }, ic('plus', 14), '붙여 넣기')));
       if (built.length) body.append(h('div.ps-h', ic('sparkles', 15), q ? '기본 틀에서 찾은 것' : F.role ? `${P.ROLES[F.role]} 기본 틀` : '기본 틀', h('small', `${built.length}개`)), h('div.ps-grid', built.map(p => card(p, uses, fav))));
-      if (!saved.length && !built.length) body.append(h('div.card', h('div.empty', '조건에 맞는 프롬프트가 없어요.', h('div', { style: { marginTop: '10px' } }, h('button.btn.sm', { type: 'button', onclick: () => { F.q = ''; F.cat = ''; F.role = ''; draw(); } }, '조건 지우기')))));
+      if (!saved.length && !built.length) body.append(h('div.card', h('div.empty', q ? `"${F.q.trim()}"에 맞는 프롬프트가 아직 없어요.` : '조건에 맞는 프롬프트가 없어요.', h('div.row', { style: { marginTop: '10px', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' } },
+        q ? h('button.btn.sm.pri', { type: 'button', onclick: () => { seed = F.q.trim(); F.q = ''; F.tab = 'make'; draw(); } }, ic('plus', 14), '이 주제로 새로 만들기') : null,
+        h('button.btn.sm', { type: 'button', onclick: () => { F.q = ''; F.cat = ''; F.role = ''; draw(); } }, '조건 지우기')))));
     }
 
     function card(p, uses, fav) {
@@ -129,12 +133,12 @@ export default {
 
     /* 만들기: 칸을 채우면 조립 + 점검 */
     function maker() {
-      const v = { role: '', goal: '', context: '', material: '', format: '', tone: '', limit: '', ask: true };
+      const v = { role: '', goal: seed ? `${seed}: ` : '', context: '', material: '', format: '', tone: '', limit: '', ask: true }; const seeded = seed; seed = '';
       const out = h('textarea.in.ps-out', { rows: 10, 'aria-label': '조립된 프롬프트', placeholder: '위 칸을 채우면 여기에 프롬프트가 만들어져요. 직접 고쳐도 돼요.' });
       const revBox = h('div.ps-rev'); let touched = false;
       const rev = () => { const r = P.review(out.value); clear(revBox).append(ring(r.score / 100, { size: 44, label: String(r.score) }), h('div.grow', h('b', r.word), r.missing.length ? h('div.small.muted', '빠진 것: ' + r.missing.map(i => i.label).join(', ')) : h('div.small.muted', '여섯 가지가 다 들어 있어요.'))); };
       const build = () => { if (!touched) out.value = P.compose(v); rev(); };
-      const f = (k, label, ph, long) => h('label.ps-f', h('span', label), h(long ? 'textarea.in' : 'input.in', { rows: long ? 3 : undefined, placeholder: ph, 'aria-label': label, oninput: e => { v[k] = e.target.value; touched = false; build(); } }));
+      const f = (k, label, ph, long) => h('label.ps-f', h('span', label), h(long ? 'textarea.in' : 'input.in', { rows: long ? 3 : undefined, placeholder: ph, 'aria-label': label, value: long ? undefined : (v[k] || undefined), oninput: e => { v[k] = e.target.value; touched = false; build(); } }));
       const roleHint = me.keys.includes('art') && !me.keys.includes('pm') ? '브랜드 경험이 많은 아트디렉터' : me.keys.includes('biz') && !me.keys.includes('pm') ? '작은 회사의 꼼꼼한 경영 담당' : '콘텐츠 기획사의 경험 많은 PM';
       const askBox = h('input', { type: 'checkbox', checked: true, onchange: e => { v.ask = e.target.checked; touched = false; build(); } });
       out.addEventListener('input', () => { touched = true; rev(); });
@@ -150,7 +154,7 @@ export default {
         catch (e) { toast(e.message || 'AI가 답하지 못했어요'); }
         busy(polish, false);
       } }, ic('sparkles', 14), 'AI로 다듬기');
-      rev();
+      if (seeded) build(); else rev();
       return h('div.card.ps-make',
         h('div.row.between', { style: { gap: '8px', flexWrap: 'wrap', marginBottom: '6px' } }, h('b', '칸을 채우면 프롬프트가 돼요'), paste),
         h('div.ps-fields', f('role', 'AI의 역할', roleHint), f('goal', '해 줄 일', '예: 팝업 제안서 목차를 잡아 줘'), f('context', '상황', '누구에게, 왜, 지금 어떤 상태인지', true), f('material', '자료 (있으면)', '바탕이 될 글을 붙여 넣어요', true), f('format', '받을 모양', '예: 표로, 다섯 개, 300자 안쪽'), f('tone', '말투·받는 사람', '예: 고객에게 보낼 정중한 말투'), f('limit', '지킬 것', '예: 뻔한 표현 빼고, 추측하지 말 것')),
@@ -168,6 +172,17 @@ export default {
       const rows = P.style(logs, prompts, names); const roleOf = n => (roster.find(r => r.name === n) || {}).role || (n === me.name ? me.role : '');
       const wrap = h('div');
       if (!logs.length) wrap.append(h('div.card.ps-first', ic('trend', 22), h('div.grow', h('b', '쓰는 만큼 서로의 방식이 보여요'), h('p.small.muted', '스튜디오에서 프롬프트를 복사하거나 돌리면 누가 어떤 일에 어떻게 시키는지 쌓여요. Claude 안에서 나눈 대화는 앱이 볼 수 없으니, 잘 통한 말은 "붙여 넣기"로 모아 주세요.'))));
+      if (logs.length >= 3) { const tipBox = h('div.ps-tips.hide');
+        const tipBtn = h('button.btn.sm', { type: 'button', onclick: async () => {
+          if (!aiOn) { const K = await import('../js/keyshare.js'); return K.guide(async () => { aiOn = await (await import('../js/ai.js')).enabled().catch(() => false); }); }
+          busy(tipBtn, true, '읽는 중');
+          try { const AI = await import('../js/ai.js'); const brief = rows.filter(r => r.uses).map(r => `${r.name}(${roleOf(r.name) || '역할 없음'}): ${r.uses}번, 분야 ${r.cats.map(c => c.join(' ')).join(', ')}, 평균 ${r.avg}자, 버릇 ${r.habits.join(', ') || '아직 없음'}, 자주 쓰는 것 ${r.top.map(t => t[0]).join(', ')}`).join('\n');
+            const ans = await AI.ask(`작은 콘텐츠 기획 팀의 팀원들이 AI에게 일을 시킨 기록 요약이야. 이걸 보고 서로 배울 점을 알려 줘.\n\n${brief}\n\n- 사람마다 잘하고 있는 점 한 줄, 해 보면 좋을 점 한 줄\n- 마지막에 팀이 같이 쓰면 좋을 프롬프트 주제 두 개\n- 기록에 없는 것은 지어내지 마. 쉬운 한국어 해요체로, 전체 열 줄 안쪽.`, { ms: 30000, temp: 0.5 });
+            tipBox.classList.remove('hide'); const box = h('div.ps-ans'); box.innerHTML = md(ans); clear(tipBox).append(h('div.ps-h', ic('sparkles', 15), 'AI가 본 서로 배울 점 (참고용)'), box); }
+          catch (e) { toast(e.message || 'AI가 답하지 못했어요'); }
+          busy(tipBtn, false);
+        } }, ic('sparkles', 14), aiOn ? 'AI로 서로 배울 점 보기' : 'AI로 서로 배울 점 보기 (AI 연결)');
+        wrap.append(h('div', { style: { marginBottom: '12px' } }, tipBtn), tipBox); }
       wrap.append(h('div.ps-people', rows.map(r => {
         const max = Math.max(1, ...r.cats.map(c => c[1]));
         return h('div.card.ps-person',

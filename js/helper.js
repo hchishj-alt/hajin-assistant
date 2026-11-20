@@ -43,7 +43,7 @@ export async function suggestFor(id, me) {
 }
 
 let opened = false;
-export async function openSheet(id) {
+export async function openSheet(id, say = '') {
   if (opened || document.querySelector('.modal-bg')) return; opened = true;
   const { MODULES, go, refresh } = await import('./app.js'); const m = MODULES.find(x => x.id === id) || {}; const sc = SCREENS[id] || SCREENS._;
   const me = await who(); const suggest = await suggestFor(id, me);
@@ -55,7 +55,7 @@ export async function openSheet(id) {
     box), { wide: true, nofocus: true, onClose: () => { shut = true; opened = false; try { off && off(); } catch { } try { cleanup && cleanup(); } catch { }
       if (changed && location.hash.replace(/^#\//, '').split('/')[0] === id && !document.querySelector('.modal-bg')) refresh(); } });   /* 비서가 뭔가 넣었으면 뒤 화면을 새로 그림 */
   box.closest('.modal')?.classList.add('ai-modal');
-  try { const mod = (await import('../modules/assistant.js')).default; const c2 = await mod.render(box, [], { sheet: { suggest, screen: `${m.title || ''}${sc.about ? ' (' + sc.about + ')' : ''}`, role: me.role } }); if (shut) { try { c2 && c2(); } catch { } } else cleanup = c2; }
+  try { const mod = (await import('../modules/assistant.js')).default; const c2 = await mod.render(box, [], { sheet: { suggest, screen: `${m.title || ''}${sc.about ? ' (' + sc.about + ')' : ''}`, role: me.role, say } }); if (shut) { try { c2 && c2(); } catch { } } else cleanup = c2; }
   catch (e) { box.append(h('p.small.muted', '비서를 열지 못했어요. 아래 "비서" 화면에서 다시 해 주세요.')); console.error(e); }
   return close;
 }
@@ -68,6 +68,24 @@ export function start() {
   document.body.append(fab);
   const sync = () => fab.classList.toggle('hide', cur() === 'assistant');
   window.addEventListener('hashchange', sync); sync();
+}
+
+// 오늘 화면의 "내 역할 바로가기": 역할마다 자주 하는 일 네 가지. to = 화면으로, say = 비서 창을 열고 그 말을 바로 물음
+const QUICK = {
+  pm: [{ icon: 'users', label: '누가 바빠?', say: '누가 바빠?' }, { icon: 'trend', label: '진행 상황', say: '프로젝트 진행 상황' }, { icon: 'type', label: '회의 정리 프롬프트', to: 'prompts/find/회의' }, { icon: 'bulb', label: '기획 보드', to: 'plan' }],
+  art: [{ icon: 'check2', label: '이번 주 마감', say: '이번 주 마감' }, { icon: 'image', label: '레퍼런스', to: 'archive' }, { icon: 'type', label: '피드백 정리 프롬프트', to: 'prompts/find/피드백' }, { icon: 'film', label: 'SNS 만들기', to: 'studio' }],
+  biz: [{ icon: 'wallet', label: '이번 달 지출', say: '이번 달 지출' }, { icon: 'trend', label: '받을 돈', say: '받을 돈 얼마야?' }, { icon: 'type', label: '견적 프롬프트', to: 'prompts/find/견적' }, { icon: 'cart', label: '구매 목록', to: 'shop' }],
+};
+export async function shortcuts(me) {
+  me = me || await who(); const out = [], seen = new Set();
+  for (const k of me.keys) for (const q of (QUICK[k] || [])) { if (seen.has(q.label)) continue; seen.add(q.label); out.push(q); }
+  return out.slice(0, me.keys.length > 1 ? 6 : 4);
+}
+export async function shortcutRow() {
+  const me = await who(); const qs = await shortcuts(me); if (!qs.length) return null;
+  const { go } = await import('./app.js');
+  return h('div.role-row', { 'aria-label': '내 역할 바로가기' }, h('span.role-tag', me.role.length > 8 ? me.role.split(/[·,\/]/)[0] : me.role),
+    qs.map(q => h('button.chip', { type: 'button', onclick: () => (q.say ? openSheet('today', q.say) : go(q.to)) }, ic(q.icon, 14), q.label)));
 }
 
 // ── 메뉴 줄이기 ──

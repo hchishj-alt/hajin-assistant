@@ -53,7 +53,7 @@ export default {
       h('p.faint.small', fmtDate(now, { year: true })),
       h('h1', name ? `${hi}, ${name}님` : hi),
       h('p.sub', brain.briefing({ events, tasks: open, drafts: drafts.length, people: reach }))),
-      h('div.row', h('a.btn.sm', { href: '#/assistant' }, ic('sparkles', 14), '비서'), h('a.btn.sm', { href: '#/meetings/new' }, ic('mic', 14), '회의 녹음'), h('button.btn.sm', { type: 'button', 'aria-label': '알림 설정', onclick: async () => (await import('../js/alarmui.js')).open() }, ic('bell', 14), '알림')));
+      h('div.row', h('a.btn.sm.only-wide', { href: '#/assistant' }, ic('sparkles', 14), '비서'), h('a.btn.sm', { href: '#/meetings/new' }, ic('mic', 14), '회의 녹음'), h('button.btn.sm', { type: 'button', 'aria-label': '알림 설정', onclick: async () => (await import('../js/alarmui.js')).open() }, ic('bell', 14), '알림')));
 
     const tiles = h('div.tiles',
       tile('calendar', events.length, '오늘 일정', '', '#/calendar'),
@@ -98,6 +98,7 @@ export default {
     const grid = h('div.home-grid');
     for (const id of homeOrder(L)) if (!L.homeOff?.includes(id) && blocks[id]) { const el = await blocks[id](); if (el) grid.append(el); }
     root.append(hdr);
+    { const row = await (await import('../js/helper.js')).shortcutRow().catch(() => null); if (row) root.append(row); }   /* 내 역할 바로가기 */
     { const nd = await Install.nudge().catch(() => null); if (nd) root.append(nd); }
     if (askName && !name) {
       const ni = h('input.in', { placeholder: '이름 (예: 민서)', 'aria-label': '내 이름', style: { maxWidth: '200px' } });

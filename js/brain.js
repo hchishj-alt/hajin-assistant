@@ -383,6 +383,14 @@ export function guessCategory(text) {
 
 // ── 채팅 한 줄 해석 ─────────────────────────────────────────
 // 반환: [{ kind, data, label, confidence }]  kind ∈ event|task|expense|contact|note|idea|reference|timelog|sns|okr|grant|query|nav
+// 화면 이름 → 주소. "회의록", "프롬프트 스튜디오 열어 줘"처럼 화면 이름만 말해도 그리로 감
+export const NAV = { 오늘: 'today', 홈: 'today', 비서: 'assistant', 캘린더: 'calendar', 일정: 'calendar', '할 일': 'tasks', 회의: 'meetings', 회의록: 'meetings', 마인드맵: 'board', '마인드맵 회의': 'board', 기획: 'plan', '기획 보드': 'plan',
+  프롬프트: 'prompts', '프롬프트 스튜디오': 'prompts', SNS: 'studio', 'SNS 스튜디오': 'studio', 스튜디오: 'studio', 레퍼런스: 'archive', 피그마: 'figma', '피그마 정리': 'figma', 메신저: 'talk', 인맥: 'people', 연락처: 'people', 팀: 'team',
+  비용: 'money', '비용 처리': 'money', 지출: 'money', 구매: 'shop', '구매 목록': 'shop', 업체: 'vendors', '업체 목록': 'vendors', 랭킹: 'radar', 지원사업: 'radar', 스타트업: 'startup', 꾸미기: 'look', 설정: 'settings', '자가 점검': 'health',
+  대기함: 'inbox', '확인 대기함': 'inbox', 메뉴: 'menu' };
+const NAV_RE = new RegExp('^(' + Object.keys(NAV).sort((a, b) => b.length - a.length).map(k => k.replace(/ /g, '\\s*')).join('|') + ')\\s*((?:화면|메뉴)?\\s*(?:으로|로)?\\s*(?:열어|가자|가\\s*줘|이동|켜|띄워|보여)?\\s*(?:줘|주세요)?)$', 'i');
+const NAV_SHY = /^(오늘|홈|비서|메뉴|구매|업체|랭킹|지원사업)$/;   // 이름만으로는 다른 뜻일 수 있어서 "열어 줘" 같은 말이 붙어야 이동
+export function navTo(to) { const k = String(to || '').replace(/\s+/g, ' ').trim(); const hit = Object.keys(NAV).find(x => x.replace(/ /g, '').toLowerCase() === k.replace(/ /g, '').toLowerCase()); return hit ? NAV[hit] : 'today'; }
 export function interpret(input, ctx = {}) {
   input = String(input == null ? '' : input).replace(/[ \t]{3,}/g, '  '); ctx = { ...ctx, people: (ctx.people || []).filter(x => typeof x === 'string' && x) };
   const base = ctx.base || new Date();
@@ -619,11 +627,15 @@ function interpretOne(s, base, ctx) {
     }
     return false;
   })();
+  // "견적 프롬프트 보여줘": 프롬프트 스튜디오에서 그 말로 찾아 줌
+  { const pm = t.length <= 40 && t.match(/^(.{1,24}?)\s*프롬프트\s*(?:좀\s*)?(?:찾아|열어|보여|꺼내|골라|쓸래|쓰자|써|줘|주세요|\s)*$/); const q = pm ? pm[1].replace(/(용|관련|쓰는|하는|에\s*쓸)$/, '').trim() : '';
+    if (q && !NAV_RE.test(t) && !/(만들|저장|고쳐|고치|지워)/.test(t) && money == null && !phone) return [{ kind: 'nav', data: { to: '프롬프트', q }, label: '이동', confidence: 0.85 }]; }
+  if (/^(새\s*)?프롬프트\s*(하나\s*)?(새로\s*)?(만들|짜)/.test(t) && t.length <= 20) return [{ kind: 'nav', data: { to: '프롬프트', make: true }, label: '이동', confidence: 0.85 }];
   if (HELPQ.test(t) && !phone && !urls.length && money == null) return [{ kind: 'talk', data: { text: t }, label: '대화', confidence: 0.6 }];
   if (isQ) return [{ kind: 'query', data: { q: t, when: w }, label: '찾아보기', confidence: 0.85 }];
   // 이동
-  const nav = t.match(/^(캘린더|일정|할\s*일|회의|회의록|기획|기획\s*보드|인맥|연락처|비용|지출|스타트업|SNS|스튜디오|피그마|설정|자가\s*점검|팀|확인\s*대기함|대기함)\s*(열어|가자|으로|로|화면)?\s*(줘)?$/i);
-  if (nav) return [{ kind: 'nav', data: { to: nav[1] }, label: '이동', confidence: 0.9 }];
+  const nav = t.match(NAV_RE);
+  if (nav && (nav[2] || !NAV_SHY.test(nav[1]))) return [{ kind: 'nav', data: { to: nav[1] }, label: '이동', confidence: 0.9 }];
 
   const gk = guessKind();
   if (gk === 'talk') return [{ kind: 'talk', data: { text: t }, label: '대화', confidence: 0.5 }];

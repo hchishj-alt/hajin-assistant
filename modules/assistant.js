@@ -236,7 +236,7 @@ export default {
       { const named = parsed.find(p => p.data && p.data.project && !p.byCtx && projects.includes(p.data.project)); if (named && named.data.project !== project) await setProj(named.data.project); }
       const ctxIds = [];
       for (const p of parsed) {
-        if (p.kind === 'nav') { const map = { 캘린더: 'calendar', 일정: 'calendar', '할 일': 'tasks', 할일: 'tasks', 회의: 'meetings', 기획: 'plan', 인맥: 'people', 연락처: 'people', 비용: 'money', 지출: 'money', 스타트업: 'startup', SNS: 'studio', 스튜디오: 'studio', 피그마: 'figma', 설정: 'settings', 대기함: 'inbox', '확인 대기함': 'inbox' }; go(map[p.data.to.replace(/\s+/g, ' ')] || 'today'); return; }
+        if (p.kind === 'nav') { go(p.data.q ? 'prompts/find/' + encodeURIComponent(p.data.q) : p.data.make ? 'prompts/make' : brain.navTo(p.data.to)); return; }
         if (p.kind === 'talk') { if (aiAdd || (await aiSay(p.src || text, '', { noAdd: true })) !== true) await talk(p.src || text); continue; }
         if (p.kind === 'query') { const a = await answer(text); replies.push(a); continue; }
         // 일정에 장소가 있으면 실제 주소를 찾아 붙임 (못 찾아도 그대로 진행)
@@ -338,6 +338,7 @@ export default {
     }
     const onChat = async e => { await drawMsg(e.detail, new Map()); scrollDown(); };
     window.addEventListener('hajin:chat', onChat);
+    if (sheet && sheet.say) { ta.value = sheet.say; send(); }   /* 바로가기에서 한 말을 들고 열린 경우 */
     return () => { window.removeEventListener('hajin:chat', onChat); if (recorder?.running) recorder.stop(); clearInterval(timer); };
   },
 };
