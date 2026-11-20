@@ -7,7 +7,7 @@ import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
 import { CONTACT } from './config.js';
 import { legalView, legalLinks, bizLine } from './legal.js';
 
-export const VERSION = '1.5.3';
+export const VERSION = '1.5.4';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -48,7 +48,7 @@ async function route() {
   view.classList.remove('in');
   view.innerHTML = '';
   if (a === 'new') {
-    if ((await scripts.all()).length >= plan.limits().scripts) { location.replace('#/'); plan.needPro('scripts'); return; }
+    if ((await scripts.all()).filter(own).length >= plan.limits().scripts) { location.replace('#/'); plan.needPro('scripts'); return; }
     const cp = curProj();
     const s = await newScript('', '', cp !== 'all' && cp !== 'none' ? cp : ''); location.replace('#/s/' + s.id); return;
   }
@@ -100,7 +100,7 @@ async function listView() {
     </div>
     <div id="cards"></div>
     <a class="btn wide" href="#/new" style="margin-top:6px">${ic('plus')}새 대본 쓰기</a>
-    ${plan.isPro() ? '' : `<p class="tip c">무료는 대본 ${plan.limits().scripts}개까지 · 지금 ${all.length}개</p>`}`;
+    ${plan.isPro() ? '' : `<p class="tip c">무료는 대본 ${plan.limits().scripts}개까지 · 지금 ${all.filter(own).length}개${all.some(x => !own(x)) ? ' (예시는 빼고)' : ''}</p>`}`;
   view.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { setCurProj(b.dataset.p); buzz(8); route(); });
   $('#addP').onclick = async () => { const n = await ask('새 프로젝트', '', { ok: '만들기', placeholder: '예: 인스타 릴스 11월' }); if (!n) return; const p = projects.add(n); setCurProj(p.id); route(); };
   $('#pmenu')?.addEventListener('click', () => projectMenu(P, list));
@@ -153,7 +153,7 @@ async function editView(id) {
     <div class="emeta"><div class="meta" id="em"></div><button class="ghost sm" id="paste">${ic('paste', 16)}붙여넣기</button></div>
     <div id="scn"></div>
     <button class="addscn" id="addS">${ic('plus', 18)}씬 추가</button>
-    <div class="secrow"><span class="lab">${ic('timer', 16)}읽는 시간</span><input class="inp" id="sec" type="number" min="5" max="3600" inputmode="numeric" value="${secOf(s)}"><span class="muted">초</span><button class="ghost sm" id="auto">글자 수로 맞추기</button></div>
+    <div class="secrow"><span class="lab">${ic('timer', 16)}읽는 시간</span><input class="inp" id="sec" aria-label="읽는 시간(초)" type="number" min="5" max="3600" inputmode="numeric" value="${secOf(s)}"><span class="muted">초</span><button class="ghost sm" id="auto">글자 수로 맞추기</button></div>
     <p class="tip">대사는 이 시간에 맞춰 올라가요. 촬영 화면에서 속도(%)로 더 조절할 수 있어요.</p>
     </div><div class="eside">
     <div id="tk"></div>
@@ -232,7 +232,8 @@ async function editView(id) {
     };
   };
   await renderTakes(s, $('#tk'));
-  return save;
+  // 아무것도 안 쓰고 나간 새 대본은 치움(무료 개수를 잡아먹지 않게)
+  return async () => { await save(); const cur = await scripts.get(s.id); if (cur && !cur.title && !(cur.body || '').trim() && !(await takes.of(s.id)).length) await scripts.remove(s.id); };
 }
 
 
@@ -554,6 +555,8 @@ function langSheet() {
 }
 document.addEventListener('click', e => { if (e.target.closest('[data-lang]')) { e.preventDefault(); langSheet(); } });
 
+// 예시 대본은 무료 개수에 안 셈 (예전 기기는 제목으로 알아봄)
+const own = s => !s.sample && !Object.values(SAMPLES).some(([, t]) => t === s.title);
 const SAMPLES = {
   ko: [SAMPLE, '첫 대본 예시'],
   en: ['[[Hello]]\nHi everyone! Today I’ll show you the work routine I use every single day.\n\n[[Routine]]\nFirst thing in the morning, I write down just three things to do. Write more, and I end up doing none.\n\nThen I put on music I love and do only one thing for an hour.\n\n[[Outro]]\nWhat’s your routine? Tell me in the comments!', 'Sample script'],
@@ -565,7 +568,7 @@ const SAMPLES = {
 (async () => {
   startI18n();
   const moved = await migrateStudio();
-  if (!flag('seeded')) { flag('seeded', '1'); if (!(await scripts.all()).length) { const [b, ti] = SAMPLES[lang()] || SAMPLES.ko; await newScript(b, ti); } }
+  if (!flag('seeded')) { flag('seeded', '1'); if (!(await scripts.all()).length) { const [b, ti] = SAMPLES[lang()] || SAMPLES.ko; const s = await newScript(b, ti); s.sample = true; await scripts.put(s); } }
   if (moved) setTimeout(() => toast(`스튜디오에서 쓰던 대본 ${moved}개를 옮겨 왔어요`), 600);
   // 처음 온 사람은 소개부터
   if (!flag('hello') && (!location.hash || location.hash === '#/') && !standalone()) history.replaceState(null, '', '#/hello');

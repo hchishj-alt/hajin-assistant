@@ -10,7 +10,8 @@ function loadS() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch {}
   if (!s) { try { s = JSON.parse(localStorage.getItem('pst_S') || 'null'); } catch {} } // 예전 스튜디오 설정 이어받기
-  const base = { ...DEF, fsL: small() ? 26 : 44, fsP: small() ? 24 : 32 };
+  const pc = !small() && !matchMedia('(pointer:coarse)').matches; // PC 웹캠은 처음에 가로로
+  const base = { ...DEF, mode: pc ? 'L' : 'P', fsL: small() ? 26 : 44, fsP: small() ? 24 : 32 };
   return { ...base, ...(s || {}) };
 }
 const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');

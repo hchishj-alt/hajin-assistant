@@ -70,6 +70,8 @@ const D = {
   '읽을 수 없는 파일이에요': ['Can’t read this file', '読めないファイルです', '无法读取此文件', 'No se puede leer el archivo'],
   '프롬프리에딧 백업 파일이 아니에요': ['Not a PROMPRI EDIT backup file', 'PROMPRI EDITのバックアップではありません', '不是 PROMPRI EDIT 备份文件', 'No es una copia de PROMPRI EDIT'],
   '저장 공간이 {n}MB 남았어요. 지난 테이크를 사진첩에 저장하고 지우면 더 길게 찍을 수 있어요.': ['Only {0} MB of storage left. Save older takes to Photos and delete them to record longer.', '保存容量が残り{0}MBです。前のテイクを写真に保存して削除すると長く撮れます。', '存储空间只剩 {0}MB。把旧镜头存到相册并删除，就能拍得更久。', 'Quedan {0} MB. Guarda tomas antiguas en Fotos y bórralas para grabar más.'],
+  '읽는 시간(초)': ['Read time (seconds)', '読む時間(秒)', '朗读时长(秒)', 'Tiempo de lectura (segundos)'],
+  '무료는 대본 {n}개까지 · 지금 {n}개 (예시는 빼고)': ['Free: up to {0} scripts · now {1} (sample not counted)', '無料は台本{0}件まで · いま{1}件 (例は除く)', '免费版最多 {0} 个台词 · 当前 {1} 个 (不含示例)', 'Gratis: hasta {0} guiones · ahora {1} (sin contar el ejemplo)'],
   // 브랜드·소개
   '프롬프리에딧': ['PROMPRI EDIT', 'プロンプリエディット', 'PROMPRI EDIT', 'PROMPRI EDIT'],
   '프롬프리에딧 소개': ['About PROMPRI EDIT', 'PROMPRI EDITについて', '关于 PROMPRI EDIT', 'Acerca de PROMPRI EDIT'],
