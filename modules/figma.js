@@ -31,7 +31,7 @@ export default {
         h('div.card-h', h('h3', ic('layers'), f.name || f.key), ring((s.score || 0) / 100, { size: 46, label: String(s.score ?? '–'), color: s.score >= 80 ? 'var(--ok)' : s.score >= 50 ? 'var(--warn)' : 'var(--bad)' })),
         h('div.chips', h('span.chip', `페이지 ${s.pages?.length || 0}`), h('span.chip', `섹션 ${s.totals?.sections || 0}`), h('span.chip', `프레임 ${s.totals?.frames || 0}`), s.totals?.loose ? h('span.chip.warn', `흩어짐 ${s.totals.loose}`) : null, f.team ? h('span.chip.ok', '팀 공유') : null),
         statusBar(st),
-        h('div.faint.tiny', { style: { marginTop: '6px' } }, last ? `${rel(last.at.slice(0, 10))} ${new Date(last.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} · ${last.who} 수정` : s.lastModified ? `마지막 수정 ${fmtDate(s.lastModified, { time: true })}` : '아직 못 읽음', s.todo?.length ? ` · 할 일 ${s.todo.length}` : '')));
+        h('div.faint.tiny', { style: { marginTop: '6px' } }, last ? `${rel(db.dayOf(last.at))} ${new Date(last.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} · ${last.who} 수정` : s.lastModified ? `마지막 수정 ${fmtDate(s.lastModified, { time: true })}` : '아직 못 읽음', s.todo?.length ? ` · 할 일 ${s.todo.length}` : '')));
     }
     root.append(g);
     if (token) F.watch(f => toast(`피그마 "${f.name}"이 바뀌어서 다시 정리했어요`, { label: '보기', fn: () => go('figma/' + f.id) }));

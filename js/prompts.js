@@ -50,7 +50,7 @@ export async function seeds(now = new Date()) {
     const roster = await db.kvGet('sync:roster', []); if (roster.length) out['나눌 사람'] = roster.map(r => r.name).filter(Boolean).join(', ');
     const cur = await db.kvGet('chat:project', null); if (cur && (cur.name || cur.project)) out['프로젝트 이름'] = cur.name || cur.project;
     const tasks = (await db.list('tasks')).filter(t => !t.deleted);
-    const done = tasks.filter(t => t.done && (t.doneAt || t.updatedAt || '').slice(0, 10) >= from).slice(0, 20);
+    const done = tasks.filter(t => t.done && db.dayOf(t.doneAt || t.updatedAt || '') >= from).slice(0, 20);
     if (done.length) out['한 일'] = done.map(t => t.title + (t.project ? ` (${t.project})` : '')).join(', ');
     const open = tasks.filter(t => !t.done).sort((a, b) => (a.due || '9').localeCompare(b.due || '9')).slice(0, 20);
     if (open.length) out['해야 할 일 목록'] = open.map(t => '- ' + t.title + ((t.due || t.who) ? ` (${[t.due ? md(t.due) + '까지' : '', t.who || ''].filter(Boolean).join(', ')})` : '')).join('\n');

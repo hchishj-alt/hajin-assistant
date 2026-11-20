@@ -661,7 +661,7 @@ export function vendorParts(t, known = []) {
   // 품목 + 가격 쌍
   const prices = []; let body = rest; if (name) body = body.replace(name, ' '); body = body.replace(/^.*?(업체|거래처|견적)(는|은|가|이)?\s*/, ' ').replace(/(추가|등록|저장)(해\s*줘|해줘|해|요)?\s*$/, ' ');
   const re = /(\d[\d,]*(?:\.\d+)?\s*만\s*(?:\d+\s*천)?\s*원?|\d[\d,]*\s*천\s*원|\d[\d,]{2,}\s*원?)(?!\s*(장|개|매|부|권|세트|박스|ea|mm|cm|g|ml))/gi;
-  let last = 0, m; const today = new Date().toISOString().slice(0, 10); let memoBits = [];
+  let last = 0, m; const today = ymd(new Date()); let memoBits = [];
   while ((m = re.exec(body))) { let item = body.slice(last, m.index).replace(/[,·:：/]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^((추가|등록|저장|견적|그리고|또)\s+)+/, '').replace(/\s*(은|는|이|가|에|으로|로)$/, ''); const price = parseMoney(m[0].includes('원') ? m[0] : m[0] + '원');
     const after = (body.slice(re.lastIndex).match(/^\s*\(([^)]{1,30})\)/) || [])[1] || ''; if (after) re.lastIndex += body.slice(re.lastIndex).indexOf(')') + 1;
     if (item.length >= 2 && price) prices.push({ item: item.slice(0, 40), price: String(price), note: after, at: today }); else if (item) memoBits.push(item); last = re.lastIndex; }

@@ -22,7 +22,7 @@ export default {
       store.eventsOn(today), db.list('tasks'), store.drafts(), store.peopleToReach(), store.upcomingBirthdays(7), db.list('expenses'), db.list('meetings')]);
     const open = allTasks.filter(t => !t.done);
     const todays = open.filter(t => !t.due || t.due <= today).sort(sortTasks);
-    const doneToday = allTasks.filter(t => t.done && (t.doneAt || '').slice(0, 10) === today).length;
+    const doneToday = allTasks.filter(t => t.done && db.dayOf(t.doneAt || '') === today).length;
     const monthKey = today.slice(0, 7);
     const monthSpend = expenses.filter(e => (e.date || '').startsWith(monthKey)).reduce((s, e) => s + (Number(e.amount) || 0), 0);
     const budget = await db.kvGet('budget', 0);

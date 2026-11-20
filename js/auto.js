@@ -29,7 +29,7 @@ export async function fill(item, { hasTeam, projects = [], loggedIn, teamNames =
   item.team = scope === 'work' && (want.includes('share') || pickedTeam) && hasTeam ? 'team-main' : '';
   if (want.includes('label') && !item.label) {
     let id = vote(lr.label, ws) || (LABEL.find(([, re]) => re.test(text)) || [])[0];
-    if (!id && item.date) { const d = Math.round((new Date(item.date) - new Date(new Date().toISOString().slice(0, 10))) / 864e5); if (d >= 0 && d <= 1 && TEAMY.test(text)) id = 'important'; }
+    if (!id && item.date) { const d = Math.round((new Date(item.date) - new Date(db.dayOf(new Date()))) / 864e5); if (d >= 0 && d <= 1 && TEAMY.test(text)) id = 'important'; }
     if (id) { item.label = id; auto.label = true; }
   }
   if (want.includes('project') && !item.project && projects.length) {

@@ -132,7 +132,7 @@ async function canvas(root, id) {
       if (p) paths += `<path d="${elbow(p.x + nodeW(p), p.y + 20, n.x, n.y + 20)}"/>`;
       const lc = LB.colorOf(n.label);
       const peer = [...peers.entries()].find(([, v]) => v.sel === n.id);
-      const el = h('div.mm-n' + (n.root ? '.root' : '') + (sel === n.id ? '.sel' : '') + (lc ? '.lab' : '') + (n.hint ? '.hint' : '') + (n.todo ? '.todo' : ''), { 'data-id': n.id, style: { left: n.x + 'px', top: n.y + 'px', '--lc': lc || 'transparent', outline: peer ? `2px solid ${colorFor(peer[0])}` : '' }, title: n.by ? `${n.by} · ${rel((n.updatedAt || '').slice(0, 10))}` : '' },
+      const el = h('div.mm-n' + (n.root ? '.root' : '') + (sel === n.id ? '.sel' : '') + (lc ? '.lab' : '') + (n.hint ? '.hint' : '') + (n.todo ? '.todo' : ''), { 'data-id': n.id, style: { left: n.x + 'px', top: n.y + 'px', '--lc': lc || 'transparent', outline: peer ? `2px solid ${colorFor(peer[0])}` : '' }, title: n.by ? `${n.by} · ${rel(db.dayOf(n.updatedAt || ''))}` : '' },
         lc ? h('i.mm-dot') : null, h('span.mm-t', n.text || '새 노드'),
         n.note || n.hasAudio ? h('button.mm-note', { 'aria-label': '음성 설명 보기', onclick: e => { e.stopPropagation(); showNote(n.id); } }, ic('mic', 12)) : null,
         peer ? h('span.mm-peer', { style: { background: colorFor(peer[0]) } }, peer[0]) : null);

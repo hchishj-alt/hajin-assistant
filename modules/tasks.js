@@ -43,7 +43,7 @@ export default {
       const hasTeam = every.some(t => t.team || t.who);
       const today = todayStr();
       const open = all.filter(t => !t.done);
-      const doneToday = all.filter(t => t.done && (t.doneAt || '').slice(0, 10) === today).length;
+      const doneToday = all.filter(t => t.done && db.dayOf(t.doneAt || '') === today).length;
       const overdue = open.filter(t => t.due && t.due < today).length;
       const dueToday = open.filter(t => t.due === today).length;
       body.append(h('div.tiles', { style: { margin: '14px 0' } },

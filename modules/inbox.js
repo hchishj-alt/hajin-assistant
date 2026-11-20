@@ -36,7 +36,7 @@ export default {
       let last = '';
       const wrap = h('div.stack');
       for (const d of shown) {
-        const day = d.createdAt.slice(0, 10);
+        const day = db.dayOf(d.createdAt);
         if (day !== last) { last = day; wrap.append(h('div.faint.tiny', { style: { marginTop: '8px', fontWeight: 650 } }, rel(day) + ' · ' + day.slice(5).replace('-', '/'))); }
         wrap.append(draftCard(d, (st, el) => { updateBadge(); setTimeout(() => { el.classList.add('leaving'); setTimeout(() => draw(), 300); }, 500); }));
       }

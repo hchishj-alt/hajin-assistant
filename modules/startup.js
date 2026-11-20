@@ -127,7 +127,7 @@ function spark(vals, goal) {
 async function reportView() {
   const end = todayStr(), start = ymd(addDays(new Date(), -6)), next = ymd(addDays(new Date(), 7));
   const [tasks, meetings, exps, logs, evs, ms] = await Promise.all([db.list('tasks'), db.list('meetings'), db.list('expenses'), db.list('timelogs'), db.list('events'), db.list('milestones')]);
-  const done = tasks.filter(t => t.done && (t.doneAt || '').slice(0, 10) >= start);
+  const done = tasks.filter(t => t.done && db.dayOf(t.doneAt || '') >= start);
   const open = tasks.filter(t => !t.done && t.due && t.due <= next);
   const mt = meetings.filter(m => (m.date || '') >= start);
   const spend = exps.filter(e => e.date >= start && e.date <= end).reduce((s, e) => s + (Number(e.amount) || 0), 0);

@@ -11,7 +11,7 @@ const FIT = [[/콘텐츠|영상|디자인|미디어|크리에이|브랜딩|모�
 const MISFIT = [/제조|농업|농식품|수산|축산|바이오|반도체|이차전지|조선|건설|수출\s*중견|대기업|상장|원전|방산/, /부고|인사\]|포토\]|주가|증시|속보/];
 export function score(it, marks = {}, base = new Date(), prof = null, me = '') {
   const text = `${it.title} ${it.desc || ''}`;
-  const today = base.toISOString().slice(0, 10);
+  const today = db.dayOf(base);
   let due = it.deadline || '';
   if (!due) { const m = text.match(/(?:~|까지|마감|접수\s*기간)[^.\d]{0,12}(\d{1,2})[.\/월]\s*(\d{1,2})|(\d{1,2})[.\/월]\s*(\d{1,2})일?\s*(?:까지|마감)/); if (m) { const mo = +(m[1] || m[3]), d = +(m[2] || m[4]); let y = base.getFullYear(); if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) { if (mo < base.getMonth() + 1 - 6) y++; due = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`; } } }
   const dday = due ? Math.round((new Date(due) - new Date(today)) / 864e5) : null;
@@ -92,7 +92,7 @@ export default {
       const top = pool.slice(0, tab === 'rank' ? 10 : 30); curRank = top;
       const learned = Object.entries(prof.w).filter(([, v]) => Math.abs(v) >= 2);
       if (learned.length) body.append(h('div.rd-learn', h('span.faint.tiny', '팀이 알려 준 기준'), ...learned.slice(0, 10).map(([k, v]) => h('button.chip' + (v > 0 ? '.ok' : '.bad'), { title: '누르면 잊어요', onclick: async () => { await taste.forget([k]); for (const r of await taste.rows()) if (!r.word && (r.words || []).includes(k)) await db.put('leadfb', { ...r, words: r.words.filter(x => x !== k) }); draw(); } }, (v > 0 ? '+ ' : '− ') + k))));
-      const left = h('div.card', h('div.card-h', h('h3', ic('trend'), tab === 'rank' ? '우리 회사 랭킹 TOP 10' : TYPE[tab][0] + ' 순위'), h('span.faint.tiny', feed.updatedAt ? `${rel(feed.updatedAt.slice(0, 10))} 모음` : '아직 자동 수집 전')));
+      const left = h('div.card', h('div.card-h', h('h3', ic('trend'), tab === 'rank' ? '우리 회사 랭킹 TOP 10' : TYPE[tab][0] + ' 순위'), h('span.faint.tiny', feed.updatedAt ? `${rel(db.dayOf(feed.updatedAt))} 모음` : '아직 자동 수집 전')));
       if (!top.length) left.append(h('div.empty', feed.updatedAt ? '조건에 맞는 글이 없어요' : '앱을 주소에 올리면 매일 아침 자동으로 채워져요. 지금은 “링크 넣기”로 직접 넣을 수 있어요.'));
       top.forEach((x, i) => left.append(row(x, i + 1, marks, me)));
       const rest = [...live].filter(match).sort((a, b) => (b.it.date || '').localeCompare(a.it.date || ''));

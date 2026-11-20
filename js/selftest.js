@@ -4,6 +4,7 @@ import * as B from './brain.js';
 import { isWhere } from './where.js';
 import * as PS from './prompts.js';
 import * as DM from './dm.js';
+import { dayOf } from './db.js';
 export const BASE = new Date(2026, 10, 19, 10, 0, 0);
 
 export const CASES = [
@@ -70,6 +71,10 @@ export function run() {
     results.push({ group: '화면 이동', name: '메뉴 이름을 말하면 그 화면으로 (예전엔 "회의록"이 오늘 화면으로 갔음)', ok: !bad.length, detail: bad.length ? '틀림: ' + bad.map(([t, w]) => `${t} → ${nv(t)} (기대 ${w})`).join(' / ') : `${cases.length}/${cases.length}` });
     const keep = [['오늘', 'nav'], ['구매', 'nav'], ['점심 9000원', 'nav'], ['내일 3시 회의', 'nav'], ['프롬프트 스튜디오에 견적 틀 저장', 'nav'], ['일정 보여줘', 'nav'], ['오늘 할 일 보여줘', 'nav'], ['민서 일정 보여줘', 'nav'], ['비용 보여줘', 'nav'], ['회의록 보여줘', 'nav']].filter(([t]) => B.interpret(t, {}).some(x => x.kind === 'nav'));
     results.push({ group: '화면 이동', name: '평범한 말을 이동으로 잘못 읽지 않음', ok: !keep.length, detail: keep.length ? '틀림: ' + keep.map(x => x[0]).join(' / ') : '10/10' });
+    { // 자정 넘어 끝낸 일이 "오늘"로 세어지는지 (저장은 UTC 글자라 앞 10글자를 자르면 하루 어긋남)
+      const late = new Date(2026, 10, 21, 0, 30).toISOString(), noon = new Date(2026, 10, 21, 12, 0).toISOString();
+      const ok = dayOf(late) === '2026-11-21' && dayOf(noon) === '2026-11-21' && dayOf('2026-11-21') === '2026-11-21' && dayOf('') === '' && dayOf(new Date(2026, 0, 1, 0, 5)) === '2026-01-01';
+      results.push({ group: '날짜', name: '저장된 시각을 이 기기 날짜로 읽음 (자정~아침에 하루 어긋나지 않음)', ok, detail: ok ? '5/5' : `${dayOf(late)} / ${dayOf(noon)}` }); }
   }
   { // 곧 울릴 알림, 비워 둘 시간, 제목 군말
     const base = new Date(2026, 10, 20, 14, 0), cx = { base, people: ['김하진', '최민서', '안서연'], projects: ['가을 팝업', '루미에'] }; const one = t => B.interpret(t, cx)[0] || { data: {} };

@@ -29,11 +29,11 @@ export default {
       const all = (await db.list('audit')).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       const people = [...new Set(all.map(a => a.by).filter(Boolean))];
       const cols = [...new Set(all.map(a => a.refCol))];
-      const today = new Date().toISOString().slice(0, 10);
+      const today = db.dayOf(new Date());
       const listEl = h('div.card');
       const sel = (k, opts, first) => h('select.in', { style: { width: 'auto' }, onchange: e => { F[k] = e.target.value; draw(); } }, h('option', { value: '' }, first), opts.map(([v, l]) => h('option', { value: v, selected: F[k] === v }, l)));
       box.append(h('div.tiles', { style: { marginBottom: '14px' } },
-        tile('edit', all.filter(a => (a.createdAt || '').slice(0, 10) === today).length, '오늘 바뀐 것'),
+        tile('edit', all.filter(a => db.dayOf(a.createdAt || '') === today).length, '오늘 바뀐 것'),
         tile('clock', all.filter(a => Date.now() - new Date(a.createdAt) < 7 * 864e5).length, '최근 7일'),
         tile('users', people.length, '기록 남긴 사람'),
         tile('trash', all.filter(a => a.action === '지움').length, '지워진 것', all.some(a => a.action === '지움') ? 'warn' : '')),
@@ -48,7 +48,7 @@ export default {
         if (!rows.length) { listEl.append(h('div.empty', all.length ? '조건에 맞는 기록이 없어요.' : '아직 기록이 없어요. 팀에 공유된 항목을 누가 만들거나 고치면 여기에 쌓여요.')); return; }
         let day = '';
         for (const a of rows.slice(0, 300)) {
-          const d = (a.createdAt || '').slice(0, 10);
+          const d = db.dayOf(a.createdAt || '');
           if (d !== day) { day = d; listEl.append(h('div.tiny.faint', { style: { padding: '10px 4px 2px', fontWeight: 700 } }, fmtDate(d, { year: true }))); }
           const det = h('div.audit-d.hide', (a.changes || []).length ? a.changes.map(c => h('div.audit-c', h('b', KLABEL[c.k] || c.k), h('span.from', c.from), h('span.faint', '→'), h('span.to', c.to))) : h('span.faint.small', a.action === '만듦' ? '새로 만든 항목이에요.' : '바뀐 칸 기록 없음'));
           listEl.append(h('div.li.audit', { onclick: () => det.classList.toggle('hide') },
@@ -75,7 +75,7 @@ export default {
         const mine = tasks.filter(t => same(t.who, n) || (!t.who && same(t.by || meName, n)));
         const acts = audit.filter(a => a.by === n);
         const last = acts.map(a => a.createdAt).sort().pop();
-        return { n, open: mine.filter(t => !t.done).length, done: mine.filter(t => t.done).length, late: mine.filter(t => !t.done && t.due && t.due < new Date().toISOString().slice(0, 10)).length,
+        return { n, open: mine.filter(t => !t.done).length, done: mine.filter(t => t.done).length, late: mine.filter(t => !t.done && t.due && t.due < db.dayOf(new Date())).length,
           refs: items.filter(i => i.col === 'refs' && i.by === n).length, made: acts.filter(a => a.action === '만듦').length, edits: acts.filter(a => a.action !== '만듦').length,
           spend: items.filter(i => i.col === 'expenses' && (i.by || meName) === n).reduce((s, e) => s + (Number(e.amount) || 0), 0), last };
       });
@@ -91,7 +91,7 @@ export default {
       box.append(h('div.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', ic('grid'), '종류별 (전체 · 공유)')),
         Object.entries(byCol).filter(([c]) => A.LABEL[c]).sort((a, b) => b[1].n - a[1].n).map(([c, v]) => h('div.statbar', h('span.sl', A.LABEL[c]), h('span.sb', h('i', { style: { width: v.n / max * 100 + '%' } }), h('i.s', { style: { width: v.s / max * 100 + '%' } })), h('span.sn', `${v.n} · ${v.s}`)))));
       // 주간 활동 (최근 14일)
-      const days = [...Array(14)].map((_, k) => { const d = new Date(Date.now() - (13 - k) * 864e5).toISOString().slice(0, 10); return { d, n: audit.filter(a => (a.createdAt || '').slice(0, 10) === d).length }; });
+      const days = [...Array(14)].map((_, k) => { const d = db.dayOf(new Date(Date.now() - (13 - k) * 864e5)); return { d, n: audit.filter(a => db.dayOf(a.createdAt || '') === d).length }; });
       const dm = Math.max(1, ...days.map(d => d.n));
       box.append(h('div.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', ic('clock'), '최근 14일 활동')),
         h('div.daybars', days.map(d => h('div.db', { title: `${d.d} · ${d.n}건` }, h('i', { style: { height: Math.max(4, d.n / dm * 100) + '%' } }), h('span', d.d.slice(8)))))));

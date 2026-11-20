@@ -39,7 +39,7 @@ export default {
       const log = h('div.talk-log');
       let day = '';
       for (const d of ms) {
-        const ds = (d.createdAt || '').slice(0, 10); if (ds !== day) { day = ds; log.append(h('div.talk-day', fmtDate(ds))); }
+        const ds = db.dayOf(d.createdAt || ''); if (ds !== day) { day = ds; log.append(h('div.talk-day', fmtDate(ds))); }
         const b = h('div.talk-b' + (d.mine ? '.mine' : ''), h('div.talk-t', d.body), h('span.talk-tm', new Date(d.createdAt).toTimeString().slice(0, 5)));
         log.append(b);
         if (!d.mine && !d.handled) log.append(await assist(d, other));

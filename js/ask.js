@@ -31,10 +31,10 @@ export async function smart(q, base = new Date(), r = null) {
   // "이번 주에 끝낸 일": 그 기간에 끝낸 할 일
   if (/(끝낸|완료한|끝난|마친|다\s*한)\s*(일|것|거|할\s*일)/.test(q) && !/(해야|까지|\d+\s*시)/.test(q)) {
     const mon = new Date(base); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7)); const [a0, b0, label] = r || [ymd(mon), today, '이번 주'];
-    let ds = tasks.filter(t => t.done && (t.doneAt || t.updatedAt || '').slice(0, 10) >= a0 && (t.doneAt || t.updatedAt || '').slice(0, 10) <= b0); if (person) ds = ds.filter(t => store.sameName(t.who, person));
+    let ds = tasks.filter(t => t.done && db.dayOf(t.doneAt || t.updatedAt || '') >= a0 && db.dayOf(t.doneAt || t.updatedAt || '') <= b0); if (person) ds = ds.filter(t => store.sameName(t.who, person));
     ds.sort((x, y) => (y.doneAt || '').localeCompare(x.doneAt || ''));
     const at = /^(오늘|어제|그제)$/.test(label) ? label : label + '에';
-    return { text: ds.length ? `${at} ${person ? person + ' 님이 ' : ''}끝낸 일은 ${ds.length}개예요.` : `${at} 끝낸 것으로 표시된 일이 아직 없어요.`, items: ds.slice(0, 15).map(t => ({ icon: 'check2', title: t.title, sub: [md((t.doneAt || t.updatedAt || '').slice(0, 10)), t.who, t.project].filter(Boolean).join(' · '), go: 'tasks' })), chips: ds.length ? [{ label: '주간 보고로 쓰기', go: 'prompts/use/builtin:pm-weekly' }] : [] };
+    return { text: ds.length ? `${at} ${person ? person + ' 님이 ' : ''}끝낸 일은 ${ds.length}개예요.` : `${at} 끝낸 것으로 표시된 일이 아직 없어요.`, items: ds.slice(0, 15).map(t => ({ icon: 'check2', title: t.title, sub: [md(db.dayOf(t.doneAt || t.updatedAt || '')), t.who, t.project].filter(Boolean).join(' · '), go: 'tasks' })), chips: ds.length ? [{ label: '주간 보고로 쓰기', go: 'prompts/use/builtin:pm-weekly' }] : [] };
   }
   // "로고 시안 누가 해?": 그 할 일의 담당
   if (/(누가|누구)\s*(해|하|맡|담당)/.test(q) || /담당(자)?\s*(이|가)?\s*(누구|누가)/.test(q) || (/(누가|누구)\s*[가-힣]{1,6}\s*[?？]*$/.test(q) && !/(바빠|바쁜|바쁘|많|여유|한가|널널|와|오지|참석|쉬|휴가|냈|결제|샀)/.test(q))) {   // "견적서 누가 보내?"도
@@ -87,7 +87,7 @@ export async function smart(q, base = new Date(), r = null) {
   // 주간 점검: 이번 주에 끝낸 것, 남은 것, 밀린 것, 다음 주 일정
   if (/(주간|이번\s*주|금주|지난\s*주)\s*(점검|보고|리포트|결산|회고|정리)/.test(q)) {
     const b0 = new Date(base); b0.setHours(0, 0, 0, 0); const mon = new Date(b0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7) - (/지난/.test(q) ? 7 : 0)); const sun = new Date(mon); sun.setDate(sun.getDate() + 6); const nx = new Date(sun); nx.setDate(nx.getDate() + 7);
-    const a = ymd(mon), z = ymd(sun); const doneW = tasks.filter(t => t.done && (t.doneAt || t.updatedAt || '').slice(0, 10) >= a && (t.doneAt || t.updatedAt || '').slice(0, 10) <= z);
+    const a = ymd(mon), z = ymd(sun); const doneW = tasks.filter(t => t.done && db.dayOf(t.doneAt || t.updatedAt || '') >= a && db.dayOf(t.doneAt || t.updatedAt || '') <= z);
     const late = open.filter(t => t.due && t.due < today), dueW = open.filter(t => t.due && t.due >= today && t.due <= z); const evN = []; for (const e of await db.list('events')) for (let d = new Date(sun.getTime() + 864e5); ymd(d) <= ymd(nx); d.setDate(d.getDate() + 1)) if (store.occursOn(e, ymd(d))) { evN.push({ ...e, date: ymd(d) }); break; }
     const byWho = new Map(); for (const t of open) { const w = t.who || me || '나'; byWho.set(w, (byWho.get(w) || 0) + 1); }
     return { text: `${/지난/.test(q) ? '지난 주' : '이번 주'} 점검이에요. 끝낸 일 ${doneW.length}개, 이번 주 안에 끝낼 일 ${dueW.length}개, 밀린 일 ${late.length}개, 다음 주 일정 ${evN.length}개예요.${byWho.size > 1 ? ' 남은 일은 ' + [...byWho.entries()].sort((x, y) => y[1] - x[1]).slice(0, 4).map(([n, c]) => `${n} ${c}개`).join(', ') + '예요.' : ''}`,
@@ -159,7 +159,7 @@ export async function smart(q, base = new Date(), r = null) {
   if (mineQ && /(할\s*일|할일|뭐\s*남|뭐\s*해|뭐\s*하|해야|마감)/.test(q)) { const myN = await store.myNames(); let ts = [...open, ...pTasks].filter(t => !t.who || myN.some(n => store.sameName(n, t.who))); if (r) ts = ts.filter(t => t.due && t.due <= r[1]); ts.sort((a, b) => (a.due || '9').localeCompare(b.due || '9'));
     return { text: ts.length ? `${r ? r[2] + ' ' : ''}내 할 일은 ${ts.length}개예요.${ts.filter(t => t.due && t.due < today).length ? ` 밀린 게 ${ts.filter(t => t.due && t.due < today).length}개 있어요.` : ''}` : `${r ? r[2] + ' ' : ''}내 할 일은 없어요.`, items: ts.slice(0, 20).map(t => taskItem(t, today)) }; }
   // 끝낸 일: "어제 뭐 했지", "이번 주 끝낸 일"
-  if (r && /(뭐\s*했|뭐했|끝낸|완료한|한\s*일|했던|어땠|하루\s*(정리|돌아|요약)|돌아보)/.test(q) && r[0] <= today) { const dn = tasks.filter(t => t.done && (t.doneAt || t.updatedAt || '').slice(0, 10) >= r[0] && (t.doneAt || t.updatedAt || '').slice(0, 10) <= r[1]); const evs = []; for (const e of await db.list('events')) for (let d = new Date(r[0] + 'T00:00'); ymd(d) <= r[1] && ymd(d) <= today; d.setDate(d.getDate() + 1)) if (store.occursOn(e, ymd(d))) { evs.push({ ...e, date: ymd(d) }); break; }
+  if (r && /(뭐\s*했|뭐했|끝낸|완료한|한\s*일|했던|어땠|하루\s*(정리|돌아|요약)|돌아보)/.test(q) && r[0] <= today) { const dn = tasks.filter(t => t.done && db.dayOf(t.doneAt || t.updatedAt || '') >= r[0] && db.dayOf(t.doneAt || t.updatedAt || '') <= r[1]); const evs = []; for (const e of await db.list('events')) for (let d = new Date(r[0] + 'T00:00'); ymd(d) <= r[1] && ymd(d) <= today; d.setDate(d.getDate() + 1)) if (store.occursOn(e, ymd(d))) { evs.push({ ...e, date: ymd(d) }); break; }
     const logs = (await db.list('timelogs')).filter(l => l.date >= r[0] && l.date <= r[1]);
     return { text: dn.length || evs.length || logs.length ? `${atK(r[2])} 끝낸 일 ${dn.length}개, 일정 ${evs.length}개${logs.length ? `, 작업 기록 ${logs.length}개` : ''}가 있어요.` : `${atK(r[2])} 남은 기록이 없어요.`, items: [...dn.slice(0, 8).map(t => ({ icon: 'check', title: t.title, sub: '끝냄' + (t.who ? ' · ' + t.who : ''), route: 'tasks' })), ...evs.slice(0, 6).map(evItem), ...logs.slice(0, 4).map(l => ({ icon: 'timer', title: l.title, sub: `${l.minutes}분`, route: 'tasks' }))] }; }
   // 밀린 일

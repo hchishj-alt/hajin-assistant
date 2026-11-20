@@ -69,7 +69,7 @@ export default {
       modal(v.id ? '업체 고치기' : '업체 추가', close => {
         const inp = (label, k, ph = '', attrs = {}) => { const i = h('input.in', { value: st[k] || '', placeholder: ph, ...attrs, oninput: () => (st[k] = i.value) }); return h('label.f', label, i); };
         const list = h('div.stack');
-        const drawP = () => { clear(list); st.prices.forEach((p, i) => { const mk = (k, ph, w, attrs = {}) => { const x = h('input.in', { value: p[k] || '', placeholder: ph, style: { flex: w, minWidth: 0, padding: '7px 9px' }, 'aria-label': ph, ...attrs, oninput: () => { p[k] = x.value; p.at = new Date().toISOString().slice(0, 10); } }); return x; };
+        const drawP = () => { clear(list); st.prices.forEach((p, i) => { const mk = (k, ph, w, attrs = {}) => { const x = h('input.in', { value: p[k] || '', placeholder: ph, style: { flex: w, minWidth: 0, padding: '7px 9px' }, 'aria-label': ph, ...attrs, oninput: () => { p[k] = x.value; p.at = db.dayOf(new Date()); } }); return x; };
           list.append(h('div.row.nowrap', { style: { gap: '4px' } }, mk('item', '품목 (예: A3 포스터 100장)', 3, { list: 'vd-items' }), mk('price', '가격', 1.4, { inputmode: 'numeric' }), mk('note', '메모 (수량·옵션·배송)', 2.4), h('button.btn.sm.ghost', { type: 'button', 'aria-label': '지우기', onclick: () => { st.prices.splice(i, 1); drawP(); } }, ic('x', 12)))); });
           if (!st.prices.length) list.append(h('div.faint.small', '품목 이름을 다른 업체와 똑같이 적으면 가격 비교에 나란히 나와요')); };
         drawP();

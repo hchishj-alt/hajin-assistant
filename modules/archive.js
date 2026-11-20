@@ -85,7 +85,7 @@ export default {
       const el = h('div.ref', { tabindex: 0, onclick: () => open(r, src), onkeydown: e => e.key === 'Enter' && open(r, src) },
         h('div.ref-img', src ? h('img', { src, loading: 'lazy', alt: r.title || '', referrerpolicy: 'no-referrer', onerror: e => { e.target.replaceWith(h('div.ref-ph', ic(k[1], 28))); } }) : h('div.ref-ph', ic(k[1], 28)),
           r.kind === 'video' ? h('span.ref-play', ic('play', 16)) : null,
-          h('div.ref-hover', h('span.av', { style: { background: colorFor(r.by || '?') } }, (r.by || '?').slice(-2, -1) || (r.by || '?')[0]), h('div', h('b', r.by || '알 수 없음'), h('div', `${rel((r.createdAt || '').slice(0, 10))} 올림`)))),
+          h('div.ref-hover', h('span.av', { style: { background: colorFor(r.by || '?') } }, (r.by || '?').slice(-2, -1) || (r.by || '?')[0]), h('div', h('b', r.by || '알 수 없음'), h('div', `${rel(db.dayOf(r.createdAt || ''))} 올림`)))),
         h('div.ref-b', h('div.ref-t', r.title || r.url), h('div.row.between', { style: { gap: '6px' } }, h('span.faint.tiny', { style: { display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 } }, ic(k[1], 12), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, r.provider || k[0])),
           r.colors?.length ? h('div.pal', r.colors.slice(0, 5).map(c => h('i', { style: { background: c }, title: c }))) : null)));
       return el;
