@@ -331,7 +331,8 @@ async function editor(root, id) {
     const hook = sum[0] || titleIn.value;
     const cap = `${titleIn.value}\n\n${hook}${sum[1] ? '\n' + sum[1] : ''}\n\n${tags.join(' ')}`;
     const ta = h('textarea.in', { rows: 6 }, cap);
-    capBox.append(h('div.row.between', h('span.chip.warn', '제안 · 고쳐서 쓰세요'), h('button.btn.sm', { onclick: async () => { try { await navigator.clipboard.writeText(ta.value); toast('캡션 복사'); } catch { } } }, ic('copy', 14), '복사')), ta);
+    const aiBtn = h('button.btn.sm', { onclick: async () => { const AI = await import('../js/ai.js'); if (!(await AI.enabled())) { toast('설정에서 Gemini 키를 넣으면 AI가 캡션을 써요', { label: '설정', fn: () => go('settings') }); return; } busy(aiBtn, true, 'AI가 쓰는 중'); const r = await AI.caption({ title: titleIn.value, subs: subs.map(s => s.text).join(' '), concept: [concept.name, concept.tone, concept.desc].filter(Boolean).join(' · '), tags: concept.hashtags || '' }); busy(aiBtn, false); if (!r) { toast('AI가 답하지 못했어요. 조금 뒤에 다시 해 주세요.'); return; } ta.value = `${r.hook}\n\n${r.body}\n\n${[...new Set([...(concept.hashtags || '').split(/\s+/).filter(Boolean).map(t => t.replace(/^#?/, '#')), ...r.hashtags])].slice(0, 14).join(' ')}`; } }, ic('sparkles', 14), 'AI로 쓰기');
+    capBox.append(h('div.row.between', h('span.chip.warn', '제안 · 고쳐서 쓰세요'), h('div.row', { style: { gap: '6px' } }, aiBtn, h('button.btn.sm', { onclick: async () => { try { await navigator.clipboard.writeText(ta.value); toast('캡션 복사'); } catch { } } }, ic('copy', 14), '복사'))), ta);
   }
 
   root.append(

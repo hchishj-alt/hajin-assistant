@@ -340,6 +340,8 @@ async function canvas(root, id) {
     a.summary = [...branches.slice(0, 8), ...a.summary.filter(s => !branches.some(b => b.includes(s.slice(0, 10)))).slice(0, 3)];
     a.decisions = [...new Set([...ns.filter(n => n.label === 'important' || n.label === 'urgent').map(pathOf), ...a.decisions])];
     a.ideas = [...new Set([...ns.filter(n => n.label === 'idea').map(pathOf), ...a.ideas])];
+    { const AI = await import('../js/ai.js'); if (await AI.enabled()) { toast('AI가 정리하고 있어요'); const dg = await AI.digest(`[마인드맵]\n${outline()}\n\n[옆에서 나눈 대화]\n${msgs.map(m => `${m.by || ''}: ${m.text}`).join('\n') || '(없음)'}`, { today: todayStr(), people, what: '회의하면서 그린 마인드맵(들여쓰기가 가지 구조)과 그때 나눈 대화' });
+      if (dg) { a.summary = dg.summary; a.decisions = [...new Set([...ns.filter(n => n.label === 'important' || n.label === 'urgent').map(pathOf), ...dg.decisions])]; a.ideas = [...new Set([...ns.filter(n => n.label === 'idea').map(pathOf), ...dg.ideas])]; if (dg.actions.length) a.actions = dg.actions; a.questions = dg.questions; a.byAI = true; } } }
     a = await FB.refine(a, text);
     await db.patch(id, { summary: a, summaryAt: db.now() });
     modal('AI 정리', close => h('div',

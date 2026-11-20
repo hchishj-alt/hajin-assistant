@@ -39,7 +39,7 @@ function scanBody(file, body) {
     if (s.type === 'FunctionDeclaration') return;
     const now = new Set(); (function w(x) { if (!x || isFn(x)) return; if ((x.type === 'CallExpression' || x.type === 'NewExpression') && x.callee.type === 'Identifier') now.add(x.callee.name); kids(x).forEach(w); })(s); /* 이 줄에서 바로 부르는 것 */
     const later = refs(s, true);           /* 이 줄에서 걸어 두는 것(이벤트 등) */
-    const report = (set, kind) => { for (const n of set) { if (!fns.has(n)) continue; const sd = decl.get(n); if (sd && sd.i > i) continue; /* 그 함수 자체가 아직 없으면 다른 종류 */
+    const report = (set, kind) => { for (const n of set) { if (!fns.has(n)) continue; const sd = decl.get(n); if (sd && sd.i > i) { if (kind === 'now') { total++; console.log(`BUG  ${file}:${s.loc.start.line} ${n}() 을 만들기 전에 부름 (만드는 줄 ${sd.line})`); } continue; }
       for (const x of closure(n)) { const d = decl.get(x); if (d && d.i > i && x !== n) { if (kind === 'later') { /* 사이에 기다림이 있어야 사용자가 누를 틈이 생김 */ let aw = false; for (let k = i; k < d.i; k++) if (stmts[k].type !== 'FunctionDeclaration' && hasAwait(stmts[k])) aw = true; if (!aw) continue; }
         total++; console.log(`${kind === 'now' ? 'BUG ' : 'risk'} ${file}:${s.loc.start.line} ${n}() → ${x} (만드는 줄 ${d.line})`); } } } };
     report(now, 'now');

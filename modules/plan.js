@@ -144,8 +144,10 @@ async function editor(root, id) {
       h('p.faint.tiny', { style: { marginTop: '6px' } }, '눌러서 태그로 확정')));
     if (sentCount(text) >= 4) {
       const sum = brain.summarize(text, 3);
-      side.append(h('div.card', h('div.card-h', h('h3', ic('sparkles'), '요약 미리보기'), h('span.chip.warn', '임시')), h('ul', { style: { margin: 0, paddingLeft: '18px' } }, sum.map(s => h('li.small', s))),
-        h('button.btn.sm', { style: { marginTop: '8px' }, onclick: async () => { ta.value = `> 요약\n${sum.map(s => '> - ' + s).join('\n')}\n\n` + ta.value; save(); } }, '문서 맨 위에 넣기')));
+      let lines = sum; const ul = h('ul', { style: { margin: 0, paddingLeft: '18px' } }, sum.map(s => h('li.small', s)));
+      const aiBtn = h('button.btn.sm', { style: { marginTop: '8px' }, onclick: async () => { const AI = await import('../js/ai.js'); if (!(await AI.enabled())) { toast('설정에서 Gemini 키를 넣으면 AI가 요약해요', { label: '설정', fn: () => go('settings') }); return; } aiBtn.disabled = true; aiBtn.textContent = 'AI가 읽는 중…'; const r = await AI.summarize(text, title.value); aiBtn.disabled = false; aiBtn.textContent = 'AI로 요약'; if (!r) { toast('AI가 답하지 못했어요. 조금 뒤에 다시 해 주세요.'); return; } lines = r.lines; clear(ul).append(...lines.map(s => h('li.small', s))); } }, ic('sparkles', 14), 'AI로 요약');
+      side.append(h('div.card', h('div.card-h', h('h3', ic('sparkles'), '요약 미리보기'), h('span.chip.warn', '임시')), ul,
+        h('div.row', { style: { gap: '6px', flexWrap: 'wrap' } }, aiBtn, h('button.btn.sm', { style: { marginTop: '8px' }, onclick: async () => { ta.value = `> 요약\n${lines.map(s => '> - ' + s).join('\n')}\n\n` + ta.value; save(); } }, '문서 맨 위에 넣기'))));
       const a = brain.analyzeNotes(text);
       if (a.actions.length) side.append(h('div.card', h('div.card-h', h('h3', ic('check2'), '할 일 후보'), h('span.chip', a.actions.length)), a.actions.slice(0, 5).map(t => h('div.li', h('div.grow.small', t.title), h('button.btn.sm', { onclick: async e => { await store.draft('task', { title: t.title, due: t.due || '', who: t.who, project: proj.value, priority: 'normal' }, { source: t.src, sourceRef: id, origin: 'doc' }); e.target.disabled = true; e.target.textContent = '대기함'; } }, '+')))));
     }

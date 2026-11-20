@@ -47,7 +47,12 @@ export async function find(text, { days = 3, max = 3 } = {}) {
   // 날짜가 없어서 할 일로 들어간 일정도 "할 일"로 침
   const isKind = async d => { if (!kind || d.kind === kind) return true; if (d.status === 'approved' && d.resultId) { const r = await db.get(d.resultId); return !!r && r.col === store.KINDS[kind]?.col; } return false; };
   const same = []; for (const d of all) if (await isKind(d)) same.push(d);
-  const pick = (same.length ? same : all).slice(0, max);
+  // 물음에 제목 낱말이 있으면("견적서 왜 없어?") 그 낱말이 든 것을 먼저, 임시 기록에 없으면 저장된 목록에서도 찾음
+  const words = String(text).replace(/[?？!.,]/g, ' ').split(/\s+/).map(w => w.replace(/(은|는|이|가|을|를|에|도|로|으로|에서|랑|이랑|한테)$/, '')).filter(w => w.length >= 2 && !/^(왜|어디|어딨|방금|아까|안|못|없|있|보여|보이|떠|뜨|나와|갔|사라|저장|확정|목록|리스트|대기함|쓴|적은|말한|넣은|만든|거|것|건|게|걸|할|일|할일|일정|캘린더|달력|약속|메모|노트|아이디어|지출|연락처)/.test(w));
+  const hit = t => words.some(w => String(t || '').replace(/\s/g, '').includes(w));
+  const named = words.length ? all.filter(d => hit(d.data.title || d.data.name)) : [];
+  const pick = (named.length ? named : same.length ? same : all).slice(0, max);
+  const extra = []; if (words.length) { const tied = new Set(pick.map(d => d.resultId).filter(Boolean)); for (const col of kind && store.KINDS[kind]?.col ? [store.KINDS[kind].col] : ['tasks', 'events']) for (const rec of await db.list(col)) if (hit(rec.title || rec.name) && !tied.has(rec.id)) extra.push(rec); }
   // "적어 둘까요?"에 아직 답하지 않은 말
   const asked = (await db.list('chat')).filter(m => m.role === 'bot' && recent(m) && !m.chipDone && m.q && (m.chips || []).some(c => c.make)).sort(newest).slice(0, 1);
 
@@ -64,7 +69,10 @@ export async function find(text, { days = 3, max = 3 } = {}) {
     lines.push(`“${rt}”${jo(rt, '은', '는')} 확정돼서 ${p.where}에 있어요${p.why ? ` (${p.why})` : ''}.`);
     items.push({ icon: store.KINDS[d.kind]?.icon || 'file', title: rt, sub: `${p.where}${p.why ? ' · ' + p.why : ''}`, route: p.route });
   }
-  for (const m of asked) { lines.push(`“${m.q.slice(0, 30)}”${jo(m.q, '은', '는')} 어떻게 적을지 아직 고르지 않아서 어디에도 안 들어갔어요. 위에서 “할 일로”를 누르거나 다시 말해 주세요.`); }
+  if (extra.length) { if (!named.length) { lines.length = 0; items.length = 0; draftIds.length = 0; chips.length = 0; }
+    for (const rec of extra.slice(0, max)) { const kd = Object.keys(store.KINDS).find(k => store.KINDS[k].col === rec.col) || 'task'; const p = await placeOf(kd, rec, today); const rt = rec.title || rec.name;
+      lines.push(`“${rt}”${jo(rt, '은', '는')} ${p.where}에 있어요${p.why ? ` (${p.why})` : ''}.`); items.push({ icon: store.KINDS[kd]?.icon || 'file', title: rt, sub: `${p.where}${p.why ? ' · ' + p.why : ''}`, route: p.route }); } }
+  if (!extra.length) for (const m of asked) { lines.push(`“${m.q.slice(0, 30)}”${jo(m.q, '은', '는')} 어떻게 적을지 아직 고르지 않아서 어디에도 안 들어갔어요. 위에서 “할 일로”를 누르거나 다시 말해 주세요.`); }
   if (!lines.length) {
     const n = kind === 'task' ? (await db.list('tasks')).filter(t => !t.done).length : 0;
     return { text: `최근 ${days}일 동안 비서로 적은 ${label}${jo(label, '을', '를')} 못 찾았어요.${n ? ` 지금 남은 할 일은 모두 ${n}개예요.` : ''} 다시 말해 주면 바로 적어 둘게요.`, items: n ? [{ icon: 'check2', title: '할 일 열기', sub: `남은 일 ${n}개`, route: 'tasks' }] : [], draftIds: [], chips: [] };

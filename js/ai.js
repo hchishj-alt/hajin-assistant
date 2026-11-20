@@ -239,3 +239,75 @@ export async function polishSaved(kind, text, rule, saved, { patch, add, fix = d
   for (const d of list.slice(1)) { await add(fix(d)); changed = true; }
   return changed;
 }
+
+// ── 대화·질문 답하기 ──
+// 사용자의 말과 "앱 기록 한눈에"(js/context.js)를 같이 주고, 뜻(질문·잡담 / 새로 적기 / 있는 것 고치기)을 고르게 한 뒤 질문이면 기록을 근거로 답하게 함.
+// 키가 없거나 늦거나 실패하면 null → 부르는 쪽이 앱 안 규칙으로 대신 답함
+export async function converse(text, { snapshot = '', history = '', name = '', now = new Date(), hint = '', ms = 15000 } = {}) {
+  if (!(await enabled()) || !text || text.length > 600) return null;
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const prompt = `너는 작은 콘텐츠 기획 팀이 쓰는 업무 앱 "하진 비서" 안의 비서야. 사용자${name ? '(' + name + ')' : ''}의 말을 읽고 JSON 하나로만 답해.
+
+지금: ${today} ${'일월화수목금토'[now.getDay()]}요일 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}
+달력(주는 월요일 시작):
+${calendarTable(today)}
+
+먼저 말의 뜻을 하나 골라 intent 에 넣어.
+- "add": 새로 적어 달라는 말. 일정·약속, 해야 할 일, 쓴 돈·받을 돈, 연락처, 메모·아이디어처럼 기록으로 남길 내용이 담긴 말. 날짜·시간·금액이 있거나 "~해야 해", "~하기로 했어"면 대개 이것. 이때 say 는 빈칸.
+- "edit": 이미 [앱 기록]에 있는 것을 바꾸거나, 끝냈다고 하거나, 지워 달라는 말(그래도 될지 묻는 말 포함). ids 에 그 기록 번호, say 에는 무엇을 어떻게 바꾸려는 말인지 한 줄, next 에는 앱에 그대로 시킬 명령문 하나를 제목을 넣어서 써(예: "견적서 보내기 금요일로 미뤄줘", "시안 보내기 끝났어", "주간회의 취소해줘", "포스터 시안 민서한테 넘겨줘").
+- "answer": 그 밖의 전부. 기록에 대한 질문(뭐가 있는지, 어디 있는지, 왜 안 보이는지, 언제인지, 얼마인지, 누가 바쁜지, 뭐부터 할지), 앱 쓰는 법, 인사·잡담.
+
+intent 가 "answer"일 때 say 쓰는 법:
+- 한국어 존댓말(해요체)로 짧게. 보통 1~3문장. 목록이 필요하면 문장 안에 풀어서 쓰고, 마크다운 기호(*, #, -)는 쓰지 마.
+- 기록에 대한 답은 아래 [앱 기록]에 있는 것만 근거로 해. 없으면 없다고 말하고, 지어내지 마. 날짜는 "11/22(일)"처럼.
+- 답의 근거가 된 기록 번호(T1, E2, D1…)를 ids 에 넣어(최대 6개). say 안에는 번호를 쓰지 말고 제목으로 말해.
+- "왜 없어/안 보여/어디 갔어"는 [대기함]과 [할 일]의 '보이는 곳'을 보고 까닭을 말해 줘: 확정 전이면 대기함에서 확정해야 한다, 마감이 내일 이후면 예정 탭에 있다, 끝냈으면 완료 탭, 담당이 다른 사람이면 담당자별 탭, 기록에 아예 없으면 저장이 안 된 것이니 다시 말해 달라.
+- 우선순위를 물으면 마감이 지났거나 가까운 것, 받을 돈, 오늘 일정을 근거로 순서를 권해.
+- 앱이 못 하는 일(인터넷 검색, 메일·카톡 보내기, 결제 등)은 못 한다고 하고 앱에서 대신 할 수 있는 것을 한 가지 알려 줘.
+- 잡담에는 가볍게 한두 문장으로 받고, 일과 이어 줄 수 있으면 한 마디만 덧붙여.
+
+앱 화면 이름: 오늘(홈), 캘린더, 할 일(탭: 오늘·예정·전체·완료·담당자별), 대기함(비서가 읽어 만든 임시 항목을 확정하는 곳), 기획 보드, 돈(지출·받을 돈), 인맥, 회의록, 마인드맵, 설정.
+앱 규칙: 비서가 말에서 읽어 만든 항목은 '임시'로 대기함에 들어가고, 확정을 눌러야 목록·캘린더에 들어가. 할 일 화면에서 직접 적은 건 바로 들어가. 할 일의 오늘 탭은 마감이 오늘까지거나 마감이 없는 일, 예정 탭은 마감이 내일 이후인 일.
+
+intent 가 "answer"면 next 에는 사용자가 이어서 보낼 만한 짧은 말을 0~2개(예: "오늘 할 일 보여줘", "그거 금요일로 미뤄줘").
+${hint ? '\n앱 규칙이 먼저 만든 답(참고만, 틀렸으면 고쳐): ' + hint + '\n' : ''}
+[앱 기록]
+${snapshot || '(비어 있음)'}
+
+[방금 대화]
+${history || '(없음)'}
+
+[사용자 말]
+${text}
+
+JSON 형식: {"intent":"answer|add|edit","say":"...","ids":["T1"],"next":["..."]}`;
+  try {
+    const j = await ask(prompt, { json: true, fast: true, ms, temp: 0.3 });
+    const o = Array.isArray(j) ? j[0] : j; if (!o || !/^(answer|add|edit)$/.test(o.intent || '')) return null;
+    const say = String(o.say || '').replace(/[*#`]/g, '').replace(/\b[TEDIXMN]\d{1,2}\b\s*[,·]?\s*/g, '').replace(/\s+\n/g, '\n').trim().slice(0, 700);
+    if (o.intent === 'answer' && !say) return null;
+    return { intent: o.intent, say, ids: (Array.isArray(o.ids) ? o.ids : []).map(String).filter(x => /^[TEDIXMN]\d{1,2}$/.test(x)).slice(0, 6), next: (Array.isArray(o.next) ? o.next : []).map(x => String(x).trim()).filter(x => x && x.length <= 30).slice(0, 2) };
+  } catch (e) { console.warn('ai', e); return null; }
+}
+
+// 글 한 덩이를 정리: 요약·결정·할 일. (마인드맵 "AI 정리", 붙여 넣은 회의록 등) 실패하면 null
+export async function digest(text, { today = '', people = [], what = '메모' } = {}) {
+  if (!(await enabled()) || (text || '').length < 40) return null;
+  try {
+    const j = await ask(`다음은 ${what}이야. 오늘은 ${today}. 아는 사람: ${people.slice(0, 30).join(', ') || '없음'}.\n한국어로 정리해서 JSON으로만 답해: {"summary":["핵심 3~6줄, 한 줄 한 문장"],"decisions":["정해진 것"],"actions":[{"title":"할 일(명사형, 짧게)","who":"맡은 사람 또는 빈칸","due":"YYYY-MM-DD 또는 빈칸"}],"ideas":["아이디어"],"questions":["아직 안 정해진 것"]}\n글에 없는 내용은 만들지 마. 숫자·날짜·금액·조건은 빼먹지 마.\n\n${String(text).slice(0, 12000)}`, { json: true });
+    if (!Array.isArray(j.summary) || !j.summary.length) return null;
+    const arr = v => (Array.isArray(v) ? v : []).map(String).filter(Boolean);
+    return { summary: arr(j.summary).slice(0, 8), decisions: arr(j.decisions).slice(0, 12), ideas: arr(j.ideas).slice(0, 12), questions: arr(j.questions).slice(0, 12),
+      actions: (Array.isArray(j.actions) ? j.actions : []).filter(x => x && x.title).slice(0, 20).map(x => ({ title: String(x.title).slice(0, 80), who: String(x.who || ''), due: isD(x.due) ? x.due : '', src: String(x.title) })) };
+  } catch (e) { console.warn('ai', e); return null; }
+}
+
+// SNS 캡션: 제목·자막·콘셉트를 보고 첫 줄(훅)·본문·해시태그. 실패하면 null
+export async function caption({ title = '', subs = '', concept = '', tags = '' } = {}) {
+  if (!(await enabled()) || !(title + subs).trim()) return null;
+  try {
+    const j = await ask(`인스타그램·릴스에 올릴 글을 한국어로 써 줘. 작은 콘텐츠 기획 팀 계정이고, 과장 없이 담백하고 귀엽게.\n제목: ${title}\n영상 자막: ${String(subs).slice(0, 3000) || '(없음)'}\n콘셉트: ${concept || '(없음)'}\n꼭 넣을 해시태그: ${tags || '(없음)'}\nJSON으로만: {"hook":"첫 줄, 20자 안팎","body":"본문 2~3문장","hashtags":["#태그", "..."]} 해시태그는 8~12개, 띄어쓰기 없이.`, { json: true, temp: 0.7 });
+    if (!j || !j.hook) return null;
+    return { hook: String(j.hook), body: String(j.body || ''), hashtags: (Array.isArray(j.hashtags) ? j.hashtags : []).map(x => '#' + String(x).replace(/^#+/, '').replace(/\s/g, '')).filter(x => x.length > 1).slice(0, 14) };
+  } catch (e) { console.warn('ai', e); return null; }
+}
