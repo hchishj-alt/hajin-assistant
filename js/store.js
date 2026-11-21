@@ -44,6 +44,8 @@ export async function approve(d, edited) {
     if (d.kind === 'note') payload.type = payload.type || 'note';
     if (d.kind === 'task') payload.done = false;
     if (d.sourceRef) payload.sourceRef = d.sourceRef;
+    // 같은 임시 항목을 두 기기에서 각각 확정해도 기록이 둘 생기지 않게, 만든 기록의 이름표를 임시 항목에서 따옴
+    if (d.id && !payload.id && d.kind !== 'vendor') { payload.id = 'ok' + d.id; payload.deleted = false; const old = await db.get(payload.id); if (old && old.deleted) await db.purge(old.id); /* 되돌렸다가 다시 확정: 예전 내용이 섞이지 않게 새로 */ }
     if (d.kind === 'vendor') saved = await saveVendor(payload);
     else saved = await db.put(k.col, await teamify(k === KINDS.task ? 'task' : d.kind, ['expense', 'income'].includes(d.kind) && payload.team === undefined ? { ...payload, team: 'auto' } : payload));
   } else if (d.kind === 'summary' && d.sourceRef) {

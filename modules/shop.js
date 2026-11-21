@@ -3,6 +3,8 @@ import { h, ic, clear, toast, head, modal, form, tile, seg, won, todayStr, fmtDa
 import * as db from '../js/db.js';
 import * as P from '../js/product.js';
 import { go } from '../js/app.js';
+import { nameCanon } from '../js/store.js';
+import { canEdit } from '../js/admin.js';
 
 const F = { tab: 'todo', folder: '', q: '' };
 const sum = xs => xs.reduce((s, x) => s + (Number(x.price) || 0) * (Number(x.qty) || 1), 0);
@@ -39,38 +41,46 @@ export default {
       const inF = all.filter(b => (!F.folder || (F.folder === '_none' ? !b.folder : b.folder === F.folder)) && (!F.q || `${b.title} ${b.store || ''} ${b.memo || ''}`.toLowerCase().includes(F.q.toLowerCase())));
       const todo = inF.filter(b => !b.bought).sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9) || (a.createdAt || '').localeCompare(b.createdAt || ''));
       const done = inF.filter(b => b.bought).sort((a, b) => (b.boughtAt || '').localeCompare(a.boughtAt || ''));
-      const picked = todo.filter(b => b.checked);
-      const budget = Number((await db.kvGet('shop:budget', {}))[F.folder || '_all']) || 0;
+      // 고르기는 이 기기에서 합계를 보려는 것이라 팀과 나누지 않음 (전에는 한 사람이 고르면 다른 사람 화면에도 골라져, 남이 고른 것까지 구매완료로 넘어갔음)
+      const pk = new Set(await db.kvGet('shop:picked', [])); for (const id of [...pk]) if (!all.some(b => b.id === id && !b.bought)) pk.delete(id);
+      const savePk = () => db.kvSet('shop:picked', [...pk]);
+      const picked = todo.filter(b => pk.has(b.id));
+      const canon = await nameCanon();
+      // 예산: 프로젝트 폴더면 프로젝트에 적어 팀이 같이 봄, 그 밖(전체·직접 적은 폴더)은 이 기기에만
+      const proj = F.folder && F.folder !== '_none' ? (await db.list('projects')).find(p => p.name === F.folder) : null;
+      const teamBudget = proj && proj.buyBudget != null && (proj.team || proj.space) ? Number(proj.buyBudget) || 0 : null;
+      const budget = teamBudget != null ? teamBudget : Number((await db.kvGet('shop:budget', {}))[F.folder || '_all']) || 0;
+      const budgetMine = !proj || await canEdit(proj);
       box.append(h('div.tiles', { style: { marginBottom: '14px' } },
         tile('inbox', todo.length, '살 것'), tile('wallet', short(sum(todo)), '살 것 합계'),
         tile('check2', short(sum(picked)), `고른 것 ${picked.length}개`, picked.length ? 'ok' : ''), tile('check', short(sum(done)), `구매완료 ${done.length}개`)),
-        ...(budget ? [h('div.card', { style: { marginBottom: '14px' } }, h('div.row.between', h('span.small', { style: { fontWeight: 650 } }, `예산 ${won(budget)}`), h('span.small.muted', `쓴 돈 ${won(sum(done))} · 남은 예산 ${won(budget - sum(done))}${sum(todo) > budget - sum(done) ? ' · 살 것이 남은 예산을 넘어요' : ''}`)),
+        ...(budget ? [h('div.card', { style: { marginBottom: '14px' } }, h('div.row.between', h('span.small', { style: { fontWeight: 650 } }, `예산 ${won(budget)}`, teamBudget != null ? h('span.faint', { style: { fontWeight: 500 } }, ' · 팀이 같이 봐요') : null), h('span.small.muted', `쓴 돈 ${won(sum(done))} · 남은 예산 ${won(budget - sum(done))}${sum(todo) > budget - sum(done) ? ' · 살 것이 남은 예산을 넘어요' : ''}`)),
           h('div.bar', { style: { marginTop: '8px' } }, h('i', { style: { width: Math.min(100, sum(done) / budget * 100) + '%' } }))) ] : []),
         h('div.chips', { style: { marginBottom: '10px' } },
           [['', '전체', all.length], ...folders.map(f => [f, f, all.filter(b => b.folder === f).length]), ...(all.some(b => !b.folder) && folders.length ? [['_none', '분류 안 됨', all.filter(b => !b.folder).length]] : [])].map(([id, name, n]) => h('button.chip' + (F.folder === id ? '.acc' : ''), { onclick: () => { F.folder = id; draw(); } }, id && id !== '_none' ? h('span.dot', { style: { background: colorFor(name) } }) : null, name, h('span.faint', ' ' + n))),
-          h('button.chip', { onclick: setBudget }, ic('wallet', 12), budget ? '예산 바꾸기' : '예산 정하기')),
+          budgetMine || teamBudget == null ? h('button.chip', { onclick: setBudget }, ic('wallet', 12), budget ? '예산 바꾸기' : '예산 정하기') : null),
         h('div.row', { style: { gap: '10px', marginBottom: '10px', flexWrap: 'wrap' } }, seg([['todo', `살 것 ${todo.length}`], ['done', `구매완료 ${done.length}`]], F.tab, v => { F.tab = v; draw(); }),
           h('input.in.grow', { placeholder: '상품명·구매처 찾기', value: F.q, style: { minWidth: '140px' }, onchange: e => { F.q = e.target.value; draw(); } })));
       const list = h('div.card.buys');
       const rows = F.tab === 'todo' ? todo : done;
       if (!rows.length) list.append(h('div.empty', F.tab === 'todo' ? '살 것이 없어요. 상품 링크를 복사해 이 화면에 붙여넣기(Ctrl+V) 하거나 “링크로 추가”를 눌러 보세요.' : '아직 구매완료한 게 없어요.'));
-      if (F.tab === 'todo' && rows.length) list.append(h('label.li.chk.small', h('input', { type: 'checkbox', checked: picked.length === todo.length, onchange: async e => { for (const b of todo) if (!!b.checked !== e.target.checked) await db.patch(b.id, { checked: e.target.checked }); draw(); } }), h('span.muted', '전체 고르기')));
+      if (F.tab === 'todo' && rows.length) list.append(h('label.li.chk.small', h('input', { type: 'checkbox', checked: picked.length === todo.length, onchange: async e => { for (const b of todo) e.target.checked ? pk.add(b.id) : pk.delete(b.id); await savePk(); draw(); } }), h('span.muted', '전체 고르기')));
       for (const b of rows) list.append(row(b));
       box.append(list);
       if (F.tab === 'todo') enableDrag(list);
       // 장바구니 합계 바
       clear(bar); bar.classList.toggle('hide', !(F.tab === 'todo' && picked.length));
       if (picked.length) bar.append(h('div', h('b', `고른 것 ${picked.length}개`), h('div.cart-sum', won(sum(picked)))),
-        h('button.btn.pri', { onclick: async () => { for (const b of picked) await db.patch(b.id, { bought: true, checked: false, boughtAt: todayStr(), buyer: await db.kvGet('name', '하진') }); toast(`${picked.length}개를 구매완료로 옮겼어요`, { label: '보기', fn: () => { F.tab = 'done'; draw(); } }); draw(); } }, ic('check', 16), '구매완료'));
+        h('button.btn.pri', { onclick: async () => { for (const b of picked) { await db.patch(b.id, { bought: true, checked: false, boughtAt: todayStr(), buyer: await db.kvGet('name', '하진') }); pk.delete(b.id); } await savePk(); toast(`${picked.length}개를 구매완료로 옮겼어요`, { label: '보기', fn: () => { F.tab = 'done'; draw(); } }); draw(); } }, ic('check', 16), '구매완료'));
 
       function row(b) {
         const qty = Number(b.qty) || 1;
         const img = b.img ? h('img', { src: b.img, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer', onerror: e => e.target.replaceWith(ph()) }) : ph();
-        return h('div.buy' + (b.checked ? '.on' : ''), { 'data-id': b.id },
-          F.tab === 'todo' ? h('input.buy-chk', { type: 'checkbox', 'aria-label': '고르기', checked: !!b.checked, onchange: async e => { await db.patch(b.id, { checked: e.target.checked }); draw(); } }) : h('span.buy-ok', ic('check', 14)),
+        return h('div.buy' + (pk.has(b.id) ? '.on' : ''), { 'data-id': b.id },
+          F.tab === 'todo' ? h('label.buy-pick', h('input.buy-chk', { type: 'checkbox', 'aria-label': '고르기', checked: pk.has(b.id), onchange: async e => { e.target.checked ? pk.add(b.id) : pk.delete(b.id); await savePk(); draw(); } })) : h('span.buy-ok', ic('check', 14)),
           h('div.buy-img', { onclick: () => edit(b) }, img),
           h('div.buy-b', b.link ? h('a.buy-t', { href: b.link, target: '_blank', rel: 'noopener' }, b.title || '(이름 없음)') : h('div.buy-t', b.title || '(이름 없음)'),
-            h('div.faint.tiny', [b.store, b.folder, b.memo, b.bought && `${fmtDate(b.boughtAt)} 구매${b.buyer ? ' · ' + b.buyer : ''}`, b.bought && b.place && '보관: ' + b.place, b.by && b.team && b.by + ' 올림'].filter(Boolean).join(' · ')),
+            h('div.faint.tiny', [b.store, b.folder, b.memo, b.bought && `${fmtDate(b.boughtAt)} 구매${b.buyer ? ' · ' + canon(b.buyer) : ''}`, b.bought && b.place && '보관: ' + b.place, b.by && b.team && canon(b.by) + ' 올림'].filter(Boolean).join(' · ')),
             h('div.row', { style: { gap: '6px', marginTop: '6px', flexWrap: 'wrap' } },
               !b.price ? h('button.chip.warn', { onclick: () => edit(b) }, '가격 넣기') : h('span.buy-p', won(b.price)),
               F.tab === 'todo' ? h('span.stepper', h('button', { 'aria-label': '수량 줄이기', onclick: async () => { if (qty > 1) { await db.patch(b.id, { qty: qty - 1 }); draw(); } } }, '−'), h('b', qty), h('button', { 'aria-label': '수량 늘리기', onclick: async () => { await db.patch(b.id, { qty: qty + 1 }); draw(); } }, '+')) : h('span.faint.small', `× ${qty}`),
@@ -87,7 +97,7 @@ export default {
           addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
         }));
       }
-      async function setBudget() { modal('예산', close => form([{ k: 'v', label: `${F.folder && F.folder !== '_none' ? F.folder : '전체'} 예산 (원, 0이면 없앰)`, type: 'number', default: budget, full: true }], {}, async v => { const m = await db.kvGet('shop:budget', {}); m[F.folder || '_all'] = v.v || 0; await db.kvSet('shop:budget', m); close(); draw(); })); }
+      async function setBudget() { const shared = !!(proj && (proj.team || proj.space) && budgetMine); modal('예산', close => form([{ k: 'v', label: `${F.folder && F.folder !== '_none' ? F.folder : '전체'} 예산 (원, 0이면 없앰) · ${shared ? '팀이 같이 봐요' : '이 기기에서만 보여요'}`, type: 'number', default: budget, full: true }], {}, async v => { if (shared) await db.patch(proj.id, { buyBudget: Number(v.v) || 0 }); else { const m = await db.kvGet('shop:budget', {}); m[F.folder || '_all'] = v.v || 0; await db.kvSet('shop:budget', m); } close(); draw(); })); }
     }
 
     async function folderList() { const all = await db.list('buys'); return [...new Set([...(await db.list('projects')).map(p => p.name), ...all.map(b => b.folder)].filter(Boolean))]; }

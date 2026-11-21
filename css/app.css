@@ -307,7 +307,8 @@ button.chip:active{transform:scale(.94)}
 .sw{width:22px;height:22px;border-radius:50%;border:1px solid color-mix(in srgb,var(--ink) 14%,transparent);cursor:pointer;padding:0;transition:transform .35s var(--spring),box-shadow .2s}
 .sw:hover{transform:scale(1.15)}
 .sw.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--acc);transform:scale(1.08)}
-.av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;color:#fff;font-size:calc(11px*var(--fs,1));font-weight:700;flex:none}
+.av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;color:#fff;font-size:calc(11px*var(--fs,1));font-weight:700;flex:none;overflow:hidden}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
 .masonry{columns:230px;column-gap:14px}
 .ref{break-inside:avoid;margin-bottom:14px;background:var(--card);border:calc(var(--bw,1px)*1) solid var(--line);border-radius:calc(16px*var(--rd,1));overflow:hidden;cursor:pointer;box-shadow:var(--sh);transition:transform .45s var(--spring),box-shadow .25s;outline:none}
 .ref:hover,.ref:focus-visible{transform:translateY(-3px);box-shadow:0 12px 28px -12px color-mix(in srgb,var(--ink) 30%,transparent)}
@@ -519,6 +520,8 @@ h1{font-weight:800}h2{font-weight:740}h3{font-weight:700}
 .buy.on{background:color-mix(in srgb,var(--acc) 6%,transparent)}
 .buy.drag{opacity:.9;box-shadow:var(--sh);border-radius:calc(12px*var(--rd,1));position:relative;z-index:2;outline:2px solid var(--acc)}
 .buy-chk{width:22px;height:22px;accent-color:var(--acc)}
+.buy-pick{display:grid;place-items:center;min-width:34px;min-height:44px;margin:-4px 0 -4px -6px;cursor:pointer}
+@media (pointer:coarse){.stepper button{width:38px;height:38px}}
 .buy-ok{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--ok-soft);color:var(--ok)}
 .buy-img{width:64px;height:64px;border-radius:calc(12px*var(--rd,1));overflow:hidden;background:var(--bg2);cursor:pointer}
 .buy-img img{width:100%;height:100%;object-fit:cover;display:block}
@@ -1202,3 +1205,4 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 /* 비용 줄: 폰에서는 제목이 넓게, 금액과 상태는 오른쪽에 두 줄로 */
 @media (max-width:560px){.exp-li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:10px;row-gap:4px;align-items:center}.exp-li>.ti{display:none!important}.exp-li>input{grid-column:1;grid-row:1/3}.exp-li>.grow{grid-column:2;grid-row:1/3}.exp-li>.exp-amt{grid-column:3;grid-row:1;min-width:0!important;justify-self:end;align-self:end}.exp-li>.exp-st{grid-column:3;grid-row:2;justify-self:end;align-self:start}}
 .ps-more{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;border-radius:calc(12px*var(--rd,1));background:var(--bg2);font-size:calc(13px*var(--fs,1));color:var(--ink2)}
+.music-info{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:8px 10px;border-radius:calc(10px*var(--rd,1));background:var(--bg2);font-size:calc(13px*var(--fs,1));color:var(--ink2);min-height:44px}.music-info .cut-line{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

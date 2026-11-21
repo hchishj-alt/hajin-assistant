@@ -155,6 +155,7 @@ async function editor(root, id) {
   const sfxList = h('div.stack');
   const musicBlob = p.musicKey ? await db.getBlob(p.musicKey).catch(() => null) : null;   /* 다른 기기에서 넣은 배경음은 이 기기에 파일이 없을 수 있음 */
   let musicEl = musicBlob ? Object.assign(new Audio(URL.createObjectURL(musicBlob)), { preload: 'auto' }) : null;
+
   let logo = concept.logoKey ? await blobImg(await db.getBlob(concept.logoKey).catch(() => null)) : null;
   let player = null, making = false;
   const stopPreview = () => { if (player && !making) { player.close(); player = null; playBtn.innerHTML = ''; playBtn.append(ic('play', 16), '미리보기'); } };   /* 클립을 손대기 전에 돌던 미리보기를 멈춤 (같은 영상을 두 곳에서 움직이지 않게) */
@@ -164,6 +165,13 @@ async function editor(root, id) {
   const canvas = h('canvas.editor-canvas');
   const timeEl = h('span.mono.small', '0:00 / 0:00');
   const playBtn = h('button.btn.pri', ic('play', 16), '미리보기');
+  /* 배경음: 무엇이 들어 있는지 보여 주고 뺄 수 있게 (전에는 넣었다는 알림만 뜨고 화면에 아무 표시가 없었음) */
+  let musicKey = p.musicKey || null, musicName = p.musicName || '';
+  const musicLbl = h('span', musicEl ? '배경음 바꾸기' : '배경음'), musicInfo = h('div.music-info');
+  const setMusic = async (blob, key, name) => { try { if (musicEl) { musicEl.pause(); URL.revokeObjectURL(musicEl.src); } } catch { } musicEl = blob ? Object.assign(new Audio(URL.createObjectURL(blob)), { preload: 'auto' }) : null; musicKey = key || null; musicName = name || ''; await db.patch(id, { musicKey, musicName }); drawMusic(); };
+  const drawMusic = () => { musicLbl.textContent = musicEl ? '배경음 바꾸기' : '배경음'; clear(musicInfo);
+    if (musicEl) musicInfo.append(ic('music', 14), h('span.grow.cut-line', { title: musicName }, musicName || '배경음이 들어 있어요'), h('button.btn.sm.ghost', { type: 'button', 'aria-label': '배경음 빼기', onclick: async () => { stopPreview(); const was = { key: musicKey, name: musicName }; await setMusic(null, null, ''); toast('배경음을 뺐어요', { label: '되돌리기', fn: async () => { const b = was.key ? await db.getBlob(was.key).catch(() => null) : null; if (b) await setMusic(b, was.key, was.name); } }); } }, '빼기'));
+    else musicInfo.append(h('span.faint', musicKey ? '다른 기기에서 넣은 배경음이라 이 기기에는 파일이 없어요. 여기서 다시 넣으면 바뀌어요.' : '배경음이 없어요. 클립 칸의 “배경음”으로 넣어요.')); };
   const exportBtn = h('button.btn', ic('download', 16), '영상 만들기');
   const clipList = h('div.stack');
   const subList = h('div.stack');
@@ -405,9 +413,10 @@ async function editor(root, id) {
       h('div.stack', { style: { position: 'sticky', top: '12px' }, class: 'editor-stage' }, canvas, bar, h('div.row.between', h('div.row', playBtn, exportBtn, cancelBtn), timeEl), exportHint),
       h('div.stack.editor-side',
         h('div.card', h('div.card-h', h('h3', ic('palette'), '콘셉트'), applyBtn), h('div.grid.g2', conceptSel, ratioSel), conceptInfo),
-        h('div.card', h('div.card-h', h('h3', ic('film'), '클립'), h('label.btn.sm', ic('music', 14), musicEl ? '배경음 바꾸기' : '배경음', h('input', { type: 'file', accept: 'audio/*', style: { display: 'none' }, onchange: async e => { const f = e.target.files[0]; if (!f) return; stopPreview(); let key; try { key = await db.putBlob(f); } catch (err) { store.logError(err, 'studio:music'); return toast('저장 공간이 모자라서 배경음을 넣지 못했어요'); } await db.patch(id, { musicKey: key }); try { if (musicEl) { musicEl.pause(); URL.revokeObjectURL(musicEl.src); } } catch { } musicEl = Object.assign(new Audio(URL.createObjectURL(f)), { preload: 'auto' }); e.target.value = ''; toast('배경음 넣었어요'); } }))),
+        h('div.card', h('div.card-h', h('h3', ic('film'), '클립'), h('label.btn.sm', ic('music', 14), musicLbl, h('input', { type: 'file', accept: 'audio/*', style: { display: 'none' }, onchange: async e => { const f = e.target.files[0]; if (!f) return; stopPreview(); let key; try { key = await db.putBlob(f); } catch (err) { store.logError(err, 'studio:music'); return toast('저장 공간이 모자라서 배경음을 넣지 못했어요'); } await setMusic(f, key, f.name || ''); e.target.value = ''; toast('배경음 넣었어요'); } }))),
           note, dropzone(h('span', ic('upload'), ' 영상·사진 끌어놓기 / 눌러서 고르기'), 'video/*,image/*', addFiles), h('div', { style: { height: '8px' } }), clipList),
         h('div.card', h('div.card-h', h('h3', ic('music'), '소리'), h('button.btn.sm', { onclick: () => { let t = 0; for (const k of clips) { t += V.clipLen(k); } sfx.push({ t: sfx.length ? +(Math.min(Math.max(0, t - .5), (sfx[sfx.length - 1].t || 0) + 2)).toFixed(1) : 0, kind: 'pop', vol: .8 }); save(); drawSfx(); } }, ic('plus', 14), '효과음')),
+          musicInfo,
           h('div.row', { style: { gap: '8px', marginBottom: '8px' } }, h('span.small', '배경음 크기'), h('input', { type: 'range', min: 0, max: 1, step: .05, value: musicVol, style: { flex: 1 }, 'aria-label': '배경음 크기', oninput: e => { musicVol = +e.target.value; save(); } })),
           h('button.btn.sm.ghost', { style: { marginBottom: '8px' }, title: '컷이 바뀌는 곳마다 효과음을 놓아요', onclick: () => { let t = 0; const add = []; clips.slice(0, -1).forEach(k => { t += V.clipLen(k); add.push({ t: +t.toFixed(1), kind: 'whoosh', vol: .6 }); }); if (!add.length) return toast('클립이 두 개 이상일 때 쓸 수 있어요'); sfx = [...sfx.filter(x => !add.some(a => Math.abs(a.t - x.t) < .2)), ...add]; save(); drawSfx(); toast(`컷 ${add.length}곳에 효과음을 놓았어요`); } }, ic('sparkles', 14), '컷마다 자동으로 놓기'),
           sfxList,
@@ -417,6 +426,7 @@ async function editor(root, id) {
         h('div.card', h('div.card-h', h('h3', ic('hash'), '캡션·해시태그'), h('button.btn.sm', { onclick: caption }, ic('sparkles', 14), '만들기')), capBox))));
   drawClips(); drawSubs(); drawSfx(); still(); tell(ghostLine());
   /* 화면을 떠날 때: 재생·녹화를 멈추고 열어 둔 영상을 놓아 줌 (폰에서 메모리가 쌓이지 않게) */
+  drawMusic();
   return () => { try { player && player.close(); } catch { } try { musicEl && musicEl.pause(); } catch { } const seen = new Set(); for (const k of clips) { const el = k.el; if (!el || seen.has(el)) continue; seen.add(el); try { if (k.type === 'video') { el.pause(); const u = el.src; el.removeAttribute('src'); el.load(); URL.revokeObjectURL(u); } else URL.revokeObjectURL(el.src); } catch { } } };
 }
 // 클립 하나를 연다. 같은 파일에서 잘라 낸 클립들은 영상 요소 하나를 같이 씀(폰은 동시에 열 수 있는 영상 수가 적음).

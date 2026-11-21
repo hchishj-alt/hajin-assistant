@@ -1,9 +1,11 @@
 // 레퍼런스 아카이브: 링크만 붙이면 미리보기, 프로젝트 = 대분류 폴더, 색·느낌·올린 사람·종류로 필터
-import { h, ic, clear, toast, head, modal, form, confirmBox, tile, seg, busy, rel, debounce, colorFor, pickFile } from '../js/ui.js';
+import { h, ic, clear, toast, head, modal, form, confirmBox, tile, seg, busy, rel, debounce, colorFor, facePic, pickFile } from '../js/ui.js';
 import * as db from '../js/db.js';
 import * as brain from '../js/brain.js';
 import * as LP from '../js/linkpreview.js';
 import { go } from '../js/app.js';
+import { nameCanon } from '../js/store.js';
+import { canEdit, who as whoAmI } from '../js/admin.js';
 
 const F = { folder: '', sub: '', kind: '', hues: new Set(), moods: new Set(), uses: new Set(), by: '', q: '', sort: 'new', open: null };
 const SORTS = { new: ['최신순', (a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')], old: ['오래된순', (a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')], name: ['이름순', (a, b) => (a.title || '').localeCompare(b.title || '', 'ko')], color: ['색상순', (a, b) => hueOf(a) - hueOf(b)], who: ['올린 사람순', (a, b) => (a.by || '').localeCompare(b.by || '', 'ko') || (b.createdAt || '').localeCompare(a.createdAt || '')] };
@@ -12,6 +14,8 @@ const KIND = { video: ['영상', 'film'], image: ['이미지', 'image'], web: ['
 const teamOf = async () => ((await db.get('team-main')) ? 'team-main' : '');
 const meName = () => db.kvGet('name', '하진');
 const blobUrls = new Map();
+let canon = w => w;   // 올린 사람 이름을 명단 이름 하나로 ("민서"·"최민서"가 따로 나오지 않게)
+const face = (name, cls = 'span.av') => facePic(name, h(cls, { style: { background: colorFor(name || '?') } }, (name || '?').slice(-2, -1) || (name || '?')[0]));
 
 export default {
   async render(root, params) {
@@ -36,9 +40,10 @@ export default {
     async function draw() {
       clear(box);
       const [all, projects, subs] = await Promise.all([db.list('refs'), db.list('projects'), db.list('reffolders')]);
-      const people = [...new Set(all.map(r => r.by).filter(Boolean))];
+      canon = await nameCanon();
+      const people = [...new Set(all.map(r => r.by && canon(r.by)).filter(Boolean))];
       const inFolder = all.filter(r => (!F.folder || (F.folder === '_none' ? !r.project : r.project === F.folder)) && (!F.sub || r.sub === F.sub));
-      const shown = inFolder.filter(r => (!F.kind || (r.kind || 'image') === F.kind) && (!F.by || r.by === F.by) && [...F.hues].every(x => (r.hues || []).includes(x)) && [...F.moods].every(x => (r.mood || []).includes(x)) && [...F.uses].every(x => (r.uses || []).includes(x)) && (!F.q || `${r.title} ${r.memo || ''} ${(r.tags || []).join(' ')} ${r.provider || ''}`.toLowerCase().includes(F.q.toLowerCase())));
+      const shown = inFolder.filter(r => (!F.kind || (r.kind || 'image') === F.kind) && (!F.by || canon(r.by || '') === F.by) && [...F.hues].every(x => (r.hues || []).includes(x)) && [...F.moods].every(x => (r.mood || []).includes(x)) && [...F.uses].every(x => (r.uses || []).includes(x)) && (!F.q || `${r.title} ${r.memo || ''} ${(r.tags || []).join(' ')} ${r.provider || ''}`.toLowerCase().includes(F.q.toLowerCase())));
       box.append(h('div.tiles', { style: { marginBottom: '14px' } }, tile('layers', all.length, '전체 레퍼런스'), tile('film', all.filter(r => r.kind === 'video').length, '영상'), tile('image', all.filter(r => (r.kind || 'image') === 'image').length, '이미지'), tile('users', people.length, '올린 사람')));
       const layout = h('div.arch');
       // 폴더 (대분류 = 프로젝트)
@@ -55,7 +60,7 @@ export default {
       const q = h('input.in', { placeholder: '제목·태그·사이트 찾기', value: F.q, oninput: debounce(e => { F.q = e.target.value; draw().then(() => { const i = box.querySelector('.arch-q input'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }); }, 250) });
       const sw = h('div.swatches', LP.HUES.map(([n, c]) => h('button.sw' + (F.hues.has(n) ? '.on' : ''), { title: n, 'aria-label': n, style: { background: c }, onclick: () => { F.hues.has(n) ? F.hues.delete(n) : F.hues.add(n); draw(); } })));
       const moods = h('div.chips', LP.MOODS.filter(m => all.some(r => (r.mood || []).includes(m))).map(m => h('button.chip' + (F.moods.has(m) ? '.acc' : ''), { onclick: () => { F.moods.has(m) ? F.moods.delete(m) : F.moods.add(m); draw(); } }, m)));
-      const who = h('div.chips', people.map(p => h('button.chip' + (F.by === p ? '.acc' : ''), { onclick: () => { F.by = F.by === p ? '' : p; draw(); } }, h('span.av', { style: { background: colorFor(p) } }, p.slice(-2, -1) || p[0]), p)));
+      const who = h('div.chips', people.map(p => h('button.chip' + (F.by === p ? '.acc' : ''), { onclick: () => { F.by = F.by === p ? '' : p; draw(); } }, face(p), p)));
       const useList = LP.USES.map(u => u[0]).filter(u => all.some(r => (r.uses || []).includes(u)));
       const uses = h('div.chips', useList.map(m => h('button.chip' + (F.uses.has(m) ? '.acc' : ''), { onclick: () => { F.uses.has(m) ? F.uses.delete(m) : F.uses.add(m); draw(); } }, m)));
       const detailN = F.hues.size + F.moods.size + F.uses.size + (F.by ? 1 : 0);
@@ -85,13 +90,14 @@ export default {
       const el = h('div.ref', { tabindex: 0, onclick: () => open(r, src), onkeydown: e => e.key === 'Enter' && open(r, src) },
         h('div.ref-img', src ? h('img', { src, loading: 'lazy', alt: r.title || '', referrerpolicy: 'no-referrer', onerror: e => { e.target.replaceWith(h('div.ref-ph', ic(k[1], 28))); } }) : h('div.ref-ph', ic(k[1], 28)),
           r.kind === 'video' ? h('span.ref-play', ic('play', 16)) : null,
-          h('div.ref-hover', h('span.av', { style: { background: colorFor(r.by || '?') } }, (r.by || '?').slice(-2, -1) || (r.by || '?')[0]), h('div', h('b', r.by || '알 수 없음'), h('div', `${rel(db.dayOf(r.createdAt || ''))} 올림`)))),
+          h('div.ref-hover', face(r.by ? canon(r.by) : '?'), h('div', h('b', r.by ? canon(r.by) : '알 수 없음'), h('div', `${rel(db.dayOf(r.createdAt || ''))} 올림`)))),
         h('div.ref-b', h('div.ref-t', r.title || r.url), h('div.row.between', { style: { gap: '6px' } }, h('span.faint.tiny', { style: { display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 } }, ic(k[1], 12), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, r.provider || k[0])),
           r.colors?.length ? h('div.pal', r.colors.slice(0, 5).map(c => h('i', { style: { background: c }, title: c }))) : null)));
       return el;
     }
 
-    function open(r, src) {
+    async function open(r, src) {
+      const mine = await canEdit(r);   // 남이 올린 팀 자료는 올린 사람과 관리자만 고침: 눌러도 거절만 뜨는 단추는 안 보여 줌
       modal(r.title || '레퍼런스', close => {
         const okEmbed = /^https:\/\//i.test(r.embed || '');
         const media = okEmbed && r.kind === 'video' ? (/\.(mp4|webm|mov)/i.test(r.embed) ? h('video', { src: r.embed, controls: true, style: { width: '100%', borderRadius: '12px' } }) : h('div.ratio', h('iframe', { src: r.embed, allow: 'autoplay; encrypted-media; picture-in-picture', allowfullscreen: true, loading: 'lazy', referrerpolicy: 'strict-origin-when-cross-origin' })))
@@ -101,21 +107,22 @@ export default {
           h('div.row', { style: { margin: '12px 0 6px', gap: '8px', flexWrap: 'wrap' } },
             r.colors?.length ? h('div.pal.lg', r.colors.map(c => h('button', { title: c + ' 복사', style: { background: c }, onclick: async () => { try { await navigator.clipboard.writeText(c); } catch { toast('복사 권한이 없어요. 색 값: ' + c); return; } toast(c + ' 복사했어요'); } }))) : null,
             ...(r.mood || []).map(m => h('span.chip', m)), ...(r.hues || []).map(x => h('span.chip', x))),
-          h('p.faint.small', [r.by && `${r.by} 올림`, r.provider, r.project && `폴더 ${r.project}${r.sub ? ' › ' + r.sub : ''}`].filter(Boolean).join(' · ')),
+          h('p.faint.small', [r.by && `${canon(r.by)} 올림`, r.provider, r.project && `폴더 ${r.project}${r.sub ? ' › ' + r.sub : ''}`].filter(Boolean).join(' · ')),
           r.memo ? h('p.small', r.memo) : null,
+          mine ? null : h('p.faint.tiny', `고치기·지우기는 올린 사람(${canon(r.by || '')})과 관리자만 할 수 있어요.`),
           h('div.modal-f',
-            h('button.btn.ghost.danger', { onclick: async () => { if (await confirmBox('이 레퍼런스를 지울까요?', '지우기')) { await db.remove(r.id); close(); draw(); } } }, ic('trash', 14)),
-            src && !r.colors?.length ? h('button.btn', { onclick: async e => { const btn = e.currentTarget; busy(btn, true, '분석 중'); try { await db.patch(r.id, await LP.analyzeColors(src)); toast('색을 분석했어요'); close(); draw(); } catch { toast('이 이미지는 색을 못 읽었어요'); busy(btn, false); } } }, '색 분석') : null,
+            !mine ? null : h('button.btn.ghost.danger', { 'aria-label': '이 레퍼런스 지우기', onclick: async () => { if (await confirmBox('이 레퍼런스를 지울까요?', '지우기')) { await db.remove(r.id); close(); draw(); } } }, ic('trash', 14)),
+            mine && src && !r.colors?.length ? h('button.btn', { onclick: async e => { const btn = e.currentTarget; busy(btn, true, '분석 중'); try { await db.patch(r.id, await LP.analyzeColors(src)); toast('색을 분석했어요'); close(); draw(); } catch { toast('이 이미지는 색을 못 읽었어요'); busy(btn, false); } } }, '색 분석') : null,
             r.url && r.kind === 'web' ? h('button.btn', { onclick: () => { close(); pickImages([r.url], { project: r.project, sub: r.sub, memo: '' }); } }, ic('image', 14), '페이지 이미지 고르기') : null,
-            h('button.btn', { onclick: () => { close(); edit(r); } }, ic('edit', 14), '고치기'),
+            mine ? h('button.btn', { onclick: () => { close(); edit(r); } }, ic('edit', 14), '고치기') : null,
             /^https?:\/\//i.test(r.url || '') ? h('a.btn.pri', { href: r.url, target: '_blank', rel: 'noopener' }, '원본 열기') : null));
       }, { wide: true });
     }
 
     async function folderFields(cur = {}) {
       const projects = (await db.list('projects')).map(p => p.name).filter(Boolean);
-      const subs = await db.list('reffolders');
-      return [{ k: 'project', label: '폴더 (프로젝트)', type: 'select', options: [['', '분류 안 됨'], ...projects.map(p => [p, p])] },
+      const subs = await db.list('reffolders'); const g = await whoAmI();
+      return [{ k: 'project', label: '폴더 (프로젝트)', type: 'select', options: [...(g.guest && projects.length ? [] : [['', '분류 안 됨']]), ...projects.map(p => [p, p])] },
         { k: 'sub', label: '하위 폴더', type: 'select', options: [['', '없음'], ...subs.filter(s => !cur.project || s.project === cur.project).map(s => [s.name, `${s.project} › ${s.name}`])] }];
     }
     async function edit(r) {
@@ -127,12 +134,14 @@ export default {
         }));
     }
 
+    // 새로 담을 때 기본 폴더: 보던 폴더, 단기 작업자는 맡은 프로젝트
+    async function defFolder() { if (F.folder && F.folder !== '_none') return F.folder; const g = await whoAmI(); if (!g.guest) return ''; const ps = (await db.list('projects')).map(p => p.name); return g.projects.find(x => ps.includes(x)) || ps[0] || ''; }
     async function addLinks(text = '') {
       const ta = h('textarea.in', { rows: 4, placeholder: '링크를 한 줄에 하나씩 (여러 개 한 번에 돼요)' });
       ta.value = text;
-      const ff = await folderFields({ project: F.folder && F.folder !== '_none' ? F.folder : '' });
+      const def = await defFolder(); const ff = await folderFields({ project: def });
       modal('링크로 레퍼런스 추가', close => {
-        const f = form([...ff, { k: 'memo', label: '메모 (선택)', full: true }], { project: F.folder && F.folder !== '_none' ? F.folder : '', sub: F.sub }, async v => {
+        const f = form([...ff, { k: 'memo', label: '메모 (선택)', full: true }], { project: def, sub: F.sub }, async v => {
           const urls = [...new Set((ta.value.match(/https?:\/\/[^\s<>"']+|(?:www\.)[^\s<>"']+/g) || []))];
           if (!urls.length) { toast('링크를 찾지 못했어요'); return; }
           // 기다리지 않게 대기열로 넘기고 창은 바로 닫음
@@ -183,11 +192,11 @@ export default {
     }
     // 이미지 (붙여넣기·올리기·끌어놓기): 링크는 선택, 팀 저장소에 webp로 줄여 올림 (로그인 안 했으면 이 기기에만)
     async function addImages(files, link = '') {
-      const ff = await folderFields({ project: F.folder && F.folder !== '_none' ? F.folder : '' });
+      const def = await defFolder(); const ff = await folderFields({ project: def });
       const urls = files.map(f => URL.createObjectURL(f));
       modal(files.length > 1 ? `이미지 ${files.length}장 담기` : '이미지 담기', close => {
         const f = form([{ k: 'title', label: '제목 (비우면 파일 이름)', full: true, req: false }, { k: 'url', label: '원본 링크 (선택)', type: 'url', full: true, default: link }, ...ff, { k: 'memo', label: '메모 (선택)', full: true }],
-          { project: F.folder && F.folder !== '_none' ? F.folder : '', sub: F.sub, url: link }, async v => {
+          { project: def, sub: F.sub, url: link }, async v => {
             const by = await meName(), team = await teamOf();
             const sync = await import('../js/sync.js'); const Q = await import('../js/queue.js');
             close(); toast(`${files.length}장을 대기열에 넣었어요. 올리는 동안 다른 걸 해도 돼요`);

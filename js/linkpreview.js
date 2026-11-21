@@ -19,6 +19,16 @@ async function getJSON(url, ms = 8000) {
   try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error(r.status); return await r.json(); } finally { clearTimeout(t); }
 }
 
+// 제목을 못 읽었을 때(오프라인·막힌 사이트): 사이트 이름만 쓰면 같은 사이트 링크가 전부 같은 이름이 되니 주소 끝말을 붙임
+export function nameFromUrl(url, provider = '') {
+  try {
+    const u = new URL(url); const site = provider || u.hostname.replace(/^www\./, '');
+    if (ytId(url)) return site;
+    let seg = u.pathname.split('/').filter(Boolean).pop() || ''; try { seg = decodeURIComponent(seg); } catch { }
+    seg = seg.replace(/\.\w{2,5}$/, '').replace(/[-_+]+/g, ' ').trim();
+    return seg.length > 3 && !/^(watch|index|view|video|reel|post|share|detail)$/i.test(seg) && !/^\d+$/.test(seg) ? `${site} · ${seg}`.slice(0, 80) : site;
+  } catch { return provider || url; }
+}
 export async function preview(url) {
   url = String(url || '').trim();
   if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
@@ -48,7 +58,7 @@ export async function preview(url) {
       if (d.video?.url && out.kind === 'web') out.kind = 'video';
     } catch { }
   }
-  out.title ||= out.provider || url;
+  out.title ||= nameFromUrl(url, out.provider);
   return out;
 }
 
