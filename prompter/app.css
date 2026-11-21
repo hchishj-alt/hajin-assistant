@@ -402,3 +402,11 @@ html[lang=ko] .onlyfx{display:none}
 .betaline{display:inline-flex;align-items:center;gap:6px;margin:10px auto 0;padding:6px 12px;border-radius:999px;background:var(--accbg);color:var(--acc);font-size:13px;font-weight:750}
 .hero .betaline{display:flex;width:max-content;max-width:100%}
 .notice.beta{background:var(--accbg);color:var(--acc)}
+
+/* 메일로 가입·로그인 */
+.hid { display: none !important; }
+.acct .row + .row { margin-top: 8px; }
+.acct .mailv { font-weight: 700; font-size: 15px; word-break: break-all; margin-top: 2px; }
+.acct #codeRow input { letter-spacing: .2em; font-variant-numeric: tabular-nums; }
+.acct #codeRow:not(.hid) { animation: acctIn .32s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes acctIn { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }

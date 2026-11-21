@@ -98,7 +98,7 @@ begin
   update pr_customers set last_seen = now() where token = upper(trim(coalesce(p_token, ''))) returning * into c;
   if c.token is null then return null; end if;
   select * into b from pr_billing where token = c.token;
-  return json_build_object('token', c.token, 'paid_until', c.paid_until, 'active', coalesce(c.paid_until > now(), false),
+  return json_build_object('token', c.token, 'email', c.email, 'paid_until', c.paid_until, 'active', coalesce(c.paid_until > now(), false),
     'card', case when b.token is null then null else json_build_object('label', b.card_label, 'status', b.status, 'next_at', b.next_at, 'amount', b.amount) end,
     'history', (select coalesce(json_agg(x order by x.created_at desc), '[]') from (
       select method, amount, currency, status, days, created_at from pr_payments where token = c.token order by created_at desc limit 24) x));
@@ -235,10 +235,40 @@ language sql stable security definer set search_path = public as $$
   select b.token, b.billing_key, b.amount from pr_billing b where b.status = 'active' and b.next_at <= now() order by b.next_at limit 200;
 $$;
 
+-- ── 메일로 가입·로그인 (11/21 하진 "메일로 가입하기") ──
+-- Supabase Auth 메일 코드(OTP)로 로그인한 사람(auth.uid())을 손님 한 명(token)에 묶음. 묶고 나면 어느 기기든 메일 코드로 같은 구독을 불러옴.
+alter table public.pr_customers add column if not exists uid uuid unique;
+alter table public.pr_customers add column if not exists email text;
+
+create or replace function public.pr_link(p_token text)
+returns json language plpgsql volatile security definer set search_path = public as $$
+declare v_uid uuid := auth.uid(); v_mail text := lower(coalesce(auth.jwt()->>'email', '')); a pr_customers; b pr_customers; v_new text;
+begin
+  if v_uid is null then raise exception 'login'; end if;
+  select * into a from pr_customers where uid = v_uid;
+  select * into b from pr_customers where token = upper(trim(coalesce(p_token, ''))) and uid is null;
+  if a.token is null then
+    if b.token is null then v_new := pr_join()->>'token'; select * into b from pr_customers where token = v_new; end if;
+    update pr_customers set uid = v_uid, email = v_mail where token = b.token;
+    return pr_me(b.token);
+  end if;
+  update pr_customers set email = v_mail where token = a.token;
+  -- 이 기기에 따로 연 기간(기프트 키 등)이 있으면 계정 쪽으로 합침
+  if b.token is not null and b.token <> a.token then
+    update pr_customers set paid_until = case when a.paid_until is null then b.paid_until when b.paid_until is null then a.paid_until else greatest(a.paid_until, b.paid_until) end where token = a.token;
+    update pr_payments set token = a.token where token = b.token;
+    insert into pr_gift_uses(key, token, used_at) select key, a.token, used_at from pr_gift_uses where token = b.token on conflict do nothing;
+    if not exists (select 1 from pr_billing where token = a.token) then update pr_billing set token = a.token where token = b.token; end if;
+    delete from pr_customers where token = b.token;
+  end if;
+  return pr_me(a.token);
+end $$;
+
 -- 권한: 손님·관리 함수만 공개, 결제 반영 함수는 service_role 전용
 revoke all on function public.pr_extend(text, int), public.pr_ok(text), public.pr_join(), public.pr_me(text), public.pr_card_cancel(text), public.pr_redeem(text, text),
   public.pr_admin(text), public.pr_admin_grant(text, text, int), public.pr_admin_gift_make(text, int, int, int, text, timestamptz), public.pr_admin_gifts(text), public.pr_admin_gift_del(text, text),
-  public.pr_card_paid(text, text, int, int, text, text), public.pr_card_failed(text, text, text), public.pr_card_due() from public, anon, authenticated;
+  public.pr_card_paid(text, text, int, int, text, text), public.pr_card_failed(text, text, text), public.pr_card_due(), public.pr_link(text) from public, anon, authenticated;
+grant execute on function public.pr_link(text) to authenticated;
 grant execute on function public.pr_join(), public.pr_me(text), public.pr_card_cancel(text), public.pr_redeem(text, text),
   public.pr_admin(text), public.pr_admin_grant(text, text, int), public.pr_admin_gift_make(text, int, int, int, text, timestamptz), public.pr_admin_gifts(text), public.pr_admin_gift_del(text, text) to anon, authenticated;
 grant execute on function public.pr_card_paid(text, text, int, int, text, text), public.pr_card_failed(text, text, text), public.pr_card_due() to service_role;

@@ -57,3 +57,13 @@
 - 사업자 정보(상호·대표·사업자등록번호·통신판매업·주소)는 `prompter/config.js`의 `BIZ`만 채우면 소개·구독 화면 아래에 나온다. 상호나 등록번호가 비면 줄 전체가 안 나온다.
 - 정기결제 고지(금액·주기·해지·7일 환불·약관 동의)는 `plan.js`의 `subNote`. 카드 결제가 열릴 때(`cardReady()`) 구독 단추 아래에 나온다.
 - 공유 미리보기 `prompter/og.png`(1200×630), 주소는 `config.js SITE`와 `index.html`의 og·canonical.
+
+## 메일로 가입·로그인 (1.6.0, 11/21)
+- 비밀번호 없이 Supabase Auth **메일 코드(OTP)**. 홈 화면 앱은 브라우저와 저장소가 따로라 링크 대신 코드를 넣게 함.
+- 앱: `prompter/plan.js` sendCode / verifyCode → `pr_link(p_token)`(로그인 JWT로 호출). 구독 관리 화면 '메일로 가입 · 로그인' 칸.
+- 서버: `pr_customers.uid·email`, `pr_link`. 이 기기 구독을 메일 계정에 묶고, 이미 묶인 계정이면 이 기기에 따로 연 기간·기록을 합침.
+- Supabase 대시보드에서 할 것:
+  1. SQL Editor에서 `supabase/prompter.sql` 전체 실행.
+  2. Authentication › Email Templates › **Magic Link** 본문에 `{{ .Token }}` 넣기 (예: `<h2>프롬프리에딧 로그인 코드</h2><p style="font-size:28px;letter-spacing:6px"><b>{{ .Token }}</b></p><p>10분 안에 앱에 넣어 주세요.</p>`). 이게 있어야 링크 대신 숫자 코드가 감.
+  3. Authentication › SMTP Settings에 바깥 메일 발송 연결(예: Brevo 무료 하루 300통). Supabase 기본 메일은 프로젝트 팀원 주소로만 가고 시간당 몇 통 제한이 있음.
+  4. Authentication › URL Configuration의 Site URL을 실제 주소로.
