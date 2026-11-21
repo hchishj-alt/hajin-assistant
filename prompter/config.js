@@ -39,4 +39,4 @@ export const BIZ = {
 };
 
 // 출시 베타: 카드 결제가 열리기 전(cardReady()가 거짓)에는 누구나 프로로 쓰게 할지. 카드가 열리면 저절로 꺼진다.
-export const BETA = false;
+export const BETA = true;
