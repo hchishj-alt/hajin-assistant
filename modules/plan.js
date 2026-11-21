@@ -84,7 +84,7 @@ export default {
       }
     }
     function newProject(p = {}) {
-      modal(p.id ? '프로젝트 고치기' : '새 프로젝트', close => form([{ k: 'name', label: '이름' }, { k: 'status', label: '상태', type: 'select', options: ['진행', '준비', '보류', '완료'] }, { k: 'color', label: '색', type: 'color', default: '#4b5bff' }, { k: 'desc', label: '설명', type: 'textarea', rows: 2 }], p, async v => { const nm = String(v.name || '').trim(); if (!nm) { toast('프로젝트 이름을 적어 주세요'); return; }
+      modal(p.id ? '프로젝트 고치기' : '새 프로젝트', close => form([{ k: 'name', label: '이름' }, { k: 'status', label: '상태', type: 'select', options: ['진행', '준비', '보류', '완료'] }, { k: 'color', label: '색', type: 'color', default: '#2f6fdd' }, { k: 'desc', label: '설명', type: 'textarea', rows: 2 }], p, async v => { const nm = String(v.name || '').trim(); if (!nm) { toast('프로젝트 이름을 적어 주세요'); return; }
         if ((await db.list('projects')).some(x => x.id !== p.id && x.name === nm)) { toast(`“${nm}” 프로젝트는 이미 있어요`); return; }
         if (p.id && p.name && p.name !== nm) { const r = await store.renameProject(p.id, nm); await db.put('projects', { ...(await db.get(p.id)), ...v, name: nm }); const g = r.guests || [], todo = Array.isArray(g) ? [] : (g.todo || []); if (projF === r.old) projF = nm; toast(todo.length ? `이름을 바꿨어요. 단기 작업자 ${todo.join(', ')} 님에게 맡긴 프로젝트는 관리자 › 멤버에서 다시 골라 주세요.` : r.n ? `이름을 바꾸고, 묶여 있던 ${r.n}개도 옮겼어요` : '이름을 바꿨어요'); }
         else await db.put('projects', { ...p, ...v, name: nm });

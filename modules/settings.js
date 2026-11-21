@@ -11,7 +11,7 @@ export default {
   async render(root, params) {
     const name = await db.kvGet('name', '하진');
     const theme = await db.kvGet('theme', 'auto');
-    const accent = await db.kvGet('accent', '#4b5bff');
+    const accent = await db.kvGet('accent', '#2f6fdd');
     const est = await navigator.storage?.estimate?.().catch(() => null);
     const persisted = await navigator.storage?.persisted?.().catch(() => false);
     root.append(head('설정', `하진 비서 v${VERSION}`));
@@ -99,7 +99,7 @@ async function profileSection(sec, nameIn, localName) {
     const pic = facePic(who, h('span.avatar', { style: { background: col, width: '64px', height: '64px', fontSize: '24px' } }, (who || '?').slice(who && who.length > 2 ? 1 : 0, who && who.length > 2 ? 2 : 1)));
     const pick = h('button.btn.sm', { type: 'button', onclick: async () => { const file = await pickFile('image/*'); if (!file) return; busy(pick, true, '올리는 중'); try { await save({ avatar: await shrink(file) }); } catch (e) { toast(e.message || '사진을 넣지 못했어요'); } finally { busy(pick, false); } } }, ic('image', 14), f.avatar ? '사진 바꾸기' : '사진 넣기');
     const drop = f.avatar ? h('button.btn.sm.ghost', { type: 'button', onclick: () => save({ avatar: '' }) }, '사진 빼기') : null;
-    const custom = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(col) ? col : '#4b5bff', 'aria-label': '다른 색 고르기', style: { width: '44px', height: '44px', padding: '0', border: '0', background: 'none' }, onchange: () => save({ color: custom.value }) });
+    const custom = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(col) ? col : '#2f6fdd', 'aria-label': '다른 색 고르기', style: { width: '44px', height: '44px', padding: '0', border: '0', background: 'none' }, onchange: () => save({ color: custom.value }) });
     box.replaceChildren(
       h('div.row.nowrap', { style: { gap: '14px', alignItems: 'center', marginBottom: '12px' } }, pic,
         h('div.grow', h('div', h('b', who || '이름 없음'), meM && meM.role ? h('span.chip', { style: { marginLeft: '6px' } }, meM.role) : null),

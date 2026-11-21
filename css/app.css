@@ -1,28 +1,28 @@
 :root{
-  --bg:#f6f5f2; --bg2:#efede8; --card:#ffffff; --line:#e4e1da; --line2:#d6d2c9;
-  --ink:#17181b; --ink2:#55575e; --ink3:#8b8d94;
-  --acc:#4b5bff; --acc-ink:#fff; --acc-soft:#e8eaff;
+  --bg:#f3f4f6; --bg2:#e9ebee; --card:#ffffff; --line:#e6e8eb; --line2:#d5d9de;
+  --ink:#1b1d22; --ink2:#565a63; --ink3:#8a8e97;
+  --acc:#2f6fdd; --acc-ink:#fff; --acc-soft:#e6eefb;
   --ok:#1f9d6b; --ok-soft:#e1f5ec; --warn:#c77700; --warn-soft:#fdf0d9; --bad:#d6453d; --bad-soft:#fde6e4;
-  --c1:#4b5bff; --c2:#ff7a59; --c3:#1fae84; --c4:#e3a008; --c5:#b05cff; --c6:#14a3c7;
-  --r:calc(14px*var(--rd,1)); --r2:calc(10px*var(--rd,1)); --sh:0 1px 2px rgba(20,20,30,.04),0 4px 16px rgba(20,20,30,.05);
+  --c1:#2f6fdd; --c2:#ef6b45; --c3:#1a9d78; --c4:#d49400; --c5:#8d6e55; --c6:#1397b5;
+  --r:calc(14px*var(--rd,1)); --r2:calc(10px*var(--rd,1)); --sh:0 1px 2px rgba(20,24,32,.05);
   --nav:232px; --font:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
   color-scheme:light;
 }
 :root[data-theme="dark"]{
-  --bg:#0f1115; --bg2:#161920; --card:#1a1d24; --line:#272b34; --line2:#343945;
+  --bg:#111214; --bg2:#17181c; --card:#1c1d21; --line:#272b34; --line2:#343945;
   --ink:#eceef3; --ink2:#a9adb8; --ink3:#727684;
-  --acc:#7c88ff; --acc-ink:#0f1115; --acc-soft:#232848;
+  --acc:#6b9cf2; --acc-ink:#0f1115; --acc-soft:#1c2a44;
   --ok:#3fcf98; --ok-soft:#173327; --warn:#f0b44c; --warn-soft:#3a2c14; --bad:#ff7a70; --bad-soft:#3d1c1a;
-  --sh:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
+  --sh:0 1px 2px rgba(0,0,0,.3);
   color-scheme:dark;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0f1115; --bg2:#161920; --card:#1a1d24; --line:#272b34; --line2:#343945;
+    --bg:#111214; --bg2:#17181c; --card:#1c1d21; --line:#272b34; --line2:#343945;
     --ink:#eceef3; --ink2:#a9adb8; --ink3:#727684;
-    --acc:#7c88ff; --acc-ink:#0f1115; --acc-soft:#232848;
+    --acc:#6b9cf2; --acc-ink:#0f1115; --acc-soft:#1c2a44;
     --ok:#3fcf98; --ok-soft:#173327; --warn:#f0b44c; --warn-soft:#3a2c14; --bad:#ff7a70; --bad-soft:#3d1c1a;
-    --sh:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
+    --sh:0 1px 2px rgba(0,0,0,.3);
     color-scheme:dark;
   }
 }
@@ -1210,3 +1210,101 @@ button.role-tag{border:0;cursor:pointer;min-height:44px;display:inline-flex;alig
 @media (max-width:560px){.exp-li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:10px;row-gap:4px;align-items:center}.exp-li>.ti{display:none!important}.exp-li>input{grid-column:1;grid-row:1/3}.exp-li>.grow{grid-column:2;grid-row:1/3}.exp-li>.exp-amt{grid-column:3;grid-row:1;min-width:0!important;justify-self:end;align-self:end}.exp-li>.exp-st{grid-column:3;grid-row:2;justify-self:end;align-self:start}}
 .ps-more{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;border-radius:calc(12px*var(--rd,1));background:var(--bg2);font-size:calc(13px*var(--fs,1));color:var(--ink2)}
 .music-info{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:8px 10px;border-radius:calc(10px*var(--rd,1));background:var(--bg2);font-size:calc(13px*var(--fs,1));color:var(--ink2);min-height:44px}.music-info .cut-line{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ══ v1.51 기본 모양 다시 잡기 ══
+   회색 바탕에 흰 묶음, 강조색 하나, 평평한 단추, 큰 숫자와 작은 회색 설명.
+   번지는 색 그림자·반짝이·알약 모양·색 칠한 아이콘 칸처럼 "AI가 만든 티"가 나는 꾸밈은 기본에서 뺌.
+   (꾸미기에서 선·그림자를 고른 사람은 --card-line / --sh 로 그대로 따라감) */
+.card,.tile,.quick{border-color:var(--card-line,transparent);box-shadow:none}
+.card{border-radius:calc(16px*var(--rd,1))}
+.tile{border-radius:calc(16px*var(--rd,1));padding:14px 16px}
+.tile .ti{background:none!important;width:auto;height:auto;margin-bottom:6px;justify-content:flex-start;place-items:center start;color:var(--ink3)}
+.tile.ok .ti{color:var(--ok)}.tile.warn .ti{color:var(--warn)}.tile.bad .ti{color:var(--bad)}
+.tile .tn{font-weight:700;letter-spacing:-.02em}
+.tile.bad .tn{color:var(--bad)}
+.card.click:hover{transform:none;box-shadow:none;background:color-mix(in srgb,var(--card) 96%,var(--ink))}
+h1{font-weight:700;letter-spacing:-.02em}h2,h3{font-weight:700}
+.btn{border-color:transparent;background:color-mix(in srgb,var(--ink) 6%,transparent);font-weight:600}
+.btn:hover{background:color-mix(in srgb,var(--ink) 10%,transparent)}
+.btn.pri{background:var(--acc);border-color:var(--acc);box-shadow:none;font-weight:600}
+.btn.pri:hover{background:var(--acc);filter:brightness(.94)}
+.btn.ghost{background:transparent}.btn.ghost:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.btn.rec{background:var(--bad);border-color:var(--bad)}
+.chip{border-radius:calc(7px*var(--rd,1));padding:2px 7px;font-weight:600}
+.in:focus,.quick:focus-within,.composer .box:focus-within{box-shadow:none;border-color:var(--acc)}
+.quick{border-radius:calc(14px*var(--rd,1))}
+.li{min-height:52px}
+.li.click{border-radius:0;margin:0 -8px;padding-left:12px;padding-right:12px}
+.li.click:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+.li .t{font-weight:600}
+.seg{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.modal{box-shadow:0 12px 40px rgba(0,0,0,.18)}
+.fb-q{display:none}
+.fb-b{width:30px;height:30px;border:0;border-radius:calc(8px*var(--rd,1));color:var(--ink3)}
+.fb-b.on{background:var(--acc-soft);color:var(--acc)}
+.fb-t{color:var(--ink3);font-weight:500;text-decoration:underline;text-underline-offset:3px}
+.draft{border:0;background:color-mix(in srgb,var(--ink) 4%,transparent);border-radius:calc(12px*var(--rd,1))}
+.draft .k{background:none;width:auto;height:auto;color:var(--ink2);margin-top:2px}
+.draft[data-kind="task"] .k{background:none;color:var(--ink2)}
+.draft.done{background:var(--ok-soft)}
+.bubble{border-radius:calc(16px*var(--rd,1))}
+.bubble.bot{border-color:var(--card-line,transparent)}
+.composer .box{border-color:var(--line2);box-shadow:none;border-radius:calc(16px*var(--rd,1))}
+.suggest .chip,.role-row .chip{border:0;border-radius:calc(10px*var(--rd,1));background:var(--card)}
+.role-row .chip.go,.role-row .role-tag{border-radius:calc(8px*var(--rd,1))}
+@media (max-width:900px){
+  #tabbar{background:var(--card);backdrop-filter:none;-webkit-backdrop-filter:none;border-top-color:var(--line)}
+  #tabbar a.center .tabic{width:auto;height:22px;margin-top:0;background:none;color:inherit;box-shadow:none;border-radius:0}
+  #tabbar a.center{color:var(--ink3)}#tabbar a.center.on{color:var(--acc)}
+  /* 아래에서 올라오는 창: 주요 단추는 아래에 넓게 */
+  .modal .modal-f .btn.pri{flex:1 1 auto;min-height:50px;font-size:calc(16px*var(--fs,1));border-radius:calc(14px*var(--rd,1))}
+  .modal .modal-f .btn:not(.pri){min-height:50px;border-radius:calc(14px*var(--rd,1))}
+}
+/* 단추: 회색 바탕 위에서는 흰색, 흰 묶음(카드·창·말풍선) 안에서는 옅은 회색 */
+.btn{background:var(--card)}
+.btn:hover{background:color-mix(in srgb,var(--card) 94%,var(--ink))}
+.card .btn,.modal .btn,.tile .btn,.quick .btn,.bubble .btn,.aisheet .btn,.draft .btn{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.card .btn:hover,.modal .btn:hover,.bubble .btn:hover,.aisheet .btn:hover,.draft .btn:hover{background:color-mix(in srgb,var(--ink) 10%,transparent)}
+.btn.pri,.card .btn.pri,.modal .btn.pri,.tile .btn.pri,.quick .btn.pri,.bubble .btn.pri,.aisheet .btn.pri,.draft .btn.pri{background:var(--acc)}
+.btn.ghost,.card .btn.ghost,.modal .btn.ghost,.tile .btn.ghost,.quick .btn.ghost,.bubble .btn.ghost,.aisheet .btn.ghost,.draft .btn.ghost{background:transparent}
+.btn.ghost:hover,.card .btn.ghost:hover,.modal .btn.ghost:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.btn.rec,.card .btn.rec,.modal .btn.rec{background:var(--bad)}
+button.chip,select.chip{border:0;font-family:inherit}
+select.chip{background:var(--card);border-radius:calc(10px*var(--rd,1));padding:6px 10px;color:var(--ink2);font-weight:600}
+/* 일정/할 일 바꿔 보기: 선 두른 카드 둘 대신 넓은 전환 단추 하나 */
+.kindpair{gap:4px;padding:4px;border-radius:calc(16px*var(--rd,1));background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.kindpair a{border:0;background:transparent;border-radius:calc(12px*var(--rd,1));min-height:52px}
+.kindpair a.ev.on,.kindpair a.tk.on{background:var(--card);border:0}
+.kindpair a.tk.on .ic,.kindpair a.tk.on b{color:var(--acc)}
+#ai-fab,.rdw-fab{box-shadow:0 4px 14px rgba(20,24,32,.16)}
+#ai-fab:hover,.rdw-fab:hover{transform:scale(1.03)}
+@media (max-width:900px){
+  .tile{padding:14px 10px}
+  #tabbar a.center .tabic{display:inline-block}
+}
+
+
+/* 세 번째 손질: 메뉴·라벨·고르기 칸·점선 */
+@media (max-width:900px){#tabbar a.center .tabic{height:auto}}
+.menu-grid a,.menu-pick{border-color:var(--card-line,transparent);border-style:solid}
+.menu-more{border:0;background:color-mix(in srgb,var(--ink) 5%,transparent)}
+.lab{border:0;border-radius:calc(10px*var(--rd,1));background:var(--card);padding:6px 11px 6px 9px}
+.lab.on{background:color-mix(in srgb,var(--lc) 18%,var(--card));color:var(--ink)}
+.in,select.in,textarea.in{border-color:var(--line)}
+#view>select.in,#view .row>select.in,.page-h select.in{border-color:transparent}
+.card .in,.modal .in,.tile .in{background:color-mix(in srgb,var(--ink) 4%,var(--card));border-color:transparent}
+.card .in:focus,.modal .in:focus,.tile .in:focus{background:var(--card);border-color:var(--acc)}
+.talk-ai{border:0;background:color-mix(in srgb,var(--ink) 5%,transparent)}
+.fb,.arch-detail,.vd-p{border-top-style:solid}
+.card .lab,.modal .lab,.tile .lab{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.card .lab.on,.modal .lab.on{background:color-mix(in srgb,var(--lc) 18%,var(--card))}
+:root{--on-bg:var(--card)}
+:root[data-theme="dark"]{--on-bg:color-mix(in srgb,var(--ink) 13%,var(--card))}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--on-bg:color-mix(in srgb,var(--ink) 13%,var(--card))}}
+.seg button.on,.kindpair a.ev.on,.kindpair a.tk.on{background:var(--on-bg)}
+.in:focus-visible{outline:none}
+.draft{background:var(--card)}
+.card .draft,.bubble .draft,.modal .draft,.aisheet .draft{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+@media (max-width:900px){.chatpage .composer{box-shadow:none}}
+.talk-list,.talk-pane,.ref{border-color:var(--card-line,transparent);box-shadow:none}
+.look-row .seg{grid-template-columns:repeat(auto-fit,minmax(72px,1fr))}

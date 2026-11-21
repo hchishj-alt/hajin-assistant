@@ -16,7 +16,7 @@ export default {
   async render(root, params, opts) {
     const sheet = (opts && opts.sheet) || null;   /* 다른 화면 위에 띄운 비서 창이면: 그 화면에 맞는 말, 화면 이름 */
     const list = h('div.chat');
-    const ta = h('textarea', { rows: 1, placeholder: sheet ? '말하거나 적어 주세요' : '무엇이든 말하거나 적어 주세요. 여러 줄이면 하나씩 처리해요.', 'aria-label': '비서에게 입력' });
+    const ta = h('textarea', { rows: 1, placeholder: sheet ? '말하거나 적어 주세요' : '무엇이든 말하거나 적어 주세요', 'aria-label': '비서에게 입력' });
     const preview = h('div.chips', { style: { minHeight: '22px', padding: '0 4px 6px' } });
     const micBtn = h('button.btn.icon.ghost', { title: '말로 입력', 'aria-label': '말로 입력', onclick: () => toggleMic() }, ic('mic', 20));
     const sendBtn = h('button.btn.pri.icon', { 'aria-label': '보내기', onclick: () => send() }, ic('right', 20));
@@ -70,7 +70,7 @@ export default {
 
     // 이 기기에 AI가 연결됐는지 한눈에 (연결은 기기마다 따로라서, 폰에서는 안 돼 있을 수 있음)
     const drawAiBar = () => import('../js/ai.js').then(async AI => { clear(aiBar); if (await AI.enabled()) aiBar.append(h('span.chip.ok', { title: '말 읽기·질문 답하기·요약을 Gemini가 해요' }, ic('sparkles', 12), 'AI 연결됨'));
-      else aiBar.append(h('button.chip.warn', { style: { minHeight: '36px' }, onclick: async () => { if (await AI.keyed()) { await db.kvSet('ai:on', true); toast('AI를 켰어요'); drawAiBar(); } else (await import('../js/keyshare.js')).guide(drawAiBar); } }, ic('sparkles', 12), (await AI.keyed()) ? 'AI가 꺼져 있어요 · 켜기' : '이 기기는 AI 미연결 (앱 규칙으로만 읽는 중) · 연결하기')); }).catch(() => { });
+      else aiBar.append(h('button.chip.warn', { style: { minHeight: '36px' }, title: '지금은 앱 규칙으로만 읽고 있어요. 연결하면 긴 글 요약과 질문 답하기가 돼요', onclick: async () => { if (await AI.keyed()) { await db.kvSet('ai:on', true); toast('AI를 켰어요'); drawAiBar(); } else (await import('../js/keyshare.js')).guide(drawAiBar); } }, ic('sparkles', 12), (await AI.keyed()) ? 'AI 꺼짐 · 켜기' : 'AI 연결 안 됨 · 연결하기')); }).catch(() => { });
     drawAiBar(); window.removeEventListener('hajin:ai-key', onAiKey); onAiKey = drawAiBar; window.addEventListener('hajin:ai-key', onAiKey);
     // 기존 대화
     const msgs = (await db.list('chat')).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-60);

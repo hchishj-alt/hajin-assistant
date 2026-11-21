@@ -68,6 +68,8 @@ export async function apply(c, set, root = document.documentElement) {
   if (L.line === 'strong') { set('--line', mix(c.bg, c.ink, c.dark ? .34 : .3)); set('--line2', mix(c.bg, c.ink, c.dark ? .46 : .42)); }
   else if (L.line === 'acc') { set('--line', mix(c.bg, c.acc, .42)); set('--line2', mix(c.bg, c.acc, .6)); }
   else { unset('--line'); unset('--line2'); }
+  /* 기본은 선 없는 흰 묶음. 선을 또렷하게·포인트 색으로 골랐거나 굵게 했으면 카드에도 선을 그림 */
+  if (L.line !== 'soft' || bw > 1) set('--card-line', 'var(--line)'); else unset('--card-line');
   if (L.shadow === 'none') set('--sh', 'none'); else if (L.shadow === 'deep') set('--sh', c.dark ? '0 2px 4px rgba(0,0,0,.4),0 14px 36px rgba(0,0,0,.45)' : '0 2px 4px rgba(20,20,30,.06),0 14px 36px rgba(20,20,30,.13)'); else unset('--sh');
   set('--iw', String(clamp(L.iw, 1.4, 2.5)));
   root.dataset.density = L.density; root.dataset.motion = L.motion;

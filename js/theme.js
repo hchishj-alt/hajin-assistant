@@ -2,7 +2,8 @@
 import * as db from './db.js';
 
 export const PALETTES = {
-  sky: { name: '하늘', note: '기본 · 크림과 인디고', light: ['#f6f5f2', '#ffffff', '#17181b', '#4b5bff'], dark: ['#0f1115', '#1a1d24', '#eceef3', '#7c88ff'] },
+  sky: { name: '기본', note: '회색 바탕과 파랑', light: ['#f3f4f6', '#ffffff', '#1b1d22', '#2f6fdd'], dark: ['#111214', '#1c1d21', '#ecedf0', '#6b9cf2'] },
+  indigo: { name: '인디고', note: '예전 기본 · 크림과 인디고', light: ['#f6f5f2', '#ffffff', '#17181b', '#4b5bff'], dark: ['#0f1115', '#1a1d24', '#eceef3', '#7c88ff'] },
   peach: { name: '복숭아', note: '따뜻하고 말랑', light: ['#fbf3ee', '#fffaf7', '#2a1d1a', '#e2532f'], dark: ['#1a1312', '#241b19', '#f5e9e4', '#ff9a7d'] },
   mint: { name: '민트', note: '맑고 편안', light: ['#eff6f2', '#fbfefc', '#14231c', '#12976b'], dark: ['#0e1512', '#161f1b', '#e3f1ea', '#4fd6a4'] },
   lavender: { name: '라벤더', note: '차분한 보라', light: ['#f4f1fa', '#fdfcff', '#1e1830', '#7b5cf0'], dark: ['#131019', '#1c1826', '#ece7f7', '#a995ff'] },

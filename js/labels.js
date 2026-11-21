@@ -2,7 +2,7 @@
 import * as db from './db.js';
 export const DEFAULTS = [
   { id: 'urgent', name: '긴급', color: '#e5484d' }, { id: 'important', name: '중요', color: '#f59e0b' },
-  { id: 'normal', name: '보통', color: '#4b5bff' }, { id: 'easy', name: '여유', color: '#12976b' }, { id: 'idea', name: '아이디어', color: '#b05cff' }];
+  { id: 'normal', name: '보통', color: '#2f6fdd' }, { id: 'easy', name: '여유', color: '#12976b' }, { id: 'idea', name: '아이디어', color: '#b05cff' }];
 let cache = DEFAULTS;
 export async function load() { const d = await db.get('labels-main'); cache = d && !d.deleted && d.list?.length ? d.list : DEFAULTS; return cache; }
 export const all = () => cache;

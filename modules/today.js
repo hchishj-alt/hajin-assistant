@@ -54,7 +54,7 @@ export default {
 
     const hdr = h('div.page-head', h('div',
       h('p.faint.small', fmtDate(now, { year: true })),
-      h('h1', name ? `${hi}, ${name}님` : hi),
+      h('h1', (name ? `${name}님, ` : '') + (todays.length ? `오늘 할 일 ${todays.length}개 남았어요` : events.length ? `오늘 일정 ${events.length}개 있어요` : hi)),   /* 인사말보다 오늘 무엇이 남았는지를 큰 글씨로 */
       h('p.sub', brain.briefing({ events, tasks: open, drafts: drafts.length, people: reach }))),
       h('div.row', h('a.btn.sm.only-wide', { href: '#/assistant' }, ic('sparkles', 14), '비서'), h('a.btn.sm', { href: '#/meetings/new' }, ic('mic', 14), '회의 녹음'), h('button.btn.sm', { type: 'button', 'aria-label': '알림 설정', onclick: async () => (await import('../js/alarmui.js')).open() }, ic('bell', 14), '알림')));
 

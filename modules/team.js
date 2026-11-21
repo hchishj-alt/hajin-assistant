@@ -41,7 +41,7 @@ export default {
     }
     root.append(g);
 
-    async function editTeam(t = { members: [], color: '#4b5bff' }) {
+    async function editTeam(t = { members: [], color: '#2f6fdd' }) {
       const cs = (await db.list('contacts')).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
       const sel = new Set(t.members || []);
       const list = h('div', { style: { maxHeight: '260px', overflow: 'auto', border: '1px solid var(--line)', borderRadius: '10px', padding: '4px 8px' } }, cs.length ? cs.map(c => h('label.li.chk', h('input', { type: 'checkbox', checked: sel.has(c.id), onchange: e => e.target.checked ? sel.add(c.id) : sel.delete(c.id) }), avatar(c, 26), h('span.small', c.name), h('span.faint.tiny', c.org || ''))) : h('p.faint.small', '인맥에 먼저 사람을 추가해 주세요'));
