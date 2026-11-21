@@ -18,8 +18,8 @@ const ls = {
   del(k) { try { localStorage.removeItem(k); } catch {} },
 };
 
-export async function rpc(fn, args = {}) {
-  const r = await fetch(`${SB.url}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: SB.key, authorization: 'Bearer ' + SB.key, 'content-type': 'application/json' }, body: JSON.stringify(args), signal: AbortSignal.timeout?.(8000) });
+export async function rpc(fn, args = {}, jwt = null) {
+  const r = await fetch(`${SB.url}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: SB.key, authorization: 'Bearer ' + (jwt || SB.key), 'content-type': 'application/json' }, body: JSON.stringify(args), signal: AbortSignal.timeout?.(8000) });
   const txt = await r.text();
   if (!r.ok) { let m = txt; try { m = JSON.parse(txt).message || txt; } catch {} throw new Error(m); }
   return txt ? JSON.parse(txt) : null;
@@ -104,10 +104,78 @@ async function subscribe(btn) {
 
 function celebrate(msg = '프로가 열렸어요') {
   buzz([15, 40, 15]);
-  const box = el(`<div class="c"><div class="upic big">${ic('check', 34)}</div><h2>${msg}</h2><p class="muted">${isForever(me?.paid_until) ? '평생 쓸 수 있어요' : ymd(me?.paid_until) + '까지 쓸 수 있어요'}</p>${token() ? `<div class="keep"><small>${ic('key', 14)}복구 코드 · 폰을 바꾸면 이걸로 구독을 되찾아요</small><div class="code noi18n">${group4(token())}</div><button class="ghost sm" data-cp>${ic('copy', 16)}복사해 두기</button></div>` : ''}<button class="btn wide" data-x>좋아요</button></div>`);
-  const sh = sheet(box); $('[data-x]', box).onclick = sh.close;
+  const box = el(`<div class="c"><div class="upic big">${ic('check', 34)}</div><h2>${msg}</h2><p class="muted">${isForever(me?.paid_until) ? '평생 쓸 수 있어요' : ymd(me?.paid_until) + '까지 쓸 수 있어요'}</p>${token() ? `<div class="keep"><small>${ic('key', 14)}복구 코드 · 폰을 바꾸면 이걸로 구독을 되찾아요</small><div class="code noi18n">${group4(token())}</div><button class="ghost sm" data-cp>${ic('copy', 16)}복사해 두기</button></div>` : ''}${me?.email ? '' : `<p class="tip c">${ic('mail', 14)}메일로 가입해 두면 코드 없이도 구독을 되찾아요</p><button class="ghost wide" data-mail>메일로 가입하기</button>`}<button class="btn wide" data-x>좋아요</button></div>`);
+  const sh = sheet(box);
+  $('[data-mail]', box)?.addEventListener('click', () => { sh.close(); if (!location.hash.startsWith('#/plan')) location.hash = '#/plan'; setTimeout(() => { const m = document.getElementById('mail'); m?.scrollIntoView({ block: 'center', behavior: 'smooth' }); m?.focus(); }, 350); }); $('[data-x]', box).onclick = sh.close;
   $('[data-cp]', box)?.addEventListener('click', () => copy(token(), '복구 코드를 복사했어요'));
   if (location.hash.startsWith('#/plan')) setTimeout(() => window.dispatchEvent(new HashChangeEvent('hashchange')), 50);
+}
+
+
+/* ---------- 메일로 가입·로그인 (Supabase Auth 메일 코드) ----------
+   홈 화면 앱은 사파리·크롬과 저장소가 따로라 메일 속 링크 대신 6자리 코드를 넣게 한다.
+   로그인하면 서버가 이 기기의 구독(token)을 그 메일 계정에 묶고(pr_link), 다른 기기에서는 그 구독을 돌려준다. */
+const mailOk = m => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m);
+async function auth(path, body) {
+  const r = await fetch(`${SB.url}/auth/v1/${path}`, { method: 'POST', headers: { apikey: SB.key, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout?.(10000) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.msg || j.error_description || j.message || 'auth'); e.status = r.status; e.code = j.error_code || j.code; throw e; }
+  return j;
+}
+export const sendCode = email => auth('otp', { email, create_user: true });
+export async function verifyCode(email, code) {
+  const s = await auth('verify', { type: 'email', email, token: code });
+  const v = await rpc('pr_link', { p_token: token() || '' }, s.access_token);
+  setMe(v); return v;
+}
+export function logout() { ls.del(LS.token); ls.del(LS.me); me = null; listeners.forEach(f => f(me)); }
+const authErr = e => e.status === 429 || /rate|seconds/i.test(e.message) ? '잠시 뒤에 다시 보내 주세요 (메일은 1분에 한 번)'
+  : /expired|invalid|otp/i.test(e.code + ' ' + e.message) ? '코드가 맞지 않거나 시간이 지났어요'
+  : e.name === 'TimeoutError' || e instanceof TypeError ? '지금은 서버에 닿지 않아요' : '메일을 보내지 못했어요';
+
+function accountBox() {
+  if (me?.email) return `<div class="sec">${ic('mail', 16)}계정</div>
+    <div class="box acct"><div class="row" style="justify-content:space-between"><div><small class="muted">로그인한 메일</small><div class="mailv noi18n">${esc(me.email)}</div></div><button class="ghost sm" id="logout">로그아웃</button></div>
+    <p class="tip">다른 폰·PC에서도 이 메일로 로그인하면 구독이 그대로 따라와요.</p></div>`;
+  return `<div class="sec">${ic('mail', 16)}메일로 가입 · 로그인</div>
+    <div class="box acct" id="acct"><div class="row"><input id="mail" class="inp grow" type="email" inputmode="email" autocomplete="email" placeholder="메일 주소" spellcheck="false"><button class="btn" id="mailGo">코드 받기</button></div>
+    <div class="row hid" id="codeRow"><input id="code" class="inp grow" inputmode="numeric" autocomplete="one-time-code" placeholder="메일로 온 숫자 코드" maxlength="8"><button class="btn" id="codeGo">확인</button></div>
+    <p class="tip" id="acctTip">처음이면 가입, 전에 썼으면 로그인이에요. 비밀번호 없이 메일로 온 코드만 넣으면 돼요. 폰을 바꿔도 구독이 따라와요.</p></div>`;
+}
+function bindAccount(view, again) {
+  const lo = $('#logout');
+  if (lo) {
+    let armed = false;
+    lo.onclick = () => {
+      if (!armed) { armed = true; lo.textContent = '한 번 더 누르면 로그아웃'; lo.classList.add('warn'); setTimeout(() => { armed = false; lo.textContent = '로그아웃'; lo.classList.remove('warn'); }, 3500); return; }
+      logout(); toast('로그아웃했어요. 대본은 이 기기에 그대로 있어요'); again();
+    };
+    return;
+  }
+  const mail = $('#mail'), go = $('#mailGo'), row = $('#codeRow'), code = $('#code'), cg = $('#codeGo'), tip = $('#acctTip');
+  if (!mail) return;
+  let sent = '';
+  const send = async () => {
+    const m = mail.value.trim().toLowerCase();
+    if (!mailOk(m)) { toast('메일 주소를 확인해 주세요'); return mail.focus(); }
+    go.disabled = true;
+    try { await sendCode(m); sent = m; row.classList.remove('hid'); go.textContent = '다시 보내기'; tip.textContent = '코드를 보냈어요. 메일이 안 보이면 스팸함도 봐 주세요.'; code.focus(); }
+    catch (e) { toast(authErr(e)); }
+    finally { setTimeout(() => { go.disabled = false; }, sent ? 30000 : 0); }
+  };
+  go.onclick = send;
+  mail.onkeydown = e => { if (e.key === 'Enter') send(); };
+  const check = async () => {
+    const c = code.value.replace(/\D/g, '');
+    if (c.length < 6) return code.focus();
+    cg.disabled = true;
+    try { const v = await verifyCode(sent || mail.value.trim().toLowerCase(), c); buzz(15); toast(isPro() ? '로그인했어요. 구독이 이어졌어요' : '가입했어요'); again(); }
+    catch (e) { toast(e.status ? authErr(e) : '로그인은 됐는데 구독을 잇지 못했어요. 다시 해 주세요'); }
+    finally { cg.disabled = false; }
+  };
+  cg.onclick = check;
+  code.oninput = () => { const c = code.value.replace(/\D/g, ''); if (c.length >= 6 && c.length === (code.dataset.n ? +code.dataset.n : 6)) check(); };
+  code.onkeydown = e => { if (e.key === 'Enter') check(); };
 }
 
 /* ---------- 구독 관리 화면 ---------- */
@@ -132,15 +200,17 @@ export async function planView(view) {
       ${card && card.status === 'active' ? `<div class="row"><button class="ghost grow" id="chg">${ic('card', 18)}카드 바꾸기</button><button class="ghost grow" id="cancel">해지하기</button></div>` : ''}
     </div>
 
+    ${accountBox()}
+
     <div class="sec">${ic('gift', 16)}기프트 키</div>
     <div class="box"><div class="row"><input id="giftin" class="inp grow" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn" id="redeem">넣기</button></div>
       <p class="tip">받은 키를 넣으면 한 달·평생처럼 키에 적힌 만큼 프로가 열려요.</p></div>
 
-    <div class="sec">${ic('devices', 16)}다른 기기에서 이어 쓰기</div>
+    <div class="sec">${ic('devices', 16)}${me?.email ? '복구 코드' : '메일 없이 옮기기 · 복구 코드'}</div>
     <div class="box">
       ${token() ? `<div class="row" style="justify-content:space-between"><div><small class="muted">내 복구 코드</small><div class="code">${group4(token())}</div></div><button class="ghost sm" id="cp">${ic('copy', 16)}복사</button></div><div class="hr"></div>` : ''}
       <div class="row"><input id="restore" class="inp grow" placeholder="다른 기기의 복구 코드 16자" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="ghost" id="rs">불러오기</button></div>
-      <p class="tip">구독은 이 코드에 묶여 있어요. 폰을 바꾸면 이 코드를 넣어 주세요.</p></div>
+      <p class="tip">${me?.email ? '메일로 로그인해도 되고, 이 코드를 넣어도 돼요.' : '메일로 가입하지 않았다면 구독은 이 코드에 묶여 있어요. 폰을 바꾸면 이 코드를 넣어 주세요.'}</p></div>
 
     <div class="sec">${ic('doc', 16)}대본 옮기기 · 백업</div>
     <div class="box"><div class="row"><button class="ghost grow" id="bkOut">${ic('share', 16)}파일로 내보내기</button><button class="ghost grow" id="bkIn">${ic('paste', 16)}파일 가져오기</button></div>
@@ -149,6 +219,7 @@ export async function planView(view) {
     ${hist.length ? `<div class="sec">${ic('receipt', 16)}결제 내역</div><div class="box list">${hist.map(h => `<div class="li"><span>${h.method === 'card' ? '카드' : h.method === 'gift' ? '기프트 키' : '운영자 지급'}${h.status === 'failed' ? ' · 실패' : ''}</span><span class="muted">${ymd(h.created_at)}</span><b>${h.amount ? won(h.amount) : h.days ? h.days + '일' : h.status === 'failed' ? '—' : '평생'}</b></div>`).join('')}</div>` : ''}
     <p class="tip c" style="margin-top:24px"><a class="mailto" href="mailto:${CONTACT}?subject=${encodeURIComponent('[PROMPRI EDIT] 문의')}">${ic('mail', 14)}<span>결제·환불 문의</span></a> <span class="noi18n">${CONTACT}</span></p>${legalLinks()}${bizLine()}`;
 
+  bindAccount(view, () => planView(view));
   const g = sessionStorage.getItem('prompter:gift'); if (g) { $('#giftin').value = g; sessionStorage.removeItem('prompter:gift'); }
   $('#sub')?.addEventListener('click', e => subscribe(e.currentTarget));
   $('#chg')?.addEventListener('click', e => subscribe(e.currentTarget));
