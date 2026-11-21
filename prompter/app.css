@@ -410,3 +410,232 @@ html[lang=ko] .onlyfx{display:none}
 .acct #codeRow input { letter-spacing: .2em; font-variant-numeric: tabular-nums; }
 .acct #codeRow:not(.hid) { animation: acctIn .32s cubic-bezier(.34, 1.56, .64, 1); }
 @keyframes acctIn { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* ===== 2.0 사람 냄새 (11/21 하진 "AI 티 안 나게") =====
+   빼는 것: 그라데이션, 파스텔 아이콘 타일, 제목마다 붙은 아이콘, 둥둥 뜬 카드 그림자, 알약 배지, 자간 벌린 영문 눈썹.
+   남기는 것: 스프링 누름감, 숫자·선 아이콘(기능 자리에만). 카드는 얇은 선, 모서리는 작게, 강조색은 녹화·주요 버튼에만. */
+:root{--bg:#fafaf7;--line:#e4e2dc;--rd:10px;--acc:#e5384f;--accbg:#f3f1ec;--sub:#686770}
+@media (prefers-color-scheme:dark){:root{--bg:#121214;--card:#19191c;--line:#2c2c31;--accbg:#232327;--sub:#9b9aa3}}
+.card,.box,.perks,.howto,.doc,.stat,.take,.joinbox,.stepper,.scenes.multi .scene,.editor,.hero,.nums div,.fc{box-shadow:none;border:1px solid var(--line)}
+.ghost,.iconbtn,.chipbtn,.planbtn{box-shadow:none;border:1px solid var(--line)}
+.card,.box,.perks,.howto,.doc,.hero,.editor,.joinbox,.scenes.multi .scene{border-radius:var(--rd)}
+.stat,.take,.stepper{border-radius:8px}
+.btn,.ghost{border-radius:9px}
+.btn.sm,.ghost.sm,.iconbtn,.iconbtn.sm{border-radius:8px}
+.chipbtn,.planbtn{border-radius:8px}
+.inp{border-radius:8px}
+.editor:focus,.scenes.multi .scene:focus-within{box-shadow:none;border-color:var(--ink)}
+.inp:focus{border-color:var(--ink)}
+.card{animation:none}
+.card:active{transform:scale(.985)}
+/* 제목 옆 아이콘 빼기 */
+.sec .ic,.howto h2 .ic,.perks .lab .ic{display:none}
+.sec{color:var(--ink);font-size:13px;font-weight:750;margin:26px 2px 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+/* 목록 머리 숫자: 상자 대신 한 줄 */
+.stats{gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 0 14px}
+.stat{border:0;border-radius:0;background:none;padding:10px 4px 8px}
+.stat+.stat{border-left:1px solid var(--line);padding-left:12px}
+.stat .n{font-size:20px;font-weight:750}
+.stat .n .ic{color:var(--sub)}
+/* 촬영 버튼: 파스텔 타일 → 빨간 점 */
+.shoot{background:transparent;border:1px solid var(--line);border-radius:50%;width:48px;height:48px;color:var(--rec)}
+/* 상태 표시: 알약 → 점 + 글자 */
+.st,.pj{background:none!important;padding:0;border-radius:0;font-size:12px;font-weight:650}
+.st::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:3px}
+.st .ic{display:none}
+.st-draft{color:var(--sub)}
+.st-ready{color:var(--acc)}
+.snum{background:none;color:var(--sub);border:1px solid var(--line);border-radius:6px;font-weight:700}
+/* 브랜드: 자간 벌린 영문 눈썹 빼기 */
+.brand em{letter-spacing:.02em;font-size:10.5px;color:var(--sub);font-weight:650}
+.brand img{border-radius:9px}
+.planbtn.on{background:var(--ink);color:var(--bg);box-shadow:none;border-color:var(--ink)}
+.planbtn .ic{display:none}
+/* 구독 머리: 그라데이션 → 먹색 */
+.hero.on{background:var(--ink);color:var(--bg);box-shadow:none;border-color:var(--ink)}
+.badge{background:none;padding:0;border-radius:0;color:var(--sub);font-weight:700}
+.badge .ic{display:none}
+.hero.on .badge{background:none;color:inherit;opacity:.7}
+.upic{background:var(--ink);box-shadow:none;border-radius:50%;color:var(--bg)}
+.notice,.notice.beta{background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;font-weight:600}
+.notice .ic{color:var(--acc)}
+.itip{background:none;border:1px solid var(--line);border-radius:var(--rd)}
+.itip b{color:var(--ink)}
+.ptag .ev{background:none;color:var(--sub);padding:0;font-weight:650}
+.ptag .off{color:var(--acc);font-weight:800}
+.keep{background:none;border:1px solid var(--line);border-radius:8px}
+.betaline{background:none;color:var(--sub);padding:0;border-radius:0}
+.addscn{border-radius:var(--rd);border-width:1px}
+.flow li::before{background:none;color:var(--sub);border:1px solid var(--line);border-radius:6px}
+.lcode{border-radius:5px}
+#toast{border-radius:9px;background:#1d1d20}
+.sheet{border-radius:14px 14px 0 0}
+
+/* 소개 화면 다시 짜기: 왼쪽 정렬, 카드 대신 줄, 실제 화면 한 장 */
+body.hello-on #view{max-width:980px}
+.h2x{gap:0}
+.hh{display:flex;justify-content:space-between;align-items:center;min-height:44px;margin-bottom:8px}
+.hh .brand img{width:30px;height:30px;border-radius:7px}
+.hh .brand b{font-size:17px;font-weight:800;letter-spacing:-.03em}
+.hx{display:grid;grid-template-columns:1fr;gap:28px;padding:28px 0 36px;border-bottom:1px solid var(--line)}
+.hx h1{font-size:38px;line-height:1.18;font-weight:800;letter-spacing:-.045em;margin:0}
+.hx .lead{font-size:16.5px;line-height:1.65;color:var(--sub);margin:16px 0 22px;max-width:30em;font-weight:500}
+.hx .cta{justify-content:flex-start;align-items:center;gap:18px}
+.hx .cta .btn{min-width:0;padding:0 22px}
+.textlink{color:var(--ink);font-weight:700;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}
+.fine{font-size:13px;color:var(--sub);line-height:1.6;margin:14px 0 0}
+.fine b{color:var(--ink);font-weight:650}
+.fine a{color:var(--ink)}
+.mock{margin:0;display:flex;flex-direction:column;align-items:center;gap:8px}
+.mock figcaption{font-size:12px;color:var(--sub)}
+.mk{position:relative;width:224px;aspect-ratio:9/17;border-radius:26px;background:#2b2a28;overflow:hidden;border:6px solid #111}
+.mface{position:absolute;left:50%;bottom:22%;width:58%;aspect-ratio:1;transform:translateX(-50%);border-radius:50% 50% 44% 44%;background:radial-gradient(circle at 50% 38%,#8d7b6c 0 30%,transparent 31%),radial-gradient(ellipse at 50% 100%,#5d5048 0 52%,transparent 53%);opacity:.9}
+.mband{position:absolute;left:0;right:0;top:0;height:46%;background:rgba(0,0,0,.72);padding:20px 14px 0 18px;font-size:13.5px;font-weight:650;line-height:1.45;color:#fff;letter-spacing:-.01em}
+.mband p{margin:0}
+.mband .r{opacity:.35}
+.mband .n{color:#ffd84d}
+.mguide{position:absolute;left:5px;top:calc(20px + 2.9em);border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:8px solid var(--acc)}
+.mhud{position:absolute;left:0;right:0;bottom:14px;display:flex;justify-content:space-around;align-items:center;color:#fff;font-size:11px;font-weight:700}
+.mrec{width:40px;height:40px;border-radius:50%;border:3px solid #fff;display:grid;place-items:center}
+.mrec::after{content:'';width:28px;height:28px;border-radius:50%;background:var(--rec)}
+.mt{opacity:.8;font-variant-numeric:tabular-nums}
+.hs2{padding:30px 0 4px}
+.hs2 h2{font-size:13px;font-weight:750;color:var(--sub);margin:0 0 6px;letter-spacing:0}
+.spec{margin:0}
+.spec div{display:grid;grid-template-columns:9.5em 1fr;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.spec dt{font-weight:700;font-size:15px}
+.spec dd{margin:0;color:var(--sub);font-size:14px;line-height:1.55}
+.ptab{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}
+.ptab th,.ptab td{padding:12px 4px;border-bottom:1px solid var(--line);text-align:left;font-weight:500}
+.ptab thead th{font-size:12.5px;color:var(--sub);font-weight:650;padding-top:6px}
+.ptab tbody th{font-weight:650;width:38%}
+.ptab td:last-child{font-weight:700}
+.ptab .pp td{font-size:15px;font-weight:800}
+.ptab .ptag{justify-content:flex-start;gap:5px}
+.ptab .ptag b:last-child{font-size:15px}
+.h2x .faq details{background:none;border-radius:0;padding:0;margin:0;border-bottom:1px solid var(--line)}
+.h2x .faq summary{padding:14px 0;font-weight:650;font-size:15px}
+.h2x .faq summary::after{content:'';width:8px;height:8px;border-right:1.5px solid var(--sub);border-bottom:1.5px solid var(--sub);transform:rotate(45deg);margin:4px 4px 0 0;flex:none;transition:transform .3s var(--spring)}
+.h2x .faq details[open] summary::after{transform:rotate(225deg);margin-top:8px}
+.h2x .faq details p{font-weight:500;font-size:14px}
+.h2x .steps{gap:0;margin-top:6px}
+.h2x .step{background:none;border-radius:0;padding:12px 0;border-bottom:1px solid var(--line)}
+.h2x .step span{font-weight:500}
+.h2x .flow{gap:0}
+.h2x .flow li{background:none;border-radius:0;border-bottom:1px solid var(--line);padding:12px 0 12px 34px;font-weight:500}
+.h2x .flow li::before{left:0;top:13px;width:auto;height:auto;border:0;font-size:14px;color:var(--sub);content:counter(f) '.'}
+.h2x .flow li b{font-weight:700}
+.hgo{margin:32px 0 8px}
+.h2x .hfoot{justify-content:flex-start;padding:4px 0}
+.h2x .legal,.h2x .biz{justify-content:flex-start}
+@media (min-width:760px){
+  .hx{grid-template-columns:1.25fr .75fr;align-items:center;padding:56px 0 56px}
+  .hx h1{font-size:56px}
+  .hx .lead{font-size:18px}
+  .mk{width:250px}
+  .hs2{display:grid;grid-template-columns:200px 1fr;gap:24px;padding-top:40px}
+  .hs2 h2{padding-top:13px}
+  .hs2>.fine:first-of-type{grid-column:2}
+  .hgo{max-width:280px}
+}
+@media (min-width:760px){.hs2>*:not(h2){grid-column:2}}
+/* 구독 머리: 가운데 큰 할인 → 왼쪽 정렬, 차분한 크기 */
+.hero{text-align:left;padding:16px}
+.hero .price{font-size:24px;margin:8px 0 4px}
+.hero .ptag{justify-content:flex-start}
+.ptag .off{font-size:.8em}
+.hero .hs{opacity:1;color:var(--sub)}
+.hero.on .hs{color:inherit;opacity:.75}
+.mface{display:none}
+.mk{background:linear-gradient(180deg,#3a3632,#25221f 70%)}
+
+/* ===== 2.0b 토스앱 방식 (11/21 하진 "토스앱 참고해") =====
+   회색 바탕 위 흰 덩어리, 선·그림자 없이 여백으로 나누기. 큰 굵은 제목, 회청색 보조 글자, 크고 둥근 버튼. */
+:root{--bg:#f2f4f6;--card:#fff;--ink:#191f28;--sub:#6b7684;--line:#e5e8eb;--rd:18px;--soft:#f2f4f6}
+@media (prefers-color-scheme:dark){:root{--bg:#0f0f12;--card:#1c1c21;--ink:#f1f2f4;--sub:#9aa0a9;--line:#2b2c32;--soft:#26272c}}
+.card,.box,.perks,.howto,.doc,.stat,.take,.joinbox,.stepper,.scenes.multi .scene,.editor,.hero,.notice,.notice.beta,.itip,.keep{border:0}
+.card,.box,.perks,.doc,.hero,.editor,.joinbox,.scenes.multi .scene,.notice,.itip,.stepper{border-radius:var(--rd)}
+.card{padding:18px 18px;margin:0 0 10px}
+.card h3{font-size:17px;font-weight:700}
+.btn,.ghost{min-height:54px;border-radius:14px;font-size:16px;font-weight:700}
+.btn.sm,.ghost.sm{min-height:38px;border-radius:10px;font-size:14px}
+.ghost{border:0;background:var(--card)}
+.box .ghost,.sheet .ghost,.hero .ghost,.joinbox .ghost{background:var(--soft)}
+.iconbtn,.chipbtn,.planbtn{border:0}
+.iconbtn{background:transparent;border-radius:12px}
+.iconbtn:active{background:var(--soft)}
+.chipbtn{background:var(--card);border-radius:10px}
+.chipbtn.add{box-shadow:none;background:transparent;color:var(--sub)}
+.planbtn{border-radius:10px;background:var(--card)}
+.inp{border:0;background:var(--soft);border-radius:12px;min-height:50px}
+.inp:focus{box-shadow:0 0 0 2px var(--acc) inset}
+.editor:focus,.scenes.multi .scene:focus-within{box-shadow:0 0 0 2px var(--ink)}
+.sec{border:0;padding:0;color:var(--ink);font-size:17px;font-weight:700;margin:28px 4px 10px}
+.top h1{font-size:24px;font-weight:700}
+.h1s{font-size:17px;font-weight:700}
+/* 숫자 세 개: 흰 덩어리 하나 */
+.stats{background:var(--card);border:0;border-radius:var(--rd);padding:6px 4px}
+.stat{padding:12px 14px}
+.stat+.stat{border-left:0}
+.stat .n{font-size:22px;font-weight:700}
+.stat .l{font-size:13px;color:var(--sub);font-weight:500}
+.shoot{border:0;background:var(--soft)}
+.addscn{border:0;background:var(--card);color:var(--sub)}
+.stepper{background:var(--card)}
+.notice{background:var(--card);font-weight:500}
+.itip{background:var(--card)}
+.keep{background:var(--soft)}
+.perks{padding:4px 18px}
+.perks .pr{border-bottom:0;min-height:46px}
+.perks .ph{border-bottom:0}
+.sheet .perks{background:var(--soft)}
+.li{border-bottom:0}
+.hero{padding:22px 20px}
+.hero .price{font-size:26px;font-weight:700}
+.hero.on{background:var(--card);color:var(--ink)}
+.hero.on .badge{color:var(--acc);opacity:1}
+.hero.on .hs{color:var(--sub);opacity:1}
+.badge{color:var(--sub);font-size:14px}
+.tip{font-size:13px}
+.doc{padding:8px 20px 20px}
+#toast{border-radius:14px}
+
+/* 소개: 흰 바탕, 구획은 회색 띠 */
+body.hello-on{background:var(--card)}
+body.hello-on #view{background:var(--card)}
+.hx{border:0;padding:26px 0 34px}
+.hx h1{font-size:30px;line-height:1.35;font-weight:700;letter-spacing:-.03em}
+.hx .lead{font-size:16px;color:var(--sub);font-weight:400;margin:12px 0 24px}
+.hx .cta{flex-direction:column;align-items:stretch;gap:12px}
+.hx .cta .btn{background:var(--acc);color:#fff}
+.hx .cta .textlink{text-align:center;text-decoration:none;color:var(--sub);font-weight:600;padding:6px}
+.hx .fine{text-align:center}
+.hs2{border-top:12px solid var(--bg);margin:0 -16px;padding:30px 20px 18px}
+.hs2 h2{font-size:20px;font-weight:700;color:var(--ink);margin:0 0 14px;letter-spacing:-.02em}
+.spec div{border:0;padding:10px 0;grid-template-columns:1fr;gap:2px}
+.spec dt{font-size:16px;font-weight:600}
+.spec dd{font-size:14.5px}
+.ptab th,.ptab td{border-bottom:0;padding:10px 4px}
+.ptab thead th{color:var(--sub)}
+.ptab td:last-child{color:var(--acc)}
+.h2x .faq details{border:0}
+.h2x .faq summary{font-size:16px;font-weight:600;padding:15px 0}
+.h2x .step,.h2x .flow li{border:0}
+.h2x .step{padding:10px 0}
+.h2x .flow li{padding:10px 0 10px 30px}
+.h2x .flow li::before{top:11px;color:var(--acc);font-weight:700}
+.hgo{background:var(--acc);color:#fff;margin:8px 0 8px}
+.h2x>.hgo{margin-top:12px}
+.h2x .hfoot,.h2x .legal,.h2x .biz{justify-content:center}
+.hh{margin:0}
+@media (min-width:760px){
+  .hx .cta{flex-direction:row;align-items:center}
+  .hx .cta .btn{min-width:220px}
+  .hx .fine{text-align:left}
+  .hx h1{font-size:48px;line-height:1.25}
+  .hs2{margin:0;border-top-width:1px;border-top-color:var(--line);padding:40px 0 24px}
+  .spec{display:grid;grid-template-columns:1fr 1fr;gap:4px 32px}
+}
+.secrow .inp,.top .inp{background:var(--card)}
+.box .row .ghost{font-size:15px;padding:0 12px;white-space:nowrap}
+.brand em{display:none}
