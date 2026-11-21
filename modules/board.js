@@ -60,7 +60,7 @@ async function canvas(root, id) {
   const myName = await me();
   let nodes = new Map(), msgs = [], sel = null, view = { x: 0, y: 0, k: 1 }, auto = !!board.voiceAuto, lastAuto = null, recorder = null, sentVoice = '', peers = new Map(), pendingDraw = false;
   const world = h('div.mm-world'); const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'mm-lines'); world.append(svg);
-  const stage = h('div.mm-stage', world);
+  const stage = h('div.mm-stage', { 'data-live': '1' }, world);   /* data-live: 다른 기기 것을 받아도 화면을 통째로 다시 그리지 않음 (노드는 db.onChange로 하나씩 반영, 보던 자리·고른 노드 유지) */
   const tools = h('div.mm-tools.hide');
   tools.addEventListener('pointerdown', e => { if (document.activeElement?.isContentEditable) e.preventDefault(); }); // 글 고치는 중에 도구를 눌러도 편집이 안 끊기게
   const chatList = h('div.mm-chat-list'); const chatIn = h('input', { placeholder: '말하거나 적어요', 'aria-label': '대화 입력' });
@@ -80,7 +80,7 @@ async function canvas(root, id) {
     h('button.btn.sm.pri', { onclick: summarize }, ic('sparkles', 14), 'AI 정리'),
     h('button.btn.sm.ghost.icon', { 'aria-label': '지우기', onclick: async () => { if (await confirmBox('이 마인드맵을 지울까요?', '지우기')) { for (const n of [...nodes.values(), ...msgs]) await db.remove(n.id); await db.remove(id); go('board'); } } }, ic('trash', 14))), wrap);
 
-  await load(); fit();
+  await load(); fit(true);
   // 실시간: 즉시 전달(방) + 저장 동기화(변경 알림) 둘 다
   const sync = await import('../js/sync.js');
   room = board.team ? sync.room('board-' + id, onRoom) : null;
@@ -152,11 +152,13 @@ async function canvas(root, id) {
   }
   function applyView() { world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`; placeTools(); }
   function zoom(f, cx = stage.clientWidth / 2, cy = stage.clientHeight / 2) { const k = Math.max(.3, Math.min(2.2, view.k * f)); view.x = cx - (cx - view.x) * (k / view.k); view.y = cy - (cy - view.y) * (k / view.k); view.k = k; applyView(); }
-  function fit() {
+  /* readable: 처음 열 때는 글자를 읽을 수 있는 크기(0.7배)보다 작게 줄이지 않고, 넘치면 가운데 노드부터 보여 줌 (폰에서 전체를 맞추면 글자가 5px이 됨) */
+  function fit(readable = false) {
     const ns = [...nodes.values()]; if (!ns.length) return;
     const x0 = Math.min(...ns.map(n => n.x)) - 40, x1 = Math.max(...ns.map(n => n.x + NW)) + 40, y0 = Math.min(...ns.map(n => n.y)) - 40, y1 = Math.max(...ns.map(n => n.y)) + 80;
     const W = stage.clientWidth || 800, H = (stage.clientHeight || 500) - 90;
     view.k = Math.max(.35, Math.min(1.1, Math.min(W / (x1 - x0), H / (y1 - y0))));
+    if (readable && view.k < .7) { const r = rootNode() || ns[0]; view.k = .7; view.x = 20 - r.x * view.k; view.y = Math.max(70, Math.min(H / 2, H * .4)) - r.y * view.k; applyView(); return; }
     view.x = (W - (x1 - x0) * view.k) / 2 - x0 * view.k; view.y = (H - (y1 - y0) * view.k) / 2 - y0 * view.k + 10; applyView();
   }
   // 색은 글을 고치는 중에도 바로 보이게 (전체를 다시 그리지 않고 그 노드만)

@@ -4,7 +4,7 @@
 // · 팀에 공유된 항목은 누가·언제·무엇을·어떻게 바꿨는지 전부 기록 (관리자 화면에서 봄).
 import * as db from './db.js';
 
-const FREE = new Set(['tasks', 'pollvotes', 'polls', 'leadmarks', 'leadfb', 'vendors', 'events', 'audit', 'drafts', '_kv', 'buys', 'boards', 'dms', 'feedback', 'accts', 'posts', 'devreqs', 'promptlogs']); // 누구나 고칠 수 있는 공유 항목
+const FREE = new Set(['tasks', 'pollvotes', 'polls', 'leadmarks', 'leadfb', 'vendors', 'events', 'audit', 'drafts', '_kv', 'buys', 'boards', 'dms', 'feedback', 'accts', 'posts', 'devreqs', 'promptlogs', 'bnodes']); // 누구나 고칠 수 있는 공유 항목 (bnodes: 마인드맵은 같이 그리는 것이라 남이 만든 노드도 고치고 옮김)
 const GUEST_COLS = new Set(['tasks', 'events', 'meetings', 'notes', 'docs', 'refs']);   // 단기 작업자가 팀과 나눌 수 있는 것 (맡은 프로젝트의 것만)
 const ADMIN_ONLY_COLS = new Set(['teams', 'projects', 'reffolders', 'labelsets']);                                   // 만들기부터 관리자만
 const SKIP = new Set(['updatedAt', 'createdAt', 'dirty', 'id', 'col', 'sharedMembers', 'code', 'space']);

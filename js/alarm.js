@@ -68,7 +68,7 @@ function banner(a) {
     h('button.btn.sm.pri', { type: 'button', onclick: () => { close(); if (a.url) location.hash = a.url; } }, '보기'),
     h('button.btn.icon.ghost', { type: 'button', 'aria-label': '알림 닫기', onclick: close }, ic('x', 16)));
   document.body.append(el);
-  try { navigator.vibrate?.([120, 60, 120]); } catch { }
+  try { if (navigator.userActivation?.hasBeenActive !== false) navigator.vibrate?.([120, 60, 120]); } catch { }   /* 아직 한 번도 안 누른 화면에서는 브라우저가 막고 경고를 남기니 건너뜀 */
   setTimeout(() => { if (document.body.contains(el)) close(); }, 25000);
 }
 export async function snooze(a, mins = 5) {

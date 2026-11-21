@@ -50,12 +50,16 @@ export default {
         h('div.chips.ps-scroll', { style: { margin: '10px 0 6px' } }, [['', '전체'], ...Object.entries(P.ROLES)].map(([v, l]) => chip(F.role === v, l + (v && me.keys.includes(v) ? ' · 내 역할' : ''), () => { F.role = v; draw(); }))),
         h('div.chips.ps-scroll', { style: { marginBottom: '12px' } }, [['', '모든 분야'], ...P.CATS.map(c => [c, c])].map(([v, l]) => chip(F.cat === v, l, () => { F.cat = v; draw(); }))));
       const q = F.q.trim().toLowerCase();
-      const match = p => (!F.cat || p.cat === F.cat) && (q || !F.role || p.role === F.role) && (!q || `${p.title} ${p.body} ${p.cat} ${p.by || ''}`.toLowerCase().includes(q));
+      const roleOk = p => q || !F.role || p.role === F.role || p.role === 'all' || !p.role;   /* 공통으로 저장한 것은 어느 역할에서나 보임 */
+      const base = p => (!F.cat || p.cat === F.cat) && (!q || `${p.title} ${p.body} ${p.cat} ${p.by || ''}`.toLowerCase().includes(q));
+      const match = p => base(p) && roleOk(p);
+      const others = mine.filter(p => base(p) && !roleOk(p)).length;   /* 역할 때문에 가려진 것 (팀원이 올린 것이 안 보여서 없는 줄 알지 않게) */
       const saved = mine.filter(match).sort((a, b) => (fav.includes(b.id) - fav.includes(a.id)) || (uses[b.id] || 0) - (uses[a.id] || 0) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
       const built = (q ? P.byRole(me.keys) : F.role ? P.BUILTIN.filter(t => t.role === F.role) : P.byRole(me.keys)).filter(p => (!F.cat || p.cat === F.cat) && (!q || `${p.title} ${p.body} ${p.cat}`.toLowerCase().includes(q)))
         .sort((a, b) => (fav.includes(b.id) - fav.includes(a.id)) || (uses[b.id] || 0) - (uses[a.id] || 0));
       if (saved.length) body.append(h('div.ps-h', ic('users', 15), '우리가 모아 둔 것', h('small', `${saved.length}개`)), h('div.ps-grid', saved.map(p => card(p, uses, fav))));
       else if (!mine.length) body.append(h('div.card.ps-first', ic('bulb', 22), h('div.grow', h('b', '자주 시키는 말을 여기 모아 두세요'), h('p.small.muted', 'Claude에서 잘 통했던 말을 붙여 넣으면 다음부터 빈칸만 바꿔 다시 쓸 수 있어요. 팀원도 같이 봐요.')), h('button.btn.sm.pri', { type: 'button', onclick: () => importOne() }, ic('plus', 14), '붙여 넣기')));
+      if (others) body.append(h('div.ps-more', h('span', `다른 역할 쪽에 모아 둔 것이 ${others}개 더 있어요.`), h('button.btn.sm', { type: 'button', onclick: () => { F.role = ''; draw(); } }, '전체 보기')));
       if (built.length) body.append(h('div.ps-h', ic('sparkles', 15), q ? '기본 틀에서 찾은 것' : F.role ? `${P.ROLES[F.role]} 기본 틀` : '기본 틀', h('small', `${built.length}개`)), h('div.ps-grid', built.map(p => card(p, uses, fav))));
       if (!saved.length && !built.length) body.append(h('div.card', h('div.empty', q ? `"${F.q.trim()}"에 맞는 프롬프트가 아직 없어요.` : '조건에 맞는 프롬프트가 없어요.', h('div.row', { style: { marginTop: '10px', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' } },
         q ? h('button.btn.sm.pri', { type: 'button', onclick: () => { seed = F.q.trim(); F.q = ''; F.tab = 'make'; draw(); } }, ic('plus', 14), '이 주제로 새로 만들기') : null,
@@ -80,6 +84,7 @@ export default {
       /* 칸에 미리 넣는 순서: 다른 화면에서 들고 온 것 → 앱 기록으로 아는 것 → 지난번에 쓴 값 */
       const vals = { ...auto }, from = {}; for (const n of mine) { vals[n] = pre[n] || seed[n] || (keep[p.id] || {})[n] || ''; if (pre[n] || seed[n]) from[n] = true; }
       let logged = {}, text = '';
+      const canFix = !p.builtin && await (await import('../js/admin.js')).canEdit(p);   /* 남이 올린 팀 프롬프트는 못 고치니 '내 것으로 고치기'(복사본)로 */
       modal(p.title, close => {
         const out = h('textarea.in.ps-out', { rows: 9, 'aria-label': '완성된 프롬프트' });
         const meter = h('div.ps-fillnote');
@@ -106,7 +111,7 @@ export default {
             run),
           result,
           h('div.modal-f',
-            p.builtin ? h('button.btn.ghost', { type: 'button', onclick: () => { close(); edit({ title: p.title, body: p.body, cat: p.cat, role: p.role, tool: p.tool }); } }, ic('edit', 14), '내 것으로 고치기')
+            !canFix ? h('button.btn.ghost', { type: 'button', title: p.builtin ? '' : `${p.by || '팀원'} 님이 올린 것이라 복사본을 만들어 고쳐요`, onclick: () => { close(); edit({ title: p.title, body: p.body, cat: p.cat, role: p.role, tool: p.tool }); } }, ic('edit', 14), '내 것으로 고치기')
               : h('button.btn.ghost', { type: 'button', onclick: () => { close(); edit(p); } }, ic('edit', 14), '고치기'),
             h('button.btn', { type: 'button', onclick: close }, '닫기')));
       }, { wide: true });

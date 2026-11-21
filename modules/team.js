@@ -186,9 +186,9 @@ async function membersCard() {
   try { ms = await sync.listMembers(); } catch (e) { card.append(h('p.faint.small', '멤버 목록을 못 불러왔어요: ' + e.message)); return card; }
   const appUrl = location.origin + location.pathname;
   const invite = m => `[하진 비서] ${m.name} 님 멤버 코드: ${m.code}\n앱 주소: ${appUrl}\n열고 → 설정 → 폰·PC 동기화 → 코드 입력 → 로그인\n(폰은 홈 화면에 추가하면 앱처럼 쓸 수 있어요)`;
-  card.append(h('div.card-h', h('h3', ic('users'), `멤버 ${ms.filter(m => m.active).length}명`), admin ? h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '멤버') : null),
-    h('div.list', ms.map(m => h('div.li' + (m.active ? '' : '.done'), h('span.dot', { style: { background: m.joined ? 'var(--ok)' : 'var(--line)' }, title: m.joined ? '로그인함' : '아직 로그인 전' }),
-      h('div.grow', h('div.t.small', m.name, m.is_admin ? h('span.chip.acc', { style: { marginLeft: '6px' } }, '관리자') : null, m.active ? null : h('span.chip', { style: { marginLeft: '6px' } }, '비활성')),
+  card.append(h('div.card-h', h('h3', ic('users'), `멤버 ${ms.filter(m => m.active && !m.ended).length}명`), admin ? h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '멤버') : null),
+    h('div.list', ms.filter(m => admin || (m.active && !m.ended)).map(m => h('div.li' + (m.active && !m.ended ? '' : '.done'),   /* 끝났거나 멈춘 사람은 관리자에게만 보임 */ h('span.dot', { style: { background: m.joined ? 'var(--ok)' : 'var(--line)' }, title: m.joined ? '로그인함' : '아직 로그인 전' }),
+      h('div.grow', h('div.t.small', m.name, m.is_admin ? h('span.chip.acc', { style: { marginLeft: '6px' } }, '관리자') : null, m.kind === 'guest' ? h('span.chip.tiny.guest-chip', { style: { marginLeft: '6px' } }, '단기') : null, m.active ? (m.ended ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '기간 끝남') : null) : h('span.chip', { style: { marginLeft: '6px' } }, '비활성')),
         h('div.faint.tiny', [m.role, m.gmail, m.joined ? '로그인함' : '로그인 전'].filter(Boolean).join(' · '))),
       admin && m.code ? h('span.mono', { style: { fontWeight: 750, letterSpacing: '.12em' } }, m.code) : null,
       admin ? h('button.btn.sm.ghost', { title: '초대 문구 복사', onclick: async () => { try { await navigator.clipboard.writeText(invite(m)); toast(`${m.name} 님 초대 문구를 복사했어요`); } catch { toast('복사 권한이 없어요'); } } }, ic('copy', 14)) : null,
