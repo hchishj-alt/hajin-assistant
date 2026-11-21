@@ -21,9 +21,11 @@ export default {
 
     const [events, allTasks, drafts, reach, bdays, expenses, meetings] = await Promise.all([
       store.eventsOn(today), db.list('tasks'), store.drafts(), store.peopleToReach(), store.upcomingBirthdays(7), db.list('expenses'), db.list('meetings')]);
-    const open = allTasks.filter(t => !t.done);
+    // "오늘 할 일"과 숫자는 내 것만(할 일 화면과 같은 기준). 남이 맡은 팀 할 일은 "팀 할 일" 카드에
+    const mineT = await store.mineFilter();
+    const open = allTasks.filter(t => !t.done && mineT(t));
     const todays = open.filter(t => !t.due || t.due <= today).sort(sortTasks);
-    const doneToday = allTasks.filter(t => t.done && db.dayOf(t.doneAt || '') === today).length;
+    const doneToday = allTasks.filter(t => t.done && mineT(t) && db.dayOf(t.doneAt || '') === today).length;
     const monthKey = today.slice(0, 7);
     const monthSpend = expenses.filter(e => (e.date || '').startsWith(monthKey)).reduce((s, e) => s + (Number(e.amount) || 0), 0);
     const budget = await db.kvGet('budget', 0);
@@ -94,7 +96,7 @@ export default {
       quick: () => h('div.home-full', h('div.quick', ic('zap'), qi, h('button.btn.icon.ghost', { type: 'button', 'aria-label': '적기', onclick: addQuick }, ic('send')), h('a.btn.icon.ghost', { href: '#/assistant', 'aria-label': '말로 입력' }, ic('mic'))), qp, qres),
       tiles: () => h('div.home-full', tiles),
       flow: () => h('div.card', h('div.card-h', h('h3', ic('calendar'), '오늘 일정', h('small', KIND_RULE.event)), h('a.btn.sm.ghost', { href: '#/calendar' }, '캘린더')), tl),
-      tasks: () => tcard, people: () => pc, meetings: () => mc, sns: () => snsCard(), team: () => teamCard(allTasks, name), projects: () => projectCard(), activity: () => activityCard(),
+      tasks: () => tcard, people: () => isGuest() ? null : pc, meetings: () => mc, sns: () => snsCard(), team: () => teamCard(allTasks, name), projects: () => projectCard(), activity: () => isGuest() ? null : activityCard(),   /* 단기 작업자는 인맥 화면과 팀 활동 기록을 못 보니 빈 카드를 안 둠 */
     };
     const grid = h('div.home-grid');
     for (const id of homeOrder(L)) if (!L.homeOff?.includes(id) && blocks[id]) { const el = await blocks[id](); if (el) grid.append(el); }

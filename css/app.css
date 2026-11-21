@@ -773,6 +773,8 @@ button.rank-t{min-height:30px}
 button.vd-n{border:0;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;padding:0;min-height:30px}
 button.vd-n:hover b{color:var(--acc)}
 .vd-p{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);display:grid;gap:4px}
+.vd-pr{gap:4px;flex-wrap:nowrap;margin-bottom:4px}
+@media (max-width:560px){.vd-pr{flex-wrap:wrap;padding-bottom:10px;margin-bottom:10px;border-bottom:calc(var(--bw,1px)*1) dashed var(--line)}.vd-pr>input:first-child{flex:1 1 100%!important}}
 .vd-scroll{overflow:auto}
 .vd-t{border-collapse:collapse;width:100%;font-size:calc(14px*var(--fs,1))}
 .vd-t th,.vd-t td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;min-width:120px}
@@ -884,6 +886,8 @@ html,body{touch-action:manipulation}
 .draft .why{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:6px;font-size:calc(13px*var(--fs,1));color:var(--ink2)}
 .draft .why button{border:0;background:none;padding:6px 4px;min-height:44px;font:inherit;font-weight:650;color:var(--acc);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .card-h h3 small{font-weight:500;font-size:calc(12px*var(--fs,1));color:var(--ink3);margin-left:6px}
+/* 메인 화면 카드 머리: 좁은 칸에서 오른쪽 단추가 아랫줄로 떨어지지 않게, 제목 옆 설명만 줄임 */
+.home-grid .card-h{flex-wrap:nowrap}.home-grid .card-h h3{flex:1 1 0;min-width:0;white-space:nowrap}.home-grid .card-h h3 small{flex:0 100 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}.home-grid .card-h>.row{flex-wrap:nowrap;flex:none}
 
 /* 홈 화면에 설치: 오늘 화면의 한 줄 권유와 순서 안내 */
 .inst-nudge{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:12px 12px 12px 14px;border-color:color-mix(in srgb,var(--acc) 35%,var(--line));background:color-mix(in srgb,var(--acc) 6%,var(--card))}

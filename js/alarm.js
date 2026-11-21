@@ -3,6 +3,7 @@
 import * as db from './db.js';
 import * as store from './store.js';
 import { h, ic } from './ui.js';
+import * as SC from './scope.js';
 
 export const DEFAULT = { on: true, lead: 10, tasks: true, taskAt: '09:00', eve: true, eveAt: '20:00', brief: true, briefAt: '08:30', badge: true };
 export const get = async () => ({ ...DEFAULT, ...(await db.kvGet('alarm', {})) });
@@ -19,7 +20,9 @@ export const onChange = f => { subs.add(f); return () => subs.delete(f); };
 // 앞으로 days일 동안 울릴 알림을 시각 순으로. until = 이때를 넘기면 늦어서 안 울림
 export async function plan({ from = new Date(), days = 2, cfg } = {}) {
   cfg = cfg || await get(); if (!cfg.on) return [];
-  const evs = (await db.list('events')).filter(e => e.date && e.kind !== 'focus');
+  // 팀 일정은 내가 낀 것만 울림(캘린더 "내 일정"과 같은 기준): 다른 팀원끼리의 약속까지 내 폰이 울리지 않게
+  const meN = await db.kvGet('name', '');
+  const evs = (await db.list('events')).filter(e => e.date && e.kind !== 'focus' && (!e.team || SC.involves(e, meN)));
   const mine = await store.mineFilter();
   const open = (await db.list('tasks')).filter(t => !t.done && t.due && mine(t));
   const out = []; const today = ymd(from);
@@ -98,7 +101,8 @@ export async function tick(now = new Date()) {
 // ── 앱 아이콘의 숫자: 오늘 남은 일정 + 오늘까지인 할 일 ──
 export async function count(now = new Date()) {
   const today = ymd(now), hm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  const evs = (await store.eventsOn(today)).filter(e => e.kind !== 'focus' && (!e.start || (e.end || e.start) >= hm));
+  const meN = await db.kvGet('name', '');
+  const evs = (await store.eventsOn(today)).filter(e => e.kind !== 'focus' && (!e.team || SC.involves(e, meN)) && (!e.start || (e.end || e.start) >= hm));
   const mine = await store.mineFilter();
   const tasks = (await db.list('tasks')).filter(t => !t.done && t.due && t.due <= today && mine(t));
   return { events: evs.length, tasks: tasks.length, n: evs.length + tasks.length };

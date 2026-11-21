@@ -1,6 +1,7 @@
 // 업체 목록: 인쇄·굿즈·대관처럼 필요한 분야별로 업체 전화·링크를 모으고, 같은 품목을 업체끼리 가격 비교 (가격은 자주 바뀌니 메모 중심)
 import { h, ic, clear, toast, head, modal, seg, tile, confirmBox, colorFor, won, debounce } from '../js/ui.js';
 import * as db from '../js/db.js';
+import { saveVendor } from '../js/store.js';
 
 const F = { tab: 'list', cat: '', q: '' };
 const CATS = ['인쇄', '굿즈 제작', '현수막·실사', '촬영·스튜디오', '대관·장소', '영상·편집', '포장·배송', '케이터링', '기타'];
@@ -70,7 +71,7 @@ export default {
         const inp = (label, k, ph = '', attrs = {}) => { const i = h('input.in', { value: st[k] || '', placeholder: ph, ...attrs, oninput: () => (st[k] = i.value) }); return h('label.f', label, i); };
         const list = h('div.stack');
         const drawP = () => { clear(list); st.prices.forEach((p, i) => { const mk = (k, ph, w, attrs = {}) => { const x = h('input.in', { value: p[k] || '', placeholder: ph, style: { flex: w, minWidth: 0, padding: '7px 9px' }, 'aria-label': ph, ...attrs, oninput: () => { p[k] = x.value; p.at = db.dayOf(new Date()); } }); return x; };
-          list.append(h('div.row.nowrap', { style: { gap: '4px' } }, mk('item', '품목 (예: A3 포스터 100장)', 3, { list: 'vd-items' }), mk('price', '가격', 1.4, { inputmode: 'numeric' }), mk('note', '메모 (수량·옵션·배송)', 2.4), h('button.btn.sm.ghost', { type: 'button', 'aria-label': '지우기', onclick: () => { st.prices.splice(i, 1); drawP(); } }, ic('x', 12)))); });
+          list.append(h('div.row.vd-pr', mk('item', '품목 (예: A3 포스터 100장)', 3, { list: 'vd-items' }), mk('price', '가격', 1.4, { inputmode: 'numeric' }), mk('note', '메모 (수량·옵션·배송)', 2.4), h('button.btn.sm.ghost', { type: 'button', 'aria-label': '지우기', onclick: () => { st.prices.splice(i, 1); drawP(); } }, ic('x', 12)))); });
           if (!st.prices.length) list.append(h('div.faint.small', '품목 이름을 다른 업체와 똑같이 적으면 가격 비교에 나란히 나와요')); };
         drawP();
         return h('div', h('datalist#vd-cats', cats.map(c => h('option', { value: c }))), h('datalist#vd-items', itemsKnown.map(c => h('option', { value: c }))),
@@ -78,7 +79,21 @@ export default {
           inp('링크', 'link', '사이트나 견적 페이지 주소'), inp('메모', 'memo', '배송 기간, 최소 수량, 응대가 어땠는지'),
           h('div.row.between', { style: { margin: '12px 0 6px' } }, h('b.small', '품목 · 가격'), h('button.btn.sm', { type: 'button', onclick: () => { st.prices.push({ item: '', price: '', note: '' }); drawP(); list.lastChild?.querySelector('input')?.focus(); } }, ic('plus', 14), '품목')), list,
           h('div.modal-f', v.id ? h('button.btn.danger', { onclick: async () => { if (await confirmBox('이 업체를 지울까요?', '지우기')) { await db.remove(v.id); close(); draw(); } } }, ic('trash', 14)) : null,
-            h('button.btn.pri', { onclick: async () => { if (!(st.name || '').trim()) return toast('업체 이름을 적어 주세요'); st.prices = st.prices.filter(p => (p.item || '').trim()); await db.put('vendors', { ...st, name: st.name.trim(), cat: (st.cat || '').trim() || '기타', team: v.team ?? ((await db.get('team-main')) ? 'team-main' : '') }); close(); draw(); } }, '저장')));
+            h('button.btn.pri', { onclick: async () => { if (!(st.name || '').trim()) return toast('업체 이름을 적어 주세요'); st.prices = st.prices.filter(p => (p.item || '').trim());
+              if (!v.id) { // 새 업체인데 띄어쓰기만 다른 같은 이름이 있으면 따로 만들지 않고 합침 (빈 칸만 채우고, 같은 품목은 새 가격)
+                const ex = (await db.list('vendors')).find(x => keyOf(x.name) && keyOf(x.name) === keyOf(st.name));
+                if (ex) { await saveVendor({ ...st, name: st.name.trim(), cat: (st.cat || '').trim() }); toast(`같은 이름의 업체가 있어서 “${ex.name}”에 합쳤어요`); close(); draw(); return; }
+              } else { // 창을 열어 둔 사이 다른 기기에서 고친 것: 내가 안 건드린 칸은 그쪽 것으로, 그쪽이 더하거나 고치거나 뺀 품목도 살림
+                const cur = await db.get(v.id);
+                if (cur && !cur.deleted && cur.updatedAt !== v.updatedAt) {
+                  for (const k of ['name', 'cat', 'phone', 'kakao', 'link', 'memo']) if ((st[k] || '') === (v[k] || '')) st[k] = cur[k];
+                  const same = (x, y) => x && y && String(x.price ?? '') === String(y.price ?? '') && (x.note || '') === (y.note || '');
+                  const origOf = k => (v.prices || []).find(q => keyOf(q.item) === k), curOf = k => (cur.prices || []).find(q => keyOf(q.item) === k);
+                  st.prices = st.prices.filter(p => { const k = keyOf(p.item), o = origOf(k); return !(o && same(p, o) && !curOf(k)); }).map(p => { const k = keyOf(p.item), o = origOf(k), c = curOf(k); return o && c && same(p, o) ? { ...c } : p; });
+                  for (const p of cur.prices || []) { const k = keyOf(p.item); if (!origOf(k) && !st.prices.some(q => keyOf(q.item) === k)) st.prices.push({ ...p }); }
+                }
+              }
+              await db.put('vendors', { ...st, name: st.name.trim(), cat: (st.cat || '').trim() || '기타', team: v.team ?? ((await db.get('team-main')) ? 'team-main' : '') }); close(); draw(); } }, '저장')));
       }, { wide: true });
     }
   },
