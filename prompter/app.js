@@ -7,7 +7,7 @@ import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
 import { CONTACT } from './config.js';
 import { legalView, legalLinks, bizLine } from './legal.js';
 
-export const VERSION = '1.7.1';
+export const VERSION = '1.8.0';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -98,14 +98,27 @@ async function listView() {
       <div class="stat"><div class="n">${ic('film', 18)}${total}</div><div class="l">찍은 테이크</div></div>
       <div class="stat"><div class="n">${ic('clock', 18)}${fmt(time)}</div><div class="l">읽는 시간 합</div></div>
     </div>
-    <div id="cards"></div>
-    <a class="btn wide" href="#/new" style="margin-top:6px">${ic('plus')}새 대본 쓰기</a>
+    ${list.length > 1 ? `<div class="lhead"><button class="linkbtn sm" id="selBtn">${SEL ? '그만 고르기' : '여러 개 고르기'}</button></div>` : ''}
+    <div id="cards" class="${SEL ? 'selecting' : ''}"></div>
+    ${SEL ? `<div class="selbar" id="selbar"><span id="selN">0개 골랐어요</span><button class="ghost sm" id="selMove">${ic('folder', 16)}옮기기</button><button class="ghost sm" id="selDel" style="color:var(--rec)">${ic('trash', 16)}지우기</button></div>` : `<a class="btn wide" href="#/new" style="margin-top:6px">${ic('plus')}새 대본 쓰기</a>`}
     ${plan.isPro() || plan.beta() ? '' : `<p class="tip c">무료는 대본 ${plan.limits().scripts}개까지 · 지금 ${all.filter(own).length}개${all.some(x => !own(x)) ? ' (예시는 빼고)' : ''}</p>`}`;
   view.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { setCurProj(b.dataset.p); buzz(8); route(); });
   $('#addP').onclick = async () => { const n = await ask('새 프로젝트', '', { ok: '만들기', placeholder: '예: 인스타 릴스 11월' }); if (!n) return; const p = projects.add(n); setCurProj(p.id); route(); };
   $('#pmenu')?.addEventListener('click', () => projectMenu(P, list));
   const chips = $('#chips'), on = chips.querySelector('[aria-pressed=true]'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   const box = $('#cards');
+  $('#selBtn')?.addEventListener('click', () => { SEL = SEL ? null : new Set(); buzz(8); route(); });
+  const selN = () => { const n = SEL?.size || 0; const e = $('#selN'); if (e) e.textContent = `${n}개 골랐어요`; $('#selMove') && ($('#selMove').disabled = !n); $('#selDel') && ($('#selDel').disabled = !n); };
+  if (SEL) {
+    selN();
+    $('#selMove').onclick = () => moveSheet(list.filter(x => SEL.has(x.id)), () => { SEL = null; route(); });
+    $('#selDel').onclick = async () => {
+      const gone = list.filter(x => SEL.has(x.id)); const keep = [];
+      for (const x of gone) { keep.push([x, await takes.of(x.id)]); await scripts.remove(x.id); }
+      SEL = null; route();
+      undoToast(`대본 ${gone.length}개를 지웠어요`, async () => { for (const [x, ts] of keep) { await scripts.put(x); for (const t of ts) await takes.put(t); } route(); });
+    };
+  }
   if (!list.length) box.innerHTML = `<div class="empty">${ic('doc', 34)}<p>${P ? '이 프로젝트에 아직 대본이 없어요.' : '아직 대본이 없어요.'}<br>새 대본을 쓰거나 복사한 글을 붙여 넣어요.</p></div>`;
   const order = { ready: 0, draft: 1, done: 2 };
   list.sort((x, y) => (order[x.status || 'draft'] - order[y.status || 'draft']) || (y.updatedAt - x.updatedAt));
@@ -117,10 +130,52 @@ async function listView() {
       <div class="grow"><div class="ctop"><span class="st st-${s.status || 'draft'}">${ic(sic, 12)}${st}</span>${pj ? `<span class="pj">${ic('folder', 12)}${esc(pj.name)}</span>` : ''}</div>
         <h3>${esc(s.title || first.slice(0, 24) || '제목 없음')}</h3><p class="pv">${esc(first)}</p>
         <div class="meta"><span>${ic('text', 14)}${chars(s.body)}자</span><span>${ic('clock', 14)}${fmt(secOf(s))}</span><span>${ic('film', 14)}${counts[s.id] || 0}</span></div></div>
-      <button class="shoot" aria-label="이 대본으로 찍기">${ic('cam', 24)}</button></div>`);
-    c.onclick = e => { location.hash = (e.target.closest('.shoot') ? '#/shoot/' : '#/s/') + s.id; };
+      ${SEL ? `<span class="ck${SEL.has(s.id) ? ' on' : ''}">${ic('check', 16)}</span>` : `<button class="shoot" aria-label="이 대본으로 찍기">${ic('cam', 24)}</button><button class="cmore" aria-label="더 보기">${ic('more', 18)}</button>`}</div>`);
+    c.onclick = e => {
+      if (SEL) { SEL.has(s.id) ? SEL.delete(s.id) : SEL.add(s.id); c.querySelector('.ck').classList.toggle('on', SEL.has(s.id)); c.classList.toggle('picked', SEL.has(s.id)); buzz(6); selN(); return; }
+      if (e.target.closest('.cmore')) { e.stopPropagation(); cardMenu(s); return; }
+      location.hash = (e.target.closest('.shoot') ? '#/shoot/' : '#/s/') + s.id;
+    };
+    if (SEL?.has(s.id)) c.classList.add('picked');
     box.append(c);
   });
+}
+
+let SEL = null; // 여러 개 고르기 중이면 고른 대본 id 모음
+addEventListener('hashchange', () => { if (SEL && !/^#\/?$/.test(location.hash)) SEL = null; });
+
+// 대본 하나의 작은 메뉴: 옮기기·이름 바꾸기·복제·지우기
+function cardMenu(s) {
+  const box = el(`<div><h2 class="noi18n">${esc(s.title || (s.body || '').replace(/\[\[.+?\]\]\n?/g, '').trim().split('\n')[0].slice(0, 24) || '제목 없음')}</h2><div class="plist">
+    <button data-a="move">${ic('folder', 16)}<span>프로젝트 옮기기</span><small class="muted noi18n">${esc(projects.get(s.project)?.name || '')}</small></button>
+    <button data-a="name">${ic('edit', 16)}<span>이름 바꾸기</span></button>
+    <button data-a="dup">${ic('copy', 16)}<span>복제하기</span></button>
+    <button data-a="del" style="color:var(--rec)">${ic('trash', 16)}<span>지우기</span></button></div></div>`);
+  const sh = sheet(box);
+  box.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
+    const a = b.dataset.a; sh.close();
+    if (a === 'move') setTimeout(() => moveSheet([s], route), 260);
+    if (a === 'name') { const n = await ask('대본 이름', s.title); if (n != null && n !== s.title) { s.title = n.trim(); s.updatedAt = Date.now(); await scripts.put(s); route(); } }
+    if (a === 'dup') {
+      const lim = plan.limits().scripts, mine = (await scripts.all()).filter(own).length;
+      if (mine >= lim) return plan.needPro('scripts');
+      await scripts.put({ ...s, id: uid(), title: (s.title || '제목 없음') + ' 사본', sample: false, status: 'draft', createdAt: Date.now(), updatedAt: Date.now() }); toast('복제했어요'); route();
+    }
+    if (a === 'del') { const keep = await takes.of(s.id); await scripts.remove(s.id); route(); undoToast('대본을 지웠어요', async () => { await scripts.put(s); for (const t of keep) await takes.put(t); route(); }); }
+  });
+}
+
+// 프로젝트로 옮기기 (하나든 여러 개든)
+function moveSheet(list, done) {
+  const projs = projects.all(), one = list.length === 1 ? list[0].project || '' : null;
+  const box = el(`<div><h2>${list.length > 1 ? `대본 ${list.length}개 옮기기` : '프로젝트로 옮기기'}</h2><div class="plist">
+    ${projs.map(p => `<button data-p="${p.id}" aria-pressed="${one === p.id}">${ic('folder', 16)}<span class="noi18n">${esc(p.name)}</span></button>`).join('')}
+    <button data-p="" aria-pressed="${one === ''}">${ic('doc', 16)}<span>미분류</span></button>
+    <button data-new>${ic('plus', 16)}<span>새 프로젝트 만들어 옮기기</span></button></div></div>`);
+  const sh = sheet(box);
+  const go = async pid => { for (const x of list) { x.project = pid; x.updatedAt = Date.now(); await scripts.put(x); } buzz(10); toast(pid ? `'${projects.get(pid)?.name}'로 옮겼어요` : '미분류로 옮겼어요'); done?.(); };
+  box.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { sh.close(); go(b.dataset.p); });
+  $('[data-new]', box).onclick = async () => { sh.close(); const n = await ask('새 프로젝트', '', { ok: '만들고 옮기기', placeholder: '예: 인스타 릴스 11월' }); if (!n) return; const p = projects.add(n); go(p.id); };
 }
 
 function projectMenu(P, list) {
