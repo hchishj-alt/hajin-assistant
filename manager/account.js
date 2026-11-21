@@ -6,7 +6,7 @@ import * as S from './store.js';
 let client = null, session = null;
 const subs = new Set();
 export const onAuth = f => (subs.add(f), () => subs.delete(f));
-const ko = m => /Invalid login/i.test(m) ? '메일이나 비밀번호가 맞지 않아요' : /already registered|already been registered/i.test(m) ? '이미 가입한 메일이에요. 로그인해 주세요' : /Password should be/i.test(m) ? '비밀번호는 8자 이상으로 해 주세요' : /rate limit|too many/i.test(m) ? '잠시 뒤에 다시 해 주세요' : /Failed to fetch|NetworkError|Load failed/i.test(m) ? '인터넷 연결을 확인해 주세요' : /valid email|invalid format/i.test(m) ? '메일 주소를 다시 확인해 주세요' : /not confirmed/i.test(m) ? '메일 확인이 아직 안 됐어요. 받은 메일의 링크를 눌러 주세요' : m;
+const ko = m => /Invalid login/i.test(m) ? '가입한 적이 없는 메일이거나 비밀번호가 달라요. 처음이면 아래 "메일로 가입하기"를 눌러 주세요' : /already registered|already been registered/i.test(m) ? '이미 가입한 메일이에요. 로그인해 주세요' : /Password should be/i.test(m) ? '비밀번호는 8자 이상으로 해 주세요' : /rate limit|too many/i.test(m) ? '잠시 뒤에 다시 해 주세요' : /Failed to fetch|NetworkError|Load failed/i.test(m) ? '인터넷 연결을 확인해 주세요' : /valid email|invalid format/i.test(m) ? '메일 주소를 다시 확인해 주세요' : /not confirmed/i.test(m) ? '메일 확인이 아직 안 됐어요. 받은 메일의 링크를 눌러 주세요' : m;
 
 async function get() {
   if (client) return client;

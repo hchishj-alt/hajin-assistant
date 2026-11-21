@@ -9,7 +9,7 @@ export const kHour = d => kst(d).getUTCHours();
 export const today = () => kst(Date.now()).toISOString().slice(0, 10);
 const avg = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
 const med = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
-export const fmt = n => n == null || !Number.isFinite(+n) ? '–' : (n = +n, Math.abs(n) >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + '만' : Math.abs(n) >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + '천' : String(Math.round(n)));
+export const fmt = n => n == null || !Number.isFinite(+n) ? '–' : (n = +n, Math.abs(n) >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + '만' : Math.round(n).toLocaleString('ko-KR'));
 export const pct = x => x == null || !Number.isFinite(x) ? '–' : (x * 100).toFixed(x < 0.1 ? 1 : 0) + '%';
 
 // 게시물 하나의 반응 숫자

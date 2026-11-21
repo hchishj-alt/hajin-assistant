@@ -13,7 +13,7 @@ import { FIELDS } from './fields.js';
 import { NAME, CONTACT, PRICE, BETA, PRO, FREE } from './config.js';
 import * as AC from './account.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.7.1';
+export const VERSION = '1.7.2';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'edit'], ['people', '사람', 'users']];
@@ -362,14 +362,32 @@ async function importExport(files) {
 }
 async function readShots(files) {
   if (!files.length) return;
-  if (!(await AI.hasKey())) { toast('캡처 읽기는 AI 연결이 필요해요. 설정 › AI 연결', 4000); return; }
-  toast(`캡처 ${files.length}장 읽는 중…`, 20000);
-  try {
-    const imgs = await Promise.all(files.slice(0, 6).map(f => imgB64(f)));
-    const r = await AI.readShot(imgs);
-    await S.update('drafts', [], d => { d.unshift({ id: S.uid(), kind: 'shot', at: Date.now(), status: '임시', data: r }); return d; });
-    toast('읽었어요. 확인해 주세요'); go('#/inbox');
-  } catch (e) { toast('못 읽었어요: ' + e.message, 4000); }
+  const box = h('div.form'); const close = sheet('캡처 읽기', box);
+  const fail = (msg, btn) => box.replaceChildren(h('div.card.note', ic('flag', 18), h('p', msg)), btn || h('button.btn.wide', { onclick: () => { close(); readShots(files); } }, ic('refresh', 16), '다시 해 보기'), h('button.ghost.wide', { onclick: () => { close(); quickCount($plat.get()); } }, '숫자 직접 적기'));
+  if (!(await AI.hasKey())) return fail('캡처를 읽으려면 이 기기에 AI가 연결돼 있어야 해요. 홈 화면 앱을 새로 추가했다면 키를 한 번 더 넣어야 해요.', h('button.btn.wide', { onclick: () => { close(); go('#/settings'); } }, 'AI 연결하러 가기'));
+  box.replaceChildren(h('div.card.center', h('span.spin'), ` 캡처 ${Math.min(files.length, 6)}장 읽는 중… (10~20초)`));
+  let r;
+  try { const imgs = await Promise.all(files.slice(0, 6).map(f => imgB64(f))); r = await AI.readShot(imgs); }
+  catch (e) { return fail('못 읽었어요. ' + (e.message || '')); }
+  if (Array.isArray(r)) r = r[0] || {};
+  const posts = (r.posts || []).filter(p => p && (p.date || p.caption || p.views != null || p.likes != null));
+  const hasProfile = r.profile && Number.isFinite(+r.profile.followers);
+  if (!hasProfile && !posts.length) return fail('캡처에서 숫자를 찾지 못했어요. 프로필 화면(팔로워가 보이는 곳)이나 인사이트 화면을 올려 주세요.');
+  const d = { id: S.uid(), kind: 'shot', at: Date.now(), status: '임시', data: { ...r, posts } };
+  await S.update('drafts', [], l => { l.unshift(d); return l; });
+  const plat = r.plat === 'tt' ? 'tt' : 'ig';
+  box.replaceChildren(h('p.muted', 'AI가 읽은 값이에요. 맞는지 보고 넣어 주세요.'),
+    h('div.card', h('b', ic(plat, 15), ' ', A.PLAT[plat]), hasProfile ? h('div.readnum', h('div', h('small', '팔로워'), h('b', A.fmt2(r.profile.followers))), h('div', h('small', '팔로잉'), h('b', r.profile.following != null ? A.fmt2(r.profile.following) : '–')), h('div', h('small', '게시물'), h('b', r.profile.posts != null ? A.fmt2(r.profile.posts) : '–')), r.profile.views30 ? h('div', h('small', '30일 조회'), h('b', A.fmt(r.profile.views30))) : null) : null, posts.length ? h('p.muted', `게시물 ${posts.length}개의 숫자도 읽었어요.`) : null),
+    h('button.btn.wide.xl', { onclick: async () => { await applyShot(d); close(); toast('기록에 넣었어요'); if (location.hash.startsWith('#/today')) route(); else go('#/today'); } }, '맞아요, 넣기'),
+    h('button.ghost.wide', { onclick: async () => { await S.update('drafts', [], l => l.map(x => x.id === d.id ? { ...x, status: '버림' } : x)); close(); route(); } }, '틀려요, 버리기'));
+}
+// 읽은 캡처를 기록에 넣기 (확인 뒤에만)
+async function applyShot(d) {
+  const r = d.data || {}; const plat = r.plat === 'tt' ? 'tt' : 'ig';
+  if (r.profile && Number.isFinite(+r.profile.followers)) { await S.update('profile', {}, pr => { pr[plat] = { ...(pr[plat] || {}), followers: +r.profile.followers, following: r.profile.following ?? pr[plat]?.following, media: r.profile.posts ?? pr[plat]?.media, views30: r.profile.views30 ?? pr[plat]?.views30 }; return pr; }); await S.snap(plat, +r.profile.followers, r.profile.following); }
+  const ps = (r.posts || []).filter(p => p.date || p.caption).map(p => ({ plat, kind: p.kind || (plat === 'tt' ? 'video' : 'reels'), at: p.date ? new Date(p.date + 'T20:00:00+09:00').toISOString() : new Date().toISOString(), caption: p.caption || '', views: p.views ?? undefined, reach: p.reach ?? undefined, likes: p.likes ?? undefined, comments: p.comments ?? undefined, saves: p.saves ?? undefined, shares: p.shares ?? undefined, avgWatch: p.avgWatch ?? undefined, dur: p.dur ?? undefined, src: 'shot' }));
+  if (ps.length) await S.addPosts(ps);
+  await S.update('drafts', [], l => l.map(x => x.id === d.id ? { ...x, status: '확정' } : x));
 }
 
 // ── 확인 대기함 ──
@@ -383,11 +401,7 @@ SCREENS.inbox = async (root, st) => {
     root.append(h('div.card', h('div.row.sb', h('b', ic(plat, 15), ' ', A.PLAT[plat], ' 캡처에서 읽은 것'), h('small.muted', new Date(d.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }))),
       r.profile ? h('p', `팔로워 ${A.fmt(r.profile.followers)} · 팔로잉 ${A.fmt(r.profile.following)} · 게시물 ${A.fmt(r.profile.posts)}${r.profile.views30 ? ' · 30일 조회 ' + A.fmt(r.profile.views30) : ''}`) : null, rows,
       h('div.row.gap', h('button.ghost', { onclick: async () => { await S.update('drafts', [], l => l.map(x => x.id === d.id ? { ...x, status: '버림' } : x)); route(); } }, '버리기'),
-        h('button.btn.grow', { onclick: async () => {
-          if (r.profile?.followers) { await S.update('profile', {}, pr => { pr[plat] = { ...(pr[plat] || {}), followers: r.profile.followers, following: r.profile.following ?? pr[plat]?.following, media: r.profile.posts ?? pr[plat]?.media, views30: r.profile.views30 ?? pr[plat]?.views30 }; return pr; }); await S.snap(plat, r.profile.followers, r.profile.following); }
-          const ps = (r.posts || []).filter(p => p.date || p.caption).map(p => ({ plat, kind: p.kind || (plat === 'tt' ? 'video' : 'reels'), at: p.date ? new Date(p.date + 'T20:00:00+09:00').toISOString() : new Date().toISOString(), caption: p.caption || '', views: p.views ?? undefined, reach: p.reach ?? undefined, likes: p.likes ?? undefined, comments: p.comments ?? undefined, saves: p.saves ?? undefined, shares: p.shares ?? undefined, avgWatch: p.avgWatch ?? undefined, dur: p.dur ?? undefined, src: 'shot' }));
-          if (ps.length) await S.addPosts(ps);
-          await S.update('drafts', [], l => l.map(x => x.id === d.id ? { ...x, status: '확정' } : x)); toast('기록에 넣었어요'); route();
+        h('button.btn.grow', { onclick: async () => { await applyShot(d); toast('기록에 넣었어요'); route();
         } }, '맞아요, 넣기'))));
   }
 };
@@ -624,6 +638,7 @@ SCREENS.start = async root => {
   const GOALS = ['3개월 안에 팔로워 1천', '3개월 안에 팔로워 1만', '첫 협찬 받기', '꾸준히 올리는 습관'];
   const goals = h('div.chips', GOALS.map(g => h('button.pchip', { onclick: e => { goal = g; goals.querySelectorAll('.pchip').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); } }, g)));
   const clean = v => v.trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?(instagram|tiktok)\.com\/@?/, '').replace(/[\/?].*$/, '').toLowerCase();
+  { const who = sessionStorage.getItem('mgr:justin'); if (who) { sessionStorage.removeItem('mgr:justin'); root.append(h('div.card.note', ic('check', 18), h('p', h('b', who + ' 로 로그인됐어요. '), '이 계정에 올려 둔 백업이 아직 없어서, 내 인스타·틱톡을 한 번만 적어 주세요.'))); } }
   root.append(h('header.top', h('div', h('h1', '1분이면 돼요'), h('p.sub', '적은 만큼 매니저가 나한테 맞춰져요. 나중에 설정에서 바꿀 수 있어요.')), h('div.topr', h('button.iconbtn', { 'aria-label': '뒤로', onclick: () => go('#/hello'), html: icon('left', 20) }))),
     h('div.card.form', field('뭐라고 부를까요', name), field('인스타', ig), field('틱톡', tt, '아이디만 적어요. 비밀번호는 묻지 않아요. 틱톡은 공개 숫자를 자동으로 읽어 와요.')),
     h('h2.sec', '어떤 걸 올려요? ', h('small', '3개까지')), chips,
@@ -669,7 +684,7 @@ SCREENS.account = async (root, st, An, [mode = 'join']) => {
       else { await AC.signIn(mail.value, pw.value); toast('로그인했어요'); }
       pw.value = '';
       // 이 기기에 기록이 없고 서버에 백업이 있으면 바로 이어 쓰기
-      if (!localStorage.getItem('mgr:onboarded')) { const row = await AC.pull().catch(() => null); if (row?.data?.profile) { if (S.getMode() === 'demo') { localStorage.setItem('mgr:mode', 'real'); S.setMode('real'); } await AC.restore(row); localStorage.setItem('mgr:onboarded', '1'); toast('서버 백업으로 이어 써요'); return go('#/today'); } return go('#/start'); }
+      if (!localStorage.getItem('mgr:onboarded')) { const row = await AC.pull().catch(() => null); if (row?.data?.profile) { if (S.getMode() === 'demo') { localStorage.setItem('mgr:mode', 'real'); S.setMode('real'); } await AC.restore(row); localStorage.setItem('mgr:onboarded', '1'); toast('서버 백업으로 이어 써요'); return go('#/today'); } sessionStorage.setItem('mgr:justin', mail.value.trim()); return go('#/start'); }
       route();
     } catch (er) { busy(b, false); toast(er.message, 4000); }
   };
