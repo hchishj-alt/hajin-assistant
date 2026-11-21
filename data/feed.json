@@ -1,19 +1,46 @@
 {
- "updatedAt": "2026-11-20T02:36:21.155Z",
+ "updatedAt": "2026-11-21T02:50:32.485Z",
  "log": [
-  "콘텐츠 지원사업 공고: 27개 (새 글 7)",
+  "콘텐츠 지원사업 공고: 26개 (새 글 7)",
   "예비·초기 창업 지원: 9개 (새 글 0)",
-  "청년 창업 지원금: 5개 (새 글 0)",
-  "영상·디자인 제작 지원: 24개 (새 글 9)",
-  "콘텐츠진흥원: 11개 (새 글 2)",
-  "소상공인·1인 기업 지원: 11개 (새 글 2)",
-  "공모전: 27개 (새 글 6)",
-  "입주·공간 지원: 25개 (새 글 3)",
-  "콘텐츠 업계 소식: 2개 (새 글 1)",
-  "스타트업 소식: 35개 (새 글 5)",
+  "청년 창업 지원금: 4개 (새 글 0)",
+  "영상·디자인 제작 지원: 21개 (새 글 1)",
+  "콘텐츠진흥원: 8개 (새 글 0)",
+  "소상공인·1인 기업 지원: 17개 (새 글 6)",
+  "공모전: 24개 (새 글 2)",
+  "입주·공간 지원: 26개 (새 글 5)",
+  "콘텐츠 업계 소식: 3개 (새 글 1)",
+  "스타트업 소식: 35개 (새 글 4)",
   "세금·제도: 2개 (새 글 0)"
  ],
  "items": [
+  {
+   "title": "광진구, AI 스타트업 투자·협력 데모데이 성료…민·관·학 ‘AX 브리지’ 구축",
+   "link": "https://news.google.com/rss/articles/CBMiVkFVX3lxTE1FMU5XNzh3RHdyc19TS1lWRFhrQjJ4TUE4MkhFTnh1VkVNQldWX1hqajZtZGs5RjVtOGZYZktuRGEyQVkzc0JWZ3BTaUJKeVpCRzU1cDhB?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiVkFVX3lxTE1FMU5XNzh3RHdyc19TS1lWRFhrQjJ4TUE4MkhFTnh1VkVNQldWX1hqajZtZGs5RjVtOGZYZktuRGEyQVkzc0JWZ3BTaUJKeVpCRzU1cDhB?oc=5\" target=\"_blank\">광진구, AI 스타트업 투자·협력 데모데이 성료…민·관·학 ‘AX 브리지’ 구축</a> <f",
+   "date": "2026-11-20T13:37:30.000Z",
+   "source": "헤럴드경제",
+   "type": "news",
+   "q": "스타트업 소식"
+  },
+  {
+   "title": "충남콘텐츠진흥원, ‘2026 GST 성과공유회’ 개최…오픈이노베이션·투자 연계 성과 공유",
+   "link": "https://news.google.com/rss/articles/CBMiRkFVX3lxTE9ZSjRzcDFuRXhyUHFfUFpnTDZ5eTFiYTRMT2ptS2tSNnpJSVlTcWZTS0pjYmlTMnotWEhLeV9xdWxuYWtLRXc?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiRkFVX3lxTE9ZSjRzcDFuRXhyUHFfUFpnTDZ5eTFiYTRMT2ptS2tSNnpJSVlTcWZTS0pjYmlTMnotWEhLeV9xdWxuYWtLRXc?oc=5\" target=\"_blank\">충남콘텐츠진흥원, ‘2026 GST 성과공유회’ 개최…오픈이노베이션·투자 연계 성과 공유</a> <font color=\"#6f6f",
+   "date": "2026-11-20T13:03:33.000Z",
+   "source": "beSUCCESS",
+   "type": "grant",
+   "q": "입주·공간 지원"
+  },
+  {
+   "title": "경기창조경제혁신센터, 스타트업 815 IR 왕중왕전 개최…우수기업 6곳 선정",
+   "link": "https://news.google.com/rss/articles/CBMiaEFVX3lxTE96X0UxU0pHaGc1ZFFKRmZ4Rl9uSk14cTJ3RHNVOGdFQk5OMmhsZndoUzlWNEk2QnZLVUY4TWw4UHFOemVmckRmaElaSmZ1X2Zvb2E4NWNpNmNDbDdkNVpGTmJTNHlHaEFK0gFsQVVfeXFMTVZCMV9tSEVPdjliMnd2em9ldDJnUE1nWnQwY1VxSWQtbnNzMXY4Mmt3dkZvenFya3lEZWI1NWhLZ1hmSGFRbk9FMDgyZmVoWWdXNXVnaHF4X3JjWWJEdTMtRnFlaktiRUJNTERD?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiaEFVX3lxTE96X0UxU0pHaGc1ZFFKRmZ4Rl9uSk14cTJ3RHNVOGdFQk5OMmhsZndoUzlWNEk2QnZLVUY4TWw4UHFOemVmckRmaElaSmZ1X2Zvb2E4NWNpNmNDbDdkNVpGTmJTNHlHaEFK0gFsQVVfeXFMTVZCMV9tSEVPdjliMnd2em9ldDJnUE1nWnQwY1",
+   "date": "2026-11-20T04:08:30.000Z",
+   "source": "스타트업엔(StartupN)",
+   "type": "news",
+   "q": "스타트업 소식"
+  },
   {
    "title": "부산정보산업진흥원, 콘텐츠 제작지원 21개사 ‘성과공유회’ 성료",
    "link": "https://news.google.com/rss/articles/CBMieEFVX3lxTE54TGphb3FubC1hQjYxLTNCUTVZLU1tQ0JORlE2ZFc0emNoeGt0eGZFcmxRWnBYb29hMlVCajFIb3NCZmJ1NjNJOVVzRE9sUGcxc01uSHpBdGJvWGs2RkZfamFuUlVHVXFKZnA2dF9SamNvRHhsdHFmSA?oc=5",
@@ -103,6 +130,15 @@
    "source": "위런치",
    "type": "news",
    "q": "스타트업 소식"
+  },
+  {
+   "title": "당근, 채용전환형 ‘2027 프로덕트 빌더 인턴십’ 참가자 모집",
+   "link": "https://news.google.com/rss/articles/CBMiZEFVX3lxTFAtbUh3TVdUb0swS2VPTE9oVWRkb3FKTXdUX2ZRR01ZSkZuNDNUR2Z4TWtKWXF0elNKN21VUnM2dnRGQ0xjX1BIRTByLUw2OWMzdDZMcnFrU1U0MklWanVqN0Jfa0Y?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiZEFVX3lxTFAtbUh3TVdUb0swS2VPTE9oVWRkb3FKTXdUX2ZRR01ZSkZuNDNUR2Z4TWtKWXF0elNKN21VUnM2dnRGQ0xjX1BIRTByLUw2OWMzdDZMcnFrU1U0MklWanVqN0Jfa0Y?oc=5\" target=\"_blank\">당근, 채용전환형 ‘2027 프로덕트 빌더 인턴십’ 참가자",
+   "date": "2026-11-19T07:46:08.000Z",
+   "source": "위런치",
+   "type": "grant",
+   "q": "콘텐츠 지원사업 공고"
   },
   {
    "title": "플로르방송제작사, 콘텐츠 제작부터 아티스트 매니지먼트까지...'올인원 미디어 기업' 도약",
@@ -213,6 +249,15 @@
    "q": "공모전"
   },
   {
+   "title": "진도에서 하룻밤 보내면 최대 55만 원…진도군, 1박 2일 체류형 관광객 모집",
+   "link": "https://news.google.com/rss/articles/CBMiXEFVX3lxTE1iTWZ2TFJaQTdseVNkLUZlMEoxcEc2ckNkNGI1UXhoV28xRlA1QTlLQ0VfVlBNenJfMHBLMVktZ0txeXFBSmhFdUFnZTBFaFBTZ2cwT2lpMkxleDhE0gFTQVVfeXFMTS1PRllhbnJhWk8zWUEzNHVmMzZZY3VScFlMOHY5SzBrQzU0TzlRWVNlZ056YmJqUFNJemVRWlZHLUpNb0NndkRCSjhnZHZWWTZIT3c?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiXEFVX3lxTE1iTWZ2TFJaQTdseVNkLUZlMEoxcEc2ckNkNGI1UXhoV28xRlA1QTlLQ0VfVlBNenJfMHBLMVktZ0txeXFBSmhFdUFnZTBFaFBTZ2cwT2lpMkxleDhE0gFTQVVfeXFMTS1PRllhbnJhWk8zWUEzNHVmMzZZY3VScFlMOHY5SzBrQzU0TzlRWV",
+   "date": "2026-11-19T01:10:59.000Z",
+   "source": "KPI뉴스",
+   "type": "grant",
+   "q": "영상·디자인 제작 지원"
+  },
+  {
    "title": "[스타트업 안테나] 에임인텔리전스 국제학회 성과·티오리 AI 보안 기술 주목…피처링 유튜브 협력, 그립 커머스 트렌드 제시",
    "link": "https://news.google.com/rss/articles/CBMivAJBVV95cUxOa29uOGxvRHRBMDctVmZ3Um9TTmozQzIwWTFib2hqeW8xWFJUZjZ1WlhLU01mVWxpeWVGWUdUZl9HcHBGYVhsNWpCdzZNWWg1SEZWaTBReU9CMzhHWDRxY0MwUlVzaWVzWWhxbUE5aHpVWTFYX0g5QkFVRERrZ1p4OXltR1VNUHFaa0ZpdDBCSDVxUDctVUtLZ3REWW55eXZkQnlOVHktTmlsY2trbzFLUV9fbmlfYmo5UjI4ZTh1TmJ3cnc2S2dId1Z0OC04VzFHQWVBeG54QjFVdUZFZUNoOEhBYVhVMmlXd3FZdnpTRkpLdENYWmUwZVIyNDVOU0MwRkF0NEFVNnc3YjJOY3JUUkZjYmdsU0RYRV9zeFZ3N2Z5cVZlVWNjRzI2eTVWMnJvbmdMREtBLVg5RHRu?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMivAJBVV95cUxOa29uOGxvRHRBMDctVmZ3Um9TTmozQzIwWTFib2hqeW8xWFJUZjZ1WlhLU01mVWxpeWVGWUdUZl9HcHBGYVhsNWpCdzZNWWg1SEZWaTBReU9CMzhHWDRxY0MwUlVzaWVzWWhxbUE5aHpVWTFYX0g5QkFVRERrZ1p4OXltR1VNUHFaa0ZpdD",
@@ -229,6 +274,15 @@
    "source": "벤처타임즈",
    "type": "grant",
    "q": "입주·공간 지원"
+  },
+  {
+   "title": "문경의 매력을 담은 관광기념품 디자인 공모전 시상식 개최",
+   "link": "https://news.google.com/rss/articles/CBMiSkFVX3lxTFBZdDB6RUctVXZpOWxRTDRQWVNCc3BHQlN3MGtsUW1EVWtPeFFHRlplaVRtYXZSSlpfamUzeFh1RTNoWEVZUlllU3Fn?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiSkFVX3lxTFBZdDB6RUctVXZpOWxRTDRQWVNCc3BHQlN3MGtsUW1EVWtPeFFHRlplaVRtYXZSSlpfamUzeFh1RTNoWEVZUlllU3Fn?oc=5\" target=\"_blank\">문경의 매력을 담은 관광기념품 디자인 공모전 시상식 개최</a> <font color=\"#6f6f6f\">미디어투데이</f",
+   "date": "2026-11-19T00:38:00.000Z",
+   "source": "미디어투데이",
+   "type": "grant",
+   "q": "공모전"
   },
   {
    "title": "유망 스타트업 10곳, 투자유치 도전…VC협회·동국대, IR 로드쇼 개최",
@@ -276,6 +330,15 @@
    "q": "공모전"
   },
   {
+   "title": "60초 영상에 담는 가족 약속…키즐링, 가족 콘텐츠 공모전 접수 - 머니투데이",
+   "link": "https://news.google.com/rss/articles/CBMid0FVX3lxTE5qZU5WcVRjbTM5NnNibmlfcUMtS3ZKQ1NlQWdxYXpIVTRVa1loTlBCc3I0Q3ZPTk5xUjJvOFZJUXViQ1pxTXZzT3p2VjltNm45MkhKaXpJdjJfUUZmRVg2ZVk0VzBhWjRtQWtaaTdmLVVtYXZmYWVr0gF8QVVfeXFMTkp6NWxXNFJtX25uX1cyT1RMUGNhcGk3Q0M0WWVYUTByQXVjUmFibkd0dkRkcUhBY054R3p5WDZDU18yRk1VUU1QWEdZZFZrUEpnNFdLWnlvQXh4dnNIenBWa05mZUYzVlRuVFpUdG5SRVJuR3JqOXVBZU1ZVg?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMid0FVX3lxTE5qZU5WcVRjbTM5NnNibmlfcUMtS3ZKQ1NlQWdxYXpIVTRVa1loTlBCc3I0Q3ZPTk5xUjJvOFZJUXViQ1pxTXZzT3p2VjltNm45MkhKaXpJdjJfUUZmRVg2ZVk0VzBhWjRtQWtaaTdmLVVtYXZmYWVr0gF8QVVfeXFMTkp6NWxXNFJtX25uX1",
+   "date": "2026-11-18T11:30:00.000Z",
+   "source": "머니투데이",
+   "type": "grant",
+   "q": "공모전"
+  },
+  {
    "title": "60초 영상에 담는 가족 약속…키즐링, 가족 콘텐츠 공모전 접수",
    "link": "https://news.google.com/rss/articles/CBMibEFVX3lxTE5lOU1HMHR5czlRUV9WdmhNa0J4dnE1REREd1F6VTYzRm1iemhhNlc2Q3JEcVpBWE5ldklINE1MWFBnQ1lqcGNYd2FTX29aX1NZV0I5OWh1QTR5Z1Fpa2FWeFUtOFhiSXdEeXZfcg?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMibEFVX3lxTE5lOU1HMHR5czlRUV9WdmhNa0J4dnE1REREd1F6VTYzRm1iemhhNlc2Q3JEcVpBWE5ldklINE1MWFBnQ1lqcGNYd2FTX29aX1NZV0I5OWh1QTR5Z1Fpa2FWeFUtOFhiSXdEeXZfcg?oc=5\" target=\"_blank\">60초 영상에 담는 가족 약속…키즐링,",
@@ -306,6 +369,15 @@
    "title": "2026년 5차 국립공주대학교 창업보육센터 입주기업 모집 2차 연장공고",
    "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE1fcVBJckdjOS1mb2dVbGVzc0czRndXSjVXU3RCVnFWbnFhR3ZQRzViRTI4OXJwQUY2b2xyR1d2dDA0OTBQQ0JJTXo2SUs1Q1VRSzVLZnJGNUFIdjE1MnB3?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMiX0FVX3lxTE1fcVBJckdjOS1mb2dVbGVzc0czRndXSjVXU3RCVnFWbnFhR3ZQRzViRTI4OXJwQUY2b2xyR1d2dDA0OTBQQ0JJTXo2SUs1Q1VRSzVLZnJGNUFIdjE1MnB3?oc=5\" target=\"_blank\">2026년 5차 국립공주대학교 창업보육센터 입주기업 모집 2차 연장공고",
+   "date": "2026-11-18T08:00:00.000Z",
+   "source": "벤처스퀘어",
+   "type": "grant",
+   "q": "입주·공간 지원"
+  },
+  {
+   "title": "공공임대주택 상가 활용 청년창업공간 입주기업 모집 공고",
+   "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE0xV19EaVhNVm9Za0JRUWNSMVppZ1diWEw0WVFaZGVQT3F1dkNmSEwzTVU0UXFHa0VLaFdmczc0M2MxZm15UHNocE5iRGptdVliSlJaZUxodU1Mdk1oTXVZ?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiX0FVX3lxTE0xV19EaVhNVm9Za0JRUWNSMVppZ1diWEw0WVFaZGVQT3F1dkNmSEwzTVU0UXFHa0VLaFdmczc0M2MxZm15UHNocE5iRGptdVliSlJaZUxodU1Mdk1oTXVZ?oc=5\" target=\"_blank\">공공임대주택 상가 활용 청년창업공간 입주기업 모집 공고</a> <fon",
    "date": "2026-11-18T08:00:00.000Z",
    "source": "벤처스퀘어",
    "type": "grant",
@@ -411,6 +483,15 @@
    "q": "공모전"
   },
   {
+   "title": "디지털콘텐츠기업 성장지원센터, 2차 신규 입주기업 모집…입주사에 맞춤 지원",
+   "link": "https://news.google.com/rss/articles/CBMia0FVX3lxTE52SVJkc3JoVTdpRy1fUkJ5WkRGdXJXMzVqN1ROdm5fZm93SkhyNHJPYWhBbnRzSkhGQ1pWXzBPdy1wODZBWUdSd2NzN1d4RjNHb3BCbnFsY3VITGhFT05zUGZIRmxQOHB5YmxZ0gFrQVVfeXFMTnZJUmRzcmhVN2lHLV9SQnlaREZ1clczNWo3VE52bl9mb3dKSHI0ck9haEFudHNKSEZDWlZfME93LXA4NkFZR1J3Y3M3V3hGM0dvcEJucWxjdUhMaEVPTnNQZkhGbFA4cHlibFk?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMia0FVX3lxTE52SVJkc3JoVTdpRy1fUkJ5WkRGdXJXMzVqN1ROdm5fZm93SkhyNHJPYWhBbnRzSkhGQ1pWXzBPdy1wODZBWUdSd2NzN1d4RjNHb3BCbnFsY3VITGhFT05zUGZIRmxQOHB5YmxZ0gFrQVVfeXFMTnZJUmRzcmhVN2lHLV9SQnlaREZ1clczNW",
+   "date": "2026-11-18T05:40:09.000Z",
+   "source": "SWTV",
+   "type": "grant",
+   "q": "콘텐츠 지원사업 공고"
+  },
+  {
    "title": "디지털콘텐츠기업 성장지원센터, 유망 중소기업 2개사 신규 입주 모집",
    "link": "https://news.google.com/rss/articles/CBMickFVX3lxTE1nN3JGY1dqQklPcmNmemozLXU2V3M2b3JTYUhQcjI4bHY4R1dLTlh5MDJBYldEU3BZM3JkamFKU0h0QlMwemU2SGVDOV9idWM1U2UwOGhjN1V3bTZYRjNQVWY0R3FYNEs3T3p0TWF0aFVPd9IBckFVX3lxTE1nN3JGY1dqQklPcmNmemozLXU2V3M2b3JTYUhQcjI4bHY4R1dLTlh5MDJBYldEU3BZM3JkamFKU0h0QlMwemU2SGVDOV9idWM1U2UwOGhjN1V3bTZYRjNQVWY0R3FYNEs3T3p0TWF0aFVPdw?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMickFVX3lxTE1nN3JGY1dqQklPcmNmemozLXU2V3M2b3JTYUhQcjI4bHY4R1dLTlh5MDJBYldEU3BZM3JkamFKU0h0QlMwemU2SGVDOV9idWM1U2UwOGhjN1V3bTZYRjNQVWY0R3FYNEs3T3p0TWF0aFVPd9IBckFVX3lxTE1nN3JGY1dqQklPcmNmemozLX",
@@ -454,6 +535,15 @@
    "source": "내외일보",
    "type": "grant",
    "q": "공모전"
+  },
+  {
+   "title": "AI·XR 콘텐츠 기업, 사무공간 부담 던다… 디지털콘텐츠기업 성장지원센터 '2026년 2차 신규 입주기업' 모집",
+   "link": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE1YYm5yWEoxUGxUR0lmM2JFWVU1M2pfbnVSMUFKMlJjVnBiX21sSWJKLWlTME1nUjNrbjVHa1k5WXZ6M2Rzb1JLY1UxMWdwWGxoYk01SV9UcEVBMlJDR1FpOTM5QldfVk3SAWtBVV95cUxPYkFkaEk2V0xlaUxsMTMycTMzMkVZeEdpSlMySHBuYkVFLS1LWHgxU3NtNmwxS3J5NDF4elhjTE5HQVZwWF9EU3ZMUTZfZlFNNF8zUTZWYjduSmpmbnNsY21rbXdDUkxtM3dGTQ?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiZ0FVX3lxTE1YYm5yWEoxUGxUR0lmM2JFWVU1M2pfbnVSMUFKMlJjVnBiX21sSWJKLWlTME1nUjNrbjVHa1k5WXZ6M2Rzb1JLY1UxMWdwWGxoYk01SV9UcEVBMlJDR1FpOTM5QldfVk3SAWtBVV95cUxPYkFkaEk2V0xlaUxsMTMycTMzMkVZeEdpSlMySH",
+   "date": "2026-11-18T02:56:51.000Z",
+   "source": "에이빙",
+   "type": "grant",
+   "q": "콘텐츠 지원사업 공고"
   },
   {
    "title": "디지털콘텐츠기업 성장지원센터, 2026년 2차 입주기업 모집…임대료 전액 지원",
@@ -502,6 +592,15 @@
   },
   {
    "title": "경상원, 1인 소상공인에 '든든한 버팀목'...고용보험료 지원 확대",
+   "link": "https://news.google.com/rss/articles/CBMidEFVX3lxTE9rbVlDRWhua3NrUk4xRlJVdlpiWm1fZ3pPZzdaVjdwbkVHVDRNR2RFZlhYNzRBV0ZaZ2NHcWtIenFnS0pWMEE4THo4OERucEhBSU5mM2ttRVFsbVpZZXByWHZydDNKeTVnV2sySnFUQWJPTEtU0gF0QVVfeXFMT2ttWUNFaG5rc2tSTjFGUlV2WmJabV9nek9nN1pWN3BuRUdUNE1HZEVmWFg3NEFXRlpnY0dxa0h6cWdLSlYwQThMejg4RG5wSEFJTmYza21FUWxtWlllcHJYdnJ0M0p5NWdXazJKcVRBYk9MS1Q?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMidEFVX3lxTE9rbVlDRWhua3NrUk4xRlJVdlpiWm1fZ3pPZzdaVjdwbkVHVDRNR2RFZlhYNzRBV0ZaZ2NHcWtIenFnS0pWMEE4THo4OERucEhBSU5mM2ttRVFsbVpZZXByWHZydDNKeTVnV2sySnFUQWJPTEtU0gF0QVVfeXFMT2ttWUNFaG5rc2tSTjFGUl",
+   "date": "2026-11-17T09:59:07.000Z",
+   "source": "포인트데일리",
+   "type": "grant",
+   "q": "소상공인·1인 기업 지원"
+  },
+  {
+   "title": "경상원, 1인 소상공인에 '든든한 버팀목'...고용보험료 지원 확대",
    "link": "https://news.google.com/rss/articles/CBMicEFVX3lxTE9FX0hqWDVneTAwWC1sN0ZHdjd4THFNZ2VPVDE4V2hzUm1la0NGM01kNElyeU1qbTV1cGoxNVNMWW42Qzd1d0Q0MC04c3ZGa1ZUODJmVUxfcHJHc25tOUg4bUZfb3dReThLZWpWWkZ0SVbSAXRBVV95cUxPa21ZQ0Vobmtza1JOMUZSVXZaYlptX2d6T2c3WlY3cG5FR1Q0TUdkRWZYWDc0QVdGWmdjR3FrSHpxZ0tKVjBBOEx6ODhEbnBIQUlOZjNrbUVRbG1aWWVwclh2cnQzSnk1Z1drMkpxVEFiT0xLVA?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMicEFVX3lxTE9FX0hqWDVneTAwWC1sN0ZHdjd4THFNZ2VPVDE4V2hzUm1la0NGM01kNElyeU1qbTV1cGoxNVNMWW42Qzd1d0Q0MC04c3ZGa1ZUODJmVUxfcHJHc25tOUg4bUZfb3dReThLZWpWWkZ0SVbSAXRBVV95cUxPa21ZQ0Vobmtza1JOMUZSVXZaYl",
    "date": "2026-11-17T09:56:38.000Z",
@@ -533,6 +632,15 @@
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMia0FVX3lxTE9iNnVHVmJsZXFRUGVXakswc2o2TUk4UXl1Ym5Tbm0xa2JFcVE1T3ZveWxDQUtJU3ZBbEtVaE5qNTdFeXBSQnViWXVfcHhlN2lwQXdQNF8wOEEyTWhSNE5hTUcwUHdBdHVEV2xV?oc=5\" target=\"_blank\">경기도 1인 소상공인 고용보험료 최대 30",
    "date": "2026-11-17T07:54:42.000Z",
    "source": "팔당유역신문",
+   "type": "grant",
+   "q": "소상공인·1인 기업 지원"
+  },
+  {
+   "title": "경상원, ‘1인 소상공인 고용보험료 지원사업’ 2차 신청 12월 31일까지",
+   "link": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE5UOTdDZEJHYjdRcUpxTVV0RlJteTE3R2NsZ2t2MHZka3pfLTg0bkVTMDQtSi15X3JOWXBRbjVvQkd5VW5vWW1iNWxJSFAwcC1MM2wxUlVmSWM?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiWEFVX3lxTE5UOTdDZEJHYjdRcUpxTVV0RlJteTE3R2NsZ2t2MHZka3pfLTg0bkVTMDQtSi15X3JOWXBRbjVvQkd5VW5vWW1iNWxJSFAwcC1MM2wxUlVmSWM?oc=5\" target=\"_blank\">경상원, ‘1인 소상공인 고용보험료 지원사업’ 2차 신청 12월 31일까지</a> <f",
+   "date": "2026-11-17T07:31:58.000Z",
+   "source": "스포츠서울",
    "type": "grant",
    "q": "소상공인·1인 기업 지원"
   },
@@ -645,6 +753,15 @@
    "q": "스타트업 소식"
   },
   {
+   "title": "군산콘텐츠팩토리『애니메이션 더빙 체험 4차 교육』참가자 모집",
+   "link": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE1SVkgwMkRVbUtxZ0JKbnZTUVRGejhsSTVDUEtYcF9rWVowWU5NOVdGX0JpZk54NFJpczQwLUpNMlluYUxKTVFvU3Z3OTZjbjQ0MlphSDNZVl80Qy1nLXhhNFpxZ0Zpdw?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiZkFVX3lxTE1SVkgwMkRVbUtxZ0JKbnZTUVRGejhsSTVDUEtYcF9rWVowWU5NOVdGX0JpZk54NFJpczQwLUpNMlluYUxKTVFvU3Z3OTZjbjQ0MlphSDNZVl80Qy1nLXhhNFpxZ0Zpdw?oc=5\" target=\"_blank\">군산콘텐츠팩토리『애니메이션 더빙 체험 4차 교육』참가",
+   "date": "2026-11-16T21:09:12.000Z",
+   "source": "군산시 누리집",
+   "type": "grant",
+   "q": "콘텐츠 지원사업 공고"
+  },
+  {
    "title": "군산콘텐츠팩토리 [아이패드로 배우는 3D모델링 기초] 교육생 모집",
    "link": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE5vYVh0cU96eFkzbUk1MkFKLTFCYjcyMDBOeENidzBZSHFqLUprNjBxZWU3b0VaLW9KaEpuLUhZaVhFNVhfWkw4WVNvMHNCOG5UWGJRSzJJZ1NlSUpzRm5UbnFoMWQ4QQ?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMiZkFVX3lxTE5vYVh0cU96eFkzbUk1MkFKLTFCYjcyMDBOeENidzBZSHFqLUprNjBxZWU3b0VaLW9KaEpuLUhZaVhFNVhfWkw4WVNvMHNCOG5UWGJRSzJJZ1NlSUpzRm5UbnFoMWQ4QQ?oc=5\" target=\"_blank\">군산콘텐츠팩토리 [아이패드로 배우는 3D모델링 기초]",
@@ -684,6 +801,15 @@
    "title": "“초기 창업의 고비 넘을 확실한 해법을 찾았다”… 한성대 성북구 중장년기술창업센터, 6개 기관 연합 ‘투자전략 On & On’ 성황리 개최",
    "link": "https://news.google.com/rss/articles/CBMicEFVX3lxTE1zQ01nWnFWaWRoZWVaX21uTXQ4SGZNekhFNXh1UzNLZmZlQXIzcU5OUEQwYTRCOG5YN2R4RXJSUTBBOXBpTVMwU3BIQTVwQW5JUVlzRk9UUWN5QXFmNnZLZjhOUzJDUjNKZndIcmR5NUQ?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMicEFVX3lxTE1zQ01nWnFWaWRoZWVaX21uTXQ4SGZNekhFNXh1UzNLZmZlQXIzcU5OUEQwYTRCOG5YN2R4RXJSUTBBOXBpTVMwU3BIQTVwQW5JUVlzRk9UUWN5QXFmNnZLZjhOUzJDUjNKZndIcmR5NUQ?oc=5\" target=\"_blank\">“초기 창업의 고비 넘을 확실",
+   "date": "2026-11-16T08:31:49.000Z",
+   "source": "스마트경제",
+   "type": "news",
+   "q": "스타트업 소식"
+  },
+  {
+   "title": "“초기 창업의 고비 넘을 확실한 해법을 찾았다”… 한성대 성북구 중장년기술창업센터, 6개 기관 연합 ‘투자전략 On & On’ 성황리 개최",
+   "link": "https://news.google.com/rss/articles/CBMib0FVX3lxTE92ZGxhR3VMMVFQczVwSy16THN3SXRoeVhYUEZFXzZ0Q3NRZmQzUVRPcVZvRTdtRHlHNFkwNWFiWENsU0RhYV84VUpFQUxNX2YxNGxkRVdjcU5KMDd3ZndIdXg3NHczMGlUTTM2UjNzOA?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMib0FVX3lxTE92ZGxhR3VMMVFQczVwSy16THN3SXRoeVhYUEZFXzZ0Q3NRZmQzUVRPcVZvRTdtRHlHNFkwNWFiWENsU0RhYV84VUpFQUxNX2YxNGxkRVdjcU5KMDd3ZndIdXg3NHczMGlUTTM2UjNzOA?oc=5\" target=\"_blank\">“초기 창업의 고비 넘을 확실한",
    "date": "2026-11-16T08:31:49.000Z",
    "source": "스마트경제",
    "type": "news",
@@ -825,6 +951,24 @@
    "q": "스타트업 소식"
   },
   {
+   "title": "부산창경, ‘BCCEI 데모데이’ 서울 개최…스타트업 15개사 투자 유치 나선다",
+   "link": "https://news.google.com/rss/articles/CBMiT0FVX3lxTE9xNGoxN0NRWmU4WmdBOXFuMzRybjZteTdjLWNaRmItaFhURzBjaFdfLV9pLWxlSVpBcEx1eTNnUnZFaE13ZHRSLXFBN3o1Zm8?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiT0FVX3lxTE9xNGoxN0NRWmU4WmdBOXFuMzRybjZteTdjLWNaRmItaFhURzBjaFdfLV9pLWxlSVpBcEx1eTNnUnZFaE13ZHRSLXFBN3o1Zm8?oc=5\" target=\"_blank\">부산창경, ‘BCCEI 데모데이’ 서울 개최…스타트업 15개사 투자 유치 나선다</a> <font color",
+   "date": "2026-11-12T08:00:00.000Z",
+   "source": "와우테일",
+   "type": "news",
+   "q": "스타트업 소식"
+  },
+  {
+   "title": "애드페스트 2027, 그랜드 심사위원장에 마르코 벤투렐리 레오 사장… 부문별 심사위원장 이끈다",
+   "link": "https://news.google.com/rss/articles/CBMifkFVX3lxTE5kOWNLS3BIc3o2WDBYZkNSS1NxWkg3aTBqRjF6bm02ZDZxSThoMlhJZHhUMk1EMFU4LWdpVUFMdHdFazhIUEsyVHpNbEZWZHdvNm55eFFFNmxmaVZmOWVrdnBKZDliZGxFNFJlUmt3cjc5d3lkdjNIZ19wNzBQZw?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMifkFVX3lxTE5kOWNLS3BIc3o2WDBYZkNSS1NxWkg3aTBqRjF6bm02ZDZxSThoMlhJZHhUMk1EMFU4LWdpVUFMdHdFazhIUEsyVHpNbEZWZHdvNm55eFFFNmxmaVZmOWVrdnBKZDliZGxFNFJlUmt3cjc5d3lkdjNIZ19wNzBQZw?oc=5\" target=\"_blan",
+   "date": "2026-11-12T08:00:00.000Z",
+   "source": "브랜드브리프",
+   "type": "news",
+   "q": "콘텐츠 업계 소식"
+  },
+  {
    "title": "[지원사업 공고] 11월 10~12일 새 정부 지원사업 공고 56건… 경영 19건·기술 17건",
    "link": "https://news.google.com/rss/articles/CBMibEFVX3lxTE1nQkt4dG1vUGhGanNnYnBKeEYtTEZmajBZNW9mdVBsR0pjRV85ZUZfTjA4ZExTR01mMmNkclhBbVJQV0xUd2lVRFJUUkNOeDFfdHFIdEVuZzAyeUM4X2R5OXQ0UnpaazNVakttSg?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMibEFVX3lxTE1nQkt4dG1vUGhGanNnYnBKeEYtTEZmajBZNW9mdVBsR0pjRV85ZUZfTjA4ZExTR01mMmNkclhBbVJQV0xUd2lVRFJUUkNOeDFfdHFIdEVuZzAyeUM4X2R5OXQ0UnpaazNVakttSg?oc=5\" target=\"_blank\">[지원사업 공고] 11월 10~12일 ",
@@ -859,15 +1003,6 @@
    "source": "신아일보",
    "type": "grant",
    "q": "청년 창업 지원금"
-  },
-  {
-   "title": "부산창경, ‘BCCEI 데모데이’ 서울 개최…스타트업 15개사 투자 유치 나선다",
-   "link": "https://news.google.com/rss/articles/CBMiT0FVX3lxTE9xNGoxN0NRWmU4WmdBOXFuMzRybjZteTdjLWNaRmItaFhURzBjaFdfLV9pLWxlSVpBcEx1eTNnUnZFaE13ZHRSLXFBN3o1Zm8?oc=5",
-   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiT0FVX3lxTE9xNGoxN0NRWmU4WmdBOXFuMzRybjZteTdjLWNaRmItaFhURzBjaFdfLV9pLWxlSVpBcEx1eTNnUnZFaE13ZHRSLXFBN3o1Zm8?oc=5\" target=\"_blank\">부산창경, ‘BCCEI 데모데이’ 서울 개최…스타트업 15개사 투자 유치 나선다</a> <font color",
-   "date": "2026-11-12T02:22:26.000Z",
-   "source": "와우테일",
-   "type": "news",
-   "q": "스타트업 소식"
   },
   {
    "title": "홈앤쇼핑, 중소기업 제품 숏폼 홍보 지원…크리에이터 10팀 모집",
@@ -906,6 +1041,15 @@
    "q": "영상·디자인 제작 지원"
   },
   {
+   "title": "오렌지나무, 해외 온라인 플랫폼 입점 희망 소상공인 300개사 모집",
+   "link": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE9HZmRoZGFEejdLUlBVRmUxd2pHWlhBQ2F1bDE1NjcteWttTnBNdWU5Y241MUpRT2JLbGRHR3ZrYXVsQzNlN1ZOdHRzT2NEZkRJVVRMTm9zRkdmVzZPRjk2bGFVekpiRmvSAWtBVV95cUxQM0djRHlhSHlXbnVBMjBrY0lmdk8tRkQtV0VOU3JVNGV0UDE2NEJ0bjJmeWNfM0xFaXNIeTlyUFpEaDZmcmVKVVE4NE1KTm0tQXBVbkNsN0wyWDBTSHRPc2NMaVVrYjZ1dEtmbw?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiZ0FVX3lxTE9HZmRoZGFEejdLUlBVRmUxd2pHWlhBQ2F1bDE1NjcteWttTnBNdWU5Y241MUpRT2JLbGRHR3ZrYXVsQzNlN1ZOdHRzT2NEZkRJVVRMTm9zRkdmVzZPRjk2bGFVekpiRmvSAWtBVV95cUxQM0djRHlhSHlXbnVBMjBrY0lmdk8tRkQtV0VOU3",
+   "date": "2026-11-11T08:00:00.000Z",
+   "source": "핸드메이커",
+   "type": "grant",
+   "q": "영상·디자인 제작 지원"
+  },
+  {
    "title": "[정책자금] 콘진원, 문화산업특화보증 신청 접수… 11월 30일까지",
    "link": "https://news.google.com/rss/articles/CBMibEFVX3lxTFBNVjg2cUJWRjBpUjJZbXB6LThHVnJ6Y3VNZW5xVldkVFNHVG1xV3JxQ01PMndRQzFDQnRqbktOVjJobHZEeGFHRmoyMy0tUVNwNUlFZFpaN1c2Q3EyWW82WWlmNjFMUnZUdkFlSg?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMibEFVX3lxTFBNVjg2cUJWRjBpUjJZbXB6LThHVnJ6Y3VNZW5xVldkVFNHVG1xV3JxQ01PMndRQzFDQnRqbktOVjJobHZEeGFHRmoyMy0tUVNwNUlFZFpaN1c2Q3EyWW82WWlmNjFMUnZUdkFlSg?oc=5\" target=\"_blank\">[정책자금] 콘진원, 문화산업특화보증 ",
@@ -915,13 +1059,22 @@
    "q": "콘텐츠진흥원"
   },
   {
-   "title": "오렌지나무, 해외 온라인 플랫폼 입점 희망 소상공인 300개사 모집",
-   "link": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE9HZmRoZGFEejdLUlBVRmUxd2pHWlhBQ2F1bDE1NjcteWttTnBNdWU5Y241MUpRT2JLbGRHR3ZrYXVsQzNlN1ZOdHRzT2NEZkRJVVRMTm9zRkdmVzZPRjk2bGFVekpiRmvSAWtBVV95cUxQM0djRHlhSHlXbnVBMjBrY0lmdk8tRkQtV0VOU3JVNGV0UDE2NEJ0bjJmeWNfM0xFaXNIeTlyUFpEaDZmcmVKVVE4NE1KTm0tQXBVbkNsN0wyWDBTSHRPc2NMaVVrYjZ1dEtmbw?oc=5",
-   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiZ0FVX3lxTE9HZmRoZGFEejdLUlBVRmUxd2pHWlhBQ2F1bDE1NjcteWttTnBNdWU5Y241MUpRT2JLbGRHR3ZrYXVsQzNlN1ZOdHRzT2NEZkRJVVRMTm9zRkdmVzZPRjk2bGFVekpiRmvSAWtBVV95cUxQM0djRHlhSHlXbnVBMjBrY0lmdk8tRkQtV0VOU3",
-   "date": "2026-11-11T05:26:12.000Z",
-   "source": "핸드메이커",
+   "title": "[지원사업 공고] 11월 11일 새 정부 지원사업 공고 28건… 기술 8건·경영 7건",
+   "link": "https://news.google.com/rss/articles/CBMibEFVX3lxTFB1Y21reXpKMXU1MGlBOGZuZTRZZUc1b1phUTF0VTNyMHY3WFJjS04xR2RSSExsMnFSWHpacFFsNC1MMXpVMEl5WVdoR29nVUl1OGQ0UHFsdUtPZFMwRlczam5wVFdQUERTTFFmUw?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMibEFVX3lxTFB1Y21reXpKMXU1MGlBOGZuZTRZZUc1b1phUTF0VTNyMHY3WFJjS04xR2RSSExsMnFSWHpacFFsNC1MMXpVMEl5WVdoR29nVUl1OGQ0UHFsdUtPZFMwRlczam5wVFdQUERTTFFmUw?oc=5\" target=\"_blank\">[지원사업 공고] 11월 11일 새 정",
+   "date": "2026-11-11T06:18:23.000Z",
+   "source": "CEO경제신문",
    "type": "grant",
-   "q": "영상·디자인 제작 지원"
+   "q": "소상공인·1인 기업 지원"
+  },
+  {
+   "title": "\"기술 증명 전의 창업자에 투자\"…매쉬업벤처스, 259억 펀드 결성",
+   "link": "https://news.google.com/rss/articles/CBMibEFVX3lxTE9SX3pyM3pMcjJ0ZnBIdDZ6LWV2TU1RUEx5dHVOVTFmV3BtZUs5LUdKOHZCMGdLRmlXOVhleUFXemI2ZjFyR2tPemJnbUxreUlXMTZkVW5meWlnbkVsMGVfeXhJeWt3ZHNEdGdHMg?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMibEFVX3lxTE9SX3pyM3pMcjJ0ZnBIdDZ6LWV2TU1RUEx5dHVOVTFmV3BtZUs5LUdKOHZCMGdLRmlXOVhleUFXemI2ZjFyR2tPemJnbUxreUlXMTZkVW5meWlnbkVsMGVfeXhJeWt3ZHNEdGdHMg?oc=5\" target=\"_blank\">\"기술 증명 전의 창업자에 투자\"…매쉬",
+   "date": "2026-11-11T06:00:00.000Z",
+   "source": "유니콘팩토리",
+   "type": "news",
+   "q": "스타트업 소식"
   },
   {
    "title": "부산창조경제혁신센터, 서울서 ‘2026 BCCEI DEMODAY’ 개최…유망 스타트업 15개사 투자유치 나선다",
@@ -966,7 +1119,7 @@
    "date": "2026-11-10T08:00:00.000Z",
    "source": "매일경제",
    "type": "grant",
-   "q": "영상·디자인 제작 지원"
+   "q": "소상공인·1인 기업 지원"
   },
   {
    "title": "군산콘텐츠팩토리 [내 목소리로 만드는 오디오북]교육 참가자 모집",
@@ -1002,7 +1155,7 @@
    "date": "2026-11-10T06:23:36.000Z",
    "source": "군산시 누리집",
    "type": "grant",
-   "q": "영상·디자인 제작 지원"
+   "q": "콘텐츠 지원사업 공고"
   },
   {
    "title": "시흥산업진흥원, 한국벤처캐피탈협회와 손잡고 지역 스타트업 투자유치 지원 나선다",
@@ -1023,6 +1176,15 @@
    "q": "입주·공간 지원"
   },
   {
+   "title": "서울창업허브 창동, 문화·콘텐츠 창조산업 이끌 입주 스타트업 모집",
+   "link": "https://news.google.com/rss/articles/CBMiZEFVX3lxTE82SEd0OG9VcWNVcGpidWRKc2tJb3RVRlpPT05sazZuN0NvZGtSMjRKS0lIam1rVWhzRk1uUjZvbkFTaFFhb0FrR1lxcnJkZDA2dkVScEpac05ETTRSN1NHbDZyVko?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiZEFVX3lxTE82SEd0OG9VcWNVcGpidWRKc2tJb3RVRlpPT05sazZuN0NvZGtSMjRKS0lIam1rVWhzRk1uUjZvbkFTaFFhb0FrR1lxcnJkZDA2dkVScEpac05ETTRSN1NHbDZyVko?oc=5\" target=\"_blank\">서울창업허브 창동, 문화·콘텐츠 창조산업 이끌 입주 스타트",
+   "date": "2026-11-10T04:03:00.000Z",
+   "source": "위런치",
+   "type": "grant",
+   "q": "입주·공간 지원"
+  },
+  {
    "title": "[청년정책 체감지도 ⑤] 53명 창업·44명 고용…전남 청년창업, ‘정착’ 숫자까지 따라가보니",
    "link": "https://news.google.com/rss/articles/CBMifkFVX3lxTFBwS1JUcURxaGRHRTdlbWszaFgyY2kzcmlPdVhTYVlsMW90a2hRVTNpQzBlLUVUQnFtdU9QSGM4ZG12d3JON3c2bWRrOVNqa0VBWlc4TDNaRmkxY1NOMEVRazVweTZsbUl6TDh0NHhuQmJrc1RBWjVWUVNCeHBrZw?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMifkFVX3lxTFBwS1JUcURxaGRHRTdlbWszaFgyY2kzcmlPdVhTYVlsMW90a2hRVTNpQzBlLUVUQnFtdU9QSGM4ZG12d3JON3c2bWRrOVNqa0VBWlc4TDNaRmkxY1NOMEVRazVweTZsbUl6TDh0NHhuQmJrc1RBWjVWUVNCeHBrZw?oc=5\" target=\"_blan",
@@ -1030,6 +1192,15 @@
    "source": "더파워",
    "type": "grant",
    "q": "예비·초기 창업 지원"
+  },
+  {
+   "title": "남해군 창생플랫폼 개방… '가상오피스' 입주기업 상시 모집",
+   "link": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE42ZHAyVlZTV0J2S2JkUGpoalp3TDR0WnVuTzR5alBxRXdMUnBJRnY1V3c1OFpkUFRoWU5hOGtYRVVLcVh5aXljbFFyNEE0Y0xuTUVVS2hDV0NaTGpDcVhJN3JDUQ?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiY0FVX3lxTE42ZHAyVlZTV0J2S2JkUGpoalp3TDR0WnVuTzR5alBxRXdMUnBJRnY1V3c1OFpkUFRoWU5hOGtYRVVLcVh5aXljbFFyNEE0Y0xuTUVVS2hDV0NaTGpDcVhJN3JDUQ?oc=5\" target=\"_blank\">남해군 창생플랫폼 개방… '가상오피스' 입주기업 상시 모집<",
+   "date": "2026-11-10T02:07:25.000Z",
+   "source": "프라임경제",
+   "type": "grant",
+   "q": "입주·공간 지원"
   },
   {
    "title": "충남혁신센터, 'NAVI효과 네트워킹데이' 개최... 초기창업자·투자유치 희망기업 모집",
@@ -1045,7 +1216,7 @@
    "link": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE5nLThBZWY1LTNmNEh5VzJvWTNHb09QVlJ2YU5HUWduU2RXaTMtMVgwX0plOVdzNUdwQ29EbXhOVXJRYjJ4aVZoT0NwSUFpbGl2YmprM1Q2NWI?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMiWEFVX3lxTE5nLThBZWY1LTNmNEh5VzJvWTNHb09QVlJ2YU5HUWduU2RXaTMtMVgwX0plOVdzNUdwQ29EbXhOVXJRYjJ4aVZoT0NwSUFpbGl2YmprM1Q2NWI?oc=5\" target=\"_blank\">대기업 협력은 마곡, 콘텐츠 창업은 창동! 창업허브 2곳 입주기업 모집</a> <fon",
    "date": "2026-11-09T08:00:00.000Z",
-   "source": "내 손안에 서울",
+   "source": "서울특별시",
    "type": "grant",
    "q": "입주·공간 지원"
   },
@@ -1120,6 +1291,33 @@
    "source": "관악FM",
    "type": "news",
    "q": "스타트업 소식"
+  },
+  {
+   "title": "내게 맞는 정책 · 지원 - 지원사업 - 2026년 5차 K-브랜드 정부인증제도 참여기업 모집 공고",
+   "link": "https://news.google.com/rss/articles/CBMijwFBVV95cUxPMWJzNC0zRzVieEZIRUptaFBneENESTRVdTlLOXFDeS1lM3hxOF81Vzd5ZTdERUowMGFGOHlpV0FtNThPXzBoQk12RWo5Snd0MzdrLXd5MGJaTUxDaG5QWFJDdWI5ZTBxd0pzTFI1cW1IZ1FfQTB1X0JabFRBR01fRFpQbW5acGN0ODQ0NTU5NA?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMijwFBVV95cUxPMWJzNC0zRzVieEZIRUptaFBneENESTRVdTlLOXFDeS1lM3hxOF81Vzd5ZTdERUowMGFGOHlpV0FtNThPXzBoQk12RWo5Snd0MzdrLXd5MGJaTUxDaG5QWFJDdWI5ZTBxd0pzTFI1cW1IZ1FfQTB1X0JabFRBR01fRFpQbW5acGN0ODQ0NT",
+   "date": "2026-11-09T08:00:00.000Z",
+   "source": "인천광역시",
+   "type": "grant",
+   "q": "콘텐츠 지원사업 공고"
+  },
+  {
+   "title": "서울시, 마곡·창동 창업허브 입주기업 25곳 모집",
+   "link": "https://news.google.com/rss/articles/CBMiUkFVX3lxTE5QcEdxWGtHYUdRQzdqTUh4M1FTLWVreG9KdXE1c1JTbTBCaVQ5ZXduOHZteTd6ZzEtYXpFS1dlajE3bzJwWXd3LVN5OEtZMlM5cmc?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiUkFVX3lxTE5QcEdxWGtHYUdRQzdqTUh4M1FTLWVreG9KdXE1c1JTbTBCaVQ5ZXduOHZteTd6ZzEtYXpFS1dlajE3bzJwWXd3LVN5OEtZMlM5cmc?oc=5\" target=\"_blank\">서울시, 마곡·창동 창업허브 입주기업 25곳 모집</a> <font color=\"#6f6f6f\">매일",
+   "date": "2026-11-09T08:00:00.000Z",
+   "source": "매일경제 마켓",
+   "type": "grant",
+   "q": "콘텐츠 지원사업 공고"
+  },
+  {
+   "title": "서울시, 마곡·창동 창업허브 입주기업 모집…총 25개사",
+   "link": "https://news.google.com/rss/articles/CBMiYEFVX3lxTE1iU3BINDkxUWVBV0w4TXhoUi1NNmoxZjc1QThvck9CaElZOWFfcFhHSDM0ZjE4d2c5QlA4WTNoaU9WR1lDdEhNbE54ZzFKZll5dXpNQkhKanVLaV9vWTM3MNIBeEFVX3lxTE1yUERoR3pCZEtvaUtUWjZDXy05eldMWE9BZ1NwdGZXUk1aUFNFMzNDUmsyTXl1RnNlSk1ra0IzekQzd01ETFJBRkxwVGdUcHY5aDl6M3ZxWG8wc2w5Z0dBbWhyd09odnZOM2VjbVpkZkhQNXFhNWxBag?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiYEFVX3lxTE1iU3BINDkxUWVBV0w4TXhoUi1NNmoxZjc1QThvck9CaElZOWFfcFhHSDM0ZjE4d2c5QlA4WTNoaU9WR1lDdEhNbE54ZzFKZll5dXpNQkhKanVLaV9vWTM3MNIBeEFVX3lxTE1yUERoR3pCZEtvaUtUWjZDXy05eldMWE9BZ1NwdGZXUk1aUF",
+   "date": "2026-11-09T08:00:00.000Z",
+   "source": "뉴시스",
+   "type": "grant",
+   "q": "입주·공간 지원"
   },
   {
    "title": "한춘옥 위원장 \"전남형 청년창업사관학교 방만 운영 개선해야\"",
@@ -1203,20 +1401,20 @@
    "q": "스타트업 소식"
   },
   {
-   "title": "서울시, 마곡·창동 창업허브 입주기업 25곳 모집",
-   "link": "https://news.google.com/rss/articles/CBMiW0FVX3lxTE1jRm5hb0hrVG4xMUdRUERXVExKSDJQbnd4c3pnYlVyOUpjN2dWd2hRQml4TjlYSUdlTElqLWZFS1NnQmFhTkt0R3REd0RmOF8zTF8zRmY4aU5sYzTSAWBBVV95cUxNZWd2SFR0Mldvd2J4bjl3RW9uN3RKRG8xQTh2QzVYTVFzclI1cy1rWVlQMXktNlhhWHhOWGpQTzBOank5THM1blNaTjA2U1lzRGRVeWdjdnAySGhXUjIyYms?oc=5",
-   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiW0FVX3lxTE1jRm5hb0hrVG4xMUdRUERXVExKSDJQbnd4c3pnYlVyOUpjN2dWd2hRQml4TjlYSUdlTElqLWZFS1NnQmFhTkt0R3REd0RmOF8zTF8zRmY4aU5sYzTSAWBBVV95cUxNZWd2SFR0Mldvd2J4bjl3RW9uN3RKRG8xQTh2QzVYTVFzclI1cy1rWV",
-   "date": "2026-11-08T21:00:06.000Z",
-   "source": "연합뉴스",
-   "type": "grant",
-   "q": "입주·공간 지원"
-  },
-  {
    "title": "“대기업 협력 돕고 문화·콘텐츠 창업 지원...서울시, 창업허브 2곳 입주기업 모집",
    "link": "https://news.google.com/rss/articles/CBMia0FVX3lxTE01Ulhlek9vOGVZR2huNkVTVHBDYlhkd19CRUNNeGFqY1QxX0pXMEVGRU5Zclo0ckY4TXBfelpIZ3FoVHFlWnBMbWtTbVFpb2hEYkdaVURjbjZrQjVJOGVjNm41SlZ2aHNJa09r?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMia0FVX3lxTE01Ulhlek9vOGVZR2huNkVTVHBDYlhkd19CRUNNeGFqY1QxX0pXMEVGRU5Zclo0ckY4TXBfelpIZ3FoVHFlWnBMbWtTbVFpb2hEYkdaVURjbjZrQjVJOGVjNm41SlZ2aHNJa09r?oc=5\" target=\"_blank\">“대기업 협력 돕고 문화·콘텐츠 창업 지원",
    "date": "2026-11-08T21:00:00.000Z",
    "source": "BBS불교방송",
+   "type": "grant",
+   "q": "입주·공간 지원"
+  },
+  {
+   "title": "서울시, 마곡·창동 창업허브 입주기업 25곳 모집",
+   "link": "https://news.google.com/rss/articles/CBMiW0FVX3lxTE1jRm5hb0hrVG4xMUdRUERXVExKSDJQbnd4c3pnYlVyOUpjN2dWd2hRQml4TjlYSUdlTElqLWZFS1NnQmFhTkt0R3REd0RmOF8zTF8zRmY4aU5sYzTSAWBBVV95cUxNZWd2SFR0Mldvd2J4bjl3RW9uN3RKRG8xQTh2QzVYTVFzclI1cy1rWVlQMXktNlhhWHhOWGpQTzBOank5THM1blNaTjA2U1lzRGRVeWdjdnAySGhXUjIyYms?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiW0FVX3lxTE1jRm5hb0hrVG4xMUdRUERXVExKSDJQbnd4c3pnYlVyOUpjN2dWd2hRQml4TjlYSUdlTElqLWZFS1NnQmFhTkt0R3REd0RmOF8zTF8zRmY4aU5sYzTSAWBBVV95cUxNZWd2SFR0Mldvd2J4bjl3RW9uN3RKRG8xQTh2QzVYTVFzclI1cy1rWV",
+   "date": "2026-11-08T08:00:00.000Z",
+   "source": "연합뉴스",
    "type": "grant",
    "q": "입주·공간 지원"
   },
@@ -1248,6 +1446,15 @@
    "q": "공모전"
   },
   {
+   "title": "[채용공고] 금천구, ‘영상 콘텐츠 기획·제작’ 분야 ‘시간선택제 임기제 다급·라급’ 1명씩 채용",
+   "link": "https://news.google.com/rss/articles/CBMibkFVX3lxTE1tN3pqNFVkUzJubmNGMnFMQlZYOElYS3BwODlNMklGd2Frdk1fRVNPcDVsWkZldFh6bkVaWklxNHp1Rjh1YmQxcXhnWHFxX1d5SHRieUpsOTJRbXpNRVVBOXMwNkQtdW9mWGRlNkNB?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMibkFVX3lxTE1tN3pqNFVkUzJubmNGMnFMQlZYOElYS3BwODlNMklGd2Frdk1fRVNPcDVsWkZldFh6bkVaWklxNHp1Rjh1YmQxcXhnWHFxX1d5SHRieUpsOTJRbXpNRVVBOXMwNkQtdW9mWGRlNkNB?oc=5\" target=\"_blank\">[채용공고] 금천구, ‘영상 콘텐츠",
+   "date": "2026-11-08T08:00:00.000Z",
+   "source": "G밸리타임스",
+   "type": "grant",
+   "q": "콘텐츠 지원사업 공고"
+  },
+  {
    "title": "'시민이 소개하는 서울시 정책'…27일까지 영상공모전 접수",
    "link": "https://news.google.com/rss/articles/CBMidEFVX3lxTE1JZkVBTnNlNFl6X0VUWDZTX1gtdXA3ZVVGZU5ELWNQUl96ZlZ0OW52YzkyVzhTYkkxSW15cW9qZmVBMFpxNkVKSWFfOFZUcDJuaHlYc0N3OHN2MWJwbVB5ek80amZhTm9MeW5BcUhfSTY4OXRL?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMidEFVX3lxTE1JZkVBTnNlNFl6X0VUWDZTX1gtdXA3ZVVGZU5ELWNQUl96ZlZ0OW52YzkyVzhTYkkxSW15cW9qZmVBMFpxNkVKSWFfOFZUcDJuaHlYc0N3OHN2MWJwbVB5ek80amZhTm9MeW5BcUhfSTY4OXRL?oc=5\" target=\"_blank\">'시민이 소개하는 서",
@@ -1255,15 +1462,6 @@
    "source": "연합뉴스 한민족센터",
    "type": "grant",
    "q": "공모전"
-  },
-  {
-   "title": "[채용공고] 금천구, ‘영상 콘텐츠 기획·제작’ 분야 ‘시간선택제 임기제 다급·라급’ 1명씩 채용",
-   "link": "https://news.google.com/rss/articles/CBMibkFVX3lxTE1tN3pqNFVkUzJubmNGMnFMQlZYOElYS3BwODlNMklGd2Frdk1fRVNPcDVsWkZldFh6bkVaWklxNHp1Rjh1YmQxcXhnWHFxX1d5SHRieUpsOTJRbXpNRVVBOXMwNkQtdW9mWGRlNkNB?oc=5",
-   "desc": "<a href=\"https://news.google.com/rss/articles/CBMibkFVX3lxTE1tN3pqNFVkUzJubmNGMnFMQlZYOElYS3BwODlNMklGd2Frdk1fRVNPcDVsWkZldFh6bkVaWklxNHp1Rjh1YmQxcXhnWHFxX1d5SHRieUpsOTJRbXpNRVVBOXMwNkQtdW9mWGRlNkNB?oc=5\" target=\"_blank\">[채용공고] 금천구, ‘영상 콘텐츠",
-   "date": "2026-11-07T15:00:00.000Z",
-   "source": "G밸리타임스",
-   "type": "grant",
-   "q": "콘텐츠 지원사업 공고"
   },
   {
    "title": "\"미국령 괌·사이판, 법인세 공제 때 미국과 별개 국가로 봐야\"",
@@ -1300,6 +1498,15 @@
    "source": "한국미디어창업뉴스",
    "type": "news",
    "q": "스타트업 소식"
+  },
+  {
+   "title": "강원영상위원회, 2027년 심의위원 공개 모집",
+   "link": "https://news.google.com/rss/articles/CBMibEFVX3lxTE52eUlPQnI2SUdVdWVFcDFGc3BLT09kanNobnBYX3Q1WmNLUWdnZ3daMUZ1MTRERkxkb1VlRmVuRmhsOEFoLXhvTEVhbnUxT3hnb3lMLUduQktPTVluQ05oWWp3ODJseVQyWHJ6Vg?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMibEFVX3lxTE52eUlPQnI2SUdVdWVFcDFGc3BLT09kanNobnBYX3Q1WmNLUWdnZ3daMUZ1MTRERkxkb1VlRmVuRmhsOEFoLXhvTEVhbnUxT3hnb3lMLUduQktPTVluQ05oWWp3ODJseVQyWHJ6Vg?oc=5\" target=\"_blank\">강원영상위원회, 2027년 심의위원 공",
+   "date": "2026-11-06T08:00:00.000Z",
+   "source": "행정신문",
+   "type": "grant",
+   "q": "콘텐츠 지원사업 공고"
   },
   {
    "title": "첫발 내딛는 장애예술인 지원 늘린다…내년 지원사업 접수",
@@ -1446,6 +1653,15 @@
    "q": "공모전"
   },
   {
+   "title": "은행연합회 청년 소상공인 무료 컨설팅 모집…3회 대면, 11월 30일까지",
+   "link": "https://news.google.com/rss/articles/CBMia0FVX3lxTFA2cHY1V24tU0lWMUNGemtVSkh0TDdMU21MVmRobTJQV3RNZG9qUHRrMHhzLXdRRzV6Mko1aTZ4YlhyQnlJYVVlVWNsOWtyZkF1SURjUExrZGJyVW9fLThUUUl5MmRMNWNYWm1z?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMia0FVX3lxTFA2cHY1V24tU0lWMUNGemtVSkh0TDdMU21MVmRobTJQV3RNZG9qUHRrMHhzLXdRRzV6Mko1aTZ4YlhyQnlJYVVlVWNsOWtyZkF1SURjUExrZGJyVW9fLThUUUl5MmRMNWNYWm1z?oc=5\" target=\"_blank\">은행연합회 청년 소상공인 무료 컨설팅 모집",
+   "date": "2026-11-03T08:00:00.000Z",
+   "source": "ISSUE ON (이슈온)",
+   "type": "grant",
+   "q": "소상공인·1인 기업 지원"
+  },
+  {
    "title": "중기부, 초기창업·도약 패키지 주관기관 35곳 모집…신청 23일까지",
    "link": "https://news.google.com/rss/articles/CBMiaEFVX3lxTFA4RFdxX2xJRFRzeTRBdjBnMXVFM19JZERBR0VzNEpZRlZ4M0dxSDAxT1RzeFVrVW94YldpQk9TZTBwUURVNks2WUNTR1hHdmpoVjR3MDNfQXhMRGpaaFlLU2RKTFhVUllH?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMiaEFVX3lxTFA4RFdxX2xJRFRzeTRBdjBnMXVFM19JZERBR0VzNEpZRlZ4M0dxSDAxT1RzeFVrVW94YldpQk9TZTBwUURVNks2WUNTR1hHdmpoVjR3MDNfQXhMRGpaaFlLU2RKTFhVUllH?oc=5\" target=\"_blank\">중기부, 초기창업·도약 패키지 주관기관 35곳 모",
@@ -1590,6 +1806,15 @@
    "q": "입주·공간 지원"
   },
   {
+   "title": "종로구, 소상공인 창업교육 마련…수료·심화 이수 땐 보증 한도 7천만원",
+   "link": "https://news.google.com/rss/articles/CBMiSkFVX3lxTE1NSkVsVmZIblpWWlNoVkJ5N00yYVY3QWpYT2FwczdfZDFBWlNnNC02T2xfWjdTeWNGWjJjQjVKNmRWS1ptNTVtUHJR?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiSkFVX3lxTE1NSkVsVmZIblpWWlNoVkJ5N00yYVY3QWpYT2FwczdfZDFBWlNnNC02T2xfWjdTeWNGWjJjQjVKNmRWS1ptNTVtUHJR?oc=5\" target=\"_blank\">종로구, 소상공인 창업교육 마련…수료·심화 이수 땐 보증 한도 7천만원</a> <font color=\"#6f6f6f\">미",
+   "date": "2026-10-29T07:00:00.000Z",
+   "source": "미디어이슈",
+   "type": "grant",
+   "q": "소상공인·1인 기업 지원"
+  },
+  {
    "title": "문서뷰어",
    "link": "https://news.google.com/rss/articles/CBMid0FVX3lxTFBOdWplRWlBbFBaVHYwODdqUUNJLXl2dUI2bXUxdG1EYmRhSXp0YXVXcldXSVBGdFlrNWp1ZHdNMkYyYlZJYjJIWnlSbXFjbVlyV1BOMHl6T0gxSWdIOGxqYkUyX295Y191YlE1SjNhOVAtTDRuS1pV?oc=5",
    "desc": "<a href=\"https://news.google.com/rss/articles/CBMid0FVX3lxTFBOdWplRWlBbFBaVHYwODdqUUNJLXl2dUI2bXUxdG1EYmRhSXp0YXVXcldXSVBGdFlrNWp1ZHdNMkYyYlZJYjJIWnlSbXFjbVlyV1BOMHl6T0gxSWdIOGxqYkUyX295Y191YlE1SjNhOVAtTDRuS1pV?oc=5\" target=\"_blank\">문서뷰어</a",
@@ -1714,6 +1939,15 @@
    "source": "https://www.diarypoint.com/",
    "type": "grant",
    "q": "청년 창업 지원금"
+  },
+  {
+   "title": "[이천시 상권활성화센터] 소상공인 대상 ‘상인대학 수강생’ 모집",
+   "link": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE9VYU9nc3JIMXVhMm5yaWhLYXVyLS1ablFRbjB6Zmx0QndlZXhOeUxpckwtUTBkaWp3T3NmWHNWQTJKSWJta1psZGRObUJhV1FIOFlwblRsTkpmS2tsdXc?oc=5",
+   "desc": "<a href=\"https://news.google.com/rss/articles/CBMiXkFVX3lxTE9VYU9nc3JIMXVhMm5yaWhLYXVyLS1ablFRbjB6Zmx0QndlZXhOeUxpckwtUTBkaWp3T3NmWHNWQTJKSWJta1psZGRObUJhV1FIOFlwblRsTkpmS2tsdXc?oc=5\" target=\"_blank\">[이천시 상권활성화센터] 소상공인 대상 ‘상인대학 수강생’ 모집</a> ",
+   "date": "2026-10-25T07:00:00.000Z",
+   "source": "커넥트이천",
+   "type": "grant",
+   "q": "소상공인·1인 기업 지원"
   },
   {
    "title": "2차 모두의 창업 1만명 선발…내년 정부안 2만명·예비창업패키지 통합",
