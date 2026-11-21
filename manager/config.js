@@ -1,6 +1,6 @@
 // 공개해도 되는 값만 둔다. 결제 시크릿·키는 절대 여기에 넣지 않는다.
 // 서비스 이름. 바꾸면 index.html 제목·manifest 이름도 같이.
-export const NAME = '매니저';
+export const NAME = '피드메이트';
 // 문의 메일(하진 11/21)
 export const CONTACT = 'hchis.hj@gmail.com';
 // 요금(하진 11/21): 월 2,990원, 원래 가격 12,990원에 줄 긋고 할인 표시. 외국은 달러.

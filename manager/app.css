@@ -219,3 +219,43 @@ body.bare #tabbar{display:none}body.bare #view{padding-bottom:calc(32px + env(sa
 .sample{position:relative;text-align:left;width:100%;border:1.5px solid var(--line);animation:pop .6s var(--spring) .1s both}.sample .tag{position:absolute;top:-10px;left:14px;background:var(--ink);color:var(--bg);font-size:12px;font-weight:800;border-radius:999px;padding:2px 10px}.sample h3{margin:8px 0 2px;font-size:17px}.sample p{margin:0;color:var(--sub);font-size:13.5px;max-width:none}
 .price{position:relative;margin-top:14px}.price .tag{position:absolute;top:-10px;left:14px;background:var(--acc);color:#fff;font-size:12px;font-weight:800;border-radius:999px;padding:2px 10px}.pr{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:8px 0}.pr s{color:var(--sub);font-size:15px}.pr b{font-size:32px;font-weight:800;letter-spacing:-.03em}.pr small{color:var(--sub)}.pr em{font-style:normal;font-weight:800;color:var(--acc);background:var(--accbg);border-radius:8px;padding:2px 8px;font-size:13px}.price h4{margin:14px 0 6px;font-size:13px;color:var(--sub)}.pl{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:14.5px}.pl .ic{color:var(--good)}a.btn{display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}a.link{text-decoration:none}
 .agree{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:var(--sub);margin:6px 0 10px}.agree input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--acc)}.agree .link{display:inline;padding:0;min-height:0}.card.acct{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border:0;cursor:pointer;font:inherit;color:inherit}.card.acct p{margin:2px 0 0;font-size:13px}.card.acct b{word-break:break-all}
+
+/* ── 담백하게 (11/21 하진: AI 티 안 나게, 토스 앱처럼). 원칙만 가져옴: 색 하나, 큰 글자와 큰 숫자, 넉넉한 여백, 선·빛 번짐·그라데이션 없음, 한 화면에 큰 단추 하나 */
+:root{--bg:#f3f4f6;--card:#fff;--line:#eceef1;--sub:#6b7280;--accbg:#fff0f3;--rd:20px}
+@media (prefers-color-scheme:dark){:root{--bg:#101012;--card:#1a1a1e;--line:#26262b;--sub:#9a9aa5;--accbg:#2a1820}}
+body{font-size:15.5px}
+#view{padding-left:16px;padding-right:16px}
+.card,.tile,.wd,.mtext{box-shadow:none;border:0;border-radius:20px}
+.card{padding:20px;margin-bottom:12px}
+.tile{padding:16px;border-radius:20px}.tiles{gap:10px;margin-bottom:12px}
+.tile.big .tv{font-size:30px;letter-spacing:-.03em}
+header.top h1,h1{font-size:25px;letter-spacing:-.035em}
+h2.sec{font-size:17px;font-weight:800;color:var(--ink);margin:22px 4px 10px;border:0;padding:0}
+.btn,.ghost{border-radius:14px;min-height:48px;font-size:15.5px}
+.btn{background:var(--acc);color:#fff}
+.ghost{border:0;background:var(--bg);color:var(--ink)}
+.card .ghost{background:var(--bg)}
+.btn.sm,.ghost.sm{min-height:40px;border-radius:12px}
+.btn.xl{background:var(--acc);color:#fff;box-shadow:none;border-radius:16px;min-height:56px;font-size:17px}
+.btn.bad{background:var(--bad)}
+.iconbtn{border-radius:14px}.iconbtn.acc{background:var(--acc);color:#fff}
+.ava{background:var(--acc);color:#fff;box-shadow:none;border-radius:14px;font-weight:800;font-size:16px}
+.ava.lg{border-radius:20px;background:none;overflow:hidden}.ava.lg img{width:100%;height:100%;display:block}
+.mtext{border-radius:6px 20px 20px 20px;font-weight:600}
+.avatar{background:var(--bg);color:var(--sub)}
+.bt i,.goal .meter i{background:var(--acc)}
+.ai{border:0;background:var(--card)}
+.askbar{box-shadow:0 6px 24px -14px rgba(0,0,0,.3);border:0;border-radius:18px}
+.wi{background:var(--bg);color:var(--ink);border-radius:14px}
+.sheet{border-radius:24px 24px 0 0}
+.nudge{border:0}.sample{border:0}.sample .tag,.price .tag{background:var(--ink);color:var(--bg)}
+.chip,.pk,.lv{border-radius:8px;background:var(--bg)}
+.pchip{border:0;background:var(--card);border-radius:14px;min-height:46px}.pchip.on{background:var(--acc);color:#fff;transform:none}
+.demo{border-radius:12px}
+input,textarea,select{border-radius:14px}
+#tabbar{background:var(--card);backdrop-filter:none;-webkit-backdrop-filter:none;border-top:1px solid var(--line)}
+#tabbar button.on{color:var(--ink)}#tabbar button.on .ic{transform:none}
+.wd{padding:12px 14px}.wi2{border-radius:12px}
+.hero h1{font-size:30px}.hero{padding-top:36px}
+.prow{padding:14px 6px}
+.tagl{font-size:17px;font-weight:700;color:var(--ink)!important;margin:0}

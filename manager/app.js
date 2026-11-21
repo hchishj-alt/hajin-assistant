@@ -13,10 +13,10 @@ import { FIELDS } from './fields.js';
 import { NAME, CONTACT, PRICE, BETA, PRO, FREE } from './config.js';
 import * as AC from './account.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.6.0';
+export const VERSION = '1.7.0';
 
 const view = document.getElementById('view');
-const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
+const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'edit'], ['people', '사람', 'users']];
 const $plat = { get: () => localStorage.getItem('mgr:plat') || 'ig', set: v => localStorage.setItem('mgr:plat', v) };
 
 async function state() {
@@ -60,8 +60,8 @@ const SCREENS = {};
 SCREENS.today = async (root, st, An) => {
   const cards = A.brief(st, An);
   const hello = h('p.hello', greet(st));
-  const line = h('div.mline', h('div.ava', ic('sparkles', 18)), h('div.mtext', hello));
-  root.append(head('매니저', null, [demoBadge(), h('button.iconbtn', { 'aria-label': '협찬', onclick: () => go('#/deals'), html: icon('briefcase', 20) }), h('button.iconbtn', { 'aria-label': '숫자 채우기', onclick: () => go('#/data'), html: icon('upload', 20) }), h('button.iconbtn', { 'aria-label': '설정', onclick: () => go('#/settings'), html: icon('gear', 20) })]), line);
+  const line = h('div.mline', h('div.ava', 'F'), h('div.mtext', hello));
+  root.append(head('오늘', null, [demoBadge(), h('button.iconbtn', { 'aria-label': '협찬', onclick: () => go('#/deals'), html: icon('briefcase', 20) }), h('button.iconbtn', { 'aria-label': '숫자 채우기', onclick: () => go('#/data'), html: icon('upload', 20) }), h('button.iconbtn', { 'aria-label': '설정', onclick: () => go('#/settings'), html: icon('gear', 20) })]), line);
   // 매니저 한마디 (AI, 하루 한 번 저장)
   (async () => {
     const day = A.today(), cache = await S.get('dailyline', null);
@@ -92,7 +92,7 @@ SCREENS.today = async (root, st, An) => {
     h('div.bcm', h('div.bct', h('span.lv.' + LV[c.lvl][1], LV[c.lvl][0]), c.title), h('p', c.body), c.go ? h('button.link', { onclick: () => go(c.go) }, c.btn || '열기', ic('right', 14)) : null),
     c.num ? h('div.bcn', c.num) : null)));
   if (!cards.length) list.append(empty('check', '오늘은 급한 게 없어요', '올릴 거 하나 정해 볼까요?', h('button.btn', { onclick: () => go('#/coach') }, '코치 열기')));
-  if (!(await AI.hasKey()) && !localStorage.getItem('mgr:ainudge')) root.append(h('div.card.nudge', h('div.wi', ic('sparkles', 20)), h('div', h('b', '매니저 머리 켜기 (무료 · 1분)'), h('p.muted', '지금은 정해진 규칙으로만 일해요. 구글 무료 AI 키를 한 번 넣으면 내 분야 트렌드 찾기, 영상·캡션 피드백, 대화가 열려요.'), h('div.row.gap', h('button.btn.sm', { onclick: () => go('#/settings') }, '켜러 가기'), h('button.link', { onclick: e => { localStorage.setItem('mgr:ainudge', '1'); e.currentTarget.closest('.nudge').remove(); } }, '나중에')))));
+  if (!(await AI.hasKey()) && !localStorage.getItem('mgr:ainudge')) root.append(h('div.card.nudge', h('div.wi', ic('zap', 20)), h('div', h('b', '매니저 머리 켜기 (무료 · 1분)'), h('p.muted', '지금은 정해진 규칙으로만 일해요. 구글 무료 AI 키를 한 번 넣으면 내 분야 트렌드 찾기, 영상·캡션 피드백, 대화가 열려요.'), h('div.row.gap', h('button.btn.sm', { onclick: () => go('#/settings') }, '켜러 가기'), h('button.link', { onclick: e => { localStorage.setItem('mgr:ainudge', '1'); e.currentTarget.closest('.nudge').remove(); } }, '나중에')))));
   root.append(h('h2.sec', '매니저가 본 것 ', h('small', cards.length + '')), list);
   // 매니저에게 묻기
   const q = h('input.ask', { placeholder: '매니저에게 물어보기 (예: 이번 주 뭐 올려?)', enterkeyhint: 'send' });
@@ -415,7 +415,7 @@ SCREENS.coach = async (root, st, An, [tab = 'video']) => {
         try {
           const v = await AI.video({ about: st.about, plat, frames: r.frames, meta: r.meta, rules: r.rules, idea: idea.value });
           const res = h('div.card.ai',
-            h('div.row.sb', h('b', ic('sparkles', 16), ' 매니저 피드백'), h('span.score', (v.score ?? '–') + '점')), h('p.one', v.one || ''),
+            h('div.row.sb', h('b', '매니저 피드백'), h('span.score', (v.score ?? '–') + '점')), h('p.one', v.one || ''),
             v.hook ? h('div.hook', h('b', `첫 1~2초 ${v.hook.score ?? '–'}/10`), h('p', v.hook.say)) : null,
             (v.good || []).length ? h('div', h('h4', '좋아요'), h('ul', v.good.map(x => h('li', x)))) : null,
             (v.fix || []).length ? h('div', h('h4', '고치면 좋아요'), h('div.fixes', v.fix.map(x => h('div.fix', h('span.ft', x.t), h('div', h('b', x.what), h('p', x.how)))))) : null,
@@ -450,7 +450,7 @@ SCREENS.coach = async (root, st, An, [tab = 'video']) => {
           h('div.card', h('p', h('b', '해시태그 '), tags), r.first ? h('p', h('b', '첫 줄 '), r.first) : null, r.cta ? h('p', h('b', '끝맺음 '), r.cta) : null, (r.keywords || []).length ? h('p', h('b', '검색 낱말 '), r.keywords.join(', ')) : null));
       } catch (er) { out.append(h('div.card', 'AI가 못 썼어요: ' + er.message), capRules(idea.value, st)); }
       busy(btn, false);
-    } }, ic('sparkles', 16), '캡션 받기')), out);
+    } }, ic('type', 16), '캡션 받기')), out);
   }
   if (tab === 'plan') {
     const out = h('div'); const saved = await S.get('plan', null);
@@ -601,7 +601,7 @@ function adForm() {
 // ── 처음 온 사람: 소개 ──
 SCREENS.hello = async root => {
   const feat = (icn, t, b) => h('div.feat', h('div.wi', ic(icn, 20)), h('div', h('b', t), h('p', b)));
-  root.append(h('div.hero', h('div.ava.lg', ic('sparkles', 30)), h('h1', '내 인스타·틱톡을', h('br'), '같이 키우는 매니저'), h('p', '뭘 올릴지, 언제 올릴지, 뭘 고칠지. 매니저가 먼저 정해서 알려 줘요. 나는 찍고 올리기만.')),
+  root.append(h('div.hero', h('div.ava.lg', h('img', { src: 'icon-192.png', alt: NAME })), h('h1', NAME), h('p.tagl', '내 인스타·틱톡을 같이 키우는 매니저'), h('p', '뭘 올릴지, 언제 올릴지, 뭘 고칠지. 매니저가 먼저 정해서 알려 줘요. 나는 찍고 올리기만.')),
     h('div.card.sample', h('span.tag', '매니저가 이렇게 알려 줘요'), h('div.row.gap0', ic('ig', 16), h('b', '오늘 20:00'), h('span.pk', '릴스'), h('span.chip', '뷰티')), h('h3', '3분 데일리 메이크업 전후'), h('p', h('b', '첫 1초 '), '완성된 얼굴 1초 → 맨얼굴로 돌아가서 시작'), h('p', h('b', '왜 '), '지난주 전후 비교 릴스가 평소의 2.1배 도달했어요')),
     h('div.card.feats',
       feat('target', '이번 주 뭘 올릴지 짜 줘요', '내 분야에서 지금 잘되는 영상을 찾아보고, 날짜·시간·첫 장면까지 정해요.'),

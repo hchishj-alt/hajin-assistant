@@ -1,5 +1,5 @@
 // 매니저 앱 오프라인 + 자동 업데이트. app.js의 VERSION과 같이 올릴 것
-const VERSION = '1.6.0';
+const VERSION = '1.7.0';
 const CACHE = 'mgr-' + VERSION;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'app.css', 'app.js', 'store.js', 'analyze.js', 'ai.js', 'ig.js', 'importers.js', 'video.js', 'demo.js', 'ui.js', 'strategy.js', 'explore.js', 'web.js', 'fields.js', 'config.js', 'account.js', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable.png', '../js/db.js', '../js/icons.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
