@@ -7,7 +7,7 @@ import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
 import { CONTACT } from './config.js';
 import { legalView, legalLinks, bizLine } from './legal.js';
 
-export const VERSION = '1.7.0';
+export const VERSION = '1.7.1';
 
 
 /* ---------- 프로젝트(폴더) ---------- */

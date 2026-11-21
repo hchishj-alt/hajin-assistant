@@ -6,7 +6,7 @@
 영상 찍을 때 폰 카메라 화면 위에 대본을 띄워 주는 텔레프롬프터. 대본이 흐르고, 그 자리에서 녹화·저장까지 된다.
 무료로 기본 기능을 쓰고, 월 990원 카드 구독(프로)으로 제한이 풀린다. 기프트 키로도 열 수 있다.
 
-- 주소: https://hchishj-alt.github.io/hajin-assistant/prompter/ (예전 https://hchishj-alt.github.io/eternia-exhibition/studio/ 는 여기로 넘어옴, 그곳 대본 `pst_scripts`는 처음 열 때 자동으로 옮김)
+- 주소(공식, 검색 등록): https://hchishj-alt.github.io/hajin-assistant/prompter/ (예전 https://hchishj-alt.github.io/eternia-exhibition/studio/ 는 여기로 넘어옴, 그곳 대본 `pst_scripts`는 처음 열 때 자동으로 옮김)
 - 구독 관리: 위 주소 + `#/plan` / 관리 화면: `#/admin` (관리 비밀키)
 - 운영자: 김하진(사업자 있음, 디자이너라 UI 기준이 높다)
 - 같은 저장소의 다른 앱(팀 앱 `/`, 매니저 `/manager/`, 틀 스튜디오 `/studio/`)과 **완전히 따로** 돈다.

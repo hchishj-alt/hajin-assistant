@@ -26,7 +26,7 @@ export const PORTONE = {
 export const CONTACT = 'hchis.hj@gmail.com';
 
 // 사이트 주소(검색·공유 미리보기). 주소가 바뀌면 index.html·robots.txt·sitemap.xml도 같이.
-export const SITE = 'https://prompri-edit.pages.dev/';
+export const SITE = 'https://hchishj-alt.github.io/hajin-assistant/prompter/';
 
 // 사업자 정보(전자상거래법 표시 의무). 하진이 알려 주면 채운다. 빈 칸은 화면에 안 나온다.
 export const BIZ = {
@@ -39,4 +39,4 @@ export const BIZ = {
 };
 
 // 출시 베타: 카드 결제가 열리기 전(cardReady()가 거짓)에는 누구나 프로로 쓰게 할지. 카드가 열리면 저절로 꺼진다.
-export const BETA = true;
+export const BETA = false;
