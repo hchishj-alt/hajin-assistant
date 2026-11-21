@@ -1,6 +1,6 @@
 // 프롬프트 스튜디오 전용 서비스 워커. 범위를 /studio/로 좁혀서, 같은 주소 아래 팀 앱의 서비스 워커가
 // 이 화면을 옛 캐시로 내주지 않게 함. 늘 새 것 먼저, 인터넷이 없을 때만 받아 둔 것.
-const CACHE = 'ps-v4';
+const CACHE = 'ps-v5';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k.startsWith('ps-') && k !== CACHE) await caches.delete(k);

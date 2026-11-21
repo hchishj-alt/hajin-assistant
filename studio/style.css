@@ -103,6 +103,8 @@ mark.filled{background:var(--hi-soft)}
 .plan span{font-size:13px;color:var(--ink3);font-weight:600}.plan b{font-size:17px;font-variant-numeric:tabular-nums}
 .plan em{position:absolute;top:-9px;font-style:normal;font-size:11px;font-weight:700;background:var(--hi);color:#16161a;padding:2px 7px;border-radius:99px}
 .plan.on{border-color:var(--ink);transform:scale(1.03)}
+s.list{color:var(--ink3);font-size:12px;font-weight:500;text-decoration-thickness:1.5px}
+.plans.one{grid-template-columns:1fr}.plans.one .plan{flex-direction:row;justify-content:center;gap:10px;padding:16px;transform:none}.plans.one .plan b{font-size:22px}.plans.one .plan s.list{font-size:14px}
 .steps{list-style:none;padding:0;margin-top:20px;display:flex;flex-direction:column;gap:12px;counter-reset:s}
 .steps li{counter-increment:s;position:relative;padding:14px 14px 14px 52px;border-radius:16px;background:var(--card);border:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
 .steps li::before{content:counter(s);position:absolute;left:14px;top:14px;width:26px;height:26px;border-radius:50%;background:var(--acc);color:var(--acc-ink);display:grid;place-items:center;font-size:13px;font-weight:800}
