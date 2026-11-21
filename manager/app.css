@@ -259,3 +259,5 @@ input,textarea,select{border-radius:14px}
 .hero h1{font-size:30px}.hero{padding-top:36px}
 .prow{padding:14px 6px}
 .tagl{font-size:17px;font-weight:700;color:var(--ink)!important;margin:0}
+header.top h1{white-space:nowrap}
+.demorow{margin:-4px 0 12px}.demorow .demo{width:100%;justify-content:center;min-height:44px;font-size:14px}

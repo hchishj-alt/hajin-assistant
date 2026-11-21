@@ -13,7 +13,7 @@ import { FIELDS } from './fields.js';
 import { NAME, CONTACT, PRICE, BETA, PRO, FREE } from './config.js';
 import * as AC from './account.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.7.0';
+export const VERSION = '1.7.1';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'edit'], ['people', '사람', 'users']];
@@ -46,7 +46,7 @@ async function route() {
   view.classList.add('in'); window.scrollTo(0, 0);
 }
 const head = (title, sub, right) => h('header.top', h('div', h('h1', title), sub ? h('p.sub', sub) : null), h('div.topr', right));
-const demoBadge = () => S.getMode() === 'demo' ? h('button.demo', { onclick: () => localStorage.getItem('mgr:onboarded') ? go('#/settings') : go('#/start') }, ic('flag', 14), localStorage.getItem('mgr:onboarded') ? '연습 모드 · 봄이' : '구경 중 · 내 계정으로 시작') : null;
+const demoBadge = () => S.getMode() === 'demo' ? h('button.demo', { onclick: () => localStorage.getItem('mgr:onboarded') ? go('#/settings') : go('#/start') }, ic('flag', 14), localStorage.getItem('mgr:onboarded') ? '연습 중' : '내 계정으로 시작') : null;
 const go = hsh => { location.hash = hsh; };
 const tile = (icn, label, val, sub, cls = '') => h('div.tile' + (cls ? '.' + cls : ''), h('div.tl', ic(icn, 15), label), h('div.tv', val), sub ? h('div.ts', sub) : null);
 // 한 곳만 쓰는 사람에게는 고르는 단추를 안 보임
@@ -61,7 +61,8 @@ SCREENS.today = async (root, st, An) => {
   const cards = A.brief(st, An);
   const hello = h('p.hello', greet(st));
   const line = h('div.mline', h('div.ava', 'F'), h('div.mtext', hello));
-  root.append(head('오늘', null, [demoBadge(), h('button.iconbtn', { 'aria-label': '협찬', onclick: () => go('#/deals'), html: icon('briefcase', 20) }), h('button.iconbtn', { 'aria-label': '숫자 채우기', onclick: () => go('#/data'), html: icon('upload', 20) }), h('button.iconbtn', { 'aria-label': '설정', onclick: () => go('#/settings'), html: icon('gear', 20) })]), line);
+  root.append(head(NAME, null, [h('button.iconbtn', { 'aria-label': '협찬', onclick: () => go('#/deals'), html: icon('briefcase', 20) }), h('button.iconbtn', { 'aria-label': '숫자 채우기', onclick: () => go('#/data'), html: icon('upload', 20) }), h('button.iconbtn', { 'aria-label': '설정', onclick: () => go('#/settings'), html: icon('gear', 20) })]), line);
+  { const d = demoBadge(); if (d) root.append(h('div.demorow', d)); }
   // 매니저 한마디 (AI, 하루 한 번 저장)
   (async () => {
     const day = A.today(), cache = await S.get('dailyline', null);
@@ -729,7 +730,7 @@ SCREENS.settings = async (root, st) => {
   root.append(h('h2.sec', '폰에 설치'), h('div.card', h('p', /iphone|ipad/i.test(navigator.userAgent) ? 'Safari 아래 공유 버튼 › "홈 화면에 추가"' : 'Chrome 메뉴(⋮) › "앱 설치" 또는 "홈 화면에 추가"'), h('p.fhint', '홈 화면에 아이콘이 생기고 앱처럼 열려요. 카카오톡·인스타 안에서 열었다면 먼저 Safari나 Chrome으로 열어 주세요.')));
   const BK = ['profile', 'posts', 'snaps', 'people', 'handled', 'deals', 'about', 'ads', 'reviews', 'plan', 'strategy', 'explore', 'routine', 'drafts', 'refs', 'chat'];
   root.append(h('h2.sec', '데이터'), h('div.card.form', h('p.muted', '모든 기록은 이 기기에만 있어요. 폰을 바꾸거나 브라우저 기록을 지우면 사라지니 가끔 백업을 받아 두세요. 백업 파일에 인스타 토큰과 AI 키는 넣지 않아요.'), h('div.row.gap', h('button.ghost', { onclick: async () => { if (S.getMode() === 'demo') return toast('연습 모드를 끄고 받아 주세요'); const all = { _app: 'manager', _v: VERSION, _at: new Date().toISOString() }; for (const k of BK) all[k] = await S.get(k); const b = new Blob([JSON.stringify(all)], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = h('a', { href: u, download: 'manager-backup-' + SG.kdate() + '.json' }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); localStorage.setItem('mgr:backupAt', Date.now()); toast('백업 파일을 받았어요'); } }, ic('download', 15), '백업 받기'), h('button.ghost', { onclick: () => { const i = h('input', { type: 'file', accept: '.json,application/json', onchange: async e => { try { const j = JSON.parse(await e.target.files[0].text()); if (S.getMode() === 'demo') return toast('연습 모드를 끄고 넣어 주세요'); if (!j || typeof j !== 'object' || !(j.profile || j.about || j.posts)) throw 0; let n = 0; for (const k of BK) if (j[k] != null) { await S.set(k, j[k]); n++; } localStorage.setItem('mgr:onboarded', '1'); toast('되살렸어요 (' + n + '가지)'); route(); } catch { toast('매니저 백업 파일이 아니에요'); } } }); i.click(); } }, ic('upload', 15), '백업 넣기')),
-    h('button.link.danger', { onclick: () => { const close = sheet('이 기기의 기록 전부 지우기', h('div.form', h('p', '숫자, 계획, 협찬 기록, 인스타 연결, 연습 기록까지 이 기기에서 전부 지워요. 되돌릴 수 없어요. 인스타·틱톡 계정에는 아무 영향이 없어요.'), h('div.row.gap', h('button.ghost', { onclick: () => close() }, '그만두기'), h('button.btn.bad', { onclick: async () => { await S.clearAll(); ['mgr:onboarded', 'mgr:mode', 'mgr:plat', 'mgr:ainudge', 'mgr:backupAt'].forEach(k => localStorage.removeItem(k)); S.setMode('real'); close(); toast('전부 지웠어요'); go('#/hello'); } }, '전부 지우기')))); } }, '이 기기의 기록 전부 지우기')), h('div.row.gap.center.wrap', h('button.link', { onclick: () => go('#/plan2') }, '요금'), h('button.link', { onclick: () => go('#/about') }, '개인정보·이용 안내'), h('a.link', { href: 'mailto:' + CONTACT }, '문의'), h('button.link', { onclick: () => go('#/hello') }, '소개 다시 보기')), h('p.ver', '매니저 ' + VERSION));
+    h('button.link.danger', { onclick: () => { const close = sheet('이 기기의 기록 전부 지우기', h('div.form', h('p', '숫자, 계획, 협찬 기록, 인스타 연결, 연습 기록까지 이 기기에서 전부 지워요. 되돌릴 수 없어요. 인스타·틱톡 계정에는 아무 영향이 없어요.'), h('div.row.gap', h('button.ghost', { onclick: () => close() }, '그만두기'), h('button.btn.bad', { onclick: async () => { await S.clearAll(); ['mgr:onboarded', 'mgr:mode', 'mgr:plat', 'mgr:ainudge', 'mgr:backupAt'].forEach(k => localStorage.removeItem(k)); S.setMode('real'); close(); toast('전부 지웠어요'); go('#/hello'); } }, '전부 지우기')))); } }, '이 기기의 기록 전부 지우기')), h('div.row.gap.center.wrap', h('button.link', { onclick: () => go('#/plan2') }, '요금'), h('button.link', { onclick: () => go('#/about') }, '개인정보·이용 안내'), h('a.link', { href: 'mailto:' + CONTACT }, '문의'), h('button.link', { onclick: () => go('#/hello') }, '소개 다시 보기')), h('p.ver', NAME + ' ' + VERSION));
 };
 
 // 매니저가 뒤에서 하는 일: 분야 탐색(하루 한 번) → 이번 주 전략 점검·조정 → 캡션 미리 쓰기
