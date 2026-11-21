@@ -3,9 +3,9 @@
 // 서버 구조와 함수는 supabase/studio.sql. 유료 틀 본문은 서버에서 구독 중인 손님에게만 내려옴.
 const SB = { url: 'https://wuvqtfvvouweqxbydlqa.supabase.co', key: 'sb_publishable_dpHWxB26toO96sIiv4XlqA_lBmzrGGp' };
 export const PLANS = [
-  { id: 'm1', label: '1개월', price: 990, note: '' },
-  { id: 'm3', label: '3개월', price: 2970, note: '' },
-  { id: 'y1', label: '1년', price: 9900, note: '2개월 무료' },
+  { id: 'm1', label: '1개월', price: 2900, note: '' },
+  { id: 'm3', label: '3개월', price: 7900, note: '9% 아껴요' },
+  { id: 'y1', label: '1년', price: 24900, note: '한 달 2,075원' },
 ];
 
 // ── 작은 도구 ──
@@ -163,8 +163,8 @@ function render() {
       h('div.stats', {},
         h('div.stat', {}, ic('stack'), h('b', {}, total || '–'), h('span', {}, '틀')),
         h('div.stat', {}, ic('gift'), h('b', {}, free || '–'), h('span', {}, '무료')),
-        h('div.stat', {}, ic('coin'), h('b', {}, '990'), h('span', {}, '원 / 월'))),
-      active() ? null : h('button.cta', { onclick: () => paySheet() }, '월 990원으로 전부 열기')),
+        h('div.stat', {}, ic('coin'), h('b', {}, '2,900'), h('span', {}, '원 / 월'))),
+      active() ? null : h('button.cta', { onclick: () => paySheet() }, '월 2,900원으로 전부 열기')),
     h('section.tools', {},
       h('label.search', {}, ic('search'), h('input', { type: 'search', placeholder: '무엇을 하려고 하나요? 예: 자소서, 캡션', value: S.q, oninput: e => { S.q = e.target.value; renderGrid(); } })),
       h('div.chips#chips')),
@@ -227,7 +227,7 @@ function lockedSheet(t) {
   sheet(close => [
     h('div.sheet-head', {}, h('span.cat', {}, t.cat), h('h2', {}, t.title), h('p.muted', {}, t.summary)),
     h('div.blur', { 'aria-hidden': 'true' }, ...[92, 78, 85, 40, 88, 70, 60].map(w => h('i', { style: { width: w + '%' } }))),
-    h('div.lockbox', {}, ic('lock'), h('b', {}, '구독하면 바로 열려요'), h('p.muted', {}, `틀 ${S.list.length}개를 전부 쓸 수 있어요. 한 달 990원.`),
+    h('div.lockbox', {}, ic('lock'), h('b', {}, '구독하면 바로 열려요'), h('p.muted', {}, `틀 ${S.list.length}개를 전부 쓸 수 있어요. 한 달 2,900원.`),
       h('button.cta', { onclick: () => { close(true); paySheet(); } }, '구독하기')),
   ]);
 }
@@ -444,7 +444,7 @@ async function renderPlan(root) {
       h('div', {},
         h('b.plan-state', {}, inf ? '평생 이용' : on ? '구독 중' : me && me.paid_until ? '구독이 끝났어요' : '무료로 쓰는 중'),
         h('p.muted', {}, inf ? `틀 ${S.list.length}개를 기간 없이 전부 쓸 수 있어요.` : on ? `${ymd(me.paid_until)}까지 틀 ${S.list.length}개를 전부 쓸 수 있어요.` : `무료 틀 ${S.list.filter(t => t.free).length}개를 쓸 수 있어요. 구독하면 ${S.list.length}개 전부 열려요.`),
-        inf ? null : h('button.cta.small', { onclick: () => paySheet() }, on ? '기간 늘리기' : '월 990원 구독하기'))),
+        inf ? null : h('button.cta.small', { onclick: () => paySheet() }, on ? '기간 늘리기' : '월 2,900원 구독하기'))),
     inf ? null : h('p.muted.small.note', {}, '자동으로 다시 빠져나가지 않아요. 끝나기 전에 늘리면 남은 기간 뒤에 이어 붙어요.'),
     me ? h('div.me', {},
       h('div.me-row', {}, h('span.muted', {}, '입금 코드'), h('button.code.small', { onclick: () => copy(me.code, '입금 코드를 복사했어요') }, h('span', {}, me.code), ic('copy'))),
@@ -547,8 +547,8 @@ async function renderAdmin() {
     const r = await rpc('ps_admin_grant', { p_secret: secret, p_code: code, p_days: +days, p_deposit: dep ?? null });
     toast(r && r.ok ? `${r.code} → ${ymd(r.until)}까지` : '그런 코드가 없어요'); renderAdmin();
   };
-  const daysOf = a => Math.floor((a || 0) / 9900) * 365 + Math.floor(((a || 0) % 9900) / 990) * 31;
-  const paste = h('textarea', { rows: 3, placeholder: '은행 앱 입금 알림을 그대로 붙여 넣어요. 예: [토스뱅크] 입금 990원 K7M2' });
+  const daysOf = a => { a = a || 0; const y = Math.floor(a / 24900); a %= 24900; const q = Math.floor(a / 7900); a %= 7900; return y * 365 + q * 93 + Math.floor(a * 31 / 2900); };
+  const paste = h('textarea', { rows: 3, placeholder: '은행 앱 입금 알림을 그대로 붙여 넣어요. 예: [토스뱅크] 입금 2,900원 K7M2' });
   const fb = { bank: h('input', { placeholder: '은행 (예: 토스뱅크)', value: bank?.bank || '' }), account: h('input', { placeholder: '계좌번호', value: bank?.account || '' }), holder: h('input', { placeholder: '예금주 (예: 김*진)', value: bank?.holder || '' }) };
   const gCode = h('input', { placeholder: '코드 K7M2', autocapitalize: 'characters' }), gDays = h('input', { type: 'number', placeholder: '일 수' });
   const hook = `${SB.url}/rest/v1/rpc/ps_deposit`;
