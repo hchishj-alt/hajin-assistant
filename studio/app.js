@@ -2,10 +2,9 @@
 // 손님은 로그인 없이 "복구 코드"(이 기기에 저장)로 구분하고, 결제는 계좌 이체 + 입금 알림 자동 확인.
 // 서버 구조와 함수는 supabase/studio.sql. 유료 틀 본문은 서버에서 구독 중인 손님에게만 내려옴.
 const SB = { url: 'https://wuvqtfvvouweqxbydlqa.supabase.co', key: 'sb_publishable_dpHWxB26toO96sIiv4XlqA_lBmzrGGp' };
+// 월결제 하나만. 정가 9,900원에서 할인한 값
 export const PLANS = [
-  { id: 'm1', label: '1개월', price: 2900, note: '' },
-  { id: 'm3', label: '3개월', price: 7900, note: '9% 아껴요' },
-  { id: 'y1', label: '1년', price: 24900, note: '한 달 2,075원' },
+  { id: 'm1', label: '월 구독', price: 2900, list: 9900 },
 ];
 
 // ── 작은 도구 ──
@@ -227,7 +226,7 @@ function lockedSheet(t) {
   sheet(close => [
     h('div.sheet-head', {}, h('span.cat', {}, t.cat), h('h2', {}, t.title), h('p.muted', {}, t.summary)),
     h('div.blur', { 'aria-hidden': 'true' }, ...[92, 78, 85, 40, 88, 70, 60].map(w => h('i', { style: { width: w + '%' } }))),
-    h('div.lockbox', {}, ic('lock'), h('b', {}, '구독하면 바로 열려요'), h('p.muted', {}, `틀 ${S.list.length}개를 전부 쓸 수 있어요. 한 달 2,900원.`),
+    h('div.lockbox', {}, ic('lock'), h('b', {}, '구독하면 바로 열려요'), h('p.muted', {}, `틀 ${S.list.length}개를 전부 쓸 수 있어요. 정가 9,900원에서 할인해 한 달 2,900원.`),
       h('button.cta', { onclick: () => { close(true); paySheet(); } }, '구독하기')),
   ]);
 }
@@ -247,7 +246,7 @@ async function paySheet(planId = store.get('plan', 'm1')) {
     const planBtns = PLANS.map(p => h('button.plan' + (p.id === plan.id ? '.on' : ''), { onclick: e => {
       plan = p; store.set('plan', p.id); amount.textContent = won(p.price);
       for (const el of e.currentTarget.parentNode.children) el.classList.toggle('on', el === e.currentTarget);
-    } }, h('span', {}, p.label), h('b', {}, won(p.price)), p.note ? h('em', {}, p.note) : null));
+    } }, h('span', {}, p.label), p.list ? h('s.list', {}, won(p.list)) : null, h('b', {}, won(p.price)), p.list ? h('em', {}, `${Math.round((1 - p.price / p.list) * 100)}% 할인`) : null));
     const wait = h('div.wait', {}, h('span.dot'), h('span', {}, '입금을 기다리는 중이에요. 이 창을 열어 두면 열리는 순간 알려 드려요.'));
     clearInterval(poll);
     poll = setInterval(async () => {
@@ -260,7 +259,7 @@ async function paySheet(planId = store.get('plan', 'm1')) {
     }, 5000);
     return [
       h('div.sheet-head', {}, h('h2', {}, startedActive ? '기간 늘리기' : '구독하기'), h('p.muted', {}, '계좌 이체로 받아요. 자동으로 다시 빠져나가지 않아요.')),
-      h('div.plans', {}, ...planBtns),
+      h('div.plans' + (PLANS.length === 1 ? '.one' : ''), {}, ...planBtns),
       h('ol.steps', {},
         h('li', {}, h('div', {}, h('b', {}, '받는 분 통장 표시(입금자명)에 이 코드를 적어요'), h('p.muted', {}, '이름 대신 코드만 적으면 돼요. 이 코드로 누가 보냈는지 알아봐요.')),
           h('button.code', { onclick: () => copy(me.code, '입금 코드를 복사했어요') }, h('span', {}, me.code), ic('copy'))),
@@ -547,7 +546,7 @@ async function renderAdmin() {
     const r = await rpc('ps_admin_grant', { p_secret: secret, p_code: code, p_days: +days, p_deposit: dep ?? null });
     toast(r && r.ok ? `${r.code} → ${ymd(r.until)}까지` : '그런 코드가 없어요'); renderAdmin();
   };
-  const daysOf = a => { a = a || 0; const y = Math.floor(a / 24900); a %= 24900; const q = Math.floor(a / 7900); a %= 7900; return y * 365 + q * 93 + Math.floor(a * 31 / 2900); };
+  const daysOf = a => Math.floor((a || 0) / 2900) * 31;
   const paste = h('textarea', { rows: 3, placeholder: '은행 앱 입금 알림을 그대로 붙여 넣어요. 예: [토스뱅크] 입금 2,900원 K7M2' });
   const fb = { bank: h('input', { placeholder: '은행 (예: 토스뱅크)', value: bank?.bank || '' }), account: h('input', { placeholder: '계좌번호', value: bank?.account || '' }), holder: h('input', { placeholder: '예금주 (예: 김*진)', value: bank?.holder || '' }) };
   const gCode = h('input', { placeholder: '코드 K7M2', autocapitalize: 'characters' }), gDays = h('input', { type: 'number', placeholder: '일 수' });

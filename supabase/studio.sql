@@ -91,12 +91,10 @@ returns json language sql stable security definer set search_path = public as $$
     'holder', (select v from ps_settings where k = 'holder'));
 $$;
 
--- 입금 금액 → 늘릴 날짜 (11/21 가격 조정): 24,900원마다 365일, 남은 7,900원마다 93일,
--- 남은 돈은 2,900원 = 31일 비율로(옛 가격 990원을 보내면 10일)
+-- 입금 금액 → 늘릴 날짜 (11/21 하진: 월결제만): 2,900원마다 31일. 모자란 돈은 자동으로 안 열고 관리 화면에 남김
 create or replace function public.ps_days(p_amount int)
 returns int language sql immutable as $$
-  select (a / 24900) * 365 + ((a % 24900) / 7900) * 93 + ((a % 24900 % 7900) * 31 / 2900)
-  from (select greatest(coalesce(p_amount, 0), 0) as a) x;
+  select (greatest(coalesce(p_amount, 0), 0) / 2900) * 31;
 $$;
 
 create or replace function public.ps_ok(p_secret text)
