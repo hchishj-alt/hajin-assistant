@@ -10,8 +10,9 @@ import * as SG from './strategy.js';
 import * as EX from './explore.js';
 import * as W from './web.js';
 import { FIELDS } from './fields.js';
+import { NAME, CONTACT, PRICE, BETA, PRO, FREE } from './config.js';
 import { h, ic, icon, toast, sheet, busy, seg, field, copy, spark } from './ui.js';
-export const VERSION = '1.4.6';
+export const VERSION = '1.5.0';
 
 const view = document.getElementById('view');
 const TABS = [['today', '오늘', 'home'], ['plan', '전략', 'target'], ['videos', '영상', 'play'], ['coach', '코치', 'sparkles'], ['people', '사람', 'users']];
@@ -30,7 +31,7 @@ let cleanup = null;
 async function route() {
   let [name, ...rest] = (location.hash.replace(/^#\/?/, '') || 'today').split('/');
   const fresh = !localStorage.getItem('mgr:onboarded') && S.getMode() !== 'demo';
-  if (fresh && !['hello', 'start', 'about'].includes(name)) { location.replace('#/hello'); return; }
+  if (fresh && !['hello', 'start', 'about', 'plan2'].includes(name)) { location.replace('#/hello'); return; }
   if (cleanup) { try { cleanup(); } catch { } cleanup = null; }
   document.getElementById('sheet-root').replaceChildren();
   document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.t === name));
@@ -608,9 +609,9 @@ SCREENS.hello = async root => {
       feat('users', '맞팔·협찬도 챙겨요', '맞팔 안 한 사람, 협찬 마감, 광고 표시까지 놓치지 않게.')),
     h('button.btn.wide.xl', { onclick: () => go('#/start') }, '내 계정으로 시작하기'),
     h('button.ghost.wide', { onclick: async e => { const b = e.currentTarget; busy(b, true, '준비 중'); localStorage.setItem('mgr:mode', 'demo'); S.setMode('demo'); await seed(); go('#/today'); background(true); } }, ic('play', 16), '가입 없이 먼저 구경하기'),
-    h('div.trust', h('span', ic('shield', 14), '가입·비밀번호 없음'), h('span', ic('phone', 14), '기록은 내 폰에만'), h('span', ic('check', 14), '무료')),
+    h('div.trust', h('span', ic('shield', 14), '가입·비밀번호 없음'), h('span', ic('phone', 14), '기록은 내 폰에만'), h('span', ic('check', 14), BETA ? '지금은 전부 무료' : '무료로 시작')),
     h('details.card.why', h('summary', '솔직하게, 안 되는 것'), h('p', '팔로우·언팔을 대신 눌러 주지는 않아요. 인스타·틱톡이 금지한 일이라 계정이 정지될 수 있어서요. 누구를 할지는 골라 드리고, 누르는 것만 직접 해요. 그리고 "무조건 뜬다"는 약속은 못 해요. 대신 매주 결과를 보고 계획을 고쳐요.')),
-    h('button.link.center', { onclick: () => go('#/about') }, '개인정보·이용 안내'));
+    h('div.row.gap.center', h('button.link', { onclick: () => go('#/plan2') }, '요금'), h('button.link', { onclick: () => go('#/about') }, '개인정보·이용 안내'), h('a.link', { href: 'mailto:' + CONTACT }, '문의')));
 };
 // ── 처음 온 사람: 시작 (1분) ──
 SCREENS.start = async root => {
@@ -637,13 +638,25 @@ SCREENS.start = async root => {
       await background(true).catch(() => { }); go('#/today');
     } }, '시작하기'), h('p.fhint.center', '적은 내용은 이 기기에만 저장돼요.'));
 };
+// ── 요금 ──
+SCREENS.plan2 = async root => {
+  const ko = (navigator.language || 'ko').startsWith('ko');
+  const now = ko ? A.fmt2(PRICE.month) + '원' : '$' + PRICE.usd, was = ko ? A.fmt2(PRICE.list) + '원' : '$' + PRICE.usdList, off = Math.round((1 - (ko ? PRICE.month / PRICE.list : PRICE.usd / PRICE.usdList)) * 100);
+  const li = (t, on) => h('div.pl', ic(on ? 'check' : 'x', 15), h('span', t));
+  root.append(head('요금', '한 달 단위, 언제든 해지', h('button.iconbtn', { 'aria-label': '뒤로', onclick: () => history.back(), html: icon('left', 20) })),
+    h('div.card.price', h('span.tag', PRICE.event), h('div.pr', h('s', was), h('b', now), h('small', '/ 월'), h('em', off + '% 할인')),
+      h('p.muted', BETA ? '지금은 오픈 준비 기간이라 아래 기능을 전부 무료로 열어 뒀어요. 카드 결제가 열리면 미리 알리고, 그때 정하시면 돼요. 자동으로 결제되지 않아요.' : '카드로 매달 결제돼요. 설정에서 언제든 해지할 수 있어요.'),
+      h('h4', '프로'), PRO.map(t => li(t, true)), h('h4', '무료'), FREE.map(t => li(t, true))),
+    h('div.card', h('b', '문의'), h('p.muted', '결제, 환불, 오류, 제안 모두 메일로 보내 주세요.'), h('a.btn.wide', { href: 'mailto:' + CONTACT + '?subject=' + encodeURIComponent(NAME + ' 문의') }, ic('msg', 16), CONTACT)));
+};
 SCREENS.about = async root => {
   const sec = (t, ...p) => h('div.card', h('b', t), p.map(x => h('p.muted', x)));
   root.append(head('이용 안내', '개인정보와 쓰는 바깥 서비스', h('button.iconbtn', { 'aria-label': '뒤로', onclick: () => history.back(), html: icon('left', 20) })),
     sec('어디에 저장돼요', '적은 것과 숫자, 계획, 협찬 기록은 전부 이 기기의 브라우저 저장소에만 있어요. 운영자 서버로 보내지 않아요. 그래서 기기를 바꾸거나 브라우저 기록을 지우면 사라져요. 설정 › 백업 받기로 파일을 받아 두세요.'),
     sec('바깥으로 나가는 것', '틱톡 공개 프로필과 유튜브 쇼츠 검색 결과를 읽을 때 공개 페이지 읽기 서비스(r.jina.ai)에 주소가 전달돼요.', 'AI를 연결했다면 캡션·영상 장면·캡처·계정 숫자 요약이 내 Gemini 키로 Google에 전달돼요. 영상 파일 자체는 보내지 않고 뽑은 장면 사진만 보내요.', '인스타 자동 연결을 했다면 내 토큰으로 인스타그램 공식 API에서 내 숫자를 받아요.'),
     sec('하지 않는 것', '비밀번호를 묻거나 저장하지 않아요. 팔로우·언팔·좋아요를 대신 누르지 않아요. 다른 사람의 비공개 정보를 모으지 않아요.'),
-    sec('알아 둘 것', '분석과 계획은 참고용이에요. 조회수나 팔로워 증가를 보장하지 않아요. 협찬·광고 게시물의 표시 책임은 올리는 사람에게 있어요.', '인스타그램·틱톡·유튜브와 제휴하거나 승인받은 서비스가 아니에요.'));
+    sec('알아 둘 것', '분석과 계획은 참고용이에요. 조회수나 팔로워 증가를 보장하지 않아요. 협찬·광고 게시물의 표시 책임은 올리는 사람에게 있어요.', '인스타그램·틱톡·유튜브와 제휴하거나 승인받은 서비스가 아니에요.'),
+    sec('문의', '오류, 환불, 내 정보에 대한 요청은 ' + CONTACT + ' 로 보내 주세요.'));
 };
 
 // ── 설정 ──
@@ -671,7 +684,7 @@ SCREENS.settings = async (root, st) => {
   root.append(h('h2.sec', '폰에 설치'), h('div.card', h('p', /iphone|ipad/i.test(navigator.userAgent) ? 'Safari 아래 공유 버튼 › "홈 화면에 추가"' : 'Chrome 메뉴(⋮) › "앱 설치" 또는 "홈 화면에 추가"'), h('p.fhint', '홈 화면에 아이콘이 생기고 앱처럼 열려요. 카카오톡·인스타 안에서 열었다면 먼저 Safari나 Chrome으로 열어 주세요.')));
   const BK = ['profile', 'posts', 'snaps', 'people', 'handled', 'deals', 'about', 'ads', 'reviews', 'plan', 'strategy', 'explore', 'routine', 'drafts', 'refs', 'chat'];
   root.append(h('h2.sec', '데이터'), h('div.card.form', h('p.muted', '모든 기록은 이 기기에만 있어요. 폰을 바꾸거나 브라우저 기록을 지우면 사라지니 가끔 백업을 받아 두세요. 백업 파일에 인스타 토큰과 AI 키는 넣지 않아요.'), h('div.row.gap', h('button.ghost', { onclick: async () => { if (S.getMode() === 'demo') return toast('연습 모드를 끄고 받아 주세요'); const all = { _app: 'manager', _v: VERSION, _at: new Date().toISOString() }; for (const k of BK) all[k] = await S.get(k); const b = new Blob([JSON.stringify(all)], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = h('a', { href: u, download: 'manager-backup-' + SG.kdate() + '.json' }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); localStorage.setItem('mgr:backupAt', Date.now()); toast('백업 파일을 받았어요'); } }, ic('download', 15), '백업 받기'), h('button.ghost', { onclick: () => { const i = h('input', { type: 'file', accept: '.json,application/json', onchange: async e => { try { const j = JSON.parse(await e.target.files[0].text()); if (S.getMode() === 'demo') return toast('연습 모드를 끄고 넣어 주세요'); if (!j || typeof j !== 'object' || !(j.profile || j.about || j.posts)) throw 0; let n = 0; for (const k of BK) if (j[k] != null) { await S.set(k, j[k]); n++; } localStorage.setItem('mgr:onboarded', '1'); toast('되살렸어요 (' + n + '가지)'); route(); } catch { toast('매니저 백업 파일이 아니에요'); } } }); i.click(); } }, ic('upload', 15), '백업 넣기')),
-    h('button.link.danger', { onclick: () => { const close = sheet('이 기기의 기록 전부 지우기', h('div.form', h('p', '숫자, 계획, 협찬 기록, 인스타 연결, 연습 기록까지 이 기기에서 전부 지워요. 되돌릴 수 없어요. 인스타·틱톡 계정에는 아무 영향이 없어요.'), h('div.row.gap', h('button.ghost', { onclick: () => close() }, '그만두기'), h('button.btn.bad', { onclick: async () => { await S.clearAll(); ['mgr:onboarded', 'mgr:mode', 'mgr:plat', 'mgr:ainudge', 'mgr:backupAt'].forEach(k => localStorage.removeItem(k)); S.setMode('real'); close(); toast('전부 지웠어요'); go('#/hello'); } }, '전부 지우기')))); } }, '이 기기의 기록 전부 지우기')), h('div.row.gap.center', h('button.link', { onclick: () => go('#/about') }, '개인정보·이용 안내'), h('button.link', { onclick: () => go('#/hello') }, '소개 다시 보기')), h('p.ver', '매니저 ' + VERSION));
+    h('button.link.danger', { onclick: () => { const close = sheet('이 기기의 기록 전부 지우기', h('div.form', h('p', '숫자, 계획, 협찬 기록, 인스타 연결, 연습 기록까지 이 기기에서 전부 지워요. 되돌릴 수 없어요. 인스타·틱톡 계정에는 아무 영향이 없어요.'), h('div.row.gap', h('button.ghost', { onclick: () => close() }, '그만두기'), h('button.btn.bad', { onclick: async () => { await S.clearAll(); ['mgr:onboarded', 'mgr:mode', 'mgr:plat', 'mgr:ainudge', 'mgr:backupAt'].forEach(k => localStorage.removeItem(k)); S.setMode('real'); close(); toast('전부 지웠어요'); go('#/hello'); } }, '전부 지우기')))); } }, '이 기기의 기록 전부 지우기')), h('div.row.gap.center.wrap', h('button.link', { onclick: () => go('#/plan2') }, '요금'), h('button.link', { onclick: () => go('#/about') }, '개인정보·이용 안내'), h('a.link', { href: 'mailto:' + CONTACT }, '문의'), h('button.link', { onclick: () => go('#/hello') }, '소개 다시 보기')), h('p.ver', '매니저 ' + VERSION));
 };
 
 // 매니저가 뒤에서 하는 일: 분야 탐색(하루 한 번) → 이번 주 전략 점검·조정 → 캡션 미리 쓰기
@@ -688,7 +701,7 @@ async function boot() {
   if (!localStorage.getItem('mgr:onboarded')) {
     S.setMode('real'); const p = await S.get('profile', null); S.setMode(localStorage.getItem('mgr:mode') === 'demo' ? 'demo' : 'real');
     if (p && (p.ig?.username || p.tt?.username)) localStorage.setItem('mgr:onboarded', '1');
-    else if (S.getMode() !== 'demo' && !/^#\/(hello|start|about)/.test(location.hash)) location.hash = '#/hello';
+    else if (S.getMode() !== 'demo' && !/^#\/(hello|start|about|plan2)/.test(location.hash)) location.hash = '#/hello';
   }
   window.addEventListener('hashchange', route);
   window.addEventListener('mgr:strategy', () => { if (/^(today|plan)?$/.test(location.hash.replace(/^#\/?/, '').split('/')[0])) route(); });

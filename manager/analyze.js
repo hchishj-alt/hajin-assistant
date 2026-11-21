@@ -176,3 +176,6 @@ export function rateGuess(followers, er) {
   const boost = er && er > 0.06 ? 1.3 : er && er < 0.02 ? 0.8 : 1;
   return [Math.round(followers * per[0] * boost / 10000) * 10000, Math.round(followers * per[1] * boost / 10000) * 10000];
 }
+
+// 줄이지 않고 쉼표만 (가격용)
+export const fmt2 = n => Number(n).toLocaleString('ko-KR');
