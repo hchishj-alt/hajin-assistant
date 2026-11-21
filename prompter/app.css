@@ -639,3 +639,20 @@ body.hello-on #view{background:var(--card)}
 .secrow .inp,.top .inp{background:var(--card)}
 .box .row .ghost{font-size:15px;padding:0 12px;white-space:nowrap}
 .brand em{display:none}
+
+/* 대본 정리: 작은 ⋯ 메뉴, 여러 개 고르기 (11/21 하진 "분류·재분류, 수정·삭제 작게 숨겨도 돼") */
+.card{position:relative}
+.cmore{position:absolute;top:6px;right:6px;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--sub);display:grid;place-items:center;opacity:.7}
+.cmore:active{background:var(--soft);transform:scale(.9)}
+.card .shoot{margin-top:18px}
+.lhead{display:flex;justify-content:flex-end;margin:-4px 0 4px}
+.linkbtn.sm{font-size:13px;color:var(--sub);min-height:32px}
+.ck{width:28px;height:28px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;color:transparent;flex:none;transition:transform .35s var(--spring),background .2s,border-color .2s}
+.ck.on{background:var(--acc);border-color:var(--acc);color:#fff;transform:scale(1.08)}
+.selecting .card{cursor:pointer}
+.card.picked{box-shadow:0 0 0 2px var(--acc)}
+.selbar{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;background:var(--ink);color:var(--bg);border-radius:16px;padding:8px 8px 8px 16px;margin-top:10px;animation:pop .4s var(--spring) both}
+.selbar span{flex:1;font-weight:700;font-size:14px}
+.selbar .ghost{background:rgba(255,255,255,.12);color:var(--bg);min-height:40px}
+.selbar .ghost:disabled{opacity:.4}
+.plist button small{margin-left:auto;font-size:12.5px}
