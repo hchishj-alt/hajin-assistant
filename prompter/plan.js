@@ -76,7 +76,9 @@ const PERKS = [
   ['film', '저장 화질', '720p', '1080p'],
   ['mic', '목소리 따라가기', '—', '사용'],
 ];
-export const perkTable = () => `<div class="perks"><div class="ph"><span></span><span>무료</span><span class="pro">프로</span></div>${PERKS.map(([i, l, f, p]) => `<div class="pr"><span class="lab">${ic(i, 16)}${l}</span><span>${f}</span><b>${p}</b></div>`).join('')}</div>`;
+export const perkTable = () => `<div class="perks"><div class="ph"><span></span><span>무료</span><span class="pro">프로</span></div>${PERKS.map(([i, l, f, p]) => `<div class="pr"><span class="lab">${l}</span><span>${f}</span><b>${p}</b></div>`).join('')}</div>`;
+
+export const perkRows = () => PERKS.map(([, l, f, p]) => `<tr><th>${l}</th><td>${f}</td><td>${p}</td></tr>`).join('');
 
 // 잠긴 기능을 눌렀을 때
 export function needPro(kind) {

@@ -7,7 +7,7 @@ import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
 import { CONTACT } from './config.js';
 import { legalView, legalLinks, bizLine } from './legal.js';
 
-export const VERSION = '1.6.0';
+export const VERSION = '1.7.0';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -496,34 +496,47 @@ function helloView() {
     ['flip', '가로 16:9 · 세로 9:16', '릴스·쇼츠·유튜브 비율 그대로 잘라 저장'],
     ['mic', '목소리 따라가기', '말하는 속도에 맞춰 대본이 따라와요 (프로)'],
   ];
-  view.innerHTML = `<div class="hello">
-    <div class="hbar"><button class="ghost sm" data-lang aria-label="언어">${ic('globe', 16)}<span class="noi18n">${LANGS[lang()]}</span></button></div>
-    <section class="hero">
-      <img class="hmark" src="icon.svg" alt="">
-      <h1>프롬프리에딧</h1><p class="en">PROMPRI EDIT</p>
-      <p class="lead">대본을 카메라 위에 띄우고,<br>씬별로 찍고, 한 번에 이어 붙여요.</p>
-      <div class="cta"><a class="btn acc" href="#/" id="go1">${ic('cam', 18)}무료로 시작하기</a><a class="ghost" href="#/plan">${ic('star', 16)}프로 보기</a></div>
-      <p class="tip c">설치 없이 브라우저에서 바로 · 폰 · 아이패드 · PC</p>
-      ${plan.beta() ? `<p class="betaline">${ic('star', 14)}<span>출시 베타 · 지금은 프로 기능도 모두 무료</span></p>` : ''}
+  view.innerHTML = `<div class="hello h2x">
+    <header class="hh"><span class="brand"><img src="icon.svg" alt=""><span><b>프롬프리에딧</b></span></span><button class="linkbtn" data-lang aria-label="언어">${ic('globe', 16)}<span class="noi18n">${LANGS[lang()]}</span></button></header>
+    <section class="hx">
+      <div class="hxt">
+        <h1><span>대본 보면서</span><br><span>카메라 보고 말하기.</span></h1>
+        <p class="lead">렌즈 바로 아래로 대본이 흘러가요. 씬별로 찍고, 잘 나온 것만 골라 이어 붙이면 영상 하나가 돼요.</p>
+        <div class="cta"><a class="btn" href="#/" id="go1">무료로 시작하기</a><a class="textlink" href="#price">요금 보기</a></div>
+        <p class="fine">설치·가입 없이 브라우저에서 바로. 폰, 아이패드, PC.${plan.beta() ? '<br><b>베타 기간이라 지금은 프로 기능도 무료예요.</b>' : ''}</p>
+      </div>
+      <figure class="mock" aria-hidden="true"><div class="mk">
+        <div class="mband"><p class="r">안녕하세요, 오늘은 제가</p><p class="r">요즘 매일 쓰는 작업 루틴을</p><p class="n">보여 드릴게요.</p><p>아침에 일어나면 제일 먼저</p></div>
+        <i class="mguide"></i><div class="mface"></div>
+        <div class="mhud"><span class="mt noi18n">00:12</span><b class="mrec"></b><span class="mt noi18n">110%</span></div></div>
+        <figcaption>실제 촬영 화면</figcaption></figure>
     </section>
-    <section class="feat">${F.map(([i, t, d], k) => `<div class="fc" style="animation-delay:${k * 50}ms"><span class="fi">${ic(i, 22)}</span><b>${t}</b><span>${d}</span></div>`).join('')}</section>
-    <section class="nums"><div><b>3</b><span>무료 대본</span></div><div><b>3분</b><span>무료 한 번 녹화</span></div><div><b>0</b><span>서버로 가는 영상</span></div></section>
-    <section class="howto price2"><h2>${ic('star', 20)}요금</h2>
-      <div class="pcols"><div class="pc"><b class="pn">무료</b><div class="pv2">0원</div><span>가입 없이 바로</span></div>
-        <div class="pc pro"><b class="pn">프로</b><div class="pv2">${plan.priceTag()}</div><span>언제든 해지 · 7일 안 전액 환불</span></div></div>
-      ${plan.perkTable()}
-      <a class="btn acc wide" href="#/plan" style="margin-top:12px">${ic('star', 18)}프로 보기</a></section>
-    <section class="howto faq"><h2>${ic('help', 20)}자주 묻는 것</h2>
-      ${FAQ.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</section>
-    <section class="howto"><h2>${ic('devices', 20)}앱처럼 쓰기</h2>
-      <p>폰이랑 아이패드는 <b>홈 화면에 추가</b>하면 앱처럼 쓸 수 있어요. 전체 화면으로 열리고, 찍은 영상도 브라우저에 더 오래 안전하게 보관돼요.</p>
+
+    <section class="hs2"><h2>할 수 있는 것</h2>
+      <dl class="spec">${F.map(([, t, d]) => `<div><dt>${t}</dt><dd>${d}</dd></div>`).join('')}</dl></section>
+
+    <section class="hs2" id="price"><h2>요금</h2>
+      <table class="ptab"><thead><tr><th></th><th>무료</th><th>프로</th></tr></thead><tbody>
+        <tr class="pp"><th>가격</th><td>0원</td><td>${plan.priceTag()}</td></tr>
+        ${plan.perkRows()}
+      </tbody></table>
+      <p class="fine">프로는 언제든 해지할 수 있고, 결제 후 7일 안에는 전액 환불해요. <a href="#/plan">구독 관리</a></p></section>
+
+    <section class="hs2"><h2>자주 묻는 것</h2>
+      <div class="faq">${FAQ.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</div></section>
+
+    <section class="hs2"><h2>앱처럼 쓰기</h2>
+      <p class="fine">홈 화면에 추가하면 전체 화면으로 열리고, 찍은 영상도 브라우저에 더 오래 보관돼요.</p>
       ${installSteps()}</section>
-    <section class="howto"><h2>${ic('play', 20)}이렇게 써요</h2>
-      <ol class="flow"><li><b>대본 쓰기</b>붙여넣기 OK. 길면 씬 추가로 나눠요</li><li><b>찍기</b>빨간 버튼 → 3·2·1 → 읽기만 하면 끝</li><li><b>고르고 붙이기</b>씬마다 ★ 고르고 이어 붙이기</li><li><b>저장</b>사진첩·파일로 바로 저장</li></ol></section>
-    <a class="btn acc wide" href="#/">${ic('cam', 18)}지금 시작하기</a>
-    <footer class="hfoot"><a class="mailto" href="mailto:${CONTACT}?subject=${encodeURIComponent('[PROMPRI EDIT] 문의')}">${ic('mail', 15)}<span>문의</span></a><span class="noi18n">${CONTACT}</span><button class="linkbtn" data-lang>${ic('globe', 15)}<span class="noi18n">${LANGS[lang()]}</span></button></footer>
+
+    <section class="hs2"><h2>이렇게 써요</h2>
+      <ol class="flow"><li><b>대본 쓰기</b><span>붙여넣기 OK. 길면 씬 추가로 나눠요</span></li><li><b>찍기</b><span>빨간 버튼 → 3·2·1 → 읽기만 하면 끝</span></li><li><b>고르고 붙이기</b><span>씬마다 ★ 고르고 이어 붙이기</span></li><li><b>저장</b><span>사진첩·파일로 바로 저장</span></li></ol></section>
+
+    <a class="btn wide hgo" href="#/">지금 시작하기</a>
+    <footer class="hfoot"><a class="mailto" href="mailto:${CONTACT}?subject=${encodeURIComponent('[PROMPRI EDIT] 문의')}"><span>문의</span></a><span class="noi18n">${CONTACT}</span></footer>
     ${legalLinks()}${bizLine()}
   </div>`;
+  view.querySelector('.textlink')?.addEventListener('click', e => { e.preventDefault(); document.getElementById('price')?.scrollIntoView({ behavior: 'smooth' }); });
   const off = () => document.body.classList.remove('hello-on');
   addEventListener('hashchange', off, { once: true });
 }
