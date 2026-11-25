@@ -228,12 +228,43 @@ begin
   return json_build_object('ok', true, 'status', b.status, 'fail_count', b.fail_count);
 end $$;
 
--- 오늘 청구할 것 (빌링키 포함이라 service_role 전용)
+-- 오늘 청구할 것 (빌링키 포함이라 service_role 전용). next_at은 청구 id(중복 방지)에 씀
+drop function if exists public.pr_card_due();
 create or replace function public.pr_card_due()
-returns table(token text, billing_key text, amount int)
+returns table(token text, billing_key text, amount int, next_at timestamptz)
 language sql stable security definer set search_path = public as $$
-  select b.token, b.billing_key, b.amount from pr_billing b where b.status = 'active' and b.next_at <= now() order by b.next_at limit 200;
+  select b.token, b.billing_key, b.amount, b.next_at from pr_billing b where b.status = 'active' and b.next_at <= now() order by b.next_at limit 200;
 $$;
+
+-- ── 1.9 실제 결제 열기 전 보안 보강 (11/25) ──
+-- 첫 결제 동시 두 번 막기: 2분짜리 잠금
+alter table public.pr_customers add column if not exists card_lock timestamptz;
+create or replace function public.pr_card_claim(p_token text)
+returns boolean language plpgsql volatile security definer set search_path = public as $$
+begin
+  update pr_customers set card_lock = now() where token = p_token and (card_lock is null or card_lock < now() - interval '2 minutes');
+  return found;
+end $$;
+create or replace function public.pr_card_release(p_token text)
+returns void language sql volatile security definer set search_path = public as $$
+  update pr_customers set card_lock = null where token = p_token;
+$$;
+-- 포트원에서 취소·환불된 결제(웹훅이 서명·재조회 확인 뒤 부름). 전액이면 그 결제로 늘린 기간을 거두고 자동결제를 멈춤
+create or replace function public.pr_card_refunded(p_payment_id text, p_full boolean default true)
+returns json language plpgsql volatile security definer set search_path = public as $$
+declare p pr_payments;
+begin
+  select * into p from pr_payments where ext_id = p_payment_id and method = 'card';
+  if p.id is null then return json_build_object('ok', false, 'reason', 'unknown'); end if;
+  if p.status = 'refunded' then return json_build_object('ok', true, 'dup', true); end if;
+  update pr_payments set status = case when p_full then 'refunded' else 'partial' end, memo = left(memo || ' 취소 ' || now()::date, 200) where id = p.id;
+  if p_full and p.status = 'paid' then
+    update pr_customers set paid_until = greatest(now(), paid_until - make_interval(days => coalesce(p.days, 0))) where token = p.token and paid_until <> 'infinity';
+    update pr_billing set status = 'canceled', updated_at = now() where token = p.token;
+  end if;
+  return json_build_object('ok', true);
+end $$;
+alter table public.pr_billing alter column amount set default 1990;
 
 -- ── 메일로 가입·로그인 (11/21 하진 "메일로 가입하기") ──
 -- Supabase Auth 메일 코드(OTP)로 로그인한 사람(auth.uid())을 손님 한 명(token)에 묶음. 묶고 나면 어느 기기든 메일 코드로 같은 구독을 불러옴.
@@ -267,8 +298,10 @@ end $$;
 -- 권한: 손님·관리 함수만 공개, 결제 반영 함수는 service_role 전용
 revoke all on function public.pr_extend(text, int), public.pr_ok(text), public.pr_join(), public.pr_me(text), public.pr_card_cancel(text), public.pr_redeem(text, text),
   public.pr_admin(text), public.pr_admin_grant(text, text, int), public.pr_admin_gift_make(text, int, int, int, text, timestamptz), public.pr_admin_gifts(text), public.pr_admin_gift_del(text, text),
-  public.pr_card_paid(text, text, int, int, text, text), public.pr_card_failed(text, text, text), public.pr_card_due(), public.pr_link(text) from public, anon, authenticated;
+  public.pr_card_paid(text, text, int, int, text, text), public.pr_card_failed(text, text, text), public.pr_card_due(), public.pr_link(text),
+  public.pr_card_claim(text), public.pr_card_release(text), public.pr_card_refunded(text, boolean) from public, anon, authenticated;
 grant execute on function public.pr_link(text) to authenticated;
 grant execute on function public.pr_join(), public.pr_me(text), public.pr_card_cancel(text), public.pr_redeem(text, text),
   public.pr_admin(text), public.pr_admin_grant(text, text, int), public.pr_admin_gift_make(text, int, int, int, text, timestamptz), public.pr_admin_gifts(text), public.pr_admin_gift_del(text, text) to anon, authenticated;
-grant execute on function public.pr_card_paid(text, text, int, int, text, text), public.pr_card_failed(text, text, text), public.pr_card_due() to service_role;
+grant execute on function public.pr_card_paid(text, text, int, int, text, text), public.pr_card_failed(text, text, text), public.pr_card_due(),
+  public.pr_card_claim(text), public.pr_card_release(text), public.pr_card_refunded(text, boolean) to service_role;
