@@ -152,6 +152,7 @@ const D = {
   '구독을 불러오고 있어요': ['Loading your subscription', 'サブスクを読み込んでいます', '正在加载订阅', 'Cargando tu suscripción'],
   '불러오지 못했어요. 다시 해 주세요': ["Couldn't load. Please try again", '読み込めませんでした。もう一度お試しください', '加载失败，请重试', 'No se pudo cargar. Inténtalo de nuevo'],
   '구독 정보를 불러오는 중이에요': ['Loading subscription info', 'サブスク情報を読み込んでいます', '正在加载订阅信息', 'Cargando la suscripción'],
+  '카메라를 켜는 중이에요': ['Turning on the camera', 'カメラを起動しています', '正在打开相机', 'Encendiendo la cámara'],
   // 브랜드·소개
   '프롬프리에딧': ['PROMPRI EDIT', 'プロンプリエディット', 'PROMPRI EDIT', 'PROMPRI EDIT'],
   '프롬프리에딧 소개': ['About PROMPRI EDIT', 'PROMPRI EDITについて', '关于 PROMPRI EDIT', 'Acerca de PROMPRI EDIT'],

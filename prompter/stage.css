@@ -177,3 +177,10 @@
 #st2 #msg.err b{font-size:15px}
 #st2 #msg.err .dim{opacity:.6}
 #st2 #msg.err button{margin-top:4px;align-self:flex-start;min-height:40px;padding:0 16px;border-radius:999px;border:0;background:#ff4f7b;color:#fff;font:inherit;font-weight:800;cursor:pointer}
+
+/* 1.9.2 카메라 켜는 중: 점 세 개가 스프링으로 튐 */
+#st2 #msg.busy{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:rgba(20,20,24,.86);font-weight:700}
+#st2 .sload{display:inline-flex;gap:4px}#st2 .sload i{width:6px;height:6px;border-radius:50%;background:#ff4f7b;animation:sdot 1.1s cubic-bezier(.34,1.56,.64,1) infinite}
+#st2 .sload i:nth-child(2){animation-delay:.15s}#st2 .sload i:nth-child(3){animation-delay:.3s}
+@keyframes sdot{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+@media (prefers-reduced-motion:reduce){#st2 .sload i{animation:none;opacity:.8}}

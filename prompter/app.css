@@ -675,3 +675,9 @@ body.hello-on #view{background:var(--card)}
 .waitov .later{position:absolute;bottom:calc(32px + env(safe-area-inset-bottom));animation:pop .45s var(--spring) both}
 @media (prefers-reduced-motion:reduce){.lmark,.lmark i,.lmark b,.ldots i{animation-duration:0s;animation-iteration-count:1}.lmark i{top:auto;opacity:1;position:static;display:block;margin:8px 14px}}
 .waitov .later[hidden]{display:none}
+
+/* 1.9.2 평소 로딩: 첫 화면 대기, 테이크 미리보기 자리 반짝임 */
+.boot{min-height:100vh;min-height:100svh;display:flex;align-items:center;justify-content:center}
+.take.vload video{background:linear-gradient(100deg,var(--line) 30%,var(--card) 50%,var(--line) 70%) 0 0/300% 100%;animation:shim 1.2s var(--ease) infinite}
+@keyframes shim{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.take.vload video{animation:none}}

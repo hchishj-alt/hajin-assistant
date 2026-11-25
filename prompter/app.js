@@ -1,13 +1,13 @@
 // 프롬프리에딧(PROMPRI EDIT): 카메라 위에 대본을 띄우고 씬별로 찍어 이어 붙이는 앱. sw.js의 VERSION과 같이 올릴 것
 import { scripts, takes, uid, flag } from './store.js';
-import { ic, esc, $, el, chars, fmt, paras, toast, buzz, sheet, undoToast } from './ui.js';
+import { ic, esc, $, el, chars, fmt, paras, toast, buzz, sheet, undoToast, loaderHtml } from './ui.js';
 import * as plan from './plan.js';
 import { mountStage, autoSec } from './stage.js';
 import { startI18n, LANGS, lang, langPref, setLang } from './i18n.js';
 import { CONTACT } from './config.js';
 import { legalView, legalLinks, bizLine } from './legal.js';
 
-export const VERSION = '1.9.1';
+export const VERSION = '1.9.2';
 
 
 /* ---------- 프로젝트(폴더) ---------- */
@@ -47,19 +47,25 @@ async function route() {
   const [, a, b, c] = (location.hash || '#/').split('/');
   view.classList.remove('in');
   view.innerHTML = '';
+  // 화면 준비가 0.3초를 넘기면 빈 화면 대신 움직이는 대기 화면(하진 11/25: 평소 로딩에도)
+  const lt = setTimeout(() => { if (!view.children.length) { view.innerHTML = loaderHtml(); view.classList.add('in'); } }, 300);
+  try { await routeTo(a, b, c); } finally { clearTimeout(lt); }
+}
+async function routeTo(a, b, c) {
+  const show = () => { if (view.children.length > 1) view.querySelectorAll(':scope > .loader').forEach(x => x.remove()); view.classList.remove('in'); requestAnimationFrame(() => requestAnimationFrame(() => view.classList.add('in'))); };
   if (a === 'new') {
     if ((await scripts.all()).filter(own).length >= plan.limits().scripts) { location.replace('#/'); plan.needPro('scripts'); return; }
     const cp = curProj();
     const s = await newScript('', '', cp !== 'all' && cp !== 'none' ? cp : ''); location.replace('#/s/' + s.id); return;
   }
-  if (a === 'hello') { helloView(); requestAnimationFrame(() => view.classList.add('in')); return; }
-  if (a === 'plan') { await plan.planView(view); requestAnimationFrame(() => view.classList.add('in')); return; }
-  if (a === 'terms' || a === 'privacy' || a === 'refund') { legalView(view, a); scrollTo(0, 0); requestAnimationFrame(() => view.classList.add('in')); return; }
-  if (a === 'admin') { await plan.adminView(view); requestAnimationFrame(() => view.classList.add('in')); return; }
+  if (a === 'hello') { helloView(); show(); return; }
+  if (a === 'plan') { await plan.planView(view); show(); return; }
+  if (a === 'terms' || a === 'privacy' || a === 'refund') { legalView(view, a); scrollTo(0, 0); show(); return; }
+  if (a === 'admin') { await plan.adminView(view); show(); return; }
   if (a === 's' && b) cleanup = await editView(b);
   else if (a === 'shoot' && b) cleanup = await shootView(b, +c || 0);
   else cleanup = await listView();
-  requestAnimationFrame(() => view.classList.add('in'));
+  show();
 }
 window.addEventListener('hashchange', route);
 
@@ -298,10 +304,11 @@ async function renderTakes(s, box) {
   const P = splitParts(s.body), multi = P.length > 1;
   const card = (t, n, i, star) => {
     const u = URL.createObjectURL(t.blob); urls.push(u);
-    const c = el(`<div class="take${star ? ' pick' : ''}" style="animation-delay:${i * 40}ms"><video src="${u}#t=0.1" playsinline muted preload="metadata"></video>
+    const c = el(`<div class="take vload${star ? ' pick' : ''}" style="animation-delay:${i * 40}ms"><video src="${u}#t=0.1" playsinline muted preload="metadata"></video>
       ${star != null ? `<button class="star" data-k aria-pressed="${!!star}" aria-label="이 테이크 쓰기">${ic('star', 16)}</button>` : ''}
       <div class="tb"><span>${t.joined ? '이어 붙임' : '#' + n} · ${fmt(t.dur)}</span><span class="row"><button class="mini" data-s aria-label="저장">${ic('share', 18)}</button><button class="mini" data-d aria-label="지우기">${ic('trash', 18)}</button></span></div></div>`);
-    $('video', c).onclick = () => takeSheet(s, t, n, () => renderTakes(s, box));
+    const vd = $('video', c); vd.addEventListener('loadeddata', () => c.classList.remove('vload'), { once: true }); vd.addEventListener('error', () => c.classList.remove('vload'), { once: true });
+    vd.onclick = () => takeSheet(s, t, n, () => renderTakes(s, box));
     $('[data-s]', c).onclick = () => saveTake(s, t, n);
     $('[data-d]', c).onclick = async () => { await takes.remove(t.id); renderTakes(s, box); undoToast('테이크를 지웠어요', async () => { await takes.put(t); renderTakes(s, box); }); };
     const k = $('[data-k]', c); if (k) k.onclick = async () => { s.picks = { ...(s.picks || {}), [t.part]: t.id }; await scripts.put(s); buzz(8); renderTakes(s, box); };
