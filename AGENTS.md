@@ -4,6 +4,7 @@
 서버 비용 0원, 외부 AI 없이 규칙 기반 두뇌(js/brain.js)로 움직인다. 이 전제를 깨는 변경은 하지 않는다.
 
 ## 절대 규칙
+- 보안 기준은 `docs/SECURITY.md`를 따른다. 올리기 전 `node tests/secrets.mjs`를 돌린다.
 - 빌드 도구, 프레임워크, npm 의존성을 추가하지 않는다. 순수 ES 모듈 + 정적 파일이다.
 - 비밀 값(Supabase secret/service_role 키, DB 비밀번호, 멤버 코드, 피그마 토큰)을 코드, 커밋, 이슈에 넣지 않는다. `js/config.js`에는 Project URL과 publishable 키만 둔다.
 - 유료 API나 상시 서버가 필요한 기능을 넣지 않는다. 필요해 보이면 구현하지 말고 대안을 제안한다.

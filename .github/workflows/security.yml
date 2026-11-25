@@ -1,0 +1,15 @@
+# 올릴 때마다 비밀 값 검사를 돌려요. 읽기 권한만 써요.
+name: security
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: node tests/secrets.mjs
