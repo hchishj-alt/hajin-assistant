@@ -93,3 +93,39 @@ export async function copy(text, msg = '복사했어요') {
   catch { const ta = document.createElement('textarea'); ta.style.cssText = 'position:fixed;opacity:0'; ta.value = text; document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
   toast(msg);
 }
+
+/* ---------- 기다리는 화면 (11/25 하진: 오류가 있을 땐 오류 문구 대신 움직이는 대기 화면) ----------
+   loaderHtml(): 화면 안에 넣는 로딩 모양(프롬프터 대본 줄이 위로 흐르는 로고).
+   wait(task, {title, sub}): 전체 화면을 덮고 task를 돌린다. 망·서버가 잠깐 안 될 때(transient)는 오류를 띄우지 않고
+   대기 화면에서 저절로 다시 해 본다(1.5→3→5→8→10초). 사람이 고쳐야 하는 오류(카드 거절 등)만 호출한 쪽으로 던진다.
+   20초가 넘으면 '나중에 하기'가 나온다(누르면 Error('later')). */
+export const loaderHtml = (title = '불러오는 중이에요', sub = '') => `<div class="loader" role="status" aria-live="polite">
+  <div class="lmark" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+  <p class="lt">${esc(title)}</p><p class="ls">${esc(sub)}</p><div class="ldots" aria-hidden="true"><i></i><i></i><i></i></div></div>`;
+export const transient = e => e?.transient === false ? false : !e || e.name === 'TimeoutError' || e.name === 'AbortError' || e instanceof TypeError || e.transient === true
+  || [0, 408, 409, 425, 429, 500, 502, 503, 504].includes(e.status ?? -1) || (e.status == null && !navigator.onLine);
+export function wait(task, { title = '잠시만 기다려 주세요', sub = '', retrySub = '연결을 다시 찾고 있어요. 그대로 두면 돼요', minMs = 700 } = {}) {
+  const ov = el(`<div class="waitov">${loaderHtml(title, sub)}<button class="ghost sm later" hidden>나중에 하기</button></div>`);
+  let shown = false, gaveUp = false;
+  const showT = setTimeout(() => { document.body.append(ov); requestAnimationFrame(() => ov.classList.add('in')); shown = Date.now(); }, 250); // 빨리 끝나면 깜빡이지 않게
+  const laterT = setTimeout(() => { ov.querySelector('.later').hidden = false; }, 20000);
+  const done = async () => {
+    clearTimeout(showT); clearTimeout(laterT);
+    if (shown) { const left = minMs - (Date.now() - shown); if (left > 0) await new Promise(r => setTimeout(r, left)); ov.classList.remove('in'); setTimeout(() => ov.remove(), 350); }
+  };
+  return new Promise((resolve, reject) => {
+    ov.querySelector('.later').onclick = () => { gaveUp = true; done(); reject(Object.assign(new Error('later'), { later: true })); };
+    const steps = [1500, 3000, 5000, 8000, 10000];
+    const run = async n => {
+      if (gaveUp) return;
+      try { const v = await task(n); if (!gaveUp) { await done(); resolve(v); } }
+      catch (e) {
+        if (gaveUp) return;
+        if (!transient(e)) { await done(); reject(e); return; }
+        const s = ov.querySelector('.ls'); if (s) s.textContent = retrySub;
+        setTimeout(() => run(n + 1), steps[Math.min(n, steps.length - 1)]);
+      }
+    };
+    run(0);
+  });
+}
