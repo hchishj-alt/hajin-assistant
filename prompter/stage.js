@@ -218,11 +218,17 @@ export function mountStage({ script: T, limits, needPro, onTake, onSec, onExit, 
     const tall = innerHeight > innerWidth && small();
     const video = Object.assign({ width: { ideal: tall ? 1080 : 1920 }, height: { ideal: tall ? 1920 : 1080 }, frameRate: { ideal: 30 } }, S.dev ? { deviceId: { exact: S.dev } } : { facingMode: 'user' });
     let st;
+    // 카메라가 켜지는 동안(권한 창 포함) 움직이는 대기 표시
+    const m = $('msg'); m.classList.remove('err'); m.classList.add('busy'); m.hidden = false;
+    m.innerHTML = '<span class="sload" aria-hidden="true"><i></i><i></i><i></i></span><span>카메라를 켜는 중이에요</span>';
+    const unbusy = () => m.classList.remove('busy');
     try { st = await navigator.mediaDevices.getUserMedia({ video, audio: S.mic ? { deviceId: { exact: S.mic } } : true }); }
     catch (e) {
+      unbusy();
       if (S.dev || S.mic) { S.dev = ''; S.mic = ''; save(); return camOn(); }
       stream = null; camErr(e.name); apply(); return;
     }
+    unbusy();
     if (!alive) { st.getTracks().forEach(t => t.stop()); return; }
     stream = st; cam.srcObject = stream; cam.hidden = false; $('msg').classList.remove('err'); say('');
     try {
