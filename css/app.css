@@ -1308,3 +1308,12 @@ select.chip{background:var(--card);border-radius:calc(10px*var(--rd,1));padding:
 @media (max-width:900px){.chatpage .composer{box-shadow:none}}
 .talk-list,.talk-pane,.ref{border-color:var(--card-line,transparent);box-shadow:none}
 .look-row .seg{grid-template-columns:repeat(auto-fit,minmax(72px,1fr))}
+/* 추가 창: 덜 쓰는 칸은 "더 적기" 뒤에 */
+.more-f{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:8px 14px;border:0;border-radius:calc(12px*var(--rd,1));background:color-mix(in srgb,var(--ink) 5%,transparent);color:var(--ink2);font:inherit;font-weight:700;font-size:calc(14px*var(--fs,1));cursor:pointer;text-align:left}
+.more-f b{flex:none}
+.more-f small{flex:1;min-width:0;font-weight:500;color:var(--ink3);font-size:calc(12px*var(--fs,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.more-f .ic{flex:none;color:var(--ink3)}
+.more-g{animation:popin .3s var(--out)}
+.more-g{scroll-margin-top:72px}
+.ps-card,.kcard,.searchbtn{border-color:var(--card-line,transparent)}
+.ps-page button.chip.acc{background:var(--acc-soft);color:var(--acc)}

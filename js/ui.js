@@ -125,7 +125,9 @@ export function form(fields, values = {}, onSubmit, { submitLabel = '저장', ex
     busy = true; if (btn) btn.disabled = true;
     try { await onSubmit(v); } finally { busy = false; if (btn) btn.disabled = false; }
   } });
-  const grid = h('div.grid.g2');
+  // 새로 적을 때는 꼭 필요한 칸만 먼저. 덜 쓰는 칸(more)은 "더 적기"를 눌러야 나와요. 고칠 때(id 있음)와 값이 든 칸은 처음부터 보여요.
+  const grid = h('div.grid.g2'), grid2 = h('div.grid.g2.more-g.hide'), tuckedNames = [];
+  const blank = (fd, x) => x === '' || x == null || x === false || (fd.default != null && String(x) === String(fd.default));
   for (const fd of fields) {
     let inp;
     const v = values[fd.k] ?? fd.default ?? '';
@@ -139,7 +141,7 @@ export function form(fields, values = {}, onSubmit, { submitLabel = '저장', ex
     if (fd.type === 'label') { const row = h('div.labels'); const paint = () => { clear(row); for (const l of [{ id: '', name: '없음', color: 'var(--line2)' }, ...labelList()]) row.append(h('button.lab' + (inp.value === l.id ? '.on' : ''), { type: 'button', style: { '--lc': l.color }, onclick: () => { inp.value = l.id; paint(); } }, h('i'), l.name)); }; paint(); wrap.append(row); }
     if (fd.datalist) wrap.append(h('datalist#' + fd.k + '-dl', fd.datalist.map(o => h('option', { value: o }))));
     if (fd.full || fd.type === 'textarea') wrap.style.gridColumn = '1/-1';
-    grid.append(wrap);
+    if (fd.more && !values.id && blank(fd, v)) { grid2.append(wrap); tuckedNames.push(fd.label.replace(/\s*\(.*\)/, '')); } else grid.append(wrap);
   }
   function read() {
     const o = {};
@@ -150,6 +152,7 @@ export function form(fields, values = {}, onSubmit, { submitLabel = '저장', ex
     return o;
   }
   f.append(grid);
+  if (tuckedNames.length) { const mb = h('button.more-f', { type: 'button', 'aria-expanded': 'false', onclick: () => { grid2.classList.remove('hide'); mb.remove(); try { grid2.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch { } } }, h('b', '더 적기'), h('small', tuckedNames.join(' · ')), ic('down', 16)); f.append(mb, grid2); }
   if (extra) f.append(extra);
   f.append(h('div.modal-f', h('button.btn.pri', { type: 'submit' }, submitLabel)));
   f.read = read; f.inputs = inputs;
