@@ -1,7 +1,7 @@
 // 구독: 상태, 잠금(needPro), 구독 관리 화면(#/plan), 관리 화면(#/admin)
 // 구독 중 = 서버 pr_customers.paid_until > now(). 이 기기는 마지막 상태를 기억해 두고 열 때마다 새로 받는다.
 import { SB, PRICE, FREE, CONTACT, BETA } from './config.js';
-// 이벤트 가격 표시: ~~9,900원~~ 90% 월 990원
+// 가격 표시: PRICE.list가 있으면 ~~정가~~ 할인율, 없으면 월 가격만(1.9.0부터 list 0)
 const off = () => PRICE.list > PRICE.month ? Math.round((1 - PRICE.month / PRICE.list) * 100) : 0;
 export const priceTag = () => off() ? `<span class="ptag"><span class="ev">${PRICE.event || '이벤트가'}</span><s>${won(PRICE.list)}</s><b class="off">${off()}% 할인</b><b>월 ${won(PRICE.month)}</b></span>` : `월 ${won(PRICE.month)}`;
 import { cardReady, startCard, finishRedirect } from './billing.js';

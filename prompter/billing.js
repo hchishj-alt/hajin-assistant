@@ -4,6 +4,12 @@ import { PORTONE, SB, PRICE } from './config.js';
 
 export const cardReady = () => !!(PORTONE.storeId && PORTONE.channelKey);
 
+// 결제사에는 복구 코드 대신 그 해시를 손님 id로 보낸다(서버 customerId와 같은 식)
+async function customerId(token) {
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('prompri:' + token)));
+  return 'pr_' + [...h].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 24);
+}
+
 let sdkP;
 function loadSdk() {
   if (window.PortOne) return Promise.resolve(window.PortOne);
@@ -31,9 +37,9 @@ export async function startCard(token) {
     storeId: PORTONE.storeId,
     channelKey: PORTONE.channelKey,
     billingKeyMethod: 'CARD',
-    issueId: 'pr-' + token.slice(0, 8) + '-' + Date.now().toString(36),
-    issueName: `프롬프리에딧 월 구독 ${PRICE.month}원`,
-    customer: { customerId: token },
+    issueId: (await customerId(token)) + '-k' + Date.now().toString(36),
+    issueName: `프롬프리에딧 프로 월 구독 ${PRICE.month.toLocaleString('ko-KR')}원`,
+    customer: { customerId: await customerId(token) },
     redirectUrl: base + '?after=card',
   });
   if (!r || r.code) throw new Error(r?.message || '카드 등록을 마치지 못했어요');

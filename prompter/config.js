@@ -2,7 +2,8 @@
 export const SB = { url: 'https://wuvqtfvvouweqxbydlqa.supabase.co', key: 'sb_publishable_dpHWxB26toO96sIiv4XlqA_lBmzrGGp' };
 
 // 요금: 카드 월 자동결제 하나. 바꾸면 supabase/functions/prompter-billing 의 PRICE도 같이 바꾼다.
-export const PRICE = { month: 990, list: 9900, days: 31, event: '오픈 이벤트가' }; // list: 원래 가격(줄 긋기), 할인율은 자동
+// list: 줄 긋는 '원래 가격'. 실제로 그 값에 판 적이 없으면 0으로 둘 것(표시광고법 허위 할인 소지). 0이면 할인 표시 없음
+export const PRICE = { month: 1990, list: 9900, days: 31, event: '오픈가' }; // 11/25 하진: 9,900 취소선 유지, 오픈가 1,990
 
 // 무료로 쓸 수 있는 범위. 여기만 고치면 앱 전체 잠금이 바뀐다.
 export const FREE = {

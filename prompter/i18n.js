@@ -379,6 +379,7 @@ const D = {
   '사용': ['On', '使える', '可用', 'Sí'],
   '대본 무제한 · 길게 찍기 · {n}p · 목소리 따라가기': ['Unlimited scripts · Longer takes · {0}p · Voice follow', '台本無制限 · 長く撮影 · {0}p · 声に合わせる', '台词无限 · 长时间录制 · {0}p · 跟随语音', 'Guiones ilimitados · Tomas largas · {0}p · Seguir la voz'],
   '오픈 이벤트가': ['Launch price', 'オープン記念価格', '开业特价', 'Precio de lanzamiento'],
+  '오픈가': ['Launch price', 'オープン価格', '开业价', 'Precio de lanzamiento'],
   '이벤트가': ['Event price', 'イベント価格', '活动价', 'Precio especial'],
   '{n}% 할인': ['{0}% off', '{0}%オフ', '{0}% 折扣', '{0}% dto.'],
   '월 {n}원': ['₩{0}/month', '月 ₩{0}', '每月 ₩{0}', '₩{0}/mes'],
