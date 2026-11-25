@@ -1,0 +1,7 @@
+# 자동 실행(GitHub Actions)에 쓰는 바깥 액션이 보안 패치되면 PR로 알려 줘요. 앱은 npm 의존성이 없어서 액션만 봐요.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
