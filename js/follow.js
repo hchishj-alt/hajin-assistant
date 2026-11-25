@@ -7,8 +7,8 @@ import * as store from './store.js';
 const FRESH = 30 * 60 * 1000;   // "아니 …"처럼 고치는 말머리가 있을 때
 const NEAR = 10 * 60 * 1000;    // 말머리 없이 "화요일"만 말했을 때
 const fmtD = d => { const x = new Date(d + 'T00:00'); return `${x.getMonth() + 1}/${x.getDate()}(${'일월화수목금토'[x.getDay()]})`; };
-const KWORD = { 일정: 'event', 약속: 'event', '할 일': 'task', 할일: 'task', 투두: 'task', 메모: 'note', 지출: 'expense', 비용: 'expense', 아이디어: 'idea', '받을 돈': 'income', 입금: 'income', 수입: 'income', '살 것': 'buy', 연락처: 'contact', 업체: 'vendor' };
-const KW = '일정|약속|할\\s*일|할일|투두|메모|지출|비용|아이디어|받을\\s*돈|입금|수입|살\\s*것|연락처|업체';
+const KWORD = { 일정: 'event', 약속: 'event', '할 일': 'task', 할일: 'task', 투두: 'task', 메모: 'note', 지출: 'expense', 비용: 'expense', 아이디어: 'idea', '받을 돈': 'income', 입금: 'income', 수입: 'income', '살 것': 'buy', 살것: 'buy', 구매: 'buy', 연락처: 'contact', 업체: 'vendor', 거래처: 'vendor', SNS: 'sns', sns: 'sns', 레퍼런스: 'reference', 받을돈: 'income' };
+const KW = '일정|약속|할\\s*일|할일|투두|메모|지출|비용|아이디어|받을\\s*돈|입금|수입|살\\s*것|구매|연락처|업체|거래처|SNS|sns|레퍼런스';
 const kindOf = s => KWORD[s.replace(/\s+/g, ' ').trim()] || KWORD[s.replace(/\s+/g, '')] || null;
 
 export async function remember(ids) { if (ids && ids.length) await db.kvSet('chat:last', { ids, at: Date.now() }); }
@@ -79,7 +79,7 @@ export async function tryFollow(text, { people = [] } = {}) {
     return { text: `방금 만든 ${xs.length > 1 ? `${xs.length}개를` : `“${title(xs[0])}”${J(title(xs[0]), '을', '를')}`} 버렸어요.`, chips: [{ label: '되살리기', follow: { op: 'revive', items } }], refresh: xs.map(x => x.d.id) };
   }
   // 2) 종류 바꾸기: "일정이 아니라 할 일이야", "이건 메모로 해줘"
-  { const m = t.match(new RegExp(`^(?:아니[,\\s]*)?(?:이건|이거|그거|그건|방금\\s*(?:거|건|것)(?:은|는)?)?\\s*(?:(${KW})(?:이|가)?\\s*(?:아니라|아니고|말고)\\s*)?(${KW})(?:이야|야|예요|이에요|임|(?:으로|로)\\s*(?:바꿔|해|만들어|넣어|옮겨)\\S*(?:\\s*(?:줘|주세요))?)$`));
+  { const m = t.match(new RegExp(`^(?:(?:아니야|아니|아냐|ㄴㄴ|노노|놉)[,\\s]*)?(?:이건|이거|그거|그건|방금\\s*(?:거|건|것)(?:은|는)?)?\\s*(?:(${KW})(?:이|가)?\\s*(?:아니라|아니고|말고)\\s*)?(${KW})(?:이야|야|예요|이에요|임|인데|(?:으로|로)\\s*(?:바꿔|해|만들어|넣어|옮겨)\\S*(?:\\s*(?:줘|주세요))?)?$`));   /* "아니 일정 말고 할 일", "ㄴㄴ 일정으로 바꿔" */
     if (m && (m[1] || /(이건|이거|그거|그건|방금|바꿔|로\s*해|만들어|넣어)/.test(t))) { const kind = kindOf(m[2]); const xs = await lastItems(FRESH); if (!kind) return null;
       if (!xs.length) return { text: '방금 만든 게 없어서 무엇을 바꿀지 모르겠어요. 확인 대기함에서 종류를 바꿀 수 있어요.' };
       const x = (m[1] && xs.find(y => y.kind === kindOf(m[1]))) || xs[0];

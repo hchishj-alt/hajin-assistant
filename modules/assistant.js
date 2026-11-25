@@ -204,7 +204,10 @@ export default {
       const nSent = brain.sentences(text).length;
       const isMeeting = /^(회의록|회의\s*(내용|정리|메모)|미팅\s*(내용|정리|메모))\s*[:：]/.test(text);
       const long = !brain.isBlock(text) && (isMeeting || (nSent >= 3 && text.length > 60 && !text.includes('\n')) || text.length > 220 || (origin === 'voice' && text.length > 90) || (text.length > 100 && nSent >= 3 && !text.includes('\n')) || text.split('\n').length > 6);
-      if (long) {
+      /* 이어 쓴 말(일정·쓴 돈·살 것·아이디어가 섞인 것)은 메모+요약으로 뭉치지 않고 항목마다 따로 읽음. 아주 긴 글·회의록만 예전처럼 메모로 */
+      let asItems = false;
+      if (long && !isMeeting && text.length <= 420 && text.split('\n').length <= 12) { try { asItems = brain.interpret(text, { projects, people, vendors: vendorNames, project }).filter(p => !/^(talk|query|nav)$/.test(p.kind)).length >= 2; } catch { asItems = false; } }
+      if (long && !asItems) {
         const a = await FB.refine(brain.analyzeNotes(text, { people }), text); await (await import('../js/ai.js')).enhance(a, text, { today: todayStr(), people });
         // "회의록: …"으로 시작하면 메모가 아니라 회의록에 넣음
         const bodyText = isMeeting ? text.replace(/^[^:：]+[:：]\s*/, '') : text;

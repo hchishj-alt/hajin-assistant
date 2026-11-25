@@ -69,7 +69,7 @@ export function know(t) {
 export function isTalk(t) {
   t = t.trim();
   if (RX.fix.test(t) || RX.meta.test(t)) return true;
-  if (know(t)) return true;
+  if (know(t) && !(t.length > 36 && !/[?？]|뭐야|뭔데|어떻게|알려/.test(t))) return true;   /* 길게 늘어놓은 말에 '방법' 같은 낱말이 들어 있다고 묻는 말로 보지 않음 */
   if (/\d/.test(t) || /https?:/.test(t)) return false;
   if (/(쓰기|하기|보내기|올리기|만들기|정리|제출|까지|해야\s*(해|돼|함))\s*$/.test(t)) return false; // 할 일로 끝나는 말은 대화가 아님
   return t.length <= 30 && [RX.hi, RX.thanks, RX.ok, RX.no, RX.who, RX.can, RX.tired, RX.happy, RX.praise, RX.scold, RX.bored, RX.laugh, RX.bye, RX.food].some(r => r.test(t));

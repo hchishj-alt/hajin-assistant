@@ -216,6 +216,11 @@ ${calendarTable(today)}
 - \"12월 첫째 주\"처럼 주만 말했으면 그 달 1일이 든 주를 첫째 주로 세고, 그 주에서 그 달에 속한 첫 평일을 date로 넣어.
 - contact는 사람이 주인공일 때(이름은 title, 직함은 role, 회사·가게는 org). vendor는 가게·업체가 주인공일 때(담당자 이름은 memo).
 - scope: 가족·친구·개인 볼일은 personal, 나머지는 work.
+- 쉼표도 줄바꿈도 없이 길게 이어 쓴 말(\"~했고 ~해야되고 아 그리고 ~\")은 토막마다 종류를 따로 가려서 항목을 하나씩 만들어. 약속·쓴 돈·받을 돈·살 것·연락처·아이디어·메모가 한 줄에 섞여 있어도 전부 task로 뭉치지 마.
+- 받아야 하는 돈·빌려준 돈·들어올 돈은 expense가 아니라 income. 앞으로 줘야 하는 돈(\"다음주에 줘야함\")은 task.
+- 지원사업·공모전 공고(마감, 최대 얼마)는 grant이고 그 금액은 쓴 돈이 아니야. 살 것(\"사야함\", 장바구니)은 buy, 물건이 여럿이면 하나씩.
+- 남에게 들은 값·조건·비밀번호·주차 같은 정보(\"시간당 5만원이래\", \"와이파이 비번 …\")는 note. 견적 받은 값은 vendor의 prices.
+- 푸념·감탄·느낌(\"아 정신없다\", \"ㅋㅋ 웃겼음\")은 항목으로 만들지 마.
 - 말에 없는 내용은 지어내지 마. 뭘 만들 말이 아니면(인사, 감탄, 질문) 빈 배열 [].
 
 규칙이 먼저 읽은 초안(틀렸으면 고쳐 써): ${JSON.stringify(hint).slice(0, 1500)}
@@ -224,11 +229,12 @@ ${calendarTable(today)}
   let arr; try { const j = await ask(prompt, { json: true, ms, temp: 0, fast: true }); arr = Array.isArray(j) ? j : j.items; } catch (e) { console.warn('ai', e); return null; }
   if (!Array.isArray(arr)) return null;
   const out = []; const seen = {};
-  for (const g of arr.slice(0, 8)) {
+  const usedBase = new Set();
+  for (const g of arr.slice(0, 12)) {
     if (!g || !KO[g.kind] || !String(g.title || '').trim()) continue;
     if (g.kind === 'expense' && (parsed || []).some(p => p.kind === 'income') && !(parsed || []).some(p => p.kind === 'expense')) g.kind = 'income'; /* 규칙이 받을 돈으로 읽은 건 지출로 뒤집지 않음 */
     if (g.kind === 'idea' && /인스타|릴스|유튜브|쇼츠|틱톡|블로그|스레드|트위터|피드/.test(text) && /올리|올려|업로드|게시|포스팅|찍어|콘텐츠/.test(text)) g.kind = 'sns';
-    const same = (parsed || []).filter(p => p.kind === g.kind); const nth = seen[g.kind] = (seen[g.kind] ?? -1) + 1; const base = (same[nth] || same[0])?.data || {}; /* 같은 종류가 여럿이면 순서대로 짝지음 */ const title = String(g.title).trim().slice(0, 80); const S = v => (typeof v === 'string' ? v.trim() : ''); let data;
+    const same = (parsed || []).filter(p => p.kind === g.kind); seen[g.kind] = (seen[g.kind] ?? -1) + 1; const free = same.filter(p => !usedBase.has(p)); const gt0 = String(g.title || ''); const near = p => { const tt = String((p.data && (p.data.title || p.data.name)) || ''); return !!tt && (gt0.includes(tt) || tt.includes(gt0) || tt.split(/\s+/).some(wd => wd.length >= 2 && gt0.includes(wd))); }; const hitB = free.find(p => Number(g.amount) > 0 && Number(p.data.amount ?? p.data.price) === Number(g.amount)) || free.find(near) || free[0] || (arr.length === 1 ? same[0] : null); if (hitB) usedBase.add(hitB); const base = hitB?.data || {}; /* 같은 종류가 여럿이면 금액·제목이 닮은 것끼리, 없으면 순서대로 짝지음. 짝이 없는 항목이 남의 금액·날짜를 물려받지 않게 함 */ const title = String(g.title).trim().slice(0, 80); const S = v => (typeof v === 'string' ? v.trim() : ''); let data;
     const date = isD(g.date) ? g.date : '';
     if (g.kind === 'event') data = { ...base, title, date: date || base.date || today, endDate: isD(g.endDate) && g.endDate > (date || '') ? g.endDate : '', start: isT(g.start) ? g.start : g.allDay ? '' : base.start || '', end: isT(g.end) ? g.end : '', who: whoIn(g.who, text, people, base.who), place: S(g.place), area: S(g.area), scope: g.scope === 'personal' ? 'personal' : 'work', repeat: /^(daily|weekly|monthly|weekdays)$/.test(g.repeat || '') ? g.repeat : '', memo: S(g.memo) || base.memo || '', _dated: !!(date || base.date), _allday: !!g.allDay };
     else if (g.kind === 'task') data = { ...base, title, due: date || base.due || '', time: isT(g.start) ? g.start : '', who: whoIn(g.who, text, people, base.who), priority: g.priority === 'high' || base.priority === 'high' ? 'high' : 'normal', project: S(g.project) || base.project || '', scope: g.scope === 'personal' ? 'personal' : 'work', memo: S(g.memo) || base.memo || '' };
@@ -236,8 +242,8 @@ ${calendarTable(today)}
     else if (g.kind === 'income') data = { ...base, title, amount: Number(base.amount) || Number(g.amount) || 0, date: date || base.date || '', from: base.from || S(g.who), project: S(g.project) || base.project || '', status: base.status || 'due', memo: base.memo || S(g.memo) };
     else if (g.kind === 'contact') data = { ...base, name: base.name && base.phone ? (S(g.title) || base.name) : title, phone: base.phone || S(g.phone), email: base.email || S(g.email), org: S(g.org) || base.org || '', role: base.role || S(g.role), memo: S(g.memo) };
     else if (g.kind === 'vendor') data = { ...base, name: title, cat: S(g.cat) || base.cat || '기타', phone: base.phone || S(g.phone), link: base.link || S(g.url), kakao: base.kakao || '', memo: S(g.memo), prices: (base.prices && base.prices.length ? base.prices : (g.prices || []).filter(x => x && x.item).map(x => ({ item: String(x.item).slice(0, 40), price: String(Number(x.price) || ''), note: S(x.note), at: today }))) };
-    else if (g.kind === 'buy') data = { ...base, title, url: base.url || S(g.url), price: Number(base.price) || Number(g.amount) || 0, qty: 1, need: 'must' };
-    else if (g.kind === 'idea' || g.kind === 'note') data = { ...base, title, body: base.body || text, tags: base.tags || [] };
+    else if (g.kind === 'buy') data = { ...base, title, url: base.url || S(g.url), price: Number(base.price) || Number(g.amount) || 0, qty: Number(base.qty) || 1, need: 'must' };
+    else if (g.kind === 'idea' || g.kind === 'note') data = { ...base, title, body: base.body || (arr.length > 1 ? (S(g.memo) ? `${title}\n${S(g.memo)}` : title) : text), tags: base.tags || [] };
     else if (g.kind === 'grant') data = { ...base, title, deadline: date || base.deadline || '', status: base.status || '검토', amount: base.amount ?? (Number(g.amount) || null), url: base.url || S(g.url) };
     else if (g.kind === 'sns') data = { ...base, title, platform: base.platform || (/유튜브|쇼츠/.test(text) ? '유튜브' : /틱톡/.test(text) ? '틱톡' : /블로그/.test(text) ? '블로그' : /트위터|\bX\b/.test(text) ? 'X' : '인스타그램'), status: base.status || '아이디어', date: date || base.date || '' };
     else data = { ...base, title, url: base.url || S(g.url) };
