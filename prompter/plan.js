@@ -4,8 +4,8 @@ import { SB, PRICE, FREE, CONTACT, BETA } from './config.js';
 // 가격 표시: PRICE.list가 있으면 ~~정가~~ 할인율, 없으면 월 가격만(1.9.0부터 list 0)
 const off = () => PRICE.list > PRICE.month ? Math.round((1 - PRICE.month / PRICE.list) * 100) : 0;
 export const priceTag = () => off() ? `<span class="ptag"><span class="ev">${PRICE.event || '이벤트가'}</span><s>${won(PRICE.list)}</s><b class="off">${off()}% 할인</b><b>월 ${won(PRICE.month)}</b></span>` : `월 ${won(PRICE.month)}`;
-import { cardReady, startCard, finishRedirect } from './billing.js';
-import { ic, esc, $, el, toast, sheet, copy, buzz } from './ui.js';
+import { cardReady, startCard, redirectKey, issue } from './billing.js';
+import { ic, esc, $, el, toast, sheet, copy, buzz, wait, loaderHtml } from './ui.js';
 import { legalLinks, bizLine } from './legal.js';
 import { scripts } from './store.js';
 // 정기결제 전 알릴 것(전자상거래법): 금액·주기·해지·환불, 약관 동의
@@ -21,7 +21,7 @@ const ls = {
 export async function rpc(fn, args = {}, jwt = null) {
   const r = await fetch(`${SB.url}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: SB.key, authorization: 'Bearer ' + (jwt || SB.key), 'content-type': 'application/json' }, body: JSON.stringify(args), signal: AbortSignal.timeout?.(8000) });
   const txt = await r.text();
-  if (!r.ok) { let m = txt; try { m = JSON.parse(txt).message || txt; } catch {} throw new Error(m); }
+  if (!r.ok) { let m = txt; try { m = JSON.parse(txt).message || txt; } catch {} throw Object.assign(new Error(m), { status: r.status }); }
   return txt ? JSON.parse(txt) : null;
 }
 
@@ -58,8 +58,8 @@ export async function boot() {
   const gift = q.get('gift');
   if (gift) { history.replaceState(null, '', location.pathname + '#/plan'); sessionStorage.setItem('prompter:gift', gift); }
   if (q.get('after') === 'card') {
-    try { const t = await ensureToken(); const v = await finishRedirect(t); if (v) { await refresh(); celebrate(); } }
-    catch (e) { toast(e.message || '카드 등록을 마치지 못했어요'); }
+    try { const k = redirectKey(); if (k) await payWith(await ensureToken(), k); }
+    catch (e) { if (!e.later) toast(e.message || '카드 등록을 마치지 못했어요'); }
   }
   refresh();
 }
@@ -93,14 +93,27 @@ export function needPro(kind) {
   $('[data-gift]', box).onclick = () => { sh.close(); location.hash = '#/plan'; setTimeout(() => $('#giftin')?.focus(), 500); };
 }
 
+// 첫 결제: 대기 화면에서 돌리고, 망이 끊기거나 서버가 처리 중이면(409) 오류 대신 계속 기다리며 실제 상태를 다시 본다
+async function payWith(t, billingKey) {
+  await wait(async () => {
+    try { await issue(t, billingKey); }
+    catch (e) {
+      await refresh().catch(() => {});
+      if (isPro() && me?.card?.status === 'active') return; // 사실은 이미 됨
+      if (e.status === 409) e.transient = true;
+      throw e;
+    }
+  }, { title: '결제를 확인하고 있어요', sub: '창을 닫지 말고 잠시만 기다려 주세요', retrySub: '결제사와 다시 연결하는 중이에요. 두 번 결제되지 않아요' });
+  await refresh(); celebrate();
+}
 async function subscribe(btn) {
   if (!cardReady()) { toast('카드 결제는 곧 열려요. 지금은 기프트 키로 열 수 있어요'); return; }
   try {
     if (btn) btn.disabled = true;
-    const t = await ensureToken();
-    const v = await startCard(t);
-    if (v) { await refresh(); celebrate(); }
-  } catch (e) { if (e.message !== 'not-ready') toast(e.message || '결제를 마치지 못했어요'); }
+    const t = await wait(() => ensureToken(), { title: '준비하고 있어요' });
+    const k = await startCard(t);
+    if (k) await payWith(t, k);
+  } catch (e) { if (e.message !== 'not-ready' && !e.later) toast(e.message || '결제를 마치지 못했어요'); }
   finally { if (btn) btn.disabled = false; }
 }
 
@@ -161,8 +174,8 @@ function bindAccount(view, again) {
     const m = mail.value.trim().toLowerCase();
     if (!mailOk(m)) { toast('메일 주소를 확인해 주세요'); return mail.focus(); }
     go.disabled = true;
-    try { await sendCode(m); sent = m; row.classList.remove('hid'); go.textContent = '다시 보내기'; tip.textContent = '코드를 보냈어요. 메일이 안 보이면 스팸함도 봐 주세요.'; code.focus(); }
-    catch (e) { toast(authErr(e)); }
+    try { await wait(() => sendCode(m).catch(e => { if (e.status === 429) e.transient = false; throw e; }), { title: '코드를 보내고 있어요', sub: m }); sent = m; row.classList.remove('hid'); go.textContent = '다시 보내기'; tip.textContent = '코드를 보냈어요. 메일이 안 보이면 스팸함도 봐 주세요.'; code.focus(); }
+    catch (e) { if (!e.later) toast(authErr(e)); }
     finally { setTimeout(() => { go.disabled = false; }, sent ? 30000 : 0); }
   };
   go.onclick = send;
@@ -171,8 +184,8 @@ function bindAccount(view, again) {
     const c = code.value.replace(/\D/g, '');
     if (c.length < 6) return code.focus();
     cg.disabled = true;
-    try { const v = await verifyCode(sent || mail.value.trim().toLowerCase(), c); buzz(15); toast(isPro() ? '로그인했어요. 구독이 이어졌어요' : '가입했어요'); again(); }
-    catch (e) { toast(e.status ? authErr(e) : '로그인은 됐는데 구독을 잇지 못했어요. 다시 해 주세요'); }
+    try { const v = await wait(() => verifyCode(sent || mail.value.trim().toLowerCase(), c), { title: '로그인하고 있어요' }); buzz(15); toast(isPro() ? '로그인했어요. 구독이 이어졌어요' : '가입했어요'); again(); }
+    catch (e) { if (!e.later) toast(e.status ? authErr(e) : '로그인은 됐는데 구독을 잇지 못했어요. 다시 해 주세요'); }
     finally { cg.disabled = false; }
   };
   cg.onclick = check;
@@ -182,7 +195,8 @@ function bindAccount(view, again) {
 
 /* ---------- 구독 관리 화면 ---------- */
 export async function planView(view) {
-  await Promise.race([refresh(), new Promise(r => setTimeout(r, 2500))]); // 느린 망에서도 화면은 먼저
+  // 서버가 늦거나 안 닿으면 오류 대신 대기 화면에서 다시 해 봄('나중에 하기'를 누르면 이 기기에 저장된 정보로 보여 줌)
+  if (token()) await wait(async () => { const v = await rpc('pr_me', { p_token: token() }); if (v) setMe(v); }, { title: '구독 정보를 불러오는 중이에요' }).catch(() => {});
   const pro = isPro(), card = me?.card, forever = isForever(me?.paid_until);
   const badge = forever ? '평생 프로' : pro ? '프로' : beta() ? '베타' : '무료';
   const hist = me?.history || [];
@@ -230,18 +244,19 @@ export async function planView(view) {
     let armed = false;
     cancel.onclick = async () => {
       if (!armed) { armed = true; cancel.textContent = '한 번 더 누르면 해지'; cancel.classList.add('warn'); setTimeout(() => { armed = false; cancel.textContent = '해지하기'; cancel.classList.remove('warn'); }, 3500); return; }
-      try { await rpc('pr_card_cancel', { p_token: token() }); toast('해지했어요. 남은 기간은 그대로 써요'); planView(view); } catch { toast('지금은 해지를 못 했어요. 잠시 뒤 다시 해 주세요'); }
+      try { await wait(() => rpc('pr_card_cancel', { p_token: token() }), { title: '해지하고 있어요' }); toast('해지했어요. 남은 기간은 그대로 써요'); planView(view); } catch (e) { if (!e.later) toast('해지를 마치지 못했어요. 다시 해 주세요'); }
     };
   }
   $('#redeem').onclick = async () => {
     const key = $('#giftin').value.trim(); if (!key) return $('#giftin').focus();
     const b = $('#redeem'); b.disabled = true;
     try {
-      const r = await rpc('pr_redeem', { p_token: token() || '', p_key: key });
+      const r = await wait(() => rpc('pr_redeem', { p_token: token() || '', p_key: key }), { title: '기프트 키를 확인하고 있어요' });
       if (r?.token) ls.set(LS.token, r.token);
+      if (!r?.ok && r?.why === 'mine') { await refresh(); if (isPro()) { celebrate(); return planView(view); } } // 다시 해 보기 중 이미 들어간 경우
       if (!r?.ok) return toast({ format: '키 모양이 달라요', none: '없는 키예요', expired: '기한이 지난 키예요', used: '이미 다 쓴 키예요', mine: '이미 넣은 키예요' }[r?.why] || '키를 넣지 못했어요');
       await refresh(); celebrate(r.forever ? '평생 프로가 열렸어요' : `${r.days}일 프로가 열렸어요`); planView(view);
-    } catch { toast('지금은 서버에 닿지 않아요'); }
+    } catch (e) { if (!e.later) toast('키를 넣지 못했어요. 다시 해 주세요'); }
     finally { b.disabled = false; }
   };
   $('#bkOut').onclick = async () => {
@@ -269,8 +284,8 @@ export async function planView(view) {
   $('#rs').onclick = async () => {
     const t = $('#restore').value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     if (t.length !== 16) return toast('복구 코드는 16자예요');
-    try { const v = await rpc('pr_me', { p_token: t }); if (!v) return toast('없는 코드예요'); setMe(v); toast('불러왔어요'); planView(view); }
-    catch { toast('지금은 서버에 닿지 않아요'); }
+    try { const v = await wait(() => rpc('pr_me', { p_token: t }), { title: '구독을 불러오고 있어요' }); if (!v) return toast('없는 코드예요'); setMe(v); toast('불러왔어요'); planView(view); }
+    catch (e) { if (!e.later) toast('불러오지 못했어요. 다시 해 주세요'); }
   };
 }
 
