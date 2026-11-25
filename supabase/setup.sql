@@ -787,3 +787,8 @@ begin
   new."by" := old."by"; new.col := old.col;
   return new;
 end $$;
+
+-- 보안 점검(11/25 Security Advisor): search_path가 고정 안 된 함수 고정 (다시 실행해도 안전)
+alter function public.touch_server_at() set search_path = public;
+alter function public.space_items_guard() set search_path = public;
+alter function public.member_live(boolean, date) set search_path = public;

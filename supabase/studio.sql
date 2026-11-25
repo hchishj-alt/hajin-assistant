@@ -327,3 +327,6 @@ end $$;
 
 revoke all on function public.ps_redeem(text, text), public.ps_admin_gift_make(text, int, int, int, text, timestamptz), public.ps_admin_gifts(text), public.ps_admin_gift_del(text, text) from public;
 grant execute on function public.ps_redeem(text, text), public.ps_admin_gift_make(text, int, int, int, text, timestamptz), public.ps_admin_gifts(text), public.ps_admin_gift_del(text, text) to anon, authenticated;
+
+-- 보안 점검(11/25 Security Advisor): search_path 고정
+alter function public.ps_days(int) set search_path = public;
