@@ -32,3 +32,11 @@ begin
 end $$;
 revoke all on function public.mg_delete_me() from public, anon;
 grant execute on function public.mg_delete_me() to authenticated;
+
+-- 보안(11/25): 가입은 열어 두되, 멤버가 아닌 계정이 무료 서버를 채우지 못하게 백업 한 줄 크기를 제한.
+-- items·사진 저장소·팀 표는 이미 멤버만 씀(is_active / is_member). 낯선 계정이 쓸 수 있는 곳은 여기 한 줄뿐.
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'mg_data_size') then
+    alter table public.mg_data add constraint mg_data_size check (pg_column_size(data) < 5000000) not valid;
+  end if;
+end $$;
