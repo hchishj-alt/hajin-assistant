@@ -45,7 +45,7 @@ export async function push() {
   if (!user() || S.getMode() === 'demo') return false;
   const c = await get(); const data = {}; for (const k of BK) data[k] = await S.get(k);
   const { error } = await c.from('mg_data').upsert({ owner: user().id, data, updated_at: new Date().toISOString() });
-  if (error) throw new Error(/mg_data|schema cache|does not exist|404/i.test(error.message) ? '서버 백업은 아직 준비 중이에요' : ko(error.message));
+  if (error) throw new Error(/mg_data_size/i.test(error.message) ? '백업이 너무 커요(5MB까지). 오래된 기록을 정리한 뒤 다시 올려 주세요' : /mg_data|schema cache|does not exist|404/i.test(error.message) ? '서버 백업은 아직 준비 중이에요' : ko(error.message));
   localStorage.setItem('mgr:cloudAt', Date.now()); return true;
 }
 export async function pull() {
