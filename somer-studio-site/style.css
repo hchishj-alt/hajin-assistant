@@ -504,3 +504,4 @@ h2{font-size:clamp(28px,4.4vw,52px);line-height:1.2;font-weight:800;letter-spaci
 .nav.dark .nav-brand .wm-d{display:none}
 .nav.dark .nav-brand .wm-l{display:block}
 .hero h1.brand img{width:min(100%,clamp(280px,46vw,640px));height:auto}
+.hero .formerly{margin-top:10px;font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--mute)}
