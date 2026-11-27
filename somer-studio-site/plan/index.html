@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ETERNIA — Game / Business Plan / Connect</title>
+<meta name="description" content="ETERNIA 게임 소개와 사업계획, 브랜드 파트너십을 하나의 경험으로 구성한 웹사이트"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap');
+
+:root{
+  --bg:#09090c;
+  --bg2:#0f0e13;
+  --panel:#141218;
+  --panel2:#1a171f;
+  --panel3:#211d27;
+  --line:#34303a;
+  --line2:#4a4451;
+  --text:#f2f2ee;
+  --muted:#aaa6af;
+  --muted2:#77727d;
+  --acid:#dfff52;
+  --acid2:#b7d43f;
+  --purple:#74657f;
+  --paper:#e8e8e2;
+  --ink:#17161a;
+  --warn:#f0d98f;
+  --max:1320px;
+  --ease:cubic-bezier(.18,.8,.22,1);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Manrope,'Noto Sans KR',sans-serif;letter-spacing:-.025em;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit}
+::selection{background:var(--acid);color:#0a0a0c}
+.mono{font-family:'DM Mono',monospace;letter-spacing:.12em;text-transform:uppercase}
+.wrap{width:min(var(--max),calc(100% - 56px));margin:auto}
+.progress{position:fixed;left:0;top:0;height:3px;width:0;background:var(--acid);z-index:999}
+
+.topbar{position:fixed;left:0;right:0;top:0;z-index:200;background:#09090cf2;border-bottom:1px solid #29262f}
+.nav{height:66px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:12px;letter-spacing:.24em}
+.brand-mark{width:16px;height:16px;border:1px solid var(--acid);transform:rotate(45deg);position:relative}
+.brand-mark:after{content:'';position:absolute;width:4px;height:4px;background:var(--acid);left:5px;top:5px}
+.navlinks{display:flex;align-items:center;gap:8px}
+.navlinks a{font:500 9px 'DM Mono',monospace;color:#97929c;padding:9px 12px;border:1px solid transparent;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
+.navlinks a:hover,.navlinks a.active{color:var(--acid);border-color:#4b4652;background:#151319}
+.nav-cta{border:1px solid var(--acid)!important;color:#101014!important;background:var(--acid)!important}
+
+.hero{min-height:100vh;padding:116px 0 74px;position:relative;border-bottom:1px solid var(--line);overflow:hidden;background:#0b0a0e}
+.hero:before{content:'';position:absolute;left:0;right:0;top:66px;height:1px;background:#24212a}
+.hero-rail{position:absolute;left:18px;top:110px;bottom:74px;width:18px;border-left:1px solid #2d2933}
+.hero-rail i{display:block;width:12px;height:1px;background:#4a4451;margin:24px 0}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:72px;align-items:center;min-height:calc(100vh - 190px)}
+.eyebrow{font:500 10px 'DM Mono',monospace;letter-spacing:.2em;color:var(--acid);margin-bottom:22px}
+.hero h1{font-size:clamp(70px,9vw,138px);line-height:.78;letter-spacing:-.09em;margin:0;font-weight:800}
+.hero h1 span{display:block}
+.hero h1 .outline{-webkit-text-stroke:1px #8a8490;color:transparent}
+.hero-lead{font-size:clamp(18px,1.7vw,24px);line-height:1.55;color:#d6d3d9;max-width:680px;margin:34px 0 0}
+.hero-sub{font-size:13px;line-height:1.75;color:#96919b;max-width:660px;margin:16px 0 0}
+.hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+.btn{display:inline-flex;align-items:center;gap:12px;min-height:44px;padding:0 17px;border:1px solid #403b47;background:#141218;font:600 10px 'DM Mono',monospace;letter-spacing:.08em;clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
+.btn.primary{background:var(--acid);border-color:var(--acid);color:#0b0b0d}
+.btn .square{width:7px;height:7px;background:currentColor}
+.hero-status{display:flex;gap:28px;margin-top:50px;padding-top:17px;border-top:1px solid #322e38;max-width:670px}
+.stat span{display:block;font:500 8px 'DM Mono',monospace;color:#68636d;letter-spacing:.13em}
+.stat b{display:block;font-size:13px;margin-top:6px;color:#dddadd;font-weight:600}
+
+.machine{position:relative;min-height:620px;border:1px solid #3c3743;background:#111015;clip-path:polygon(26px 0,100% 0,100% calc(100% - 26px),calc(100% - 26px) 100%,0 100%,0 26px);overflow:hidden}
+.machine:before,.machine:after{content:'';position:absolute;background:var(--acid);z-index:4}
+.machine:before{width:76px;height:4px;right:0;top:0}
+.machine:after{width:4px;height:76px;left:0;bottom:0}
+.machine-head{height:50px;border-bottom:1px solid #34303a;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font:500 9px 'DM Mono',monospace;color:#8b8690;background:#16141a}
+.machine-head strong{color:var(--acid);font-weight:500}
+.machine-core{position:relative;height:390px;display:grid;place-items:center;background:#0d0c10}
+.core-ring{width:270px;height:270px;border:1px solid #45404b;border-radius:50%;display:grid;place-items:center;position:relative}
+.core-ring:before{content:'';position:absolute;inset:24px;border:1px solid #2f2b34;border-radius:50%}
+.core-ring:after{content:'';position:absolute;width:12px;height:12px;background:var(--acid);border:4px solid #0d0c10;top:4px;left:50%;margin-left:-10px}
+.core-cross{position:absolute;width:320px;height:320px}
+.core-cross:before,.core-cross:after{content:'';position:absolute;background:#26232b}
+.core-cross:before{width:100%;height:1px;top:50%}
+.core-cross:after{height:100%;width:1px;left:50%}
+.core-logo{text-align:center;z-index:2}
+.core-logo b{display:block;font-size:34px;letter-spacing:.22em;font-weight:600;margin-left:.22em}
+.core-logo span{font:500 9px 'DM Mono',monospace;color:var(--acid);letter-spacing:.16em}
+.scanner{position:absolute;left:14%;right:14%;height:1px;background:var(--acid);top:26%;opacity:.8;animation:scan 5s linear infinite}
+.machine-data{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #34303a}
+.data-cell{min-height:132px;padding:18px;border-right:1px solid #34303a;background:#151319}
+.data-cell:last-child{border-right:0}
+.data-cell span{font:500 8px 'DM Mono',monospace;color:#6f6974;letter-spacing:.12em}
+.data-cell b{display:block;font-size:22px;margin-top:18px}
+.data-cell em{display:block;margin-top:5px;font-style:normal;font-size:10px;color:#96909b}
+
+.section{padding:138px 0;border-bottom:1px solid var(--line);position:relative;background:var(--bg)}
+.section.alt{background:#0d0c10}
+.section.paper{background:var(--paper);color:var(--ink);border-color:#c8c8c0}
+.section-head{display:grid;grid-template-columns:220px 1fr;gap:45px;align-items:start}
+.section-index{font:500 10px 'DM Mono',monospace;letter-spacing:.16em;color:#77727d;position:sticky;top:92px}
+.section-index b{color:var(--acid);font-weight:500}
+.paper .section-index b{color:#536313}
+.section h2{font-size:clamp(42px,5.7vw,78px);line-height:.94;letter-spacing:-.075em;margin:0;max-width:970px}
+.section .lead{font-size:17px;line-height:1.75;color:#a29da7;max-width:780px;margin:26px 0 0}
+.paper .lead{color:#5c5960}
+.acid-text{color:var(--acid)}
+
+.module-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:72px}
+.module{border:1px solid #35313a;background:#131117;min-height:280px;padding:24px;position:relative;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);overflow:hidden}
+.module:before{content:'';position:absolute;left:0;top:0;width:42px;height:3px;background:#514b56}
+.module:hover:before{background:var(--acid);width:100%;transition:.5s var(--ease)}
+.module .mno{font:500 9px 'DM Mono',monospace;color:#6f6a73}
+.module h3{font-size:25px;line-height:1.08;margin:42px 0 14px}
+.module p{font-size:12px;line-height:1.75;color:#89848e}
+.module .tech{position:absolute;left:24px;bottom:22px;font:500 8px 'DM Mono',monospace;color:#54505a}
+
+.system-shell{margin-top:72px;border:1px solid #3d3843;background:#0e0d11;display:grid;grid-template-columns:230px 1fr;min-height:620px;clip-path:polygon(20px 0,100% 0,100% calc(100% - 20px),calc(100% - 20px) 100%,0 100%,0 20px)}
+.system-tabs{border-right:1px solid #3d3843;background:#151319;padding:20px}
+.system-tabs .label{font:500 8px 'DM Mono',monospace;color:#6c6671;margin-bottom:18px}
+.system-tab{width:100%;text-align:left;border:0;border-top:1px solid #38333e;background:transparent;padding:18px 10px;cursor:pointer;color:#8e8993;font:600 11px 'DM Mono',monospace;position:relative}
+.system-tab:last-child{border-bottom:1px solid #38333e}
+.system-tab.active{color:var(--acid);padding-left:22px}
+.system-tab.active:before{content:'';position:absolute;left:4px;top:50%;width:8px;height:8px;margin-top:-4px;background:var(--acid)}
+.system-main{position:relative;padding:34px;overflow:hidden}
+.system-panel{display:none;grid-template-columns:1.05fr .95fr;gap:30px;height:100%;animation:panelin .5s var(--ease)}
+.system-panel.active{display:grid}
+.visual-box{position:relative;border:1px solid #35313a;background:#18151d;min-height:500px;overflow:hidden}
+.visual-grid{position:absolute;inset:24px;border:1px solid #2c2830}
+.visual-grid:before,.visual-grid:after{content:'';position:absolute;background:#312d35}
+.visual-grid:before{height:1px;left:0;right:0;top:50%}
+.visual-grid:after{width:1px;top:0;bottom:0;left:50%}
+.specimen{position:absolute;left:50%;top:50%;width:190px;height:260px;transform:translate(-50%,-50%);border:1px solid #59515f;clip-path:polygon(28% 0,72% 0,100% 24%,90% 100%,10% 100%,0 24%);background:#211d27}
+.specimen:before{content:'';position:absolute;left:50%;top:28px;width:68px;height:68px;margin-left:-34px;border:1px solid #817789;border-radius:50%}
+.specimen:after{content:'';position:absolute;left:32px;right:32px;bottom:28px;height:90px;border:1px solid #46404c}
+.target-dot{position:absolute;width:9px;height:9px;background:var(--acid);box-shadow:0 0 16px #dfff5266}
+.t1{left:22%;top:28%}.t2{right:24%;top:38%}.t3{left:29%;bottom:25%}
+.hud-label{position:absolute;padding:7px 9px;border:1px solid #45404a;background:#111015;font:500 8px 'DM Mono',monospace;color:#c0bbc4}
+.h1{left:8%;top:14%}.h2{right:8%;top:20%}.h3{right:7%;bottom:15%}
+.system-copy{padding:10px 4px}
+.system-copy .code{font:500 9px 'DM Mono',monospace;color:var(--acid);letter-spacing:.12em}
+.system-copy h3{font-size:38px;line-height:1.04;margin:18px 0}
+.system-copy p{font-size:13px;line-height:1.8;color:#aaa5ae}
+.spec-list{margin-top:28px;border-top:1px solid #39343f}
+.spec-row{display:grid;grid-template-columns:120px 1fr;gap:15px;padding:13px 0;border-bottom:1px solid #2f2b34}
+.spec-row b{font:500 8px 'DM Mono',monospace;color:#6d6872}
+.spec-row span{font-size:12px;color:#d6d2d8}
+
+.flow{display:grid;grid-template-columns:repeat(5,1fr);margin-top:70px;border:1px solid #3a3540;background:#111015}
+.flow-step{padding:26px 22px;min-height:205px;border-right:1px solid #3a3540;position:relative}
+.flow-step:last-child{border-right:0}
+.flow-step .fno{font:500 9px 'DM Mono',monospace;color:var(--acid)}
+.flow-step h3{font-size:22px;margin:36px 0 10px}
+.flow-step p{font-size:11px;line-height:1.7;color:#817c86}
+.flow-step:after{content:'';position:absolute;right:-5px;top:48%;width:9px;height:9px;background:var(--acid);z-index:3;transform:rotate(45deg)}
+.flow-step:last-child:after{display:none}
+
+.research-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;margin-top:72px}
+.research-main{border:1px solid #bab8b0;background:#deded7;padding:34px;min-height:490px;position:relative}
+.paper .research-main h3{font-size:34px;margin:0 0 12px}
+.paper .research-main p{font-size:13px;line-height:1.8;color:#5b585f;max-width:650px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:60px}
+.metric{border-top:2px solid #252329;padding-top:16px}
+.metric .num{font-size:78px;font-weight:800;line-height:1;letter-spacing:-.08em}
+.metric .label{font-size:11px;margin-top:8px;color:#615d64}
+.meter{height:8px;background:#bbb9b1;margin-top:18px;overflow:hidden}
+.meter i{display:block;width:0;height:100%;background:#252329;transition:width 1.4s var(--ease)}
+.research-side{display:grid;gap:14px}
+.r-card{border:1px solid #bab8b0;background:#d5d5ce;padding:26px;min-height:238px}
+.r-card .rno{font:500 8px 'DM Mono',monospace;color:#69666c}
+.r-card b{display:block;font-size:34px;margin-top:28px}
+.r-card p{font-size:11px;line-height:1.7;color:#5d5960}
+
+.market-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:14px;margin-top:72px}
+.market-card{border:1px solid #3a3541;background:#131118;padding:30px;min-height:430px;position:relative}
+.market-card.key{background:var(--acid);color:#0c0c0e;border-color:var(--acid)}
+.market-card .lab{font:500 9px 'DM Mono',monospace;color:#77717d}
+.market-card.key .lab{color:#3a401d}
+.market-number{font-size:86px;font-weight:800;letter-spacing:-.08em;margin-top:72px;line-height:.9}
+.market-card p{font-size:12px;line-height:1.75;color:#908a95;max-width:570px}
+.market-card.key p{color:#303518}
+.market-bars{height:220px;display:flex;align-items:end;gap:18px;margin-top:40px;border-bottom:1px solid #403a45}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:10px}
+.bar i{width:66%;height:0;background:#77717d;transition:height 1.3s var(--ease)}
+.bar.acid i{background:var(--acid)}
+.bar b{font:600 9px 'DM Mono',monospace}
+.bar span{font:500 8px 'DM Mono',monospace;color:#77717d}
+
+.business-dual{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:72px}
+.biz{border:1px solid #3b3641;background:#131118;padding:30px;min-height:420px}
+.biz.featured{border-color:#768144;box-shadow:inset 0 0 0 1px #dfff5220}
+.biz .bizno{font:500 9px 'DM Mono',monospace;color:#77717d}
+.biz.featured .bizno{color:var(--acid)}
+.biz h3{font-size:38px;line-height:1;margin:54px 0 20px}
+.biz ul{list-style:none;padding:0;margin:0}
+.biz li{border-top:1px solid #332f39;padding:12px 0;font-size:12px;color:#9b96a0}
+.biz li strong{color:#f0edef;font-weight:600}
+.connector{margin-top:14px;border:1px solid #3b3641;background:#0f0e12;padding:22px;display:flex;gap:13px;justify-content:center;align-items:center;flex-wrap:wrap;font:500 9px 'DM Mono',monospace;color:#817b86}
+.connector b{color:var(--acid)}
+
+.package-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:72px}
+.package{border:1px solid #3a3540;background:#131117;padding:28px;min-height:480px;position:relative}
+.package.featured{border-color:var(--acid)}
+.package.featured:before{content:'RECOMMENDED';position:absolute;right:0;top:0;background:var(--acid);color:#0d0d0f;padding:7px 10px;font:600 8px 'DM Mono',monospace}
+.package .p-tag{font:500 9px 'DM Mono',monospace;color:#79737e}
+.package h3{font-size:32px;line-height:1.05;margin:48px 0 16px}
+.package p{font-size:12px;line-height:1.75;color:#98929d}
+.package ul{padding:0;margin:24px 0 0;list-style:none}
+.package li{padding:10px 0;border-top:1px solid #332f39;font-size:11px;color:#c7c2ca}
+.package .gate{position:absolute;left:28px;right:28px;bottom:24px;border-top:1px solid #4b4550;padding-top:13px;font:500 9px 'DM Mono',monospace;color:var(--acid)}
+
+.risk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:72px}
+.risk{border:1px solid #bab8b0;background:#d8d8d1;padding:24px;min-height:265px}
+.risk .rno{font:500 8px 'DM Mono',monospace;color:#747078}
+.risk h3{font-size:22px;margin:30px 0 12px}
+.risk p{font-size:11px;line-height:1.75;color:#5e5a61}
+.risk .fix{margin-top:18px;color:#2b292e;font-weight:600}
+.compliance{margin-top:12px;border:1px solid #a8a69e;background:#cecec7;padding:20px;font-size:11px;line-height:1.75;color:#504d53}
+.compliance b{color:#1d1b20}
+
+.roadmap{margin-top:72px;border-top:1px solid #3e3943}
+.phase{display:grid;grid-template-columns:130px 240px 1fr 180px;gap:20px;padding:25px 0;border-bottom:1px solid #312d35;align-items:start;position:relative}
+.phase:before{content:'';position:absolute;left:-1px;top:0;width:0;height:2px;background:var(--acid);transition:width 1s var(--ease)}
+.phase.on:before{width:100%}
+.phase .pno{font:500 9px 'DM Mono',monospace;color:#77717d}
+.phase h3{font-size:24px;margin:0}
+.phase p{font-size:12px;line-height:1.75;color:#928c97;margin:0}
+.phase .gate{font:500 9px 'DM Mono',monospace;color:var(--acid)}
+
+.team-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:72px}
+.member{border:1px solid #38333e;background:#131118;padding:24px;min-height:270px}
+.member .role{font:500 9px 'DM Mono',monospace;color:var(--acid)}
+.member h3{font-size:25px;margin:35px 0 4px}
+.member .name{font-size:12px;color:#7d7781}
+.member p{font-size:11px;line-height:1.75;color:#918b96;margin-top:24px}
+
+.cta{padding:160px 0 120px;text-align:center;background:#0d0c10;border-bottom:1px solid #2c2931}
+.cta h2{font-size:clamp(46px,7vw,94px);line-height:.9;letter-spacing:-.075em;margin:0 auto;max-width:1050px}
+.cta h2 em{font-style:normal;color:var(--acid)}
+.cta p{max-width:660px;margin:27px auto 0;font-size:14px;line-height:1.75;color:#99939e}
+.cta .hero-actions{justify-content:center}
+
+.footer{padding:40px 0 55px;background:#09090c}
+.footer-grid{display:grid;grid-template-columns:1fr 2fr;gap:50px}
+.footer .name{font-weight:800;letter-spacing:.2em;font-size:11px}
+.footer p,.footer a{font:500 9px 'DM Mono',monospace;line-height:1.7;color:#68636d}
+.footer a:hover{color:var(--acid)}
+
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
+.reveal.on{opacity:1;transform:none}
+.delay1{transition-delay:.08s}.delay2{transition-delay:.16s}.delay3{transition-delay:.24s}
+
+/* v5 / graph detail + connect */
+.metric .value-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.metric .value-head small{font:500 8px 'DM Mono',monospace;color:#706c72;letter-spacing:.08em;margin-bottom:7px}
+.meter-scale{display:grid;grid-template-columns:repeat(5,1fr);margin-top:7px;font:500 7px 'DM Mono',monospace;color:#817d82}
+.meter-scale span:nth-child(2),.meter-scale span:nth-child(3),.meter-scale span:nth-child(4){text-align:center}
+.meter-scale span:last-child{text-align:right}
+
+.market-share{margin-top:30px;border-top:1px solid #5d6827;padding-top:18px}
+.share-head{display:flex;align-items:center;justify-content:space-between;font:600 8px 'DM Mono',monospace;color:#333919}
+.share-track{height:12px;margin-top:10px;background:#87964a;position:relative;overflow:hidden}
+.share-track i{display:block;height:100%;width:0;background:#111216;transition:width 1.25s var(--ease)}
+.share-legend{display:flex;justify-content:space-between;gap:18px;margin-top:9px;font:500 8px 'DM Mono',monospace;color:#3c4220}
+.share-legend b{font-weight:600;color:#171918}
+.chart-frame{position:relative;height:260px;margin-top:24px;padding-left:42px}
+.chart-axis{position:absolute;left:0;top:0;bottom:36px;width:34px;font:500 7px 'DM Mono',monospace;color:#66616b}
+.chart-axis span{position:absolute;right:6px;transform:translateY(50%)}
+.chart-axis .a100{top:-4px}.chart-axis .a75{top:25%}.chart-axis .a50{top:50%}.chart-axis .a25{top:75%}.chart-axis .a0{bottom:-4px}
+.chart-lines{position:absolute;left:42px;right:0;top:0;bottom:36px;pointer-events:none}
+.chart-lines i{position:absolute;left:0;right:0;height:1px;background:#2d2931}
+.chart-lines i:nth-child(1){top:0}.chart-lines i:nth-child(2){top:25%}.chart-lines i:nth-child(3){top:50%}.chart-lines i:nth-child(4){top:75%}.chart-lines i:nth-child(5){bottom:0}
+.market-bars.detail{position:absolute;left:42px;right:0;top:0;bottom:0;height:auto;margin:0;border:0}
+.market-bars.detail .bar{height:100%;position:relative;padding-bottom:0}
+.market-bars.detail .bar i{position:absolute;bottom:36px}
+.market-bars.detail .bar b{position:absolute;bottom:17px}
+.market-bars.detail .bar span{position:absolute;bottom:0;white-space:nowrap}
+.chart-note{margin-top:16px;padding-top:12px;border-top:1px solid #302c34;display:grid;grid-template-columns:110px 1fr;gap:15px;font-size:10px;line-height:1.6;color:#77717c}
+.chart-note b{font:500 8px 'DM Mono',monospace;color:#a39da7}
+
+.kpi-strip{margin-top:14px;border:1px solid #3b3641;background:#101014;display:grid;grid-template-columns:repeat(5,1fr)}
+.kpi-step{min-height:126px;padding:18px;border-right:1px solid #3b3641;position:relative}
+.kpi-step:last-child{border-right:0}
+.kpi-step .kno{font:500 8px 'DM Mono',monospace;color:var(--acid)}
+.kpi-step b{display:block;font-size:13px;margin-top:18px}
+.kpi-step span{display:block;font-size:9px;line-height:1.55;color:#79737f;margin-top:6px}
+.kpi-step:after{content:'';position:absolute;right:-4px;top:50%;width:7px;height:7px;background:var(--acid);transform:rotate(45deg);z-index:2}
+.kpi-step:last-child:after{display:none}
+
+.member.lead-member{border-color:var(--acid);box-shadow:inset 0 0 0 1px #dfff5222}
+.member.lead-member .role{color:#101014;background:var(--acid);display:inline-block;padding:5px 7px}
+.member .scope{display:flex;gap:6px;flex-wrap:wrap;margin-top:20px}
+.member .scope i{font-style:normal;font:500 7px 'DM Mono',monospace;color:#79737f;border:1px solid #332f39;padding:5px 6px}
+
+.contact-terminal{width:min(900px,100%);margin:52px auto 0;border:1px solid #3d3843;background:#111015;text-align:left;display:grid;grid-template-columns:170px 1fr;min-height:220px;position:relative;clip-path:polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px)}
+.contact-terminal:before{content:'';position:absolute;left:0;top:0;width:90px;height:3px;background:var(--acid)}
+.contact-logo{display:grid;place-items:center;border-right:1px solid #39343f;background:#17151b}
+.contact-logo img{width:108px;height:108px;object-fit:contain}
+.contact-info{padding:30px 34px}
+.contact-info .terminal-label{font:500 8px 'DM Mono',monospace;color:#77717d;letter-spacing:.12em}
+.contact-info h3{font-size:27px;margin:16px 0 4px}
+.contact-info .position{font:600 10px 'DM Mono',monospace;color:var(--acid);letter-spacing:.08em}
+.mail-link{display:inline-flex;align-items:center;gap:11px;margin-top:24px;padding:12px 14px;border:1px solid #504957;background:#0c0b0f;font:600 11px 'DM Mono',monospace;color:#f1eef2}
+.mail-link:before{content:'>';color:var(--acid)}
+.mail-link:hover{border-color:var(--acid);color:var(--acid)}
+.contact-note{font-size:10px;line-height:1.65;color:#7f7984;margin-top:15px}
+
+@media(max-width:720px){
+  .kpi-strip{grid-template-columns:1fr}
+  .kpi-step{border-right:0;border-bottom:1px solid #3b3641;min-height:100px}
+  .kpi-step:after{display:none}
+  .contact-terminal{grid-template-columns:1fr}
+  .contact-logo{border-right:0;border-bottom:1px solid #39343f;padding:22px}
+}
+
+@keyframes scan{0%{top:20%;opacity:.1}10%{opacity:.9}90%{opacity:.9}100%{top:79%;opacity:.1}}
+@keyframes panelin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+
+@media(max-width:1050px){
+  .hero-grid,.section-head,.system-shell,.system-panel,.research-grid,.market-grid{grid-template-columns:1fr}
+  .hero-grid{gap:42px}
+  .machine{min-height:580px}
+  .section-index{position:static}
+  .system-tabs{border-right:0;border-bottom:1px solid #3d3843;display:flex;overflow:auto}
+  .system-tab{min-width:180px;border-bottom:0}
+  .module-grid,.team-grid{grid-template-columns:1fr 1fr}
+  .package-grid,.risk-grid{grid-template-columns:1fr}
+  .phase{grid-template-columns:110px 190px 1fr}
+  .phase .gate{grid-column:3}
+}
+@media(max-width:720px){
+  .wrap{width:calc(100% - 30px)}
+  .navlinks a:not(.nav-cta){display:none}
+  .hero{padding-top:100px}
+  .hero h1{font-size:60px}
+  .machine{min-height:520px}
+  .machine-core{height:335px}
+  .core-ring{width:220px;height:220px}
+  .machine-data{grid-template-columns:1fr}
+  .data-cell{min-height:95px;border-right:0;border-bottom:1px solid #34303a}
+  .module-grid,.business-dual,.team-grid{grid-template-columns:1fr}
+  .flow{grid-template-columns:1fr}
+  .flow-step{border-right:0;border-bottom:1px solid #3a3540;min-height:150px}
+  .flow-step:after{display:none}
+  .metrics{grid-template-columns:1fr}
+  .phase{grid-template-columns:1fr}
+  .phase .gate{grid-column:auto}
+  .footer-grid{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  *{scroll-behavior:auto!important;animation:none!important;transition:none!important}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<header class="topbar">
+  <div class="wrap nav">
+    <a class="brand" href="#top"><i class="brand-mark"></i> ETERNIA</a>
+    <nav class="navlinks">
+      <a href="#game">GAME</a>
+      <a href="#system">SYSTEM</a>
+      <a href="#plan">BUSINESS PLAN</a>
+      <a href="#partner">PARTNERSHIP</a>
+      <a class="nav-cta" href="#contact">CONNECT</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="hero-rail" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="wrap hero-grid">
+    <div class="reveal">
+      <div class="eyebrow">GAME INTRODUCTION / BUSINESS PLAN / PARTNERSHIP</div>
+      <h1><span>ETER</span><span class="outline">NIA</span></h1>
+      <p class="hero-lead">게임을 먼저 즐기게 하고, 플레이 과정에서 피부 고민과 화장품 선택의 기준을 자연스럽게 경험하게 만드는 액션 RPG.</p>
+      <p class="hero-sub">이 페이지는 게임 소개서이자 사업계획서입니다. 전투·수집·제작·NPC 문제 해결이라는 실제 게임 구조와, 사용자 검증·시장 진입·수익모델·브랜드 협업 구조를 같은 흐름 안에서 보여줍니다.</p>
+      <div class="hero-actions">
+        <a class="btn primary" href="#game"><i class="square"></i> ENTER GAME SYSTEM</a>
+        <a class="btn" href="#plan"><i class="square"></i> VIEW BUSINESS PLAN</a>
+      </div>
+      <div class="hero-status">
+        <div class="stat"><span>GENRE</span><b>ACTION RPG</b></div>
+        <div class="stat"><span>PLATFORM</span><b>PC / STEAM</b></div>
+        <div class="stat"><span>CORE</span><b>FIGHT → CRAFT → SOLVE</b></div>
+      </div>
+    </div>
+
+    <div class="machine reveal delay1" id="machine">
+      <div class="machine-head"><span>ETERNIA // SYSTEM CORE</span><strong>ONLINE</strong></div>
+      <div class="machine-core">
+        <div class="core-cross"></div>
+        <div class="core-ring">
+          <div class="core-logo"><b>ETERNIA</b><span>BEAUTY EXPERIENCE PROTOCOL</span></div>
+        </div>
+        <div class="scanner"></div>
+      </div>
+      <div class="machine-data">
+        <div class="data-cell"><span>PLAYER LOOP</span><b>05</b><em>linked actions</em></div>
+        <div class="data-cell"><span>RESEARCH</span><b>73</b><em>internal survey</em></div>
+        <div class="data-cell"><span>INGREDIENT TYPE</span><b>03</b><em>water / powder / oil</em></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="game">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-index"><b>01</b> / GAME OVERVIEW</div>
+      <div>
+        <h2>설명하는 게임이 아니라,<br><span class="acid-text">선택하게 만드는 게임.</span></h2>
+        <p class="lead">ETERNIA의 정보 전달은 별도의 교육 화면이 아니라 플레이 규칙 자체에 들어갑니다. 필요한 원료를 얻기 위해 보스를 선택하고, 제작하고, NPC의 상황에 맞게 적용하면서 제품 선택의 사고방식을 반복하게 됩니다.</p>
+      </div>
+    </div>
+
+    <div class="module-grid">
+      <article class="module reveal"><div class="mno">MODULE / 01</div><h3>전투</h3><p>보스와 지역마다 다른 원료를 배치해 공략 대상 자체가 성분 선택과 연결됩니다.</p><div class="tech">COMBAT / CHANCE GAUGE</div></article>
+      <article class="module reveal delay1"><div class="mno">MODULE / 02</div><h3>원료 수집</h3><p>물·가루·오일 3가지 형태와 보스별 기능 태그를 조합해 제작 재료를 관리합니다.</p><div class="tech">INGREDIENT / DROP TABLE</div></article>
+      <article class="module reveal delay2"><div class="mno">MODULE / 03</div><h3>제작</h3><p>원료를 조합해 토너·세럼·크림·밤 등 서로 다른 제형과 결과를 만듭니다.</p><div class="tech">CRAFT / RECIPE LOGIC</div></article>
+      <article class="module reveal delay3"><div class="mno">MODULE / 04</div><h3>문제 해결</h3><p>NPC의 환경과 고민을 읽고 알맞은 제품을 전달해 결과 피드백을 얻습니다.</p><div class="tech">NPC / SITUATION MATCH</div></article>
+    </div>
+
+    <div class="flow">
+      <div class="flow-step reveal"><div class="fno">01 / FIGHT</div><h3>전투</h3><p>보스 공략</p></div>
+      <div class="flow-step reveal delay1"><div class="fno">02 / COLLECT</div><h3>원료 획득</h3><p>고유 드롭 수집</p></div>
+      <div class="flow-step reveal delay2"><div class="fno">03 / CRAFT</div><h3>제작</h3><p>원료 조합</p></div>
+      <div class="flow-step reveal delay3"><div class="fno">04 / SOLVE</div><h3>NPC 해결</h3><p>상황 기반 선택</p></div>
+      <div class="flow-step reveal"><div class="fno">05 / FEEDBACK</div><h3>성장</h3><p>결과 학습 + 해금</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="system">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-index"><b>02</b> / SYSTEM ANALYSIS</div>
+      <div>
+        <h2>기능마다 다른 이유가 있고,<br>연출도 <span class="acid-text">그 이유를 따라갑니다.</span></h2>
+        <p class="lead">단순 카드 나열 대신 각 시스템의 역할에 맞는 인터랙션을 배치했습니다. 전투는 타깃 스캔, 원료는 분석 패널, 제작은 조합 단계, NPC는 상황 판독처럼 기능과 정보 구조가 애니메이션의 원인이 되도록 설계했습니다.</p>
+      </div>
+    </div>
+
+    <div class="system-shell reveal">
+      <aside class="system-tabs">
+        <div class="label">SYSTEM SELECT / 04</div>
+        <button class="system-tab active" data-tab="combat">01. COMBAT</button>
+        <button class="system-tab" data-tab="ingredient">02. INGREDIENT</button>
+        <button class="system-tab" data-tab="craft">03. CRAFT</button>
+        <button class="system-tab" data-tab="npc">04. NPC SOLVE</button>
+      </aside>
+      <div class="system-main">
+        <div class="system-panel active" id="combat">
+          <div class="visual-box">
+            <div class="visual-grid"></div><div class="specimen"></div>
+            <i class="target-dot t1"></i><i class="target-dot t2"></i><i class="target-dot t3"></i>
+            <span class="hud-label h1">TARGET / HELIONE</span><span class="hud-label h2">CHANCE 68%</span><span class="hud-label h3">DROP / SAP</span>
+          </div>
+          <div class="system-copy"><div class="code">COMBAT SYSTEM / WHY</div><h3>전투가 원료의 의미를 만든다.</h3><p>필요한 성분을 얻기 위해 특정 보스와 패턴을 선택하게 만들면 원료 정보가 전투 목표가 됩니다. 그래서 전투 화면은 설명보다 타깃·게이지·드롭 정보를 빠르게 읽게 하는 HUD 중심으로 연출합니다.</p><div class="spec-list"><div class="spec-row"><b>INPUT</b><span>L/R Attack · Chance action</span></div><div class="spec-row"><b>OUTPUT</b><span>Boss-specific ingredient</span></div><div class="spec-row"><b>ANIMATION</b><span>Target scan / gauge fill / acquisition flash</span></div></div></div>
+        </div>
+        <div class="system-panel" id="ingredient">
+          <div class="visual-box">
+            <div class="visual-grid"></div><div class="specimen" style="width:220px;height:180px;clip-path:polygon(10% 0,90% 0,100% 25%,86% 100%,14% 100%,0 25%)"></div>
+            <i class="target-dot t1"></i><i class="target-dot t2"></i><i class="target-dot t3"></i>
+            <span class="hud-label h1">TYPE / WATER</span><span class="hud-label h2">TAG / SOOTHING</span><span class="hud-label h3">RARITY / RARE</span>
+          </div>
+          <div class="system-copy"><div class="code">INGREDIENT SYSTEM / WHY</div><h3>원료는 ‘정답’이 아니라 선택지다.</h3><p>같은 고민에 여러 원료가 대응할 수 있게 기능을 중첩시켜 단순 암기 게임이 되지 않도록 설계합니다. UI는 형태·효과·희귀도를 기계 분석 레이어처럼 분리해 비교하게 합니다.</p><div class="spec-list"><div class="spec-row"><b>TYPE</b><span>Water / Powder / Oil</span></div><div class="spec-row"><b>TAG</b><span>Moisture / Soothing / Barrier / etc.</span></div><div class="spec-row"><b>ANIMATION</b><span>Scan line / tag lock / compare pulse</span></div></div></div>
+        </div>
+        <div class="system-panel" id="craft">
+          <div class="visual-box">
+            <div class="visual-grid"></div><div class="specimen" style="width:260px;height:220px;clip-path:polygon(18% 0,82% 0,100% 18%,100% 82%,82% 100%,18% 100%,0 82%,0 18%)"></div>
+            <span class="hud-label h1">SLOT A / WATER</span><span class="hud-label h2">SLOT B / POWDER</span><span class="hud-label h3">RESULT / SERUM</span>
+          </div>
+          <div class="system-copy"><div class="code">CRAFT SYSTEM / WHY</div><h3>조합 과정 자체가 제품 구조를 이해시킨다.</h3><p>플레이어가 원료를 넣고 결과 제형을 확인하는 순간에 ‘원료 → 기능 → 제품’ 관계가 만들어집니다. 조합 슬롯은 단계적으로 잠금 해제되고 결과 패널은 마지막에만 노출됩니다.</p><div class="spec-list"><div class="spec-row"><b>INPUT</b><span>3 ingredient slots</span></div><div class="spec-row"><b>RESULT</b><span>Toner / Serum / Cream / Balm...</span></div><div class="spec-row"><b>ANIMATION</b><span>Slot insert / validation / result deploy</span></div></div></div>
+        </div>
+        <div class="system-panel" id="npc">
+          <div class="visual-box">
+            <div class="visual-grid"></div><div class="specimen"></div>
+            <span class="hud-label h1">NPC / CROA</span><span class="hud-label h2">ENV / DRY</span><span class="hud-label h3">NEED / BARRIER</span>
+          </div>
+          <div class="system-copy"><div class="code">NPC SOLVE / WHY</div><h3>상황을 읽고 제품을 선택하게 한다.</h3><p>NPC는 피부 상태뿐 아니라 환경과 생활 조건을 함께 제공합니다. 플레이어는 단일 성분을 맞히는 것이 아니라 상황을 해석해 적합한 제작물을 결정합니다.</p><div class="spec-list"><div class="spec-row"><b>READ</b><span>Skin concern + environment</span></div><div class="spec-row"><b>DECIDE</b><span>Required function / product</span></div><div class="spec-row"><b>ANIMATION</b><span>Condition detect / choice confirm / feedback state</span></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section paper" id="plan">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-index"><b>03</b> / PROBLEM & VALIDATION</div>
+      <div>
+        <h2>게임의 차별화보다 먼저,<br>해결할 문제를 검증합니다.</h2>
+        <p class="lead">팀 자체 조사에서 확인된 수치는 외부 시장통계와 분리해 표시합니다. 사업계획서의 핵심은 ‘남성 뷰티 시장이 크다’는 주장보다, 실제 타깃이 제품 선택 과정에서 어디에서 이탈하는지에 있습니다.</p>
+      </div>
+    </div>
+
+    <div class="research-grid">
+      <div class="research-main reveal">
+        <h3>“무엇을 써야 하는지 모르겠다.”</h3>
+        <p>20대 초반 남성 대상 자체 설문에서 자기관리 중단과 탐색 피로가 반복적으로 나타났습니다. 웹에서는 수치를 단순 숫자로 보여주는 대신, 스크롤 진입 시 막대가 채워지며 ‘이탈 지점’을 시각적으로 강조합니다.</p>
+        <div class="metrics">
+          <div class="metric">
+            <div class="value-head"><div class="num count" data-to="60">0</div><small>INTERNAL / n=73</small></div>
+            <div class="label">% · 1개월 내 자기관리 중단 경험</div>
+            <div class="meter"><i data-width="60%"></i></div>
+            <div class="meter-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div>
+          </div>
+          <div class="metric">
+            <div class="value-head"><div class="num count" data-to="50">0</div><small>INTERNAL / n=73</small></div>
+            <div class="label">% · 탐색 과정에서 시간 소요 또는 중도 포기</div>
+            <div class="meter"><i data-width="50%"></i></div>
+            <div class="meter-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="research-side">
+        <div class="r-card reveal delay1"><div class="rno">INTERNAL RESEARCH</div><b>n = 73</b><p>20대 초반 남성 자체 설문. 외부 통계가 아닌 팀 조사 데이터로 명시합니다.</p></div>
+        <div class="r-card reveal delay2"><div class="rno">QUALITATIVE</div><b>8 INTERVIEWS</b><p>뷰티 입문 과정과 정보 탐색 피로를 구체적으로 확인한 인터뷰 자료.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="market">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-index"><b>04</b> / MARKET</div>
+      <div>
+        <h2>게임에서 유저를 확보하고,<br>브랜드 협업으로 <span class="acid-text">확장합니다.</span></h2>
+        <p class="lead">외부 시장 수치는 ETERNIA의 직접 TAM으로 과장하지 않고, Steam 기반 게임이 진입하는 산업 환경을 보여주는 근거로 사용합니다.</p>
+      </div>
+    </div>
+
+    <div class="market-grid">
+      <article class="market-card key reveal">
+        <div class="lab">KOREA GAME INDUSTRY / 2024</div>
+        <div class="market-number">23.85<span style="font-size:.34em">조</span></div>
+        <p>한국콘텐츠진흥원 《2025 대한민국 게임백서》 기준 2024년 국내 게임산업 매출은 23조 8,515억 원이며, PC게임 매출은 6조 94억 원(25.2%)입니다.</p>
+        <div class="market-share">
+          <div class="share-head"><span>PC GAME SHARE</span><b>25.2%</b></div>
+          <div class="share-track"><i data-share="25.2%"></i></div>
+          <div class="share-legend"><span><b>PC 25.2</b></span><span>OTHER 74.8</span></div>
+        </div>
+        <div class="lab" style="position:absolute;left:30px;bottom:28px">SOURCE / KOCCA 2025 GAME WHITE PAPER</div>
+      </article>
+      <article class="market-card reveal delay1">
+        <div class="lab">ENTRY → EXPANSION</div>
+        <div class="chart-frame">
+          <div class="chart-axis"><span class="a100">100</span><span class="a75">75</span><span class="a50">50</span><span class="a25">25</span><span class="a0">0</span></div>
+          <div class="chart-lines"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="market-bars detail">
+            <div class="bar acid"><i data-h="190px"></i><b>GAME</b><span>CORE</span></div>
+            <div class="bar"><i data-h="155px"></i><b>DATA</b><span>MEASURE</span></div>
+            <div class="bar"><i data-h="120px"></i><b>B2B</b><span>PILOT</span></div>
+            <div class="bar"><i data-h="90px"></i><b>O2O</b><span>LINK</span></div>
+            <div class="bar"><i data-h="70px"></i><b>IP</b><span>SCALE</span></div>
+          </div>
+        </div>
+        <div class="chart-note"><b>READING</b><span>사업 확장 우선순위를 시각화한 전략 단계도이며, 막대 높이는 매출·시장점유율 실측치가 아닙니다.</span></div>
+        <p>게임성 검증 → 플레이 데이터 → 브랜드 파일럿 → 샘플·팝업·제품 경험 → IP 확장 순으로 리스크를 나눕니다.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="business">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-index"><b>05</b> / BUSINESS MODEL</div>
+      <div>
+        <h2>B2C와 B2B를 섞지 않고,<br><span class="acid-text">순서대로 연결합니다.</span></h2>
+        <p class="lead">게임 자체가 재미있어 유저를 확보하는 B2C 구조와, 검증된 플레이 경험을 브랜드 마케팅 포맷으로 판매하는 B2B2C 구조를 분리합니다.</p>
+      </div>
+    </div>
+
+    <div class="business-dual">
+      <article class="biz reveal"><div class="bizno">B2C / GAME</div><h3>게임이<br>팬을 만든다.</h3><ul><li><strong>Steam</strong> 게임 판매</li><li><strong>DLC</strong> 추가 스토리·콘텐츠</li><li><strong>IP</strong> 스킨·굿즈·펀딩</li><li><strong>Community</strong> 초기 팬층과 플레이 데이터</li></ul></article>
+      <article class="biz featured reveal delay1"><div class="bizno">B2B2C / BRAND</div><h3>브랜드가<br>플레이가 된다.</h3><ul><li><strong>Ingredient</strong> 대표 원료의 게임 아이템화</li><li><strong>Quest</strong> 브랜드 전용 퀘스트·레시피</li><li><strong>Reward</strong> 샘플·체험 키트 연동</li><li><strong>Offline</strong> 게임/서브컬처 행사 공동 체험</li></ul></article>
+    </div>
+    <div class="connector reveal"><span>BRAND INGREDIENT</span><b>→</b><span>GAME ITEM</span><b>→</b><span>QUEST</span><b>→</b><span>PLAYER ACTION</span><b>→</b><span>REAL PRODUCT</span></div>
+    <div class="kpi-strip reveal">
+      <div class="kpi-step"><div class="kno">KPI / 01</div><b>REACH</b><span>데모 진입 · 콘텐츠 도달</span></div>
+      <div class="kpi-step"><div class="kno">KPI / 02</div><b>START</b><span>퀘스트 시작 · 원료 확인</span></div>
+      <div class="kpi-step"><div class="kno">KPI / 03</div><b>COMPLETE</b><span>제작 완료 · NPC 해결</span></div>
+      <div class="kpi-step"><div class="kno">KPI / 04</div><b>INTERACT</b><span>브랜드 정보 · 리워드 행동</span></div>
+      <div class="kpi-step"><div class="kno">KPI / 05</div><b>CONNECT</b><span>샘플 · 행사 · 실제 제품 접점</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="partner">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-index"><b>06</b> / PARTNERSHIP</div>
+      <div>
+        <h2>큰 콜라보보다 먼저,<br><span class="acid-text">작은 단위를 증명합니다.</span></h2>
+        <p class="lead">기업 제안 단계에서는 완성되지 않은 매출 전망보다 ‘어떤 범위로 시작하고 무엇을 측정할지’를 먼저 보여줍니다.</p>
+      </div>
+    </div>
+
+    <div class="package-grid">
+      <article class="package reveal"><div class="p-tag">01 / PILOT</div><h3>한 원료,<br>한 경험.</h3><p>브랜드의 대표 원료 하나를 아이템·레시피·NPC 중 하나에 연결해 게임 안에서 자연스러운지 검증합니다.</p><ul><li>대표 원료 1개</li><li>인게임 경험 1종</li><li>브랜드 표현 검수</li><li>완료율·행동 로그 리포트</li></ul><div class="gate">GATE / 광고처럼 느껴지지 않는가?</div></article>
+      <article class="package featured reveal delay1"><div class="p-tag">02 / BRAND QUEST</div><h3>브랜드를<br>한 퀘스트로.</h3><p>원료 획득부터 제작, NPC 문제 해결까지 하나의 완결된 브랜드 경험으로 설계합니다.</p><ul><li>브랜드 전용 퀘스트</li><li>희귀 원료·레시피</li><li>NPC/세계관 연결</li><li>행동 퍼널 리포트</li></ul><div class="gate">GATE / 체험 → 기억 → 관심 행동</div></article>
+      <article class="package reveal delay2"><div class="p-tag">03 / O2O</div><h3>플레이를<br>실물 경험으로.</h3><p>검증된 디지털 경험만 샘플·체험키트·팝업·제품 상세 페이지와 연결합니다.</p><ul><li>샘플 신청 / 리워드 코드</li><li>행사 현장 퀘스트</li><li>동의 기반 전환 추적</li><li>브랜드별 성과 리포트</li></ul><div class="gate">GATE / 디지털 → 실제 접점 전환</div></article>
+    </div>
+  </div>
+</section>
+
+<section class="section paper" id="risk">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-index"><b>07</b> / REALITY CHECK</div>
+      <div>
+        <h2>실제 사업에서 생길 문제까지<br>웹 안에서 먼저 답합니다.</h2>
+        <p class="lead">브랜드 담당자가 가장 먼저 보는 부분은 아이디어보다 실행 리스크입니다. 게임성, 표현 규제, 승인 과정, 개인정보, B2B 제작 범위를 분리해 대응합니다.</p>
+      </div>
+    </div>
+
+    <div class="risk-grid">
+      <article class="risk reveal"><div class="rno">RISK / 01</div><h3>게임성 훼손</h3><p>뷰티 정보가 전면에 나오면 게임 유입이 약해질 수 있습니다.</p><div class="fix">→ Steam/PV는 세계관·전투 우선. 뷰티는 플레이 결과로 노출.</div></article>
+      <article class="risk reveal delay1"><div class="rno">RISK / 02</div><h3>효능 오인</h3><p>게임 아이템 효과와 실제 화장품 효능을 동일하게 읽히게 해서는 안 됩니다.</p><div class="fix">→ 실제 제품 정보와 판타지 효과를 UI 레벨에서 분리.</div></article>
+      <article class="risk reveal delay2"><div class="rno">RISK / 03</div><h3>브랜드 세이프티</h3><p>캐릭터 표현·퀘스트 문구·원료 정보가 브랜드 이미지와 충돌할 수 있습니다.</p><div class="fix">→ 기획 → 표현 가이드 → 브랜드 승인 → 공개 게이트.</div></article>
+      <article class="risk reveal"><div class="rno">RISK / 04</div><h3>개인정보</h3><p>게임 행동 데이터와 실제 제품 신청 정보는 목적과 권한이 다릅니다.</p><div class="fix">→ 캠페인 분석은 집계 중심, 개인 연계는 별도 동의.</div></article>
+      <article class="risk reveal delay1"><div class="rno">RISK / 05</div><h3>B2B 리드타임</h3><p>큰 커스텀 협업은 개발 일정과 브랜드 승인 일정을 동시에 흔듭니다.</p><div class="fix">→ 1원료 × 1퀘스트부터 제작 범위를 표준화.</div></article>
+      <article class="risk reveal delay2"><div class="rno">RISK / 06</div><h3>성과 과장</h3><p>초기 단계에서 매출 기여를 확정 성과처럼 약속하기 어렵습니다.</p><div class="fix">→ 도달·시작·완료·상호작용·O2O 퍼널로 계약 KPI 합의.</div></article>
+    </div>
+
+    <div class="compliance reveal"><b>COMPLIANCE</b> · 실제 브랜드 제품 및 원료를 사용할 경우 화장품 표시·광고 관련 기준과 브랜드 공식 자료를 기준으로 문구를 검수하고, 게임 내 판타지 효과와 실제 제품 정보는 분리해 표시합니다. 개인 식별 정보가 브랜드 또는 제3자와 연계되는 경우에는 별도의 동의와 목적 제한이 필요합니다.</div>
+  </div>
+</section>
+
+<section class="section" id="roadmap">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-index"><b>08</b> / ROADMAP</div>
+      <div>
+        <h2>연도보다 먼저,<br><span class="acid-text">다음 단계로 갈 조건</span>을 봅니다.</h2>
+        <p class="lead">사업계획서의 일정은 ‘언제 출시한다’보다 각 단계에서 무엇을 검증해야 다음 단계로 넘어가는지가 명확해야 합니다.</p>
+      </div>
+    </div>
+
+    <div class="roadmap">
+      <div class="phase reveal"><div class="pno">PHASE 01</div><h3>MVP</h3><p>전투·수집·제작·NPC 해결 루프가 브랜드 없이도 재미있는지 확인합니다.</p><div class="gate">GATE / 반복 플레이 의향</div></div>
+      <div class="phase reveal"><div class="pno">PHASE 02</div><h3>USER TEST</h3><p>게임성, 정보 방해 지점, 원료·제품 관계 이해도를 분리 측정합니다.</p><div class="gate">GATE / 게임성 + 기억</div></div>
+      <div class="phase reveal"><div class="pno">PHASE 03</div><h3>BRAND PILOT</h3><p>1개 브랜드·1개 원료로 승인 프로세스와 행동 KPI 리포트를 검증합니다.</p><div class="gate">GATE / 재협업 의향</div></div>
+      <div class="phase reveal"><div class="pno">PHASE 04</div><h3>STEAM</h3><p>데모 공개와 위시리스트 등 실제 게임 이용자 지표를 확보합니다.</p><div class="gate">GATE / 유입 → 플레이</div></div>
+      <div class="phase reveal"><div class="pno">PHASE 05</div><h3>SCALE</h3><p>검증된 포맷만 DLC·브랜드·샘플·팝업·IP 협업으로 확장합니다.</p><div class="gate">GATE / 반복 가능한 단위경제성</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="team">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-index"><b>09</b> / TEAM</div>
+      <div><h2>기획·개발·아트가<br>한 제작 파이프라인으로 움직입니다.</h2><p class="lead">직함을 사업용으로 임의 변환하지 않고 현재 프로젝트의 실제 역할 기준으로 정리했습니다.</p></div>
+    </div>
+    <div class="team-grid">
+      <article class="member lead-member reveal">
+        <div class="role">PROJECT LEAD / PM</div><h3>김하진</h3><div class="name">Representative · Planning · Project Management</div>
+        <p>ETERNIA 대표 및 PM. 게임·사업 기획을 연결하고 일정, 의사결정, 외부 협업과 전체 프로젝트 방향을 총괄합니다.</p>
+        <div class="scope"><i>PM</i><i>GAME PLANNING</i><i>BUSINESS</i></div>
+      </article>
+      <article class="member reveal delay1">
+        <div class="role">ART DIRECTOR</div><h3>최민서</h3><div class="name">Visual Direction · Character / UI Art</div>
+        <p>프로젝트의 아트 디렉션과 시각 언어를 총괄하고 캐릭터·UI·콘셉트의 일관성을 관리합니다.</p>
+        <div class="scope"><i>ART DIRECTION</i><i>VISUAL SYSTEM</i></div>
+      </article>
+      <article class="member reveal delay2">
+        <div class="role">BACKGROUND ART</div><h3>김예진</h3><div class="name">Environment · Background Production</div>
+        <p>지역과 공간의 배경 아트 제작을 담당하고 세계관의 환경 톤과 플레이 공간의 시각 완성도를 구축합니다.</p>
+        <div class="scope"><i>ENVIRONMENT</i><i>BACKGROUND</i></div>
+      </article>
+      <article class="member reveal delay3">
+        <div class="role">DEVELOPER</div><h3>강창훈</h3><div class="name">Unity · Gameplay Programming</div>
+        <p>Unity 기반 게임 코딩, 전투·수집·제작 등 핵심 시스템 구현과 기능 안정화를 담당합니다.</p>
+        <div class="scope"><i>UNITY</i><i>GAMEPLAY CODE</i><i>SYSTEM</i></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="cta" id="contact">
+  <div class="wrap">
+    <div class="eyebrow reveal">10 / CONNECT</div>
+    <h2 class="reveal">게임·사업·브랜드 협업을<br><em>ETERNIA로 연결합니다.</em></h2>
+    <p class="reveal">게임 소개, 사업계획, 브랜드 파일럿 또는 프로젝트 협업 관련 문의는 프로젝트 대표/PM에게 연결됩니다.</p>
+
+    <div class="contact-terminal reveal">
+      <div class="contact-logo"><img src="data:image/png;base64,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" alt="김하진 프로젝트 로고"/></div>
+      <div class="contact-info">
+        <div class="terminal-label">PRIMARY CONTACT / PROJECT LEAD</div>
+        <h3>김하진</h3>
+        <div class="position">REPRESENTATIVE · PM</div>
+        <a class="mail-link" href="mailto:hchis.hj@gmail.com">hchis.hj@gmail.com</a>
+        <div class="contact-note">GAME PROJECT · BUSINESS PLAN · BRAND PARTNERSHIP</div>
+      </div>
+    </div>
+
+    <div class="hero-actions reveal">
+      <a class="btn primary" href="mailto:hchis.hj@gmail.com"><i class="square"></i> SEND MAIL</a>
+      <a class="btn" href="#top"><i class="square"></i> BACK TO TOP</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-grid">
+    <div><div class="name">ETERNIA / HAMCHIS GAMES</div><p>PROJECT LEAD / PM · 김하진<br>CONNECT · hchis.hj@gmail.com</p></div>
+    <div>
+      <p>SOURCE / 프로젝트 내부 사업계획서·UI·시스템 기획 · 팀 자체 설문 n=73 · 인터뷰 8명</p>
+      <p>EXTERNAL / 한국콘텐츠진흥원 《2025 대한민국 게임백서》 — 2024 국내 게임산업 매출 23조 8,515억 원, PC게임 6조 94억 원(25.2%).</p>
+      <p><a href="https://welcon.kocca.kr/ko/info/business/1957374" target="_blank" rel="noopener">KOCCA SOURCE ↗</a></p>
+    </div>
+  </div>
+</footer>
+
+<script>
+const progress=document.getElementById('progress');
+const navLinks=[...document.querySelectorAll('.navlinks a[href^="#"]')];
+const sections=[...document.querySelectorAll('main section[id]')];
+
+addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  const max=h.scrollHeight-innerHeight;
+  progress.style.width=(max>0?scrollY/max*100:0)+'%';
+  let current='';
+  sections.forEach(s=>{if(scrollY>=s.offsetTop-140)current=s.id});
+  navLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+current));
+},{passive:true});
+
+const io=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.classList.add('on');
+    }else{
+      // Fully leaving the viewport resets the reveal state,
+      // so returning to the section replays the motion.
+      e.target.classList.remove('on');
+    }
+  });
+},{threshold:0,rootMargin:'-4% 0px -4% 0px'});
+document.querySelectorAll('.reveal,.phase').forEach(el=>io.observe(el));
+
+const running=new WeakMap();
+function resetDataVisual(el){
+  const raf=running.get(el);
+  if(raf) cancelAnimationFrame(raf);
+  running.delete(el);
+  if(el.dataset.to) el.textContent='0';
+  if(el.dataset.width) el.style.width='0';
+  if(el.dataset.h) el.style.height='0';
+  if(el.dataset.share) el.style.width='0';
+}
+function playDataVisual(el){
+  if(el.dataset.to){
+    const target=+el.dataset.to, start=performance.now();
+    const tick=now=>{
+      const p=Math.min((now-start)/950,1);
+      const q=1-Math.pow(1-p,3);
+      el.textContent=Math.round(target*q);
+      if(p<1){
+        const id=requestAnimationFrame(tick);
+        running.set(el,id);
+      }else{
+        running.delete(el);
+      }
+    };
+    const id=requestAnimationFrame(tick);
+    running.set(el,id);
+  }
+  if(el.dataset.width) requestAnimationFrame(()=>el.style.width=el.dataset.width);
+  if(el.dataset.h) requestAnimationFrame(()=>el.style.height=el.dataset.h);
+  if(el.dataset.share) requestAnimationFrame(()=>el.style.width=el.dataset.share);
+}
+const dataIO=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    const el=e.target;
+    if(e.isIntersecting) playDataVisual(el);
+    else resetDataVisual(el);
+  });
+},{threshold:0.28,rootMargin:'-4% 0px -4% 0px'});
+document.querySelectorAll('.count,.meter i,.bar i,.share-track i').forEach(el=>{
+  resetDataVisual(el);
+  dataIO.observe(el);
+});
+
+const tabs=[...document.querySelectorAll('.system-tab')];
+tabs.forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.system-panel').forEach(x=>x.classList.remove('active'));
+    btn.classList.add('active');
+    const panel=document.getElementById(btn.dataset.tab);
+    void panel.offsetWidth;
+    panel.classList.add('active');
+  });
+});
+
+const machine=document.getElementById('machine');
+if(machine && matchMedia('(pointer:fine)').matches){
+  machine.addEventListener('mousemove',e=>{
+    const r=machine.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width-.5;
+    const y=(e.clientY-r.top)/r.height-.5;
+    machine.style.transform=`translate(${x*4}px,${y*4}px)`;
+  });
+  machine.addEventListener('mouseleave',()=>machine.style.transform='');
+}
+</script>
+</body>
+</html>
