@@ -1,0 +1,4 @@
+# Somer Studio site (somer-studio.com). Static, no build step.
+[build]
+  publish = "."
+  command = ""
