@@ -497,3 +497,10 @@ h2{font-size:clamp(28px,4.4vw,52px);line-height:1.2;font-weight:800;letter-spaci
 .inq .agree input{margin-top:3px;width:18px;height:18px;flex:none;accent-color:var(--ink)}
 .inq .btn{align-self:flex-start}
 .renamed[hidden]{display:none}
+
+/* wordmark (11/27 somer–studio) */
+.nav-brand .wm{height:15px;width:auto;display:block}
+.nav-brand .wm-l{display:none}
+.nav.dark .nav-brand .wm-d{display:none}
+.nav.dark .nav-brand .wm-l{display:block}
+.hero h1.brand img{width:min(100%,clamp(280px,46vw,640px));height:auto}
