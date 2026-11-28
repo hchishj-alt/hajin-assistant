@@ -1,0 +1,20 @@
+# 공모전 모음 사이트의 수집 허용 규칙(robots.txt)과 목록 모양을 확인 (사람이 눌러서 한 번만 실행, 저장 없음)
+name: probe
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: '확인할 목록 주소 (띄어쓰기로 구분)'
+        required: true
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: node scripts/probe-sources.mjs
+        env:
+          PROBE: ${{ inputs.urls }}
