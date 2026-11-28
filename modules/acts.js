@@ -4,7 +4,7 @@ import * as db from '../js/db.js';
 import * as A from '../js/acts.js';
 import { nameCanon, sameName } from '../js/store.js';
 
-const F = { tab: 'mine', view: 'grid', type: '', part: '', who: '', region: '', status: '', due: '', ok: false, q: '', sort: 'due', open: false };
+const F = { tab: 'mine', view: 'grid', viewRec: 'list', type: '', part: '', who: '', region: '', status: '', due: '', ok: false, q: '', sort: 'due', open: false };
 const DUE = [['', '전체'], ['7', '이번 주'], ['14', '2주 안'], ['30', '한 달 안'], ['past', '지난 것도']];
 const SORTS = [['due', '마감 가까운 순'], ['match', '우리와 맞는 순'], ['new', '새로 담은 순']];
 const blobUrls = new Map();
@@ -21,7 +21,7 @@ export default {
   async render(root, params) {
     const box = h('div'); const titleEl = h('h1', '대외활동'), subEl = h('p.sub', '');
     let prof = A.PROFILE, canon = w => w, me = '', rec = { items: [] }, roster = [];
-    const saved = await db.kvGet('acts:view', null); if (saved) { F.view = saved.view || F.view; F.sort = saved.sort || F.sort; }
+    const saved = await db.kvGet('acts:view', null); if (saved) { F.view = saved.view || F.view; F.viewRec = saved.viewRec || F.viewRec; F.sort = saved.sort || F.sort; }
     if (params[0] === 'rec') F.tab = 'rec';
     root.append(h('div.page-head', h('div', titleEl, subEl), h('div.row',
       h('button.btn.sm', { type: 'button', onclick: () => editProfile() }, ic('users', 14), '우리 팀 조건'),
@@ -52,14 +52,14 @@ export default {
         && (F.due === 'past' ? true : F.due ? (r.dday != null && r.dday >= 0 && r.dday <= +F.due) : F.tab === 'mine' ? true : !(r.dday < 0))
         && (!F.q || `${a.title} ${a.host || ''} ${a.field || ''} ${a.body || ''}`.toLowerCase().includes(F.q.toLowerCase())));
       const past = x => (x.r.dday != null && x.r.dday < 0 ? 2 : 0) + (['sent', 'won', 'lost', 'drop'].includes(x.a.status) ? 1 : 0);
-      const by = { due: (x, z) => past(x) - past(z) || (x.r.dday ?? 9999) - (z.r.dday ?? 9999), match: (x, z) => past(x) - past(z) || z.r.total - x.r.total, new: (x, z) => (z.a.createdAt || z.a.date || '').localeCompare(x.a.createdAt || x.a.date || '') };
+      const by = { due: (x, z) => past(x) - past(z) || (x.r.dday ?? 9999) - (z.r.dday ?? 9999) || z.r.pct - x.r.pct, match: (x, z) => past(x) - past(z) || z.r.total - x.r.total, new: (x, z) => (z.a.createdAt || z.a.date || '').localeCompare(x.a.createdAt || x.a.date || '') };
       rows.sort(by[F.tab === 'rec' && F.sort === 'new' ? 'match' : F.sort] || by.due);
 
-      const keep = () => db.kvSet('acts:view', { view: F.view, sort: F.sort });
+      const keep = () => db.kvSet('acts:view', { view: F.view, viewRec: F.viewRec, sort: F.sort }); const vk = F.tab === 'rec' ? 'viewRec' : 'view';   /* 찾아온 것은 포스터가 없는 뉴스라 목록이 기본, 담은 것은 포스터 갤러리가 기본. 따로 기억해요 */
       const q = h('input.in', { type: 'search', placeholder: '이름·주최·분야 찾기', 'aria-label': '대외활동 찾기', value: F.q, oninput: debounce(e => { F.q = e.target.value; draw().then(() => { const i = box.querySelector('.ac-q input'); if (i) { i.focus(); try { i.setSelectionRange(i.value.length, i.value.length); } catch { } } }); }, 250) });
       const pick = (key, opts) => h('div.chips', opts.map(([v, l]) => h('button.chip.ac-pick' + (F[key] === v ? '.acc' : ''), { type: 'button', 'aria-pressed': String(F[key] === v), onclick: () => { F[key] = v; draw(); } }, l)));
       const n = (F.part ? 1 : 0) + (F.who ? 1 : 0) + (F.region ? 1 : 0) + (F.status && F.tab === 'mine' ? 1 : 0) + (F.due ? 1 : 0) + (F.ok ? 1 : 0);
-      const viewBtn = (v, icon, label) => h('button' + (F.view === v ? '.on' : ''), { type: 'button', 'aria-label': label, 'aria-pressed': String(F.view === v), onclick: () => { F.view = v; keep(); draw(); } }, ic(icon, 16));
+      const viewBtn = (v, icon, label) => h('button' + (F[vk] === v ? '.on' : ''), { type: 'button', 'aria-label': label, 'aria-pressed': String(F[vk] === v), onclick: () => { F[vk] = v; keep(); draw(); } }, ic(icon, 16));
       box.append(
         h('div.ac-tabs', seg([['mine', `우리가 담은 것 ${mine.length}`], ['rec', `찾아온 것 ${recs.length}`]], F.tab, v => { F.tab = v; if (v === 'rec' && F.sort === 'new') F.sort = 'match'; draw(); })),
         h('div.card.ac-filter',
@@ -75,9 +75,9 @@ export default {
             h('div.ac-frow', h('span.lbl', '마감'), pick('due', DUE)),
             F.tab === 'mine' ? h('div.ac-frow', h('span.lbl', '상태'), pick('status', [['', '전체'], ...A.STATUS])) : null,
             h('div.ac-frow', h('span.lbl', '자격'), h('div.chips', h('button.chip.ac-pick' + (F.ok ? '.acc' : ''), { type: 'button', 'aria-pressed': String(F.ok), onclick: () => { F.ok = !F.ok; draw(); } }, '우리가 나갈 수 있는 것만')))) : null));
-      if (F.tab === 'rec') box.append(h('div.faint.small.ac-note', rec.updatedAt ? `${mmdd(db.dayOf(rec.updatedAt))} 아침에 새로 찾았어요. 맞는 순서와 마감을 같이 봐서 늘어놓아요.` : '아직 찾아온 게 없어요. 매일 아침 새로 찾아 둘게요. 그 전에는 “링크로 담기”로 넣을 수 있어요.'));
+      if (F.tab === 'rec') box.append(h('div.faint.small.ac-note', rec.updatedAt ? `${mmdd(db.dayOf(rec.updatedAt))}에 뉴스에서 새로 찾아왔어요. 기사에 마감·인원이 안 적혀 있으면 “마감 모름”으로 떠요. 나갈 만하면 담아서 고쳐 주세요.` : '아직 찾아온 게 없어요. 매일 아침 새로 찾아 둘게요. 그 전에는 “링크로 담기”로 넣을 수 있어요.'));
       if (!rows.length) box.append(h('div.card', h('div.empty', src.length ? '조건에 맞는 게 없어요. 조건을 지워 보세요.' : F.tab === 'mine' ? '공고 링크를 “링크로 담기”에 붙이거나 “직접 적기”로 넣어 보세요. 비서에게 “○○ 공모전 12월 20일 마감 팀 4명까지”라고 말해도 들어와요.' : '지금은 보여 줄 추천이 없어요.')));
-      else if (F.view === 'grid') { const g = h('div.ac-grid'); for (const x of rows) g.append(await cardOf(x)); box.append(g); }
+      else if (F[vk] === 'grid') { const g = h('div.ac-grid'); for (const x of rows) g.append(await cardOf(x)); box.append(g); }
       else { const l = h('div.card.pad0.ac-list'); for (const x of rows) l.append(await rowOf(x)); box.append(l); }
       box.append(h('div.faint.tiny.ac-count', `${rows.length}개`));
       if (y && Math.abs(scrollY - y) > 4) scrollTo(0, y);
@@ -104,14 +104,14 @@ export default {
         h('div.ac-b',
           h('div.ac-t', a.title || '(이름 없음)'),
           h('div.ac-sub', [A.typeName(a.type), a.host, a.due ? `${mmdd(a.due)} 마감` : ''].filter(Boolean).join(' · ')),
-          h('div.chips', isRec ? h('span.chip' + (r.ok ? (r.pct >= 70 ? '.ok' : '.acc') : '.bad'), r.ok ? `맞음 ${r.pct}%` : '자격 안 맞음') : stchip(a), ...tagsOf(a, r, { max: 2 })),
+          h('div.chips', isRec ? h('span.chip' + (r.ok ? (r.pct >= A.GOOD ? '.ok' : '.acc') : '.bad'), r.ok ? `맞음 ${r.pct}%` : '자격 안 맞음') : stchip(a), ...tagsOf(a, r, { max: 2 })),
           isRec ? h('div.ac-why', r.line) : null));
     }
     async function rowOf({ a, r }) {
       const src = await posterOf(a); const isRec = F.tab === 'rec';
       return h('button.ac-row' + (r.dday != null && r.dday < 0 ? '.gone' : ''), { type: 'button', onclick: () => detail(a, isRec) },
         h('span.ac-thumb', src ? img(src, a) : ic('image', 18)),
-        h('span.ac-rb', h('b', a.title || '(이름 없음)'), h('small', [A.typeName(a.type), a.host, a.due ? `${mmdd(a.due)} 마감` : '', isRec ? r.line : ''].filter(Boolean).join(' · ')), h('span.chips', isRec ? h('span.chip' + (r.ok ? (r.pct >= 70 ? '.ok' : '.acc') : '.bad'), r.ok ? `맞음 ${r.pct}%` : '자격 안 맞음') : stchip(a), a.goal ? h('span.chip.acc', ic('flag', 12), '팀 목표') : null, ...tagsOf(a, r, { max: 3 }))),
+        h('span.ac-rb', h('b', a.title || '(이름 없음)'), h('small', [A.typeName(a.type), a.host, a.due ? `${mmdd(a.due)} 마감` : '', isRec ? r.line : ''].filter(Boolean).join(' · ')), h('span.chips', isRec ? h('span.chip' + (r.ok ? (r.pct >= A.GOOD ? '.ok' : '.acc') : '.bad'), r.ok ? `맞음 ${r.pct}%` : '자격 안 맞음') : stchip(a), a.goal ? h('span.chip.acc', ic('flag', 12), '팀 목표') : null, ...tagsOf(a, r, { max: 3 }))),
         dchip(r));
     }
 

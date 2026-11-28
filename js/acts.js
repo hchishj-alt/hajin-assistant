@@ -202,7 +202,7 @@ export async function loadFeed() {
   try { const r = await fetch('data/acts.json', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); return { updatedAt: j.updatedAt || null, items: Array.isArray(j.items) ? j.items : [] }; } } catch { }
   return { updatedAt: null, items: [] };
 }
-export const GOOD = 70;
+export const GOOD = 75;   /* 뉴스에서 온 것은 인원·자격이 비어 있는 때가 많아, 분야 하나만 맞은 것(70 안팎)은 알림까지는 안 보냄 */
 export async function refreshNew(feedData, now = new Date()) {
   const items = ((feedData && feedData.items) || []).filter(i => i && i.id); if (!items.length) return null;
   const seen = new Set(await db.kvGet('acts:seen', [])); const fresh = items.filter(i => !seen.has(i.id)); if (!fresh.length) return null;
