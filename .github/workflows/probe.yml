@@ -6,6 +6,9 @@ on:
       urls:
         description: '확인할 목록 주소 (띄어쓰기로 구분)'
         required: true
+      depth:
+        description: '구조를 몇 단계까지 볼지'
+        default: '5'
 permissions:
   contents: read
 jobs:
@@ -18,3 +21,4 @@ jobs:
       - run: node scripts/probe-sources.mjs
         env:
           PROBE: ${{ inputs.urls }}
+          DEPTH: ${{ inputs.depth }}
