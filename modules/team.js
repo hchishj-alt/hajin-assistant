@@ -63,7 +63,7 @@ export default {
         h('p.small.muted', '팀원은 이 앱에서 동기화에 로그인한 뒤 아래 코드나 링크로 들어오면 돼요.'),
         h('div', { style: { fontSize: '34px', fontWeight: 800, letterSpacing: '.18em', textAlign: 'center', margin: '14px 0' } }, code),
         h('div.row', { style: { justifyContent: 'center' } },
-          h('button.btn.sm.pri', { onclick: async () => { try { await navigator.clipboard.writeText(`[하진 비서] "${t.name}" 팀 참여 코드: ${code}\n${link}`); toast('초대 문구를 복사했어요'); } catch { toast('복사 권한이 없어요. 코드를 직접 알려 주세요'); } } }, ic('copy', 14), '초대 문구 복사'),
+          h('button.btn.sm.pri', { onclick: async () => { try { await navigator.clipboard.writeText(`[소머스튜디오] "${t.name}" 팀 참여 코드: ${code}\n${link}`); toast('초대 문구를 복사했어요'); } catch { toast('복사 권한이 없어요. 코드를 직접 알려 주세요'); } } }, ic('copy', 14), '초대 문구 복사'),
           navigator.share ? h('button.btn.sm', { onclick: () => navigator.share({ title: t.name + ' 팀 참여', text: `참여 코드 ${code}`, url: link }).catch(() => { }) }, '공유') : null,
           h('button.btn.sm.ghost', { onclick: close }, '닫기'))));
     }
@@ -185,7 +185,7 @@ async function membersCard() {
   let ms = [];
   try { ms = await sync.listMembers(); } catch (e) { card.append(h('p.faint.small', '멤버 목록을 못 불러왔어요: ' + e.message)); return card; }
   const appUrl = location.origin + location.pathname;
-  const invite = m => `[하진 비서] ${m.name} 님 멤버 코드: ${m.code}\n앱 주소: ${appUrl}\n열고 → 설정 → 폰·PC 동기화 → 코드 입력 → 로그인\n(폰은 홈 화면에 추가하면 앱처럼 쓸 수 있어요)`;
+  const invite = m => `[소머스튜디오] ${m.name} 님 멤버 코드: ${m.code}\n앱 주소: ${appUrl}\n열고 → 설정 → 폰·PC 동기화 → 코드 입력 → 로그인\n(폰은 홈 화면에 추가하면 앱처럼 쓸 수 있어요)`;
   card.append(h('div.card-h', h('h3', ic('users'), `멤버 ${ms.filter(m => m.active && !m.ended).length}명`), admin ? h('button.btn.sm.pri', { onclick: () => edit() }, ic('plus', 14), '멤버') : null),
     h('div.list', ms.filter(m => admin || (m.active && !m.ended)).map(m => h('div.li' + (m.active && !m.ended ? '' : '.done'),   /* 끝났거나 멈춘 사람은 관리자에게만 보임 */ h('span.dot', { style: { background: m.joined ? 'var(--ok)' : 'var(--line)' }, title: m.joined ? '로그인함' : '아직 로그인 전' }),
       h('div.grow', h('div.t.small', m.name, m.is_admin ? h('span.chip.acc', { style: { marginLeft: '6px' } }, '관리자') : null, m.kind === 'guest' ? h('span.chip.tiny.guest-chip', { style: { marginLeft: '6px' } }, '단기') : null, m.active ? (m.ended ? h('span.chip.bad', { style: { marginLeft: '6px' } }, '기간 끝남') : null) : h('span.chip', { style: { marginLeft: '6px' } }, '비활성')),

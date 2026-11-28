@@ -55,7 +55,7 @@ async function guard(prev, item) {
   }
   // 공유 → 나만 보기로 바꾸면 팀 공간에서는 빼기 (내 기록은 그대로)
   if (prev?.team && !item.team && me.loggedIn) import('./sync.js').then(s => s.unshare(prev)).catch(() => { });
-  if (!shared || !me.loggedIn || item.col === 'bnodes' || item.col === 'pollvotes' || item.col === 'leadmarks' || item.col === 'leadfb') return;
+  if (!shared || !me.loggedIn || item.col === 'gripes' || item.col === 'bnodes' || item.col === 'pollvotes' || item.col === 'leadmarks' || item.col === 'leadfb') return;
   const changes = diff(prev, item);
   if (prev && !changes.length) return;
   const action = !prev ? '만듦' : item.deleted && !prev.deleted ? '지움' : changes.length === 1 && changes[0].k === 'done' ? (item.done ? '완료' : '완료 취소') : '고침';

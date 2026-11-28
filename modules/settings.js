@@ -14,7 +14,7 @@ export default {
     const accent = await db.kvGet('accent', '#2f6fdd');
     const est = await navigator.storage?.estimate?.().catch(() => null);
     const persisted = await navigator.storage?.persisted?.().catch(() => false);
-    root.append(head('설정', `하진 비서 v${VERSION}`));
+    root.append(head('설정', `소머스튜디오 v${VERSION}`));
 
     const nameIn = h('input.in', { value: name, onchange: async () => { await db.kvSet('name', nameIn.value.trim() || '하진'); toast('저장했어요'); } });
     const goalIn = h('input.in', { type: 'number', value: Math.round((await db.kvGet('focusGoal', 240)) / 60), onchange: async () => db.kvSet('focusGoal', (+goalIn.value || 4) * 60) });
@@ -35,7 +35,7 @@ export default {
         (() => { const i = h('input.in', { type: 'password', placeholder: '카카오 REST API 키 (선택)', autocomplete: 'off', 'aria-label': '카카오 REST API 키' }); db.kvGet('secret:kakao', '').then(v => (i.value = v || '')); const out = h('span.faint.tiny');
           return h('div.stack', h('div.row', { style: { gap: '6px' } }, h('div.grow', i), h('button.btn.sm', { onclick: async () => { await db.kvSet('secret:kakao', i.value.trim()); out.textContent = '찾는 중…'; const PL = await import('../js/place.js'); const hit = await PL.lookup('서울시청'); out.textContent = hit ? `잘 돼요: ${hit.name} · ${hit.addr} (${hit.by})` : '찾지 못했어요. 키나 인터넷 연결을 확인해 주세요.'; } }, '저장하고 시험')), out,
             h('p.faint.tiny', '키 받는 곳: ', h('a', { href: 'https://developers.kakao.com/console/app', target: '_blank', rel: 'noopener' }, 'Kakao Developers'), ' → 앱 만들기 → 앱 키의 REST API 키 복사, 플랫폼(Web)에 이 앱 주소 등록.')); })()),
-      sec('외부 AI 연결', 'sparkles', h('p.small.muted', '링크 본문 읽기와 페이지 이미지 찾기는 키 없이 돼요. 구글 Gemini 무료 키를 넣으면 쓴 말을 AI가 먼저 읽어서 날짜·사람·종류를 정리하고, 비서가 질문과 대화에 앱 기록을 보고 답하고, 링크·회의록·마인드맵·문서 요약, SNS 캡션, 받은 메시지 답장 추천, 지원사업 순위 설명, 자료 태그도 AI가 써요. 인터넷이 없거나 키가 없으면 앱 안 규칙이 대신해요. AI가 만든 항목은 늘 확인 대기로만 들어가요. 멤버 코드로 로그인한 기기는 팀 공용 키를 받아서 바로 쓰고, 로그인하지 않은 기기에는 아래 “키 보내기”나 “따라 하며 연결하기”로 넣을 수 있어요.'),
+      sec('외부 AI 연결', 'sparkles', h('p.small.muted', '링크 본문 읽기와 페이지 이미지 찾기는 키 없이 돼요. 구글 Gemini 무료 키를 넣으면 쓴 말을 AI가 먼저 읽어서 날짜·사람·종류를 정리하고, 소머AI가 질문과 대화에 앱 기록을 보고 답하고, 링크·회의록·마인드맵·문서 요약, SNS 캡션, 받은 메시지 답장 추천, 지원사업 순위 설명, 자료 태그도 AI가 써요. 인터넷이 없거나 키가 없으면 앱 안 규칙이 대신해요. AI가 만든 항목은 늘 확인 대기로만 들어가요. 멤버 코드로 로그인한 기기는 팀 공용 키를 받아서 바로 쓰고, 로그인하지 않은 기기에는 아래 “키 보내기”나 “따라 하며 연결하기”로 넣을 수 있어요.'),
         (() => { const i = h('input.in', { type: 'password', placeholder: 'Gemini API 키 (선택)', autocomplete: 'off', 'aria-label': 'Gemini API 키' }); const on = h('input', { type: 'checkbox', onchange: () => db.kvSet('ai:on', on.checked) }); const out = h('span.faint.tiny');
           import('../js/ai.js').then(async AI => { i.value = (await db.kvGet(AI.KEY, '')) || ''; on.checked = await db.kvGet('ai:on', true); });
           const teamBox = h('div.stack'); const drawTeam = async () => { const S = await import('../js/sync.js'); const f = await S.aiKeyInfo(); clear(teamBox); if (!f.hasServer) return;
@@ -50,7 +50,7 @@ export default {
               h('button.btn.sm', { onclick: async () => (await import('../js/keyshare.js')).showQR() }, ic('phone', 14), '폰·아이패드로 키 보내기'),
               h('button.btn.sm', { onclick: async () => (await import('../js/keyshare.js')).scan(k => { i.value = k; out.textContent = '키를 받았어요. 바로 쓸 수 있어요.'; }) }, ic('camera', 14), 'QR로 키 받기'),
               h('button.btn.sm', { onclick: async () => (await import('../js/keyshare.js')).guide(async () => { i.value = (await db.kvGet('secret:gemini', '')) || ''; on.checked = true; }) }, ic('sparkles', 14), '따라 하며 연결하기')),
-            h('p.faint.tiny', '키 받는 곳: ', h('a', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener' }, 'Google AI Studio'), ' → API 키 만들기(무료, 카드 등록 없음). 키는 이 기기에 저장되고, 관리자가 넣은 키는 로그인한 팀원 기기가 같이 써요(위에서 끌 수 있어요). 공개 저장소에는 올라가지 않아요. AI를 쓸 때는 그 문장이나 링크 본문, 답장을 추천받을 때는 받은 메시지가, 비서에게 질문할 때는 할 일·일정·돈 기록의 제목·날짜·금액과 사람 이름(전화번호·메모 본문은 빼고)이 구글로 전송되고, 무료 등급은 구글이 품질 개선에 쓸 수 있으니 민감한 내용은 피해 주세요.')); })()),
+            h('p.faint.tiny', '키 받는 곳: ', h('a', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener' }, 'Google AI Studio'), ' → API 키 만들기(무료, 카드 등록 없음). 키는 이 기기에 저장되고, 관리자가 넣은 키는 로그인한 팀원 기기가 같이 써요(위에서 끌 수 있어요). 공개 저장소에는 올라가지 않아요. AI를 쓸 때는 그 문장이나 링크 본문, 답장을 추천받을 때는 받은 메시지가, 소머AI에게 질문할 때는 할 일·일정·돈 기록의 제목·날짜·금액과 사람 이름(전화번호·메모 본문은 빼고)이 구글로 전송되고, 무료 등급은 구글이 품질 개선에 쓸 수 있으니 민감한 내용은 피해 주세요.')); })()),
       sec('데이터', 'shield',
         h('p.small.muted', `모든 기록은 이 기기 안에만 있어요. ${est ? `사용 ${(est.usage / 1e6).toFixed(1)}MB` : ''}${persisted ? ' · 자동 삭제 방지 켜짐' : ''}`),
         h('div.row', { style: { marginTop: '8px' } },
@@ -107,7 +107,7 @@ async function profileSection(sec, nameIn, localName) {
       h('div.row', { style: { gap: '8px', marginBottom: '12px' } }, pick, drop),
       h('div.small.muted', { style: { marginBottom: '6px' } }, '내 색'),
       h('div.swatches.face-sw', FACE_COLORS.map(c => h('button.sw' + (c.toLowerCase() === String(col).toLowerCase() ? '.on' : ''), { type: 'button', 'aria-label': '색 ' + c, style: { background: c }, onclick: () => save({ color: c }) })), custom),
-      meM && !meM.is_admin ? null : h('div.grid.g2', { style: { marginTop: '14px' } }, h('label.f', meM ? '비서가 부를 이름' : '부를 이름', nameIn)));
+      meM && !meM.is_admin ? null : h('div.grid.g2', { style: { marginTop: '14px' } }, h('label.f', meM ? '소머AI가 부를 이름' : '부를 이름', nameIn)));
   };
   await draw();
   return sec('내 프로필', 'user', box);
@@ -148,7 +148,7 @@ async function learnedSection() {
     ...Object.entries(L.kind || {}).map(([k, v]) => ({ t: `"${k}" 들어가면 → ${kindLabel(v)}`, del: () => delete L.kind[k] })),
     ...(L.people || []).map((p, i) => ({ t: `사람 이름: ${p}`, del: () => L.people.splice(L.people.indexOf(p), 1) })),
   ];
-  box.append(h('div.card-h', h('h3', ic('sparkles'), '비서가 배운 것'), h('span.chip', rows.length)),
+  box.append(h('div.card-h', h('h3', ic('sparkles'), '소머AI가 배운 것'), h('span.chip', rows.length)),
     h('p.small.muted', '확인 대기함에서 고치거나 종류를 바꾸면 여기에 규칙으로 쌓여서 다음부터 반영돼요. 틀린 규칙은 지우면 돼요.'),
     rows.length ? h('div.list', { style: { marginTop: '6px' } }, rows.map(r => h('div.li', h('div.small.grow', r.t), h('button.btn.sm.ghost', { 'aria-label': '지우기', onclick: async e => { r.del(); brain.setLearned(L); await store.saveLearned(); e.target.closest('.li').remove(); } }, ic('x', 13))))) : h('p.faint.small', { style: { marginTop: '6px' } }, '아직 배운 게 없어요'),
     h('div.row', { style: { marginTop: '8px' } }, h('button.btn.sm', { onclick: () => modal('규칙 직접 추가', close => form([{ k: 'word', label: '이 말이 들어가면' }, { k: 'kind', label: '이걸로', type: 'select', options: Object.entries(store.KINDS).filter(([, v]) => v.col).map(([k, v]) => [k, v.label]) }], {}, async v => { if (!v.word) return; L.kind[v.word] = v.kind; brain.setLearned(L); await store.saveLearned(); close(); go('settings'); })) }, ic('plus', 14), '규칙 추가')));

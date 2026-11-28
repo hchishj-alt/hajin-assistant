@@ -22,7 +22,7 @@ export async function showQR() {
   let left = 60, timer; const cnt = h('span.faint.tiny', '60초 뒤 닫혀요');
   const close = modal('폰·아이패드로 키 보내기', h('div.stack.qr-box',
     cv,
-    h('p.small', '받을 기기에서 비서 앱을 열고 ', h('b', '설정 → 외부 AI 연결 → QR로 키 받기'), '를 눌러 이 QR을 비춰 주세요.'),
+    h('p.small', '받을 기기에서 소머스튜디오 앱을 열고 ', h('b', '설정 → 외부 AI 연결 → QR로 키 받기'), '를 눌러 이 QR을 비춰 주세요.'),
     h('p.faint.tiny', '앱을 설치하지 않았다면 기본 카메라로 찍어도 돼요. 이 QR은 키 그 자체라서 다른 사람에게 보이거나 캡처해 두지 마세요. 키는 이 화면에서만 그려지고 어디로도 전송되지 않아요.'),
     h('div.row', { style: { gap: '8px', justifyContent: 'center', flexWrap: 'wrap' } },
       h('button.btn.sm', { onclick: async e => { try { await navigator.clipboard.writeText(link(key)); e.currentTarget.textContent = '복사했어요. 다른 브라우저 주소창에 붙여 넣으세요'; } catch { toast('복사하지 못했어요'); } } }, '같은 컴퓨터의 다른 브라우저로 옮기기 (링크 복사)')),
@@ -56,7 +56,7 @@ export function scan(onDone) {
         let r = null; try { r = jsQR(cx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height, { inversionAttempts: 'dontInvert' }); } catch {}
         const k = r && keyFrom(r.data);
         if (k) { stop(); await save(k); close(); toast('AI 키를 받았어요'); onDone && onDone(k); return; }
-        if (r && r.data) msg.textContent = '이 QR은 비서 키가 아니에요. PC의 "키 보내기" QR을 비춰 주세요.';
+        if (r && r.data) msg.textContent = '이 QR은 소머스튜디오 키가 아니에요. PC의 "키 보내기" QR을 비춰 주세요.';
       }
       raf = requestAnimationFrame(tick);
     };

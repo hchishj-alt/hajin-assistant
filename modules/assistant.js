@@ -16,7 +16,9 @@ export default {
   async render(root, params, opts) {
     const sheet = (opts && opts.sheet) || null;   /* 다른 화면 위에 띄운 비서 창이면: 그 화면에 맞는 말, 화면 이름 */
     const list = h('div.chat');
-    const ta = h('textarea', { rows: 1, placeholder: sheet ? '말하거나 적어 주세요' : '무엇이든 말하거나 적어 주세요', 'aria-label': '비서에게 입력' });
+    let gripeNote = null;   /* 고치는 말에 불평이 섞여 있었을 때: 평소대로 처리한 뒤 '불편으로도 접수했어요' 한 줄을 붙이려고 */
+    const hereName = sheet ? (sheet.screen || '다른 화면 위 창') : '소머AI 화면';
+    const ta = h('textarea', { rows: 1, placeholder: sheet ? '말하거나 적어 주세요' : '무엇이든 말하거나 적어 주세요', 'aria-label': '소머AI에게 입력' });
     const preview = h('div.chips', { style: { minHeight: '22px', padding: '0 4px 6px' } });
     const micBtn = h('button.btn.icon.ghost', { title: '말로 입력', 'aria-label': '말로 입력', onclick: () => toggleMic() }, ic('mic', 20));
     const sendBtn = h('button.btn.pri.icon', { 'aria-label': '보내기', onclick: () => send() }, ic('right', 20));
@@ -38,7 +40,7 @@ export default {
     const page = h('div.chatpage');
     root.append(page);
     page.append(...[
-      sheet ? null : h('div.page-head', h('div', h('h1', '비서'), h('p.sub', '한 줄로 일정·할 일·지출·연락처·메모 무엇이든. 결과는 확정 전까지 임시예요.')),
+      sheet ? null : h('div.page-head', h('div', h('h1', '소머AI'), h('p.sub', '한 줄로 일정·할 일·지출·연락처·메모 무엇이든. 결과는 확정 전까지 임시예요.')),
         h('div.row', h('button.btn.sm.ghost', { onclick: clearChat }, ic('trash', 14), '대화 지우기'))),
       aiBar, list,
       h('div.composer', sug, projBar, recBar, h('div.box', ta, micBtn, sendBtn), preview)].filter(Boolean));
@@ -117,7 +119,8 @@ export default {
       const me = await db.put('chat', { role: 'me', text });
       list.append(meBubble(text));
       scrollDown();
-      try { await handle(text, origin); await db.patch(me.id, { ok: true }); }
+      gripeNote = null;
+      try { await handle(text, origin); await db.patch(me.id, { ok: true }); if (gripeNote) { const g = gripeNote; gripeNote = null; await drawMsg(await db.put('chat', { role: 'bot', gripe: g.id, text: '방금 말은 불편으로도 접수해 뒀어요. 고쳐지면 알려 드릴게요.', chips: [{ label: '접수 내역 보기', go: 'dev' }, { label: '불편이 아니에요', gripeNo: g.id }] }), new Map()); } }
       catch (e) { store.logError(e, 'assistant'); try { await db.patch(me.id, { err: true }); await drawMsg(await db.put('chat', { role: 'bot', text: '이 말을 처리하다 문제가 생겼어요. 한 번 더 읽어 볼게요, 아래를 눌러 주세요. (' + e.message + ')', chips: [{ label: '다시 읽기', say: text }] }), new Map()); } catch { list.append(botBubble('처리하다 문제가 생겼어요: ' + e.message)); } }
       scrollDown();
     }
@@ -157,6 +160,13 @@ export default {
       // 프로젝트 이름(또는 그 안의 낱말)을 말하면 '지금 프로젝트'가 그쪽으로 바뀜
       const project = await curProj();
       const F = await import('../js/follow.js');
+      // 불편 접수: 불평·짜증은 자료가 아니라 고칠 일로 받아 적음. 고치는 말이 같이 들어 있으면 접수만 하고 아래에서 평소대로 처리
+      { const G = await import('../js/gripe.js'); const cx = await G.context(text); const j = G.judge(text, { recent: cx.recent, people }) || (await G.followUp(text));
+        if (j) { const adm = await (await import('../js/admin.js')).isAdmin();
+          if (j.more) { await drawMsg(await db.put('chat', { role: 'bot', gripe: j.id, text: '접수한 불편에 덧붙였어요. 자세히 알려 줘서 고마워요.' }), new Map()); return; }
+          const g = await G.file({ text: j.body, kind: j.explicit ? 'write' : 'say', route: hereName, before: cx, quiet: j.quiet });
+          if (j.quiet) gripeNote = g;
+          else { await G.waitMore(g.id); await drawMsg(await db.put('chat', { role: 'bot', gripe: g.id, text: g.joined ? '이어서 적어 뒀어요. 어떤 점이 이상했는지 한 줄만 더 알려 주면 고치기 쉬워요.' : `불편 접수했어요. 방금 하신 말과 그 앞의 제 답을 같이 적어 ${adm ? '앱 개선 요청에 모아 뒀어요' : '관리자에게 전해요'}. 어떤 점이 이상했는지 한 줄 더 적어 주면 고치기 쉬워요. 고쳐지면 알려 드릴게요.`, chips: g.joined ? [] : [{ label: '접수 내역 보기', go: 'dev' }, { label: '불편이 아니에요', gripeNo: g.id }] }), new Map()); return; } } }
       // AI가 연결돼 있으면 대화·질문은 AI가 앱 기록을 보고 답함. true=답했음, 'add'=새로 적을 말이라 아래 읽기로 넘김, false=AI 없음·실패(규칙으로 답함)
       let aiAdd = false;
       const aiSay = async (src, hint = '', extra = {}) => { const AI = await import('../js/ai.js'); if (!(await AI.enabled())) return false;
@@ -171,7 +181,7 @@ export default {
       { const W = await import('../js/where.js'); if (W.isWhere(text)) { const r = await W.find(text); if ((await aiSay(text, r.text, { noAdd: true, items: r.items, draftIds: r.draftIds, chips: r.chips })) === true) return; await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, items: r.items, draftIds: r.draftIds, chips: r.chips }), new Map((await store.drafts()).map(d => [d.id, d]))); updateBadge(); return; } }
       { const pend = await db.kvGet('chat:ask', null); if (pend) { if (looksNew(text, pend.need[0], { projects, people, vendors: vendorNames, project })) await db.kvSet('chat:ask', null); else if (await answerAsk(pend, text)) return; } }
       // 방금 만든 것을 말로 고치기·취소하기
-      { const r = await F.tryFollow(text, { people }); if (r) { await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: r.chips }), new Map()); updateBadge(); return; } }
+      { const r = await F.tryFollow(text, { people }); if (r) { { const G = await import('../js/gripe.js'); const g = await G.noteFix(text, hereName).catch(() => null); if (g && !gripeNote) gripeNote = g; } await refreshCards(r.refresh); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: r.chips }), new Map()); updateBadge(); return; } }
       const talk = async src => { const r = await CH.reply(src, { name: (await db.kvGet('name', '')) || '' }); await drawMsg(await db.put('chat', { role: 'bot', q: src, text: r.text, list: r.list, chips: r.chips }), new Map()); };
       { const T = await import('../js/taste.js'); if (T.isFeedback(text)) { const r = await T.talk(text); if (r) { await drawMsg(await db.put('chat', { role: 'bot', q: text, text: r.text, chips: (r.chips || []).filter(c => c.say) }), new Map()); return; } } }
       // "○○한테 ~ 전해줘"인데 메신저를 못 쓰는 상태면 그렇다고 말하고 대신 적어 둘지 물음
@@ -302,6 +312,7 @@ export default {
         row.append(...m.chips.map(c => h('button.chip' + (c.make === 'task' ? '.acc' : ''), { onclick: async () => {
           if (c.say) return send(c.say);
           if (c.skip) return done('넘겼어요');
+          if (c.gripeNo) { const g = await db.get(c.gripeNo); if (g && g.col === 'gripes') await db.remove(g.id); return done('접수를 취소했어요'); }
           if (c.aiGuide) return import('../js/keyshare.js').then(K => K.guide(drawAiBar));
           if (c.go) return go(c.go);
           if (c.proj !== undefined) { await setProj(c.proj); return done(c.proj ? `지금 프로젝트: ${c.proj}` : '프로젝트 없이'); }

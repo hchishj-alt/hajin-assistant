@@ -31,7 +31,7 @@ export default {
       if (q.trim()) { const hit = brain.similar(q, xs.map(c => ({ id: c.id, text: `${c.name} ${c.org || ''} ${c.role || ''} ${c.memo || ''} ${(c.tags || []).join(' ')} ${c.phone || ''}` })), 50).map(x => x.id); xs = xs.filter(c => hit.includes(c.id) || (c.name || '').includes(q) || (c.phone || '').includes(q)); }
       if (reach.length && !q) body.append(h('div.card', { style: { marginBottom: '12px' } }, h('div.card-h', h('h3', ic('bell'), '연락할 때가 됐어요')), reach.slice(0, 5).map(c => row(c, `${c.overdue + c.cadence}일째 · 주기 ${c.cadence}일`))));
       const card = h('div.card');
-      if (!xs.length) card.append(h('div.empty', cs.length ? '찾는 사람이 없어요' : '비서에게 "김민서 010-1234-5678 디자이너"라고 말해도 돼요'));
+      if (!xs.length) card.append(h('div.empty', cs.length ? '찾는 사람이 없어요' : '소머AI에게 "김민서 010-1234-5678 디자이너"라고 말해도 돼요'));
       let ch = '';
       xs.forEach(c => { const f = initial(c.name); if (f !== ch && !q) { ch = f; card.append(h('div.faint.tiny', { style: { padding: '8px 4px 2px', fontWeight: 700 } }, f)); } card.append(row(c)); });
       body.append(card);

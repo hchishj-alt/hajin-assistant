@@ -135,7 +135,7 @@ export default {
 
     // 랭킹 화면에 떠 있는 비서: 말로 피드백 ("제조 쪽은 필요 없어", "3번 왜 높아?")
     function widget() {
-      const log = h('div.rdw-log'); const inp = h('input.in', { placeholder: '예: 제조 쪽은 필요 없어', 'aria-label': '비서에게 말하기' });
+      const log = h('div.rdw-log'); const inp = h('input.in', { placeholder: '예: 제조 쪽은 필요 없어', 'aria-label': '소머AI에게 말하기' });
       const bub = (t, me, chips) => { const b = h('div.rdw-b' + (me ? '.me' : ''), t); log.append(b); if (chips?.length) log.append(h('div.chips', chips.map(c => h('button.chip', { onclick: () => say(c.say) }, c.label)))); log.scrollTop = log.scrollHeight; };
       const say = async t => { t = (t || '').trim(); if (!t) return; inp.value = ''; bub(t, true);
         let r = await taste.talk(t, { rank: curRank });
@@ -144,10 +144,10 @@ export default {
         if (!r) { const CH = await import('../js/chat.js'); r = CH.isTalk(t) ? await CH.reply(t, { name: (await db.kvGet('name', '')) || '' }) : { text: '여기서는 랭킹을 우리 팀에 맞게 고쳐요. “콘텐츠 더 보여줘”, “제조 쪽은 필요 없어”, “3번 필요 없어”, “1번 왜 높아?”처럼 말해 주세요.' }; r = { text: r.text, chips: (r.chips || []).filter(c => c.say) }; }
         if (r.changed) await draw();
         bub(r.text, false, r.chips); };
-      const panel = h('div.rdw', { hidden: true }, h('div.rdw-h', h('b', ic('sparkles', 15), '랭킹 비서'), h('button.btn.icon.ghost', { 'aria-label': '닫기', onclick: () => { panel.hidden = true; fab.hidden = false; } }, ic('minus', 16))), log,
+      const panel = h('div.rdw', { hidden: true }, h('div.rdw-h', h('b', ic('sparkles', 15), '랭킹 소머AI'), h('button.btn.icon.ghost', { 'aria-label': '닫기', onclick: () => { panel.hidden = true; fab.hidden = false; } }, ic('minus', 16))), log,
         h('div.chips.rdw-q', ['배운 기준 보기', '1번 왜 높아?'].map(t => h('button.chip', { onclick: () => say(t) }, t))),
         h('form.rdw-f', { onsubmit: e => { e.preventDefault(); say(inp.value); } }, inp, h('button.btn.icon.pri', { 'aria-label': '보내기' }, ic('send', 16))));
-      const fab = h('button.rdw-fab', { 'aria-label': '랭킹 비서 열기', onclick: () => { panel.hidden = false; fab.hidden = true; if (!log.children.length) bub('어떤 글이 더 필요하고 어떤 글이 필요 없는지 알려 주세요. 팀원 모두의 말이 모여서 랭킹이 우리에게 맞게 좁혀져요.'); inp.focus(); } }, ic('sparkles', 18), '비서에게 알려주기');
+      const fab = h('button.rdw-fab', { 'aria-label': '랭킹 소머AI 열기', onclick: () => { panel.hidden = false; fab.hidden = true; if (!log.children.length) bub('어떤 글이 더 필요하고 어떤 글이 필요 없는지 알려 주세요. 팀원 모두의 말이 모여서 랭킹이 우리에게 맞게 좁혀져요.'); inp.focus(); } }, ic('sparkles', 18), '소머AI에게 알려주기');
       root.append(fab, panel);
     }
 
@@ -160,7 +160,7 @@ export default {
     }
     function howto() {
       modal('랭킹은 이렇게 매겨요', close => h('div',
-        h('div.list', [['시급성 (40점)', '마감이 가까울수록 높아요. 3일 안 40, 7일 안 33, 2주 안 26, 한 달 안 17. 마감이 없으면 새 글일수록. 마감 지난 글은 자동으로 빠져요.'], ['유익성 (40점)', '콘텐츠·영상·디자인, 예비·초기 창업, 청년·소규모, 지원금·바우처 같은 말이 있으면 높아요. 제조·농업처럼 우리와 먼 분야는 깎여요.'], ['우선순위 (20점)', '지원사업 > 도움말 > 커뮤니티 > 뉴스 순. 팀원이 찜(★)하면 한 명당 +5, 관심 있어요는 +3, 우리가 직접 넣은 링크는 +4.'], ['팀이 알려 준 기준', '관심 있어요·필요 없어요를 누르거나 비서에게 “제조 쪽은 필요 없어”처럼 말하면 배워요. 같은 낱말이 두 번 이상 모이거나 말로 직접 알려 주면 그 낱말이 든 글이 올라가거나 내려가요. 두 명이 필요 없다고 한 글은 모두에게서 빠져요. 점수는 −20에서 +20까지 따로 더해져요.']].map(([t, d]) => h('div.li', { style: { alignItems: 'flex-start' } }, h('div.grow', h('div.t.small', t), h('div.faint.small', d))))),
+        h('div.list', [['시급성 (40점)', '마감이 가까울수록 높아요. 3일 안 40, 7일 안 33, 2주 안 26, 한 달 안 17. 마감이 없으면 새 글일수록. 마감 지난 글은 자동으로 빠져요.'], ['유익성 (40점)', '콘텐츠·영상·디자인, 예비·초기 창업, 청년·소규모, 지원금·바우처 같은 말이 있으면 높아요. 제조·농업처럼 우리와 먼 분야는 깎여요.'], ['우선순위 (20점)', '지원사업 > 도움말 > 커뮤니티 > 뉴스 순. 팀원이 찜(★)하면 한 명당 +5, 관심 있어요는 +3, 우리가 직접 넣은 링크는 +4.'], ['팀이 알려 준 기준', '관심 있어요·필요 없어요를 누르거나 소머AI에게 “제조 쪽은 필요 없어”처럼 말하면 배워요. 같은 낱말이 두 번 이상 모이거나 말로 직접 알려 주면 그 낱말이 든 글이 올라가거나 내려가요. 두 명이 필요 없다고 한 글은 모두에게서 빠져요. 점수는 −20에서 +20까지 따로 더해져요.']].map(([t, d]) => h('div.li', { style: { alignItems: 'flex-start' } }, h('div.grow', h('div.t.small', t), h('div.faint.small', d))))),
         h('p.small.muted', { style: { marginTop: '10px' } }, '글은 GitHub가 매일 아침 6시 40분에 무료로 모아요. 모으는 검색어는 저장소의 data/sources.json 에서 바꿀 수 있어요. 제목을 누르면 항상 원문으로 가요.'),
         feed.log?.length ? h('details', h('summary.small', '오늘 수집 기록'), h('pre.tiny', { style: { whiteSpace: 'pre-wrap' } }, feed.log.join('\n'))) : null,
         h('div.modal-f', h('button.btn.pri', { onclick: close }, '알겠어요'))));

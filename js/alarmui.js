@@ -25,7 +25,7 @@ export function panel() {
     if (perm === 'none' || (w.ios && !w.installed)) {
       state.append(h('span.chip.warn', ic('bell', 14), w.ios ? '설치한 앱에서만 알림이 와요' : '이 브라우저는 알림이 안 돼요'), w.ios || w.android ? h('button.btn.sm.pri', { type: 'button', onclick: () => Install.guide() }, '홈 화면에 설치하기') : null);
     } else if (perm === 'denied') {
-      state.append(h('span.chip.bad', ic('bell', 14), '알림이 막혀 있어요'), h('small.faint', w.ios ? '아이폰 설정 › 알림 › 하진 비서에서 허용해 주세요.' : w.android ? '폰 설정 › 애플리케이션 › 하진 비서(없으면 Chrome) › 알림에서 허용해 주세요.' : '주소창의 자물쇠 › 알림에서 허용해 주세요.'));
+      state.append(h('span.chip.bad', ic('bell', 14), '알림이 막혀 있어요'), h('small.faint', w.ios ? '아이폰 설정 › 알림 › 소머스튜디오에서 허용해 주세요.' : w.android ? '폰 설정 › 애플리케이션 › 소머스튜디오(없으면 Chrome) › 알림에서 허용해 주세요.' : '주소창의 자물쇠 › 알림에서 허용해 주세요.'));
     } else if (ps.on) {
       state.append(h('span.chip.ok', ic('check', 14), '앱을 닫아도 알림이 와요'), h('button.btn.sm.ghost', { type: 'button', onclick: async () => { await P.disable(); toast('이 기기의 닫힌 앱 알림을 껐어요'); draw(); } }, '끄기'));
     } else {

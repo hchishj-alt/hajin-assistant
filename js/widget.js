@@ -57,7 +57,7 @@ function agenda(events, now, span) {
 `;
 
 export function script(url, appUrl = 'https://hchishj-alt.github.io/hajin-assistant/') {
-  return `// 하진 비서 위젯 (Scriptable). 내 일정 주소가 들어 있으니 다른 사람에게 보내지 마세요.
+  return `// 소머스튜디오 위젯 (Scriptable). 내 일정 주소가 들어 있으니 다른 사람에게 보내지 마세요.
 const FEED = ${JSON.stringify(url)};
 const APP = ${JSON.stringify(appUrl)};
 ${core}

@@ -8,6 +8,7 @@ import { dayOf, clockOf, whenShort } from './db.js';
 import * as V from './video.js';
 import * as SY from './sync.js';
 import * as AC from './acts.js';
+import * as GR from './gripe.js';
 export const BASE = new Date(2026, 10, 19, 10, 0, 0);
 
 export const CASES = [
@@ -153,6 +154,12 @@ export function run() {
           && S({ title: '비 마이 에이전트 공모전', host: '과기정통부', news: 1 }, { title: '2026 비 마이 에이전트(Be My Agent) 공모전', host: '과학기술정보통신부', due: '2026-12-11' })
           && S({ title: 'x', link: 'https://www.wevity.com/?c=find&s=1&gub=1&gbn=view&gp=1&ix=112589' }, { title: 'y', link: 'https://www.wevity.com/?c=find&s=1&gbn=view&ix=112589' })
           && !S({ title: 'x', link: 'https://linkareer.com/activity/367621' }, { title: 'y', link: 'https://linkareer.com/activity/367622' }), detail: AC.actKey('[제3회] 2026 매경 AI 광고 공모전 참가자 모집') }); }
+      /* 불편 접수 (v1.56.0) */
+      { const J = (t, recent = false) => GR.judge(t, { recent, people: ['최민서', '안서연'] });
+        const yes = [['왜 이래'], ['이상하게 알아듣네'], ['알림이 안 와'], ['버튼이 안 눌려'], ['말귀를 못 알아먹네'], ['ㅡㅡ', true], ['안 돼', true], ['또 틀렸네', true], ['불편: 캘린더 글씨가 너무 작아요'], ['저장한 게 사라졌어']].filter(([t, r]) => !J(t, r)).map(x => x[0]);
+        const no = [['내일 3시 회의'], ['클라이언트가 짜증냄'], ['민서 왜 이래'], ['오늘 컨디션 별로'], ['버그 수정 금요일까지'], ['이거 엑셀로는 안 돼?'], ['아 짜증나'], ['점심 9000원', true], ['교수님 피드백 엉망이라고 하심']].filter(([t, r]) => J(t, r)).map(x => x[0]);
+        const q = J('아니 4시라고 ㅡㅡ', true);
+        results.push({ group: '불편 접수', name: '소머AI에게 한 불평·짜증은 접수로, 남 이야기·일정·묻는 말은 아님. 고치는 말이 섞이면 접수만 조용히 하고 그대로 처리', ok: !yes.length && !no.length && !!q && q.quiet === true && B.navTo('우리 웹사이트') === 'site' && B.navPhrase('소머AI 열어줘') === 'assistant', detail: [yes.length ? '놓침: ' + yes.join(', ') : '', no.length ? '잘못 접수: ' + no.join(', ') : ''].filter(Boolean).join(' / ') || '통과' }); }
       /* 길게 이어 쓴 말 (v1.53.0) */
       { const kk = t => all(t).map(x => x.kind).join(' ');
         const g1 = kk('내일 3시에 민서랑 홍대에서 미팅있고 택시비 12000원 썼고 서연이한테 견적서 금요일까지 보내라고 해야하고 아 그리고 삼각대 사야되는데 4만원쯤 하더라 쿠팡에서'), g2 = all('어제 택시 12300원 오늘 택시 9800원 커피 4500원 다 개인카드'), g7 = all('내일\n10시 회의\n점심 서연\n3시 촬영\n저녁 운동'), g8 = all('오늘 너무 힘들었다 클라이언트가 또 수정 요청해서 포스터를 처음부터 다시 해야될것 같다 민서한테 미안하네 내일 다시 얘기해봐야지');

@@ -50,6 +50,8 @@ export async function plan({ from = new Date(), days = 2, cfg } = {}) {
   }
   /* 새로 찾은 대외활동 중 우리와 잘 맞는 것: 찾은 날 한 번만 묶어서 */
   { const an = cfg.tasks ? await db.kvGet('acts:new', null) : null; if (an && an.at) { const t = new Date(an.at); if (+t > +from - 12 * 36e5) out.push({ id: `actnew|${an.date}`, kind: 'bell', at: t, until: new Date(+t + 12 * 36e5), title: `새로 찾은 대외활동 ${an.n}개`, body: `가장 맞는 건 “${String(an.title || '').slice(0, 24)}” (맞음 ${an.pct}%)`, url: '#/acts/rec' }); } }
+  /* 불편 접수: 관리자에게는 새 접수, 말한 사람에게는 반영 소식 */
+  try { const G = await import('./gripe.js'); for (const a of await G.alarms(from)) out.push(a); } catch { }
   for (const s of await db.kvGet(SNOOZE, [])) out.push({ ...s, at: new Date(s.at), until: new Date(s.until) });
   return out.sort((a, b) => a.at - b.at);
 }

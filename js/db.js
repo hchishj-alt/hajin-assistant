@@ -142,7 +142,7 @@ export function clean(it) {
   return o;
 }
 export async function importAll(json) {
-  if (json.app !== 'hajin-assistant') throw new Error('하진 비서 백업 파일이 아니에요');
+  if (json.app !== 'hajin-assistant') throw new Error('소머스튜디오 백업 파일이 아니에요');
   for (const raw of json.items || []) {
     const it = clean(raw); if (!it || it.col === '_kv' && !SYNC_KV.includes(it.key)) continue;
     const cur = await get(it.id);

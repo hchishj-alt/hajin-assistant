@@ -7,7 +7,7 @@ export const REPO = 'hchishj-alt/hajin-assistant';
 // 말에 나오는 낱말 → 관련 화면과 파일
 const MAP = [
   [/오늘|메인|홈|첫\s*화면/, '오늘(메인)', ['modules/today.js', 'js/look.js']],
-  [/비서|채팅|말투|명령|알아듣/, '비서', ['modules/assistant.js', 'js/brain.js', 'js/query.js']],
+  [/비서|소머|채팅|말투|명령|알아듣/, '소머AI', ['modules/assistant.js', 'js/brain.js', 'js/query.js']],
   [/확인\s*대기|임시\s*항목|대기함/, '확인 대기함', ['modules/inbox.js', 'js/draftcard.js', 'js/store.js']],
   [/캘린더|일정|달력|구글/, '캘린더', ['modules/calendar.js', 'js/gcal.js', 'js/fields.js']],
   [/할\s*일|마감|체크/, '할 일', ['modules/tasks.js', 'js/fields.js']],
@@ -71,7 +71,7 @@ export async function save(text, r) { return db.put('devreqs', { text, title: r.
 
 // 이 앱에서 안 되는 것과 대신 쓰는 방법 (솔직하게)
 export const LIMITS = [
-  ['비서가 코드를 직접 짜기', '비서는 규칙으로 움직여서 코드를 만들지 못해요.', '여기서 요청서를 만들어 GPT Codex에 붙여 넣으면 Codex가 저장소를 고쳐요.'],
+  ['소머AI가 코드를 직접 짜기', '소머AI는 규칙으로 움직여서 코드를 만들지 못해요.', '여기서 요청서를 만들어 GPT Codex에 붙여 넣으면 Codex가 저장소를 고쳐요.'],
   ['사람처럼 자유롭게 대화하는 AI', '무료·오프라인이라 큰 AI 모델이 없어요. 정해진 말 종류만 알아들어요.', '자주 쓰는 말은 피드백으로 학습시키고, 긴 글 정리는 ChatGPT에 맡긴 뒤 결과를 붙여 넣어요.'],
   ['앱을 닫아도 오는 푸시 알림', '무료 구성에는 알림을 대신 보내 줄 서버가 없어요. 아이폰은 홈 화면에 설치해야만 알림이 돼요.', '일정은 구글 캘린더 연동으로 구글 알림을 받고, 메신저는 앱이 열려 있을 때 바로 알려요.'],
   ['인스타·X·유튜브에 바로 올리기', '각 회사의 심사받은 유료·사업자용 연결이 필요해요.', '"올릴 준비"로 크기 맞춘 사진과 글을 만들고, 폰 공유 창에서 앱으로 넘겨요.'],

@@ -77,7 +77,7 @@ export default {
             F.tab === 'mine' ? h('div.ac-frow', h('span.lbl', '상태'), pick('status', [['', '전체'], ...A.STATUS])) : null,
             h('div.ac-frow', h('span.lbl', '자격'), h('div.chips', h('button.chip.ac-pick' + (F.ok ? '.acc' : ''), { type: 'button', 'aria-pressed': String(F.ok), onclick: () => { F.ok = !F.ok; draw(); } }, '우리가 나갈 수 있는 것만')))) : null));
       if (F.tab === 'rec') box.append(h('div.faint.small.ac-note', rec.updatedAt ? srcNote() : '아직 찾아온 게 없어요. 매일 아침 새로 찾아 둘게요. 그 전에는 “링크로 담기”로 넣을 수 있어요.'));
-      if (!rows.length) box.append(h('div.card', h('div.empty', src.length ? '조건에 맞는 게 없어요. 조건을 지워 보세요.' : F.tab === 'mine' ? '공고 링크를 “링크로 담기”에 붙이거나 “직접 적기”로 넣어 보세요. 비서에게 “○○ 공모전 12월 20일 마감 팀 4명까지”라고 말해도 들어와요.' : '지금은 보여 줄 추천이 없어요.')));
+      if (!rows.length) box.append(h('div.card', h('div.empty', src.length ? '조건에 맞는 게 없어요. 조건을 지워 보세요.' : F.tab === 'mine' ? '공고 링크를 “링크로 담기”에 붙이거나 “직접 적기”로 넣어 보세요. 소머AI에게 “○○ 공모전 12월 20일 마감 팀 4명까지”라고 말해도 들어와요.' : '지금은 보여 줄 추천이 없어요.')));
       else if (F[vk] === 'grid') { const g = h('div.ac-grid'); for (const x of rows.slice(0, F.more)) g.append(await cardOf(x)); box.append(g); }
       else { const l = h('div.card.pad0.ac-list'); for (const x of rows.slice(0, F.more)) l.append(await rowOf(x)); box.append(l); }
       if (rows.length > F.more) box.append(h('button.btn.ac-more', { type: 'button', onclick: () => { F.more += 60; draw(); } }, `더 보기 (${rows.length - F.more}개 남음)`));

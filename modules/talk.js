@@ -10,7 +10,7 @@ export default {
   async render(root, params) {
     const sync = await import('../js/sync.js');
     const meM = await sync.me();
-    root.append(head('메신저', '비서가 전해 주고, 받은 말은 읽어서 일정·할 일로 바꿔 드려요. 두 사람만 볼 수 있어요.'));
+    root.append(head('메신저', '소머AI가 전해 주고, 받은 말은 읽어서 일정·할 일로 바꿔 드려요. 두 사람만 볼 수 있어요.'));
     if (!meM) { root.append(h('div.card', h('div.empty', ic('msg', 28), h('p', '멤버 코드로 로그인하면 팀원과 메시지를 주고받을 수 있어요.'), h('a.btn.pri', { href: '#/settings/sync', style: { marginTop: '10px' } }, '로그인하러 가기')))); return; }
     if (params[0]) open = params[0]; else if (matchMedia('(max-width:900px)').matches) open = '';   /* 폰에서는 목록 주소로 오면 목록을 보여 줌 (뒤로 가기가 먹게) */
     const roster = (await db.kvGet('sync:roster', [])).filter(r => r.id && r.id !== meM.id);
@@ -59,7 +59,7 @@ export default {
         const chipsOf = list => list.map(r => h('button.chip', { title: '이 말로 답장', onclick: async () => { await send(r); done(); } }, ic('send', 12), r));
         const rp = h('span', { style: { display: 'contents' } }, chipsOf(j.replies));
         DM.aiReplies(d.id, d.body, other.name, j.note).then(rs => { if (rs && rs.length) rp.replaceChildren(...chipsOf(rs)); }).catch(() => { });
-        return h('div.talk-ai', h('div.talk-ai-h', ic('sparkles', 12), '비서', j.note ? h('span', j.note) : null),
+        return h('div.talk-ai', h('div.talk-ai-h', ic('sparkles', 12), '소머AI', j.note ? h('span', j.note) : null),
           h('div.chips', j.actions.map(a => h('button.chip.acc', { onclick: async () => { await store.draft(a.kind, a.data, { source: d.body, origin: 'dm', confidence: .75 }); updateBadge(); toast(`${store.KINDS[a.kind]?.label || ''} 임시 항목을 만들었어요`, { label: '확인 대기함', fn: () => go('inbox') }); done(); } }, ic('plus', 12), a.label)),
             rp,
             h('button.chip', { onclick: done }, '넘기기')));

@@ -27,7 +27,7 @@ export async function ics({ tasks = true } = {}) {
   const cfg = await (await import('./alarm.js')).get();
   const hmDur = hm => { const [a, b] = String(hm || '09:00').split(':').map(Number); return `PT${a || 0}H${b ? b + 'M' : ''}`; };
   const evs = (await db.list('events')).filter(e => e.date && e.kind !== 'focus');
-  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//hajin-assistant//KO', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:하진 비서', 'X-WR-TIMEZONE:' + TZ, 'REFRESH-INTERVAL;VALUE=DURATION:PT1H', 'X-PUBLISHED-TTL:PT1H'];
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//hajin-assistant//KO', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:소머스튜디오', 'X-WR-TIMEZONE:' + TZ, 'REFRESH-INTERVAL;VALUE=DURATION:PT1H', 'X-PUBLISHED-TTL:PT1H'];
   const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
   for (const e of evs) {
     L.push('BEGIN:VEVENT', 'UID:' + e.id + '@hajin', 'DTSTAMP:' + stamp, 'SUMMARY:' + esc(e.title));

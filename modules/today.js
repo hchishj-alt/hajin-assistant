@@ -56,7 +56,7 @@ export default {
       h('p.faint.small', fmtDate(now, { year: true })),
       h('h1', (name ? `${name}님, ` : '') + (todays.length ? `오늘 할 일 ${todays.length}개 남았어요` : events.length ? `오늘 일정 ${events.length}개 있어요` : hi)),   /* 인사말보다 오늘 무엇이 남았는지를 큰 글씨로 */
       h('p.sub', brain.briefing({ events, tasks: open, drafts: drafts.length, people: reach }))),
-      h('div.row', h('a.btn.sm.only-wide', { href: '#/assistant' }, ic('sparkles', 14), '비서'), h('a.btn.sm', { href: '#/meetings/new' }, ic('mic', 14), '회의 녹음'), h('button.btn.sm', { type: 'button', 'aria-label': '알림 설정', onclick: async () => (await import('../js/alarmui.js')).open() }, ic('bell', 14), '알림')));
+      h('div.row', h('a.btn.sm.only-wide', { href: '#/assistant' }, ic('sparkles', 14), '소머AI'), h('a.btn.sm', { href: '#/meetings/new' }, ic('mic', 14), '회의 녹음'), h('button.btn.sm', { type: 'button', 'aria-label': '알림 설정', onclick: async () => (await import('../js/alarmui.js')).open() }, ic('bell', 14), '알림')));
 
     const tiles = h('div.tiles',
       tile('calendar', events.length, '오늘 일정', '', '#/calendar'),
@@ -124,6 +124,9 @@ export default {
           h('p.faint.small', { style: { margin: '14px 0 8px', paddingTop: '12px', borderTop: '1px solid var(--line)' } }, '코드가 없으면 이름만 알려 주세요. 이 기기에서 혼자 쓸 수 있어요.'), nameRow));
       }
     }
+    /* 관리자: 새로 들어온 불편 접수 */
+    { const GR = await import('../js/gripe.js'); const AD = await import('../js/admin.js'); if (await AD.isAdmin()) { const fresh = (await GR.all()).filter(g => g.status === '접수');
+      if (fresh.length) root.append(h('a.card.click.today-acts', { href: '#/dev' }, h('div.card-h', h('h3', ic('flag'), '불편 접수'), h('span.faint.small', '전체 보기')), fresh.slice(0, 3).map(g => h('div.ta-row', h('span', g.text), h('span.chip', g.by))), fresh.length > 3 ? h('div.faint.tiny', `외 ${fresh.length - 3}건`) : null)); } }
     /* 2주 안에 마감인 대외활동 (챙기는 것만) */
     { const AC = await import('../js/acts.js'); const td = db.dayOf(new Date()); const near = (await db.list('acts')).filter(a => a.kind !== 'profile' && AC.LIVE.has(a.status || 'want')).map(a => ({ a, n: AC.dday(a.due, td) })).filter(x => x.n != null && x.n >= 0 && x.n <= 14).sort((x, y) => x.n - y.n).slice(0, 3);
       if (near.length) root.append(h('a.card.click.today-acts', { href: '#/acts' }, h('div.card-h', h('h3', ic('award'), '대외활동 마감'), h('span.faint.small', '전체 보기')), near.map(x => h('div.ta-row', h('span', x.a.title), h('span.chip' + (x.n <= 3 ? '.bad' : x.n <= 7 ? '.warn' : ''), AC.ddayText(x.n)))))); }

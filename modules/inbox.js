@@ -9,7 +9,7 @@ export default {
   async render(root) {
     const body = h('div');
     const approveAllBtn = h('button.btn.sm', { onclick: approveAll }, ic('check', 14), '모두 확정');
-    root.append(head('확인 대기함', '비서가 만든 임시 항목이에요. 확정해야 실제 기록이 돼요.', approveAllBtn), body);
+    root.append(head('확인 대기함', '소머AI가 만든 임시 항목이에요. 확정해야 실제 기록이 돼요.', approveAllBtn), body);
     await draw();
 
     async function draw() {
@@ -18,7 +18,7 @@ export default {
       const allN = ds.filter(d => d.kind !== 'summary').length;
       approveAllBtn.lastChild.textContent = allN ? `모두 확정 (${allN})` : '모두 확정'; approveAllBtn.disabled = !allN;
       if (!(await db.kvGet('hint:inbox', false))) body.append(h('div.card.flat', { style: { marginBottom: '12px' } }, h('div.row.between', { style: { alignItems: 'flex-start', gap: '10px' } },
-        h('div.small', h('b', '이렇게 써요'), h('div.faint', { style: { marginTop: '4px', lineHeight: 1.6 } }, '확정: 실제 기록으로 저장', h('br'), '고치기: 고쳐서 저장 (비서가 배워요)', h('br'), '종류 바꾸기: 다음부터 비슷한 말은 그 종류로', h('br'), '버리기: 없던 일로')),
+        h('div.small', h('b', '이렇게 써요'), h('div.faint', { style: { marginTop: '4px', lineHeight: 1.6 } }, '확정: 실제 기록으로 저장', h('br'), '고치기: 고쳐서 저장 (소머AI가 배워요)', h('br'), '종류 바꾸기: 다음부터 비슷한 말은 그 종류로', h('br'), '버리기: 없던 일로')),
         h('button.btn.sm.ghost', { type: 'button', onclick: async () => { await db.kvSet('hint:inbox', true); draw(); } }, '알겠어요'))));
       const counts = {}; ds.forEach(d => (counts[d.kind] = (counts[d.kind] || 0) + 1));
       const hist = (await db.list('drafts')).filter(d => d.status !== 'pending');

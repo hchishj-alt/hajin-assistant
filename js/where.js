@@ -75,7 +75,7 @@ export async function find(text, { days = 3, max = 3 } = {}) {
   if (!extra.length) for (const m of asked) { lines.push(`“${m.q.slice(0, 30)}”${jo(m.q, '은', '는')} 어떻게 적을지 아직 고르지 않아서 어디에도 안 들어갔어요. 위에서 “할 일로”를 누르거나 다시 말해 주세요.`); }
   if (!lines.length) {
     const n = kind === 'task' ? (await db.list('tasks')).filter(t => !t.done).length : 0;
-    return { text: `최근 ${days}일 동안 비서로 적은 ${label}${jo(label, '을', '를')} 못 찾았어요.${n ? ` 지금 남은 할 일은 모두 ${n}개예요.` : ''} 다시 말해 주면 바로 적어 둘게요.`, items: n ? [{ icon: 'check2', title: '할 일 열기', sub: `남은 일 ${n}개`, route: 'tasks' }] : [], draftIds: [], chips: [] };
+    return { text: `최근 ${days}일 동안 소머AI로 적은 ${label}${jo(label, '을', '를')} 못 찾았어요.${n ? ` 지금 남은 할 일은 모두 ${n}개예요.` : ''} 다시 말해 주면 바로 적어 둘게요.`, items: n ? [{ icon: 'check2', title: '할 일 열기', sub: `남은 일 ${n}개`, route: 'tasks' }] : [], draftIds: [], chips: [] };
   }
   const lead = kind && !same.length && pick.length ? `최근에 ${label}${ro(label)} 적힌 건 없고, 가장 최근에 적은 건 이래요. ` : '';
   return { text: lead + lines.join(' '), items, draftIds, chips };

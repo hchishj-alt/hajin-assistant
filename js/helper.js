@@ -10,7 +10,7 @@ export const SCREENS = {
   today: { say: ['뭐부터 할까?', '오늘 빈 시간', '밀린 할 일', '내일 일정'], about: '오늘 일정·할 일·대기함을 한눈에 보는 첫 화면' },
   calendar: { say: ['이번 주 일정', '이번 주 빈 시간', '다음 주 일정', '내일 오후 3시 팀 회의'], about: '일정을 달력으로 보고 넣는 화면' },
   tasks: { say: ['뭐부터 할까?', '밀린 할 일', '이번 주 마감', '금요일까지 견적서 보내기'], about: '할 일을 오늘·예정·전체·완료·담당자별로 보는 화면' },
-  inbox: { say: ['오늘 할 일', '오늘 일정', '뭐부터 할까?'], about: '비서가 읽어 만든 임시 항목을 확정하거나 버리는 화면' },
+  inbox: { say: ['오늘 할 일', '오늘 일정', '뭐부터 할까?'], about: '소머AI가 읽어 만든 임시 항목을 확정하거나 버리는 화면' },
   meetings: { say: ['팀 일정', '이번 주 일정', '내일 오전 10시 주간 회의', '누가 바빠?'], about: '회의를 녹음·기록하고 요약과 할 일을 뽑는 화면' },
   board: { say: ['팀 일정', '프로젝트 진행 상황', '이번 주 마감'], about: '회의하면서 생각을 마인드맵으로 펼치는 화면' },
   plan: { say: ['프로젝트 진행 상황', '이번 주 마감', '누가 바빠?', '뭐부터 할까?'], about: '프로젝트별 기획과 진행을 보는 화면' },
@@ -50,14 +50,14 @@ export async function openSheet(id, say = '') {
   const me = await who(); const suggest = await suggestFor(id, me);
   const box = h('div.aisheet'); let cleanup = null, changed = false, shut = false;
   const off = db.onChange(col => { if (col !== 'chat') changed = true; });
-  const close = modal('비서', c => h('div',
+  const close = modal('소머AI', c => h('div',
     h('div.aisheet-top', h('span.chip', ic(m.icon || 'sparkles', 13), `지금 화면: ${m.short || m.title || '앱'}`),
       h('button.btn.sm.ghost', { type: 'button', onclick: () => { c(); go('assistant'); } }, ic('right', 14), '크게 보기')),
     box), { wide: true, nofocus: true, onClose: () => { shut = true; opened = false; try { off && off(); } catch { } try { cleanup && cleanup(); } catch { }
       if (changed && location.hash.replace(/^#\//, '').split('/')[0] === id && !document.querySelector('.modal-bg')) refresh(); } });   /* 비서가 뭔가 넣었으면 뒤 화면을 새로 그림 */
   box.closest('.modal')?.classList.add('ai-modal');
   try { const mod = (await import('../modules/assistant.js')).default; const c2 = await mod.render(box, [], { sheet: { suggest, screen: `${m.title || ''}${sc.about ? ' (' + sc.about + ')' : ''}`, role: me.role, say } }); if (shut) { try { c2 && c2(); } catch { } } else cleanup = c2; }
-  catch (e) { box.append(h('p.small.muted', '비서를 열지 못했어요. 아래 "비서" 화면에서 다시 해 주세요.')); console.error(e); }
+  catch (e) { box.append(h('p.small.muted', '소머AI를 열지 못했어요. 아래 "소머AI" 화면에서 다시 해 주세요.')); console.error(e); }
   return close;
 }
 
@@ -65,7 +65,7 @@ export async function openSheet(id, say = '') {
 export function start() {
   const cur = () => (location.hash.replace(/^#\/?/, '').split('/')[0]) || 'today';
   document.getElementById('tabbar')?.addEventListener('click', e => { const a = e.target.closest('a[data-nav="assistant"]'); if (!a || cur() === 'assistant' || e.metaKey || e.ctrlKey) return; e.preventDefault(); openSheet(cur()); });
-  const fab = h('button#ai-fab', { type: 'button', 'aria-label': '비서 부르기', title: '이 화면에서 비서 부르기', onclick: () => openSheet(cur()) }, ic('sparkles', 22), h('span', '비서'));
+  const fab = h('button#ai-fab', { type: 'button', 'aria-label': '소머AI 부르기', title: '이 화면에서 소머AI 부르기', onclick: () => openSheet(cur()) }, ic('sparkles', 22), h('span', '소머AI'));
   document.body.append(fab);
   const sync = () => fab.classList.toggle('hide', cur() === 'assistant');
   window.addEventListener('hashchange', sync); sync();
@@ -129,7 +129,7 @@ export async function toStudio(id, values = {}) {
 }
 
 // ── 메뉴 줄이기 ──
-const CORE = { all: ['plan', 'meetings', 'talk', 'prompts', 'team', 'acts', 'settings'], pm: ['board', 'people', 'radar'], art: ['archive', 'figma', 'studio'], make: ['studio', 'archive'], biz: ['money', 'shop', 'vendors', 'radar'], none: ['money', 'archive', 'people'] };
+const CORE = { all: ['plan', 'meetings', 'talk', 'prompts', 'team', 'acts', 'site', 'settings'], pm: ['board', 'people', 'radar'], art: ['archive', 'figma', 'studio'], make: ['studio', 'archive'], biz: ['money', 'shop', 'vendors', 'radar'], none: ['money', 'archive', 'people'] };
 // 앞에 둘 메뉴: 역할 기본 + 최근 3주 안에 3번 넘게 연 것, 그리고 직접 고정한 것(끄면 뺌)
 export async function pinned(now = Date.now()) {
   const me = await who(); const use = await db.kvGet('nav:use', {}); const pin = await db.kvGet('nav:pin', {});

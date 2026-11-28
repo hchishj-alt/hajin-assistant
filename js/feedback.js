@@ -4,7 +4,7 @@ import * as db from './db.js';
 import * as brain from './brain.js';
 import { h, ic, toast } from './ui.js';
 
-const KIND = { summary: '회의 요약', board: '마인드맵 정리', chat: '비서 대답', draft: '임시 항목', auto: '자동 분류', edit: '자동 편집' };
+const KIND = { summary: '회의 요약', board: '마인드맵 정리', chat: '소머AI 대답', draft: '임시 항목', auto: '자동 분류', edit: '자동 편집' };
 const KINDWORD = { 일정: 'event', '할 일': 'task', 할일: 'task', 지출: 'expense', 비용: 'expense', 메모: 'note', 아이디어: 'idea', 연락처: 'contact', 사람: 'contact' };
 
 // 한마디 → 규칙
@@ -67,9 +67,11 @@ export function widget({ kind, ref = '', source = '', shared = false, onLearn } 
   const send = async (rating, text = '') => {
     const rule = parse(text);
     const item = await db.put('feedback', { kind, ref, rating, text, rule, source: String(source).slice(0, 300), by: await db.kvGet('name', '하진'), team: shared && (await db.get('team-main')) ? 'team-main' : '' });
+    /* 아쉬워요는 불편 접수로도 올림: 무슨 말에 어떤 답이 나왔는지 같이 적어서 */
+    let filed = false; if (rating < 0) { try { const G = await import('./gripe.js'); const m = ref ? await db.get(ref) : null; await G.file({ text: text || '(아쉬워요만 누름)', kind: 'down', route: KIND[kind] || kind, before: { said: String(source).slice(0, 160), bot: m && m.text ? String(m.text).slice(0, 220) : '', made: [], ai: !!(m && m.ai) }, quiet: !text }); filed = true; } catch { } }
     if (rule.kind && source) { brain.learnKind(source, rule.kind); await db.kvSet('brain:learned', brain.getLearned()); }
     const d = describe(rule);
-    toast(d.length ? `배웠어요: ${d.join(', ')}. 다음부터 반영할게요` : rating > 0 ? '고마워요. 이 방식을 유지할게요' : text ? '기록했어요. 비슷한 피드백이 쌓이면 방식을 바꿀게요' : '기록했어요. 어떤 점이 아쉬웠는지 적어 주면 바로 배워요');
+    toast(d.length ? `배웠어요: ${d.join(', ')}. 다음부터 반영할게요` : rating > 0 ? '고마워요. 이 방식을 유지할게요' : text ? (filed ? '불편으로 접수했어요. 고쳐지면 알려 드릴게요' : '기록했어요. 비슷한 피드백이 쌓이면 방식을 바꿀게요') : '기록했어요. 어떤 점이 아쉬웠는지 적어 주면 바로 배워요');
     if (d.length && onLearn) onLearn(item);
     return item;
   };

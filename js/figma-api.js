@@ -131,7 +131,7 @@ async function commentsToDrafts(f) {
   for (const c of f.comments || []) {
     if (seen.has(c.id)) continue;
     seen.add(c.id);
-    if (first || c.resolved || c.parent || /^\[하진 비서\]/.test(c.msg)) continue; // 처음 연결 때 옛 댓글은 건너뜀
+    if (first || c.resolved || c.parent || /^\[(하진 비서|소머스튜디오)\]/.test(c.msg)) continue; // 처음 연결 때 옛 댓글은 건너뜀
     const who0 = findAssignee(c.msg, people);
     const isMe = mine.some(n => store.sameName(n, who0));
     const w = parseWhen(c.msg);
@@ -148,7 +148,7 @@ export function findNode(f, id) {
 
 // ── 역방향: 앱 → 피그마 ──
 export async function postTask(f, node, task) {
-  const msg = `[하진 비서] ${task.who ? task.who + ': ' : ''}${task.title}${task.due ? ` (마감 ${task.due.slice(5).replace('-', '/')})` : ''}`;
+  const msg = `[소머스튜디오] ${task.who ? task.who + ': ' : ''}${task.title}${task.due ? ` (마감 ${task.due.slice(5).replace('-', '/')})` : ''}`;
   const body = { message: msg };
   if (node?.id) body.client_meta = { node_id: node.id, node_offset: { x: 24, y: 24 } };
   const c = await api(`/files/${f.key}/comments`, { method: 'POST', body });
@@ -158,7 +158,7 @@ async function sendDoneReplies(f) {
   if (!(await getToken())) return;
   const ts = (await db.list('tasks')).filter(t => t.figma?.key === f.key && t.figma.comment && t.done && !t.figma.doneSent);
   for (const t of ts) {
-    try { await api(`/files/${f.key}/comments`, { method: 'POST', body: { message: `[하진 비서] ✅ 완료${t.who ? ' · ' + t.who : ''}`, comment_id: t.figma.comment } }); await db.patch(t.id, { figma: { ...t.figma, doneSent: true } }); } catch { }
+    try { await api(`/files/${f.key}/comments`, { method: 'POST', body: { message: `[소머스튜디오] ✅ 완료${t.who ? ' · ' + t.who : ''}`, comment_id: t.figma.comment } }); await db.patch(t.id, { figma: { ...t.figma, doneSent: true } }); } catch { }
   }
 }
 

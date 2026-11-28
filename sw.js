@@ -1,9 +1,9 @@
 // 오프라인 실행 + 자동 업데이트. 배포 때 VERSION을 js/version.js와 같이 올리면 새 버전이 설치돼요.
-const VERSION = '1.55.0';
+const VERSION = '1.56.0';
 const CACHE = 'hajin-' + VERSION;
-const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable.png', 'supabase/setup.sql',
+const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable.png', 'icons/icon-apple.png', 'js/logo.js', 'js/gripe.js', 'supabase/setup.sql',
   'js/app.js', 'js/install.js', 'js/alarm.js', 'js/alarmui.js', 'js/push.js', 'js/widget.js', 'js/prompts.js', 'js/helper.js', 'modules/prompts.js', 'js/ui.js', 'js/db.js', 'js/icons.js', 'js/brain.js', 'js/store.js', 'js/fields.js', 'js/draftcard.js', 'js/where.js', 'js/context.js', 'js/query.js', 'js/voice.js', 'js/video.js', 'js/ext.js', 'js/seed.js', 'js/selftest.js', 'js/version.js', 'js/sync.js', 'js/config.js', 'js/figma-api.js', 'js/linkpreview.js', 'js/theme.js', 'js/admin.js', 'js/look.js', 'js/labels.js', 'js/auto.js', 'js/feedback.js', 'js/dm.js', 'js/gcal.js', 'js/codex.js', 'js/chat.js', 'js/outline.js', 'js/taste.js', 'js/place.js', 'js/scope.js', 'js/queue.js', 'js/ai.js', 'js/keyshare.js', 'js/vendor-qr.js', 'js/vendor-jsqr.js', 'js/act.js', 'js/acts.js', 'js/ask.js', 'js/follow.js', 'js/xlsx.js', 'js/product.js', 'js/vendor-supabase.js',
-  ...['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'studio', 'figma', 'archive', 'radar', 'acts', 'admin', 'look', 'shop', 'board', 'talk', 'feed', 'vendors', 'dev', 'people', 'team', 'money', 'startup', 'settings', 'health', 'menu'].map(m => `modules/${m}.js`)];
+  ...['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'studio', 'figma', 'archive', 'radar', 'acts', 'admin', 'look', 'shop', 'board', 'talk', 'feed', 'vendors', 'dev', 'site', 'people', 'team', 'money', 'startup', 'settings', 'health', 'menu'].map(m => `modules/${m}.js`)];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))));
 });
@@ -53,7 +53,7 @@ async function onPush(e) {
   /* 조금 전에 이미 띄운 것은 빼고 새것만. 새것이 없으면 같은 것을 조용히 다시(같은 자리에) 띄움. 신호를 받으면 꼭 하나는 보여야 폰이 알림을 끊지 않음 */
   const shown = (await kvRead('me:pushshown').catch(() => null)) || {};
   const fresh = list.filter(a => !shown[a.id]); if (fresh.length) list = fresh;
-  if (!list.length) list = [{ id: 'ping', title: '하진 비서', body: '확인할 알림이 있어요.', url: '#/today' }];
+  if (!list.length) list = [{ id: 'ping', title: '소머스튜디오', body: '확인할 알림이 있어요.', url: '#/today' }];
   const fired = (await kvRead('me:alarmfired').catch(() => null)) || {}; const keep = Date.now() - 3 * 864e5;
   for (const k of Object.keys(shown)) if (shown[k] < keep) delete shown[k];
   for (const a of list) { fired[a.id] = shown[a.id] = Date.now(); await self.registration.showNotification(a.title, { body: a.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: a.id || 'hajin', renotify: !!fresh.length, data: { url: a.url || '#/today' } }); }

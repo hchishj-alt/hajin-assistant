@@ -2,12 +2,13 @@ import { h, ic, clear, toast, modal, setFaces } from './ui.js';
 import * as db from './db.js';
 import * as store from './store.js';
 import { VERSION } from './version.js';
+import { WORDMARK, siteUrl } from './logo.js';
 import './install.js';
 
 // 메뉴 구성 (모듈은 필요할 때 불러옴)
 export const MODULES = [
   { id: 'today', title: '오늘', icon: 'home', group: '하루', tab: 1 },
-  { id: 'assistant', title: '비서', icon: 'sparkles', group: '하루', tab: 3 },
+  { id: 'assistant', title: '소머AI', icon: 'sparkles', group: '하루', tab: 3 },
   { id: 'inbox', title: '확인 대기함', icon: 'inbox', group: '하루', tab: 4, short: '대기함' },
   { id: 'calendar', title: '캘린더', icon: 'calendar', group: '시간', tab: 2, short: '일정·할 일' },
   { id: 'tasks', title: '할 일', icon: 'check2', group: '시간', short: '할 일' },
@@ -27,6 +28,7 @@ export const MODULES = [
   { id: 'radar', title: '지원사업 · 정보 랭킹', icon: 'trend', group: '회사', short: '랭킹' },
   { id: 'acts', title: '대외활동 · 공모전', icon: 'award', group: '회사', short: '대외활동' },
   { id: 'startup', title: '스타트업 PM', icon: 'rocket', group: '회사', short: '스타트업' },
+  { id: 'site', title: '우리 웹사이트', icon: 'globe', group: '회사', short: '웹사이트', out: true },   /* out: 바깥 주소(우리 사이트)로 바로 나감. 주소는 logo.js siteUrl() */
   { id: 'look', title: '꾸미기', icon: 'palette', group: '시스템' },
   { id: 'admin', title: '관리자', icon: 'shield', group: '시스템', adminOnly: true },
   { id: 'dev', title: '앱 개선 요청', icon: 'zap', group: '시스템', short: '개선 요청' },
@@ -35,7 +37,7 @@ export const MODULES = [
   { id: 'menu', title: '메뉴', icon: 'menu', hidden: true, tab: 5 },
 ];
 // 단기 작업자에게 보이는 화면: 맡은 프로젝트 일을 하는 데 필요한 것만. 돈·업체·연락처·팀 관리 쪽은 메뉴에서 빼고 주소로 가도 오늘 화면으로 돌림
-export const GUEST_OK = new Set(['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'prompts', 'studio', 'archive', 'talk', 'look', 'settings', 'health', 'menu']);
+export const GUEST_OK = new Set(['today', 'assistant', 'inbox', 'calendar', 'tasks', 'meetings', 'plan', 'prompts', 'studio', 'archive', 'talk', 'site', 'look', 'settings', 'health', 'menu']);
 let guestOn = false;
 export const isGuest = () => guestOn;
 export const canOpen = (m, adm = true) => !!m && (!m.adminOnly || adm) && (!guestOn || GUEST_OK.has(m.id));
@@ -91,13 +93,13 @@ export async function buildNav() {
   const meW = await (await import('./admin.js')).who(), adm = meW.admin; guestOn = !!meW.guest; document.body.classList.toggle('is-guest', guestOn);
   const nav = document.getElementById('nav');
   clear(nav);
-  nav.append(h('div.brand', h('img', { src: 'icons/icon.svg', alt: '' }), '하진 비서'));
+  nav.append(h('div.brand', { role: 'img', 'aria-label': '소머스튜디오', html: WORDMARK }));
   nav.append(h('button.searchbtn', { onclick: openPalette }, ic('search', 16), h('span.lbl', '검색·명령'), h('kbd', navigator.platform.includes('Mac') ? '⌘K' : 'Ctrl K')));
   let g = '', box = null;
   const hid = (await db.kvGet('look', null))?.hidden || [];
   // 카테고리별로 접기: 하루는 늘 펼침, 나머지는 접어 두고 지금 보는 화면의 묶음만 열림 (누르면 기억)
   const fold = await db.kvGet('nav:fold', {}); navFold = fold; const cur = (location.hash.replace(/^#\//, '').split('/')[0]) || 'today';
-  let curGroup = '';
+  let curGroup = ''; const site = await siteUrl();
   // 메뉴 줄이기: 하루·시간은 그대로, 나머지는 내 역할에서 주로 쓰는 것 + 자주 연 것만 "자주 쓰는 것"으로, 그 밖은 "더보기"로 접음
   const pins = await (await import('./helper.js')).pinned();
   const shown = MODULES.filter(m => !m.hidden && !hid.includes(m.id) && canOpen(m, adm)).map(m => ({ ...m, group: ['하루', '시간'].includes(m.group) ? m.group : pins.has(m.id) ? '자주 쓰는 것' : '더보기' }));
@@ -109,7 +111,7 @@ export async function buildNav() {
       const head = h('button.grp', { 'aria-expanded': String(open), onclick: async () => { const b2 = head.nextElementSibling; const now = !b2.classList.contains('open'); b2.classList.toggle('open', now); head.setAttribute('aria-expanded', String(now)); const f = await db.kvGet('nav:fold', {}); f[name] = !now; navFold = f; await db.kvSet('nav:fold', f); } }, h('span', name), ic('down', 12));
       nav.append(head, outer);
     }
-    const a = h('a.navlink', { href: '#/' + m.id, 'data-nav': m.id }, ic(m.icon), h('span.grow', m.title));
+    const a = h('a.navlink', m.out ? { href: site, target: '_blank', rel: 'noopener', 'data-nav': m.id } : { href: '#/' + m.id, 'data-nav': m.id }, ic(m.icon), h('span.grow', m.title));   /* href가 있는 것은 바깥 주소: 새 창으로 바로 */
     if (m.id === 'inbox') a.append(h('span.badge#inbox-badge.hide'));
     if (m.id === 'talk') a.append(h('span.badge#talk-badge.hide'));
     box.append(a);
@@ -155,7 +157,7 @@ export async function openPalette() {
       if (parsed.length) made = { icon: 'zap', title: `적어 두기: ${parsed.map(p => p.label).join(', ')}`, sub: parsed.map(p => p.data.title || p.data.name).join(' / '), run: async () => { for (const p of parsed) await store.draft(p.kind, p.data, { source: p.src || q, confidence: p.confidence, origin: 'palette' }); updateBadge(); toast('확인 대기함에 넣었어요', { label: '보기', fn: () => go('inbox') }); } };
     }
     const ql = q.toLowerCase();
-    for (const m of MODULES.filter(m => !m.hidden && canOpen(m, !document.body.classList.contains('not-admin')) && (!q || m.title.includes(q) || m.title.replace(/\s/g, '').includes(q.replace(/\s/g, '')) || m.id.includes(ql)))) items.push({ icon: m.icon, title: m.title, sub: '메뉴로 이동', run: () => go(m.id) });
+    for (const m of MODULES.filter(m => !m.hidden && canOpen(m, !document.body.classList.contains('not-admin')) && (!q || m.title.includes(q) || m.title.replace(/\s/g, '').includes(q.replace(/\s/g, '')) || m.id.includes(ql)))) items.push({ icon: m.icon, title: m.title, sub: m.out ? '주소·QR 보기' : '메뉴로 이동', run: () => go(m.id) });
     if (made) { if (items.length && q.length <= 6) items.push(made); else items.unshift(made); } /* 메뉴 이름을 친 거면 이동이 먼저 */
     if (q) for (const d of brain.similar(q, docs, 8)) items.push({ icon: store.KINDS[Object.keys(store.KINDS).find(k => store.KINDS[k].col === d.col)]?.icon || 'file', title: d.title || '(제목 없음)', sub: d.text.slice(0, 70), run: () => go(d.route + '/' + d.id) });
     sel = Math.min(sel, Math.max(0, items.length - 1));

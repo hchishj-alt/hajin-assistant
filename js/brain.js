@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 import { guess as guessScope } from './scope.js';
 import { parse as actParse, titleOf as actTitle, isActLink } from './acts.js';
-// 하진 비서의 기본 두뇌 (외부 AI 없이 기기 안에서 돌아가는 한국어 분석 로직)
+// 소머스튜디오의 기본 두뇌 (외부 AI 없이 기기 안에서 돌아가는 한국어 분석 로직)
 //  - parseWhen   : "다음 주 화요일 오후 3시" 같은 날짜·시간 인식
 //  - keywords    : 핵심 키워드 추출
 //  - summarize   : 중요한 문장 골라 요약 (TextRank)
@@ -401,12 +401,12 @@ export function guessCategory(text) {
 // ── 채팅 한 줄 해석 ─────────────────────────────────────────
 // 반환: [{ kind, data, label, confidence }]  kind ∈ event|task|expense|contact|note|idea|reference|timelog|sns|okr|grant|query|nav
 // 화면 이름 → 주소. "회의록", "프롬프트 스튜디오 열어 줘"처럼 화면 이름만 말해도 그리로 감
-export const NAV = { 오늘: 'today', 홈: 'today', 비서: 'assistant', 캘린더: 'calendar', 일정: 'calendar', '할 일': 'tasks', 회의: 'meetings', 회의록: 'meetings', 마인드맵: 'board', '마인드맵 회의': 'board', 기획: 'plan', '기획 보드': 'plan',
+export const NAV = { 오늘: 'today', 홈: 'today', 비서: 'assistant', 소머AI: 'assistant', '소머 AI': 'assistant', 소머: 'assistant', 소머에이아이: 'assistant', 웹사이트: 'site', 홈페이지: 'site', '우리 웹사이트': 'site', '우리 사이트': 'site', '우리 홈페이지': 'site', '소머스튜디오 사이트': 'site', '소머스튜디오 홈페이지': 'site', 캘린더: 'calendar', 일정: 'calendar', '할 일': 'tasks', 회의: 'meetings', 회의록: 'meetings', 마인드맵: 'board', '마인드맵 회의': 'board', 기획: 'plan', '기획 보드': 'plan',
   프롬프트: 'prompts', '프롬프트 스튜디오': 'prompts', SNS: 'studio', 'SNS 스튜디오': 'studio', 스튜디오: 'studio', 레퍼런스: 'archive', 피그마: 'figma', '피그마 정리': 'figma', 메신저: 'talk', 인맥: 'people', 연락처: 'people', 팀: 'team',
   비용: 'money', '비용 처리': 'money', 지출: 'money', 구매: 'shop', '구매 목록': 'shop', 업체: 'vendors', '업체 목록': 'vendors', 랭킹: 'radar', 지원사업: 'radar', 스타트업: 'startup', 꾸미기: 'look', 설정: 'settings', '자가 점검': 'health',
   대기함: 'inbox', '확인 대기함': 'inbox', 메뉴: 'menu' };
 const NAV_RE = new RegExp('^(' + Object.keys(NAV).sort((a, b) => b.length - a.length).map(k => k.replace(/ /g, '\\s*')).join('|') + ')\\s*((?:(?:화면|메뉴|페이지|탭|창)(?:을|를)?)?\\s*(?:으로|로)?\\s*(?:좀\\s*)?(?:열어|가자|가\\s*줘|가\\s*볼래|가고\\s*싶어|들어가|이동|켜|띄워|보여)?\\s*(?:해\\s*)?(?:줘|주세요|줄래)?)\\s*[.!?~]*$', 'i');
-const NAV_NOREC = /^(설정|꾸미기|자가점검|메뉴|캘린더|메신저|마인드맵|마인드맵회의|기획보드|프롬프트|프롬프트스튜디오|SNS스튜디오|스튜디오|SNS|피그마|피그마정리|랭킹|스타트업|홈|비서)$/i;   // 기록을 찾는 말일 리 없는 화면 이름
+const NAV_NOREC = /^(설정|꾸미기|자가점검|메뉴|캘린더|메신저|마인드맵|마인드맵회의|기획보드|프롬프트|프롬프트스튜디오|SNS스튜디오|스튜디오|SNS|피그마|피그마정리|랭킹|스타트업|홈|비서|소머AI|소머에이아이)$/i;   // 기록을 찾는 말일 리 없는 화면 이름
 // 화면으로 가자는 말이 분명하면 그 화면 주소, 아니면 null. "설정 화면 보여줘"는 찾는 말이 아니라 가자는 말
 export function navPhrase(text) { const t = String(text || '').replace(/\s+/g, ' ').trim(); const m = t.match(NAV_RE); if (!m || !m[2]) return null;
   if (/(화면|메뉴|페이지|탭|창)/.test(m[2]) || /(열어|가자|가\s*줘|가\s*볼래|가고\s*싶어|들어가|이동|켜|띄워)/.test(m[2]) || NAV_NOREC.test(m[1].replace(/\s+/g, ''))) return navTo(m[1]);
@@ -415,7 +415,7 @@ export function navPhrase(text) { const t = String(text || '').replace(/\s+/g, '
 export function screensIn(text) { const out = []; const re = new RegExp('(' + Object.keys(NAV).sort((a, b) => b.length - a.length).map(k => k.replace(/ /g, '\\s*')).join('|') + ')\\s*(?:화면|메뉴|페이지|탭)', 'gi'); let m;
   while ((m = re.exec(String(text || '')))) { const to = navTo(m[1]); if (!out.some(x => x.to === to)) out.push({ name: m[1].replace(/\s+/g, ' '), to }); }
   return out.slice(0, 2); }
-const NAV_SHY = /^(오늘|홈|비서|메뉴|구매|업체|랭킹|지원사업)$/;   // 이름만으로는 다른 뜻일 수 있어서 "열어 줘" 같은 말이 붙어야 이동
+const NAV_SHY = /^(오늘|홈|비서|소머|메뉴|구매|업체|랭킹|지원사업)$/;   // 이름만으로는 다른 뜻일 수 있어서 "열어 줘" 같은 말이 붙어야 이동
 export function navTo(to) { const k = String(to || '').replace(/\s+/g, ' ').trim(); const hit = Object.keys(NAV).find(x => x.replace(/ /g, '').toLowerCase() === k.replace(/ /g, '').toLowerCase()); return hit ? NAV[hit] : 'today'; }
 export function interpret(input, ctx = {}) {
   input = String(input == null ? '' : input).replace(/[ \t]{3,}/g, '  '); input = korMoney(input); input = input.replace(/([월화수목금토일]요일)(?:하고|이랑|랑|과|와|\s*,)\s*(?=[월화수목금토일]요일)/g, '$1 ');
