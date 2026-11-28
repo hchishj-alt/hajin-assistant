@@ -4,7 +4,7 @@ import * as db from '../js/db.js';
 import * as A from '../js/acts.js';
 import { nameCanon, sameName } from '../js/store.js';
 
-const F = { tab: 'mine', view: 'grid', viewRec: 'list', type: '', part: '', who: '', region: '', status: '', due: '', ok: false, q: '', sort: 'due', open: false };
+const F = { tab: 'mine', view: 'grid', viewRec: 'grid', more: 60, type: '', part: '', who: '', region: '', status: '', due: '', ok: false, q: '', sort: 'due', open: false };
 const DUE = [['', '전체'], ['7', '이번 주'], ['14', '2주 안'], ['30', '한 달 안'], ['past', '지난 것도']];
 const SORTS = [['due', '마감 가까운 순'], ['match', '우리와 맞는 순'], ['new', '새로 담은 순']];
 const blobUrls = new Map();
@@ -21,7 +21,7 @@ export default {
   async render(root, params) {
     const box = h('div'); const titleEl = h('h1', '대외활동'), subEl = h('p.sub', '');
     let prof = A.PROFILE, canon = w => w, me = '', rec = { items: [] }, roster = [];
-    const saved = await db.kvGet('acts:view', null); if (saved) { F.view = saved.view || F.view; F.viewRec = saved.viewRec || F.viewRec; F.sort = saved.sort || F.sort; }
+    const saved = await db.kvGet('acts:view', null); if (saved) { F.view = saved.view || F.view; F.viewRec = saved.recView || F.viewRec; F.sort = saved.sort || F.sort; }
     if (params[0] === 'rec') F.tab = 'rec';
     root.append(h('div.page-head', h('div', titleEl, subEl), h('div.row',
       h('button.btn.sm', { type: 'button', onclick: () => editProfile() }, ic('users', 14), '우리 팀 조건'),
@@ -38,7 +38,8 @@ export default {
       const [all, p, cn, nm, hide, ros] = await Promise.all([db.list('acts'), A.profile(), nameCanon(), meName(), db.kvGet('acts:hide', []), db.kvGet('sync:roster', [])]);
       prof = p; canon = cn; me = nm; roster = [...new Set(ros.filter(m => m && m.name && m.kind !== 'guest').map(m => m.name))]; if (nm && !roster.some(n => sameName(n, nm))) roster.push(nm);   /* 단기 작업자는 빼고, 내 이름이 명단과 같은 사람이면 한 번만 */
       const t = today(); const mine = all.filter(a => a.kind !== 'profile');
-      const recs = (rec.items || []).filter(r => !mine.some(a => sameLink(a.link, r.link) || (a.srcId && a.srcId === r.id)) && !hide.includes(r.link) && !(A.dday(r.due, t) < 0));
+      const hid = new Set(hide); const links = r => [r.link, ...(r.sources || []).map(x => x.u)].filter(Boolean);
+      const recs = (rec.items || []).filter(r => !(A.dday(r.due, t) < 0) && !hid.has('k:' + A.actKey(r.title)) && !links(r).some(u => hid.has(u)) && !mine.some(a => (a.srcId && a.srcId === r.id) || links(r).some(u => sameLink(a.link, u)) || A.sameAct(a, r)));   /* 담았거나 관심 없다고 한 것은 다른 사이트에서 다시 찾아와도 안 띄움 */
       const live = mine.filter(a => A.LIVE.has(a.status || 'want') && !(A.dday(a.due, t) < 0));
       const near = live.map(a => A.dday(a.due, t)).filter(n => n != null).sort((a, b) => a - b)[0];
       titleEl.textContent = live.length ? `챙기는 대외활동 ${live.length}개${near != null ? `, 가장 가까운 마감은 ${near === 0 ? '오늘' : 'D-' + near}` : ''}` : mine.length ? '대외활동, 지금 챙기는 건 없어요' : '대외활동, 아직 담은 게 없어요';
@@ -55,7 +56,7 @@ export default {
       const by = { due: (x, z) => past(x) - past(z) || (x.r.dday ?? 9999) - (z.r.dday ?? 9999) || z.r.pct - x.r.pct, match: (x, z) => past(x) - past(z) || z.r.total - x.r.total, new: (x, z) => (z.a.createdAt || z.a.date || '').localeCompare(x.a.createdAt || x.a.date || '') };
       rows.sort(by[F.tab === 'rec' && F.sort === 'new' ? 'match' : F.sort] || by.due);
 
-      const keep = () => db.kvSet('acts:view', { view: F.view, viewRec: F.viewRec, sort: F.sort }); const vk = F.tab === 'rec' ? 'viewRec' : 'view';   /* 찾아온 것은 포스터가 없는 뉴스라 목록이 기본, 담은 것은 포스터 갤러리가 기본. 따로 기억해요 */
+      const keep = () => db.kvSet('acts:view', { view: F.view, recView: F.viewRec, sort: F.sort }); const vk = F.tab === 'rec' ? 'viewRec' : 'view';   /* 담은 것과 찾아온 것의 보기 방식을 따로 기억해요 */
       const q = h('input.in', { type: 'search', placeholder: '이름·주최·분야 찾기', 'aria-label': '대외활동 찾기', value: F.q, oninput: debounce(e => { F.q = e.target.value; draw().then(() => { const i = box.querySelector('.ac-q input'); if (i) { i.focus(); try { i.setSelectionRange(i.value.length, i.value.length); } catch { } } }); }, 250) });
       const pick = (key, opts) => h('div.chips', opts.map(([v, l]) => h('button.chip.ac-pick' + (F[key] === v ? '.acc' : ''), { type: 'button', 'aria-pressed': String(F[key] === v), onclick: () => { F[key] = v; draw(); } }, l)));
       const n = (F.part ? 1 : 0) + (F.who ? 1 : 0) + (F.region ? 1 : 0) + (F.status && F.tab === 'mine' ? 1 : 0) + (F.due ? 1 : 0) + (F.ok ? 1 : 0);
@@ -75,10 +76,11 @@ export default {
             h('div.ac-frow', h('span.lbl', '마감'), pick('due', DUE)),
             F.tab === 'mine' ? h('div.ac-frow', h('span.lbl', '상태'), pick('status', [['', '전체'], ...A.STATUS])) : null,
             h('div.ac-frow', h('span.lbl', '자격'), h('div.chips', h('button.chip.ac-pick' + (F.ok ? '.acc' : ''), { type: 'button', 'aria-pressed': String(F.ok), onclick: () => { F.ok = !F.ok; draw(); } }, '우리가 나갈 수 있는 것만')))) : null));
-      if (F.tab === 'rec') box.append(h('div.faint.small.ac-note', rec.updatedAt ? `${mmdd(db.dayOf(rec.updatedAt))}에 뉴스에서 새로 찾아왔어요. 기사에 마감·인원이 안 적혀 있으면 “마감 모름”으로 떠요. 나갈 만하면 담아서 고쳐 주세요.` : '아직 찾아온 게 없어요. 매일 아침 새로 찾아 둘게요. 그 전에는 “링크로 담기”로 넣을 수 있어요.'));
+      if (F.tab === 'rec') box.append(h('div.faint.small.ac-note', rec.updatedAt ? srcNote() : '아직 찾아온 게 없어요. 매일 아침 새로 찾아 둘게요. 그 전에는 “링크로 담기”로 넣을 수 있어요.'));
       if (!rows.length) box.append(h('div.card', h('div.empty', src.length ? '조건에 맞는 게 없어요. 조건을 지워 보세요.' : F.tab === 'mine' ? '공고 링크를 “링크로 담기”에 붙이거나 “직접 적기”로 넣어 보세요. 비서에게 “○○ 공모전 12월 20일 마감 팀 4명까지”라고 말해도 들어와요.' : '지금은 보여 줄 추천이 없어요.')));
-      else if (F[vk] === 'grid') { const g = h('div.ac-grid'); for (const x of rows) g.append(await cardOf(x)); box.append(g); }
-      else { const l = h('div.card.pad0.ac-list'); for (const x of rows) l.append(await rowOf(x)); box.append(l); }
+      else if (F[vk] === 'grid') { const g = h('div.ac-grid'); for (const x of rows.slice(0, F.more)) g.append(await cardOf(x)); box.append(g); }
+      else { const l = h('div.card.pad0.ac-list'); for (const x of rows.slice(0, F.more)) l.append(await rowOf(x)); box.append(l); }
+      if (rows.length > F.more) box.append(h('button.btn.ac-more', { type: 'button', onclick: () => { F.more += 60; draw(); } }, `더 보기 (${rows.length - F.more}개 남음)`));
       box.append(h('div.faint.tiny.ac-count', `${rows.length}개`));
       if (y && Math.abs(scrollY - y) > 4) scrollTo(0, y);
     }
@@ -95,6 +97,11 @@ export default {
     function dchip(r) { return h('span.ac-d' + (r.dday == null ? '.none' : r.dday < 0 ? '.past' : r.dday <= 3 ? '.hot' : r.dday <= 7 ? '.warm' : ''), A.ddayText(r.dday)); }
     function stchip(a) { return h('span.chip' + ({ prep: '.acc', sent: '.ok', second: '.acc', won: '.ok', lost: '', drop: '' }[a.status] || ''), A.statusName(a.status || 'want')); }
     function ph(a) { return h('div.ac-ph' + ((a.type || 'contest') === 'supporters' ? '.sup' : ''), h('small', A.typeName(a.type)), h('b', a.title || '')); }
+    function srcNote() {
+      const sites = rec.sites || [], ok = sites.filter(x => x.ok).map(x => x.name), bad = sites.filter(x => !x.ok).map(x => x.name), manual = [...bad, ...(rec.manual || [])];
+      return `${mmdd(db.dayOf(rec.updatedAt))}에 ${[...ok, '뉴스'].join('·')}에서 찾아왔어요. 같은 건 하나로 합쳤어요.` + (manual.length ? ` 목록을 읽을 수 없는 곳(${manual.join('·')})은 “링크로 담기”로 넣어 주세요.` : '');
+    }
+    function srcNames(a) { return (a.sources || []).map(x => x.n); }
     function img(src, a) { const im = h('img', { src, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer' }); im.onerror = () => im.replaceWith(ph(a)); return im; }
 
     async function cardOf({ a, r }) {
@@ -111,7 +118,7 @@ export default {
       const src = await posterOf(a); const isRec = F.tab === 'rec';
       return h('button.ac-row' + (r.dday != null && r.dday < 0 ? '.gone' : ''), { type: 'button', onclick: () => detail(a, isRec) },
         h('span.ac-thumb', src ? img(src, a) : ic('image', 18)),
-        h('span.ac-rb', h('b', a.title || '(이름 없음)'), h('small', [A.typeName(a.type), a.host, a.due ? `${mmdd(a.due)} 마감` : '', isRec ? r.line : ''].filter(Boolean).join(' · ')), h('span.chips', isRec ? h('span.chip' + (r.ok ? (r.pct >= A.GOOD ? '.ok' : '.acc') : '.bad'), r.ok ? `맞음 ${r.pct}%` : '자격 안 맞음') : stchip(a), a.goal ? h('span.chip.acc', ic('flag', 12), '팀 목표') : null, ...tagsOf(a, r, { max: 3 }))),
+        h('span.ac-rb', h('b', a.title || '(이름 없음)'), h('small', [A.typeName(a.type), a.host, a.due ? `${mmdd(a.due)} 마감` : '', isRec ? srcNames(a).join('·') : ''].filter(Boolean).join(' · ')), h('span.chips', isRec ? h('span.chip' + (r.ok ? (r.pct >= A.GOOD ? '.ok' : '.acc') : '.bad'), r.ok ? `맞음 ${r.pct}%` : '자격 안 맞음') : stchip(a), a.goal ? h('span.chip.acc', ic('flag', 12), '팀 목표') : null, ...tagsOf(a, r, { max: 3 }))),
         dchip(r));
     }
 
@@ -127,7 +134,9 @@ export default {
           const main = h('div.ac-main',
             h('div.chips', dchip(r), isRec ? null : stchip(a), ...tagsOf(a, r, { max: 6 })),
             h('div.ac-fit' + (r.ok ? '' : '.no'), h('b', r.ok ? `우리와 맞는 정도 ${r.pct}%` : '우리는 나가기 어려워요'), h('span', r.line)),
-            h('div.ac-infos', info('종류', A.typeName(a.type)), info('주최', a.host), info('분야', a.field), info(a.start ? '접수' : '마감', a.start ? `${mmdd(a.start)} ~ ${a.due ? mmdd(a.due) : ''}` : a.due ? `${mmdd(a.due)} (${A.ddayText(r.dday)})` : ''), info('상금·혜택', a.prize), info('담당', a.owner), info('올린 사람', a.by)),
+            h('div.ac-infos', info('종류', A.typeName(a.type)), info('주최', a.host), info('분야', a.field), info(a.start ? '접수' : '마감', a.start ? `${mmdd(a.start)} ~ ${a.due ? mmdd(a.due) : ''}` : a.due ? `${mmdd(a.due)} (${A.ddayText(r.dday)})` : ''), info('상금·혜택', a.prize), info('담당', a.owner), info('올린 사람', a.by), isRec && a.seen ? info('확인한 날', mmdd(a.seen)) : null),
+            a.approx ? h('p.faint.small', '마감은 목록의 남은 날로 계산해서 하루 차이 날 수 있어요. 공고에서 확인해 주세요.') : null,
+            (a.sources || []).length ? h('div.ac-srcs', h('span.lbl', '출처'), h('div.chips', a.sources.map(x => h('a.chip.ac-src', { href: x.u, target: '_blank', rel: 'noopener' }, ic('link', 12), x.n === '뉴스' && x.by ? `뉴스 · ${x.by}` : x.n)), a.apply ? h('a.chip.ac-src', { href: a.apply, target: '_blank', rel: 'noopener' }, ic('link', 12), '주최 측 공고') : null)) : null,
             a.body ? h('p.ac-body', a.body) : null,
             a.memo ? h('p.ac-body.memo', a.memo) : null);
           if (!isRec) {
@@ -145,7 +154,7 @@ export default {
           }
           const foot = h('div.modal-f');
           if (a.link) foot.append(h('a.btn', { href: a.link, target: '_blank', rel: 'noopener' }, ic('link', 14), '공고 열기'));
-          if (isRec) foot.append(h('button.btn', { type: 'button', onclick: async () => { const hide = await db.kvGet('acts:hide', []); await db.kvSet('acts:hide', [...new Set([...hide, a.link])].slice(-400)); c(); toast('이건 다시 안 보여 드릴게요'); draw(); } }, '관심 없어요'),
+          if (isRec) foot.append(h('button.btn', { type: 'button', onclick: async () => { const hide = await db.kvGet('acts:hide', []); await db.kvSet('acts:hide', [...new Set([...hide, a.link, 'k:' + A.actKey(a.title)])].slice(-800)); c(); toast('이건 다시 안 보여 드릴게요'); draw(); } }, '관심 없어요'),
             h('button.btn.pri', { type: 'button', onclick: async () => { const it = await keepRec(a); c(); F.tab = 'mine'; toast('담았어요. 나갈 거면 팀 목표로 등록해 보세요'); await draw(); detail(it); } }, ic('plus', 14), '담기'));
           else foot.append(h('button.btn', { type: 'button', onclick: async () => { if (!(await confirmBox(`“${a.title}”을(를) 지울까요? 캘린더에 넣어 둔 일정도 같이 지워요.`, '지우기'))) return; await A.syncLinks({ ...a, goal: false }); await db.remove(a.id); c(); toast('지웠어요'); draw(); } }, ic('trash', 14), '지우기'),
             h('button.btn.pri', { type: 'button', onclick: () => { c(); edit(a); } }, ic('edit', 14), '고치기'));
@@ -156,8 +165,8 @@ export default {
       return close;
     }
     async function keepRec(r) {
-      const { id, source, date, ...rest } = r;
-      return db.put('acts', { ...rest, srcId: id || '', src: source || '', status: 'want', stages: [], team: await teamOf(), by: await meName() });
+      const { id, source, date, pri, det, detErr, approx, seen, news, by: _by, stages, ...rest } = r;
+      return db.put('acts', { ...rest, srcId: id || '', src: source || '', status: 'want', stages: (stages || []).map(x => ({ ...x, id: x.id || db.uid() })), team: await teamOf(), by: await meName() });
     }
 
     // 링크로 담기: 미리보기에서 이름·포스터·설명을 가져오고, 글에서 마감·인원·자격을 읽어 채운 뒤 고치는 창을 띄워요

@@ -114,9 +114,11 @@ export function parse(text, base = new Date()) {
   else if (open) o.who = 'anyone';
   else if (/청년|만\s*\d{2}\s*세\s*[~\-–]\s*(?:만\s*)?\d{2}\s*세/.test(t)) { o.who = 'youth'; const ag = t.match(/만\s*(\d{2})\s*세?\s*[~\-–]\s*(?:만\s*)?(\d{2})\s*세/); if (ag) o.whoNote = `만 ${ag[1]}~${ag[2]}세`; }
   /* 지역 */
-  const rg = t.match(REGION_RE) || t.match(/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|[가-힣]{2,3}?)\s*(?:시|군|구|도)?\s*(?:시민|도민|군민|구민)(?!\s*참여\s*예산)/); if (rg) o.region = rg[1].replace(/충청북도/, '충북').replace(/충청남도/, '충남').replace(/전라북도/, '전북').replace(/전라남도/, '전남').replace(/경상북도/, '경북').replace(/경상남도/, '경남').replace(/경기도/, '경기').replace(/강원도/, '강원'); else if (/전국/.test(t)) o.region = '전국';
+  const rg = t.match(REGION_RE) || t.match(/(?:^|[^가-힣])(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|[가-힣]{2,3}?)(?:특별자치|특별|광역)?\s*(?:시|군|구|도)?\s*(?:시민|도민|군민|구민)(?!\s*참여\s*예산)/); if (rg) o.region = rg[1].replace(/충청북도/, '충북').replace(/충청남도/, '충남').replace(/전라북도/, '전북').replace(/전라남도/, '전남').replace(/경상북도/, '경북').replace(/경상남도/, '경남').replace(/경기도/, '경기').replace(/강원도/, '강원'); else if (/전국/.test(t)) o.region = '전국';
   /* 상금·혜택, 주최 */
-  const pz = t.match(/(?:총\s*상금|상금\s*총액|대상|최우수상|시상\s*내역|상금|활동비)\s*[:：]?\s*[^\n\d]{0,10}(\d[\d,.]*\s*(?:억|천만|백만|만)?\s*원)/); if (pz) o.prize = pz[0].replace(/\s+/g, ' ').trim().slice(0, 40);
+  const pz = t.match(/(총\s*상금|상금\s*총액|대상|최우수상|시상\s*내역|상금|활동비)\s*[:：]?\s*([^\n\d]{0,10})(\d[\d,.]*\s*(?:억|천만|백만|만)?\s*원)/);
+  if (pz) { const gap = pz[2].replace(/[^가-힣A-Za-z ]/g, ' ').replace(/\s+/g, ' ').trim(); let lab = pz[1].replace(/\s+/g, ''); if (/총\s*상금/.test(pz[2])) lab = '총상금'; else if (lab === '시상내역') lab = (gap.match(/(대상|최우수상|우수상|1등|1위)/) || [])[1] || '시상'; else if (lab === '상금총액') lab = '총상금';   /* "시상 내역 (총상금 150만 원" → "총상금 150만 원" */
+    o.prize = `${lab} ${pz[3].replace(/\s+/g, ' ').trim()}`.slice(0, 40); }
   const ho = t.match(/주최\s*(?:\/|·|및)?\s*(?:주관)?\s*[:：]\s*([^\n,\/|]{2,30})/); if (ho) o.host = ho[1].trim();
   return o;
 }
@@ -224,8 +226,8 @@ export async function fromLink(url, extra = '') {
 
 // ── 찾아온 목록 ── 매일 아침 모아 둔 data/acts.json. 새로 온 것 중 잘 맞는 것은 그날 한 번 묶어서 알려요.
 export async function loadFeed() {
-  try { const r = await fetch('data/acts.json', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); return { updatedAt: j.updatedAt || null, items: Array.isArray(j.items) ? j.items : [] }; } } catch { }
-  return { updatedAt: null, items: [] };
+  try { const r = await fetch('data/acts.json', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); return { updatedAt: j.updatedAt || null, items: Array.isArray(j.items) ? j.items : [], sites: Array.isArray(j.sites) ? j.sites : [], manual: Array.isArray(j.manual) ? j.manual : [] }; } } catch { }
+  return { updatedAt: null, items: [], sites: [], manual: [] };
 }
 export const GOOD = 75;   /* 뉴스에서 온 것은 인원·자격이 비어 있는 때가 많아, 분야 하나만 맞은 것(70 안팎)은 알림까지는 안 보냄 */
 export async function refreshNew(feedData, now = new Date()) {

@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { parse, typeName, sameAct } from '../js/acts.js';
-import { collectLists, fillDetails } from './act-sites.mjs';
+import { collectLists, fillDetails, fromText } from './act-sites.mjs';
 
 const un = s => String(s || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 const tag = (x, t) => { const m = x.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`, 'i')); return m ? m[1] : ''; };
@@ -77,11 +77,13 @@ export function fuse(cur, it) {
   out.source = out.sources[0].n; out.pri = P(hi); out.link = hi.link; if (!hi.news && hi.pri) delete out.news;
   return out;
 }
+/* 읽는 법이 나아지기 전에 자세히 읽어 둔 것은, 저장해 둔 글에서 인원·지역·상금을 다시 읽음(사이트를 다시 부르지 않고) */
+function reread(i) { const o = fromText(i.title, i.body || '', { part: '', teamMin: null, teamMax: null, region: '', whoNote: '', prize: i.prize ? (parse(i.prize).prize || '') : '', who: i.who || '' }); return { ...i, ...o, dv: 2 }; }
 export function merge(prev, found, now = new Date()) {
   const today = new Date(now.getTime() + 9 * 36e5).toISOString().slice(0, 10); const old = d => now.getTime() - new Date(d).getTime();
   /* 거르는 법이 나아지면 예전에 모은 뉴스도 다시 거름 */
   prev = prev.filter(i => { if (P(i) < 9) return true; const t = String(i.body || i.title).split('\n')[0]; return keep(t, t + ' 모집') && !BADSRC.test(i.by || i.source || ''); })
-    .map(i => { if (P(i) < 9) return i; const t = String(i.body || i.title).split('\n')[0]; const host = hostOf(t) || ''; return { ...i, news: 1, pri: 9, host: i.host || host, title: (i.sources || []).length > 1 ? i.title : full_(nameOf(t), host), due: i.due || bareDue(t, i.date) }; });
+    .map(i => { if (P(i) < 9) return i.det && (i.dv || 0) < 2 ? reread(i) : i; const t = String(i.body || i.title).split('\n')[0]; const host = hostOf(t) || ''; return { ...i, news: 1, pri: 9, host: i.host || host, title: (i.sources || []).length > 1 ? i.title : full_(nameOf(t), host), due: i.due || bareDue(t, i.date) }; });
   const list = [];
   for (const it of [...prev, ...found]) {
     const i = list.findIndex(c => c.id === it.id || sameAct(c, it) || (P(c) === 9 && P(it) === 9 && alike(c.title, it.title)));

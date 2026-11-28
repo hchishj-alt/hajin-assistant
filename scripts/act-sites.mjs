@@ -36,10 +36,20 @@ export function whoOf(names, note = '') {
   if (/(청소년|초등|중학|고등|유치|어린이|영유아)/.test(s)) return 'teen';
   return '';
 }
-/* 자세한 글에서 개인/팀 인원·지역·상금 같은 것을 더 읽어 채움. 사이트가 칸으로 준 값이 있으면 그게 먼저 */
-function fromText(title, body, o) {
-  const p = parse(`${title}\n${body}`.slice(0, 4000));
-  for (const k of ['part', 'teamMin', 'teamMax', 'region', 'whoNote', 'prize']) if ((o[k] == null || o[k] === '') && p[k]) o[k] = p[k];
+/* 긴 공고 글에서 자격·대상·팀 구성을 말하는 줄만 고름. 글 전체에서 읽으면 "본선 16팀", "60인치" 같은 말을 인원으로 잘못 읽어요 */
+export function eligText(body) {
+  const lines = String(body || '').split('\n').map(l => l.trim()).filter(Boolean); const out = []; const head = /(자격|대상|팀\s*구성|참가\s*(형태|방법|단위|인원)|응모\s*(형태|단위|방법)|지원\s*자격|모집\s*(대상|인원)|인원\s*구성)/;
+  for (let i = 0; i < lines.length; i++) { if (!head.test(lines[i]) || /심사|시상|수상|발표|일정/.test(lines[i].slice(0, 12))) continue; out.push(lines[i]); if (lines[i].length < 26) for (let k = i + 1; k < Math.min(lines.length, i + 5); k++) { if (/^[■●▶◆□○▣◇★☆\[【]|^\d+\s*[.)]\s/.test(lines[k]) && !/^[■●▶◆□○▣◇★☆]\s*(개인|팀|대학|누구)/.test(lines[k])) break; out.push(lines[k]); } }
+  return out.join('\n').slice(0, 900);
+}
+const REG_OK = /^(전국|서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|[가-힣]{2,4}(시|군|구))$/;
+/* 자세한 글에서 개인/팀 인원·지역·상금을 더 읽어 채움. 사이트가 칸으로 준 값이 있으면 그게 먼저 */
+export function fromText(title, body, o) {
+  const p = parse(`${title}\n${eligText(body)}`); const all = parse(String(body || '').slice(0, 4000));
+  if (p.teamMax && p.teamMax > 10) { delete p.teamMax; delete p.teamMin; if (p.part !== 'solo') delete p.part; }
+  if (p.region && (!REG_OK.test(p.region) || /^(위한|통한|대한|관한|달하고)/.test(p.region))) delete p.region;
+  for (const k of ['part', 'teamMin', 'teamMax', 'region', 'whoNote']) if ((o[k] == null || o[k] === '') && p[k]) o[k] = p[k];
+  if ((o.prize == null || o.prize === '') && all.prize) o.prize = all.prize;
   if (!o.who && p.who) o.who = p.who;
   return o;
 }
@@ -63,7 +73,7 @@ export function linkareerDetail(html, id) {
   const st = apollo(html), a = st['Activity:' + id]; if (!a) throw new Error('자세히 모양이 바뀜');
   const de = r => (r && r.__ref ? st[r.__ref] : null), names = l => (l || []).map(de).filter(Boolean).map(x => x.name).filter(Boolean);
   const body = text(de(a.detailText)?.text || ''); const targets = names(a.targets); const files = (a.files || []).map(de).filter(Boolean);
-  const o = { det: 1, start: msDay(a.recruitStartAt), due: msDay(a.recruitCloseAt), host: one(a.organizationName), field: [...new Set([...names(a.categories), ...names(a.interests)])].slice(0, 4).join(', '), who: whoOf(targets), whoNote: '', region: names(a.regions).filter(x => !/전체|전국/.test(x)).slice(0, 2).join('·'),
+  const o = { det: 1, dv: 2, start: msDay(a.recruitStartAt), due: msDay(a.recruitCloseAt), host: one(a.organizationName), field: [...new Set([...names(a.categories), ...names(a.interests)])].slice(0, 4).join(', '), who: whoOf(targets), whoNote: '', region: names(a.regions).filter(x => !/전체|전국/.test(x)).slice(0, 2).join('·'),
     poster: (files.find(f => de(f.type)?.name === '포스터') || files.find(f => de(f.type)?.name === '썸네일') || {}).url || '', body: brief(body), apply: /^https?:\/\//.test(a.applyDetail || '') ? a.applyDetail : (a.homepageURL || '') };
   fromText(a.title, body, o);
   if (!o.prize && +a.tenThousandUnitOfReward > 0) o.prize = `시상 ${Number(a.tenThousandUnitOfReward).toLocaleString('ko-KR')}만원`;
@@ -94,7 +104,7 @@ export function ckDetail(html) {
   const row = th => { const m = html.match(new RegExp(`<th[^>]*>\\s*${th}\\s*</th>\\s*<td[^>]*>([\\s\\S]*?)</td>`)); return m ? one(m[1]) : ''; };
   const per = row('접수기간').match(/(20\d\d[.\-\/]\s*\d{1,2}[.\-\/]\s*\d{1,2})\s*~\s*(20\d\d[.\-\/]\s*\d{1,2}[.\-\/]\s*\d{1,2})/); const target = row('참가대상').replace(/해당자|▶/g, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
   const img = (html.match(/<div class="img_area">\s*<div>\s*<img src="([^"]+)"/) || [])[1]; const prize = row('시상내역').replace(/^상금\s*\(\s*|\s*\)$/g, '').slice(0, 60); const home = (html.match(/class="homepage_go[^"]*"[^>]*val2="(https?:\/\/[^"]+)"/) || html.match(/<a href="(https?:\/\/[^"]+)"[^>]*class="homepage_go"/) || [])[1] || '';
-  const o = { det: 1, start: per ? ymd(per[1]) : '', due: per ? ymd(per[2]) : '', host: row('주최 . 주관').split(/\s*[,\/]\s*/)[0], who: whoOf(target), whoNote: /만\s*\d+\s*세|학년|재학|거주/.test(target) ? target.slice(0, 40) : '', prize: /무관|없음|해당\s*없/.test(prize) ? '' : prize, poster: img ? new URL(img, 'https://www.contestkorea.com').href : '', apply: ent(home), body: brief(target ? `참가 대상: ${target}` : '') };
+  const o = { det: 1, dv: 2, start: per ? ymd(per[1]) : '', due: per ? ymd(per[2]) : '', host: row('주최 . 주관').split(/\s*[,\/]\s*/)[0], who: whoOf(target), whoNote: /만\s*\d+\s*세|학년|재학|거주/.test(target) ? target.slice(0, 40) : '', prize: /무관|없음|해당\s*없/.test(prize) ? '' : prize, poster: img ? new URL(img, 'https://www.contestkorea.com').href : '', apply: ent(home), body: brief(target ? `참가 대상: ${target}` : '') };
   return fromText('', `${target}\n${row('시상내역')}`, o);
 }
 
@@ -116,7 +126,7 @@ export function wevityDetail(html) {
   const per = li('접수기간').match(/(20\d\d-\d{1,2}-\d{1,2})\s*~\s*(20\d\d-\d{1,2}-\d{1,2})/); const target = li('응모대상'); const img = (html.match(/<div class="thumb">\s*<img src="([^"]+)"/) || [])[1];
   const bi = html.indexOf('id="viewContents"'); const body = bi > 0 ? text(html.slice(bi + 18, bi + 9000).replace(/^[^>]*>/, '')) : '';
   const tot = li('총 상금'), first = li('1등 상금'); const home = (html.match(/<span class="tit">\s*홈페이지\s*<\/span>\s*<a href="(https?:\/\/[^"]+)"/) || [])[1] || '';
-  const o = { det: 1, approx: 0, start: per ? ymd(per[1]) : '', due: per ? ymd(per[2]) : '', host: li('주최/주관').split(/\s*\/\s*/)[0], who: whoOf(target), whoNote: '', prize: tot && !/없음|해당|^-$/.test(tot) ? `총상금 ${tot}`.slice(0, 40) : first && !/없음|^-$/.test(first) ? `1등 ${first}`.slice(0, 40) : '', poster: img ? new URL(img, 'https://www.wevity.com').href : '', apply: ent(home), body: brief(body) };
+  const o = { det: 1, dv: 2, approx: 0, start: per ? ymd(per[1]) : '', due: per ? ymd(per[2]) : '', host: li('주최/주관').split(/\s*\/\s*/)[0], who: whoOf(target), whoNote: '', prize: tot && !/없음|해당|^-$/.test(tot) ? `총상금 ${tot}`.slice(0, 40) : first && !/없음|^-$/.test(first) ? `1등 ${first}`.slice(0, 40) : '', poster: img ? new URL(img, 'https://www.wevity.com').href : '', apply: ent(home), body: brief(body) };
   return fromText(li('분야'), body, o);
 }
 
