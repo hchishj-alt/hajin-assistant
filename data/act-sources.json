@@ -1,12 +1,55 @@
 {
  "_설명": "대외활동(공모전·서포터즈)을 매일 찾아오는 곳. 뉴스 검색 RSS처럼 가져가도 된다고 열어 둔 주소만 넣어요. type: contest(공모전) / supporters(서포터즈).",
  "feeds": [
-  { "name": "디자인·영상·콘텐츠 공모전", "type": "contest", "q": "(디자인 OR 영상 OR 콘텐츠 OR 광고 OR 브랜드) 공모전 (접수 OR 모집 OR 개최) when:30d", "max": 40 },
-  { "name": "대학생 공모전", "type": "contest", "q": "대학생 공모전 (접수 OR 모집 OR 개최) when:30d", "max": 40 },
-  { "name": "캐릭터·로고·네이밍 공모전", "type": "contest", "q": "(캐릭터 OR 로고 OR 네이밍 OR 슬로건 OR 포스터 OR 굿즈) 공모전 when:30d", "max": 30 },
-  { "name": "숏폼·UCC 공모전", "type": "contest", "q": "(숏폼 OR UCC OR 유튜브 OR 릴스 OR 영상) 공모전 참가자 when:30d", "max": 30 },
-  { "name": "아이디어·기획 공모전", "type": "contest", "q": "(아이디어 OR 기획 OR 마케팅) 공모전 (접수 OR 모집) when:30d", "max": 30 },
-  { "name": "대학생 서포터즈", "type": "supporters", "q": "대학생 서포터즈 모집 when:30d", "max": 40 },
-  { "name": "기자단·앰배서더·홍보대사", "type": "supporters", "q": "(기자단 OR 앰배서더 OR 홍보대사 OR 크리에이터) 대학생 모집 when:30d", "max": 30 }
- ]
+  {
+   "name": "디자인·영상·콘텐츠 공모전",
+   "type": "contest",
+   "q": "(디자인 OR 영상 OR 콘텐츠 OR 광고 OR 브랜드) 공모전 (접수 OR 모집 OR 개최) when:30d",
+   "max": 40
+  },
+  {
+   "name": "대학생 공모전",
+   "type": "contest",
+   "q": "대학생 공모전 (접수 OR 모집 OR 개최) when:30d",
+   "max": 40
+  },
+  {
+   "name": "캐릭터·로고·네이밍 공모전",
+   "type": "contest",
+   "q": "(캐릭터 OR 로고 OR 네이밍 OR 슬로건 OR 포스터 OR 굿즈) 공모전 when:30d",
+   "max": 30
+  },
+  {
+   "name": "숏폼·UCC 공모전",
+   "type": "contest",
+   "q": "(숏폼 OR UCC OR 유튜브 OR 릴스 OR 영상) 공모전 참가자 when:30d",
+   "max": 30
+  },
+  {
+   "name": "아이디어·기획 공모전",
+   "type": "contest",
+   "q": "(아이디어 OR 기획 OR 마케팅) 공모전 (접수 OR 모집) when:30d",
+   "max": 30
+  },
+  {
+   "name": "대학생 서포터즈",
+   "type": "supporters",
+   "q": "대학생 서포터즈 모집 when:30d",
+   "max": 40
+  },
+  {
+   "name": "기자단·앰배서더·홍보대사",
+   "type": "supporters",
+   "q": "(기자단 OR 앰배서더 OR 홍보대사 OR 크리에이터) 대학생 모집 when:30d",
+   "max": 30
+  }
+ ],
+ "manual": [
+  "씽굿",
+  "캠퍼스픽",
+  "요즘것들",
+  "올콘",
+  "대티즌"
+ ],
+ "note": "공모전 모음 사이트(링커리어·콘테스트코리아·위비티)는 scripts/act-sites.mjs가 robots.txt에서 허용한 목록만 읽어요. manual은 목록을 읽을 수 없어 링크로 담아야 하는 곳이에요."
 }

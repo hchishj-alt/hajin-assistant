@@ -3,7 +3,8 @@
 // 시험: node scripts/fetch-acts.mjs --file 저장해_둔.xml  (인터넷 없이 읽는 법만 확인)
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { parse, typeName } from '../js/acts.js';
+import { parse, typeName, sameAct } from '../js/acts.js';
+import { collectLists, fillDetails } from './act-sites.mjs';
 
 const un = s => String(s || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 const tag = (x, t) => { const m = x.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`, 'i')); return m ? m[1] : ''; };
@@ -40,7 +41,7 @@ export function hostOf(title) {
 /* "20일까지 접수"처럼 달이 없으면 기사 난 달(그 날짜가 지났으면 다음 달) */
 export function bareDue(text, when) { const m = String(text).match(/(?:오는\s*)?(\d{1,2})일\s*(?:까지|마감)/); if (!m || +m[1] < 1 || +m[1] > 31) return ''; const k = new Date(new Date(when).getTime() + 9 * 36e5); let mo = k.getUTCMonth(); if (+m[1] < k.getUTCDate()) mo++; const d = new Date(Date.UTC(k.getUTCFullYear(), mo, +m[1])); return d.getUTCDate() === +m[1] ? d.toISOString().slice(0, 10) : ''; }
 /* 이름이 "숏폼 공모전"처럼 너무 흔하면 주최를 앞에 붙여 알아볼 수 있게 */
-export const full = (name, host) => (name = name.replace(/^(총\s*)?상금\s*[\d,]+\s*(만|억)\s*원\s*/, '').trim() || name, host && !name.includes(host) && name.replace(/\s/g, '').length <= 11 ? `${host} ${name}` : name);
+export const full_ = (name, host) => (name = name.replace(/^(총\s*)?상금\s*[\d,]+\s*(만|억)\s*원\s*/, '').trim() || name, host && !name.includes(host) && name.replace(/\s/g, '').length <= 11 ? `${host} ${name}` : name);
 export function itemsOf(xml, src, now = new Date()) {
   const out = [];
   for (const b of (xml.match(/<item[\s>][\s\S]*?<\/item>|<entry[\s>][\s\S]*?<\/entry>/gi) || []).slice(0, src.max || 40)) {
@@ -53,7 +54,7 @@ export function itemsOf(xml, src, now = new Date()) {
     if (!p.due) p.due = bareDue(text, when);
     if (p.due && p.due < when.toISOString().slice(0, 10)) delete p.due;   /* 기사보다 이른 날짜는 마감이 아님 */
     const type = /서포터즈|기자단|앰배서더|홍보\s*대사|체험단|크리에이터\s*모집/.test(title) && !/공모전|경진\s*대회|콘테스트/.test(title) ? 'supporters' : src.type === 'supporters' && !/공모전/.test(title) ? 'supporters' : 'contest';
-    out.push({ id: 'n' + crypto.createHash('sha1').update(link).digest('hex').slice(0, 12), type, title: full(nameOf(title), hostOf(title) || p.host), host: hostOf(title) || p.host, due: p.due || '', start: p.start || '', link, poster: '', body: title + (desc && desc !== title && !desc.startsWith(title.slice(0, 20)) ? '\n' + desc : ''), field: '', part: p.part || '', teamMin: p.teamMin || null, teamMax: p.teamMax || null, who: p.who || '', whoNote: p.whoNote || '', region: p.region || '', prize: p.prize || '', source: un(tag(b, 'source')) || src.name, date: when.toISOString() });
+    out.push({ id: 'n' + crypto.createHash('sha1').update(link).digest('hex').slice(0, 12), type, title: full_(nameOf(title), hostOf(title) || p.host), host: hostOf(title) || p.host, due: p.due || '', start: p.start || '', link, poster: '', body: title + (desc && desc !== title && !desc.startsWith(title.slice(0, 20)) ? '\n' + desc : ''), field: '', part: p.part || '', teamMin: p.teamMin || null, teamMax: p.teamMax || null, who: p.who || '', whoNote: p.whoNote || '', region: p.region || '', prize: p.prize || '', source: un(tag(b, 'source')) || src.name, date: when.toISOString() });
   }
   return out;
 }
@@ -61,29 +62,65 @@ export function itemsOf(xml, src, now = new Date()) {
 const norm = t => t.replace(/20\d\d\s*년?/g, '').replace(/제?\s*\d+\s*(회|기)/g, '').replace(/(참가자|모집|접수|개최|공모전|서포터즈)/g, m => (m === '공모전' || m === '서포터즈' ? m : '')).replace(/([가-힣]{2,3})(특별시|광역시|시|군|구|도)(?=\s|[가-힣])/g, '$1').replace(/[^가-힣A-Za-z0-9]/g, '');
 const grams = s => { const g = new Set(); for (let i = 0; i < s.length - 1; i++) g.add(s.slice(i, i + 2)); return g; };
 export const alike = (a, b) => { const x = grams(norm(a)), y = grams(norm(b)); if (x.size < 3 || y.size < 3) return norm(a) === norm(b); let n = 0; for (const g of x) if (y.has(g)) n++; return n / Math.min(x.size, y.size) >= 0.72; };
+const P = i => i.pri || 9;
+const full = o => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)));
+const srcOf = i => (i.sources && i.sources.length ? i.sources : [{ n: i.news || !i.pri ? '뉴스' : i.source, u: i.link, ...(i.news || !i.pri ? { by: i.source || '' } : {}) }]);
+/* 같은 것 두 개를 하나로: 믿을 만한 출처(링커리어 → 콘테스트코리아 → 위비티 → 뉴스) 값이 먼저, 빈 칸은 다른 쪽에서 채움. 출처 링크는 다 남김 */
+export function fuse(cur, it) {
+  const [hi, lo] = P(it) < P(cur) ? [it, cur] : [cur, it];
+  const out = { ...lo, ...full(hi) };
+  if (P(it) === P(cur) && it.link === cur.link) { for (const k of ['title', 'host', 'poster']) if (it[k] && !cur.det) out[k] = it[k]; if (it.due && !(it.approx && cur.det)) out.due = it.due; }   /* 같은 곳에서 다시 봄: 마감이 바뀌었으면 따라감 */
+  out.approx = (out.due === hi.due ? hi.approx : lo.approx) ? 1 : 0;
+  out.id = cur.id; out.date = [cur.date, it.date].filter(Boolean).sort()[0]; out.seen = [cur.seen, it.seen].filter(Boolean).sort().pop() || '';
+  const all = [...srcOf(cur), ...srcOf(it)]; const order = ['링커리어', '콘테스트코리아', '위비티', '뉴스'];
+  out.sources = all.filter((x, i) => all.findIndex(y => y.n === x.n) === i).sort((a, b) => order.indexOf(a.n) - order.indexOf(b.n));
+  out.source = out.sources[0].n; out.pri = P(hi); out.link = hi.link; if (!hi.news && hi.pri) delete out.news;
+  return out;
+}
 export function merge(prev, found, now = new Date()) {
-  const today = now.toISOString().slice(0, 10); const cut = now.getTime() - 30 * 864e5;
+  const today = new Date(now.getTime() + 9 * 36e5).toISOString().slice(0, 10); const old = d => now.getTime() - new Date(d).getTime();
+  /* 거르는 법이 나아지면 예전에 모은 뉴스도 다시 거름 */
+  prev = prev.filter(i => { if (P(i) < 9) return true; const t = String(i.body || i.title).split('\n')[0]; return keep(t, t + ' 모집') && !BADSRC.test(i.by || i.source || ''); })
+    .map(i => { if (P(i) < 9) return i; const t = String(i.body || i.title).split('\n')[0]; const host = hostOf(t) || ''; return { ...i, news: 1, pri: 9, host: i.host || host, title: (i.sources || []).length > 1 ? i.title : full_(nameOf(t), host), due: i.due || bareDue(t, i.date) }; });
   const list = [];
-  prev = prev.filter(i => { const t = String(i.body || i.title).split('\n')[0]; return keep(t, t + ' 모집') && !BADSRC.test(i.source || ''); }).map(i => { const t = String(i.body || i.title).split('\n')[0]; const host = hostOf(t) || ''; return { ...i, host, title: full(nameOf(t), host), due: i.due || bareDue(t, i.date) }; });   /* 거르는 법이 나아지면 예전에 모은 것도 다시 거름 */
-  for (const it of [...prev, ...found]) { const i = list.findIndex(c => c.id === it.id || c.link === it.link || alike(c.title, it.title)); if (i < 0) { list.push(it); continue; } const cur = list[i]; list[i] = { ...cur, due: cur.due || it.due, start: cur.start || it.start, part: cur.part || it.part, teamMax: cur.teamMax || it.teamMax, teamMin: cur.teamMin || it.teamMin, who: cur.who || it.who, whoNote: cur.whoNote || it.whoNote, region: cur.region || it.region, prize: cur.prize || it.prize, host: cur.host || it.host }; }
-  return list.filter(i => (i.due ? i.due >= today : new Date(i.date).getTime() > cut)).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || b.date.localeCompare(a.date)).slice(0, 160);
+  for (const it of [...prev, ...found]) {
+    const i = list.findIndex(c => c.id === it.id || sameAct(c, it) || (P(c) === 9 && P(it) === 9 && alike(c.title, it.title)));
+    if (i < 0) list.push({ ...it, sources: srcOf(it) }); else list[i] = fuse(list[i], it);
+  }
+  return list.filter(i => (i.due ? i.due >= today : old(i.date) < (P(i) === 9 ? 14 : 45) * 864e5))
+    .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || P(a) - P(b) || String(b.date).localeCompare(String(a.date))).slice(0, 360);
 }
 
 const fileArg = process.argv.indexOf('--file');
 if (process.argv[1] && process.argv[1].endsWith('fetch-acts.mjs')) {
   const sources = JSON.parse(fs.readFileSync('data/act-sources.json', 'utf8'));
   const prev = fs.existsSync('data/acts.json') ? JSON.parse(fs.readFileSync('data/acts.json', 'utf8')) : { items: [] };
-  const found = []; const log = [];
+  const found = []; const log = []; let sites = prev.sites || [];
+  const nowIso = new Date().toISOString(), today = new Date(Date.now() + 9 * 36e5).toISOString().slice(0, 10);
   if (fileArg > 0) { const xml = fs.readFileSync(process.argv[fileArg + 1], 'utf8'); const got = itemsOf(xml, sources.feeds[0]); found.push(...got); log.push(`파일: ${got.length}개`); }
-  else for (const s of sources.feeds) {
-    const url = s.url || `https://news.google.com/rss/search?q=${encodeURIComponent(s.q)}&hl=ko&gl=KR&ceid=KR:ko`;
-    try {
-      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (feed reader)' }, signal: AbortSignal.timeout(20000) });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const got = itemsOf(await r.text(), s); found.push(...got); log.push(`${s.name}: ${got.length}개`);
-    } catch (e) { log.push(`${s.name}: 실패 (${e.message})`); }
+  else {
+    /* 1) 공모전 모음 사이트 목록 (허용된 곳만) */
+    const have = new Set((prev.items || []).flatMap(i => (i.sources || []).map(x => x.n)));
+    const got = await collectLists(have); sites = got.status;
+    for (const it of got.found) { const { sid, src, ...rest } = it; found.push({ poster: '', body: '', field: '', part: '', teamMin: null, teamMax: null, who: '', whoNote: '', region: '', prize: '', start: '', ...rest, id: 's' + sid, source: src, sources: [{ n: src, u: it.link, id: sid }], date: nowIso, seen: today }); }
+    for (const s of sites) log.push(`${s.name}: ${s.ok ? s.n + '개' : '못 읽음 (' + s.why + ')'}`);
+    /* 2) 뉴스 검색 피드 (사이트에 안 올라온 것 보충) */
+    for (const s of sources.feeds) {
+      const url = s.url || `https://news.google.com/rss/search?q=${encodeURIComponent(s.q)}&hl=ko&gl=KR&ceid=KR:ko`;
+      try {
+        const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (feed reader)' }, signal: AbortSignal.timeout(20000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const g = itemsOf(await r.text(), s).map(i => ({ ...i, news: 1, pri: 9, by: i.source, seen: today })); found.push(...g); log.push(`${s.name}: ${g.length}개`);
+      } catch (e) { log.push(`${s.name}: 실패 (${e.message})`); }
+    }
   }
   const items = merge(prev.items || [], found);
   if (fileArg > 0) { console.log(log.join('\n')); for (const i of items) console.log(`- [${typeName(i.type)}] ${i.title} | 주최 ${i.host || '-'} | 마감 ${i.due || '-'} | ${i.part || '-'} ${i.teamMax || ''} | ${i.who || '-'} | ${i.region || '-'} | ${i.prize || '-'}`); }
-  else { fs.writeFileSync('data/acts.json', JSON.stringify({ updatedAt: new Date().toISOString(), log, items }, null, 1)); console.log(log.join('\n'), '\n총', items.length); }
+  else {
+    const n = await fillDetails(items).catch(e => { log.push('자세히 읽기 실패: ' + e.message); return 0; }); log.push(`자세히 읽은 것: ${n}개`);
+    const out = merge(items, []);   /* 자세히 읽으며 마감·주최가 정확해진 뒤 한 번 더 합침 */
+    fs.writeFileSync('data/acts.json', JSON.stringify({ updatedAt: nowIso, log, sites, manual: sources.manual || [], items: out }, null, 1));
+    console.log(log.join('\n'), '\n총', out.length, '· 마감 있는 것', out.filter(i => i.due).length, '· 포스터 있는 것', out.filter(i => i.poster).length, '· 둘 이상 출처', out.filter(i => (i.sources || []).length > 1).length);
+    for (const i of out.slice(0, 25)) console.log(`- [${typeName(i.type)}] ${i.title} | ${i.host || '-'} | ${i.due || '-'} | ${i.part || '-'}${i.teamMax || ''} | ${i.who || '-'} | ${i.region || '-'} | ${i.prize || '-'} | ${(i.sources || []).map(x => x.n).join('+')}${i.poster ? ' | 포스터' : ''}`);
+  }
 }

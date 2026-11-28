@@ -181,6 +181,31 @@ export function alarmText(hit) {
   return { title: `챙길 대외활동 ${hit.length}건, 가장 가까운 건 ${when(f.n)}`, body: hit.slice(0, 4).map(h => `${short(h.a.title, 16)} ${h.label} ${h.n === 0 ? '오늘' : 'D-' + h.n}`).join(' · ') };
 }
 
+// ── 같은 것 알아보기 ── 같은 공모전이 여러 사이트·기사에 올라와도 하나로. 수집 스크립트와 화면이 같이 써요.
+/* 이름에서 꾸밈을 뺀 뼈대: 짧은 괄호 말([제3회], (Be My Agent)), 연도, 회차, "참가자 모집" 같은 말, 띄어쓰기·기호 */
+export const actKey = t => String(t || '').toLowerCase()
+  .replace(/[\[(【〔][^\])】〕]{0,16}[\])】〕]/g, ' ').replace(/20\d\d\s*(년|학년도)?/g, ' ').replace(/제?\s*\d+\s*(회|차|th|rd|nd|st)/g, ' ')
+  .replace(/(참가자|참여자|지원자|단원|작품|신규)?\s*(모집\s*공고|모집|공고|안내|개최|접수\s*중|접수)/g, ' ').replace(/[^가-힣a-z0-9]/g, '');
+const grams2 = s => { const g = new Set(); for (let i = 0; i < s.length - 1; i++) g.add(s.slice(i, i + 2)); return g; };
+export const nameSim = (x, y) => { const a = grams2(x), b = grams2(y); if (!a.size || !b.size) return x === y ? 1 : 0; let n = 0; for (const g of a) if (b.has(g)) n++; return 2 * n / (a.size + b.size); };
+const hostKey = h => String(h || '').toLowerCase().replace(/\(주\)|㈜|주식회사|재단법인|사단법인|\(재\)|\(사\)/g, '').split(/[,\/·]| 외 /)[0].replace(/[^가-힣a-z0-9]/g, '');
+const linkKey = u => String(u || '').replace(/^https?:\/\/(www\.|m\.)?/, '').replace(/[?#].*$/, m => (/[?&](ix|str_no|id|seq|no)=\w+/.test(m) ? '?' + m.match(/[?&]((?:ix|str_no|id|seq|no)=\w+)/)[1] : '')).replace(/\/$/, '');
+export function sameAct(a, b) {
+  if (a.link && b.link && linkKey(a.link) === linkKey(b.link)) return true;
+  const x = actKey(a.title), y = actKey(b.title); if (x.length < 4 || y.length < 4) return false;
+  const gap = a.due && b.due ? Math.abs(dday(a.due, b.due)) : null;
+  if (gap != null && gap > 45) return false;   /* 이름이 같아도 마감이 한 달 반 넘게 다르면 다른 회차 */
+  const s = nameSim(x, y), inside = Math.min(x.length, y.length) >= 6 && (x.includes(y) || y.includes(x));
+  const hx = hostKey(a.host), hy = hostKey(b.host), both = hx.length >= 2 && hy.length >= 2, hostNear = both && (hx.includes(hy) || hy.includes(hx) || nameSim(hx, hy) >= 0.6);
+  const clash = both && !hostNear;   /* 주최가 둘 다 적혀 있는데 서로 다름: "대학생 아이디어 공모전"처럼 흔한 이름은 다른 대회일 수 있음 */
+  const loose = !!(a.news || b.news);   /* 기사는 주최를 줄여 쓰는 때가 많아(과기정통부) 주최가 달라 보여도 이름이 같으면 같은 것으로. 틀려도 기사 쪽이 사이트 항목에 묻힐 뿐 */
+  if (x === y) return !clash || loose || (gap != null && gap <= 1 && x.length >= 12);
+  if (s >= 0.85 && (gap == null || gap <= 3) && !(clash && gap == null && !loose)) return true;
+  if ((s >= 0.7 || inside) && gap != null && gap <= 1 && (hostNear || inside || s >= 0.78)) return true;
+  if ((inside || s >= 0.75) && hostNear && (gap == null || gap <= 3)) return true;
+  return false;
+}
+
 // ── 링크에서 읽기 ── 공고 주소를 읽어 이름·마감·인원·자격·포스터를 채움. 읽어 온 것은 임시이고, 사람이 확인하고 고쳐서 담아요.
 export const isActLink = u => /(linkareer\.com|wevity\.com|thinkcontest\.com|campuspick\.com|all-con\.co\.kr|detizen\.com|contestkorea\.com|allforyoung\.com|onoffmix\.com|event-us\.kr)/i.test(String(u || ''));
 const SITE = /\s*[|\-–:·]\s*(링커리어|위비티|씽굿|캠퍼스픽|올콘|대티즌|콘테스트\s*코리아|요즘것들|온오프믹스|이벤터스|linkareer|wevity|네이버\s*블로그|공모전\s*대외활동)[^|]*$/i;
