@@ -25,6 +25,7 @@ export const MODULES = [
   { id: 'shop', title: '구매 목록', icon: 'cart', group: '회사', short: '구매' },
   { id: 'vendors', title: '업체 목록', icon: 'briefcase', group: '회사', short: '업체' },
   { id: 'radar', title: '지원사업 · 정보 랭킹', icon: 'trend', group: '회사', short: '랭킹' },
+  { id: 'acts', title: '대외활동 · 공모전', icon: 'award', group: '회사', short: '대외활동' },
   { id: 'startup', title: '스타트업 PM', icon: 'rocket', group: '회사', short: '스타트업' },
   { id: 'look', title: '꾸미기', icon: 'palette', group: '시스템' },
   { id: 'admin', title: '관리자', icon: 'shield', group: '시스템', adminOnly: true },
@@ -231,6 +232,7 @@ async function boot() {
   setupSW();
   store.repairTitles().catch(() => { }); // 예전 버전이 잘못 만든 제목(“만들어기”)을 한 번 고침
   import('./helper.js').then(H => H.start()).catch(e => store.logError(e, 'helper'));   /* 어느 화면에서든 비서 부르기 */
+  import('./acts.js').then(async AC => { await AC.refreshNew(await AC.loadFeed()); }).catch(() => { });   /* 새로 찾은 대외활동 중 잘 맞는 것이 있으면 알림 목록에 올림 */
   import('./alarm.js').then(A => A.start()); import('./push.js').then(P => P.start());   /* 알림: 일정 전, 마감, 아침 브리핑, 닫힌 앱 푸시 */
   // 동기화 (설정에서 로그인했을 때만). 다른 기기·팀원이 바꾼 게 오면 입력 중이 아닐 때 화면 새로 그림
   import('./sync.js').then(s => { let was = '', told = ''; s.onState(async st => { const tr = s.trouble(st); if (tr && tr !== told) { told = tr; toast('다른 기기와 맞추지 못하고 있어요. ' + tr, { label: '다시 맞추기', fn: () => s.syncNow() }); } else if (st.status === 'idle' && told) { told = ''; if (document.querySelector('#view .sync-strip')) render(); }   /* 문제는 한 번만 알리고, 풀리면 오늘 화면의 안내도 거둠 */

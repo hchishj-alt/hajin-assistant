@@ -1,5 +1,6 @@
 // 종류별 입력 항목 정의 — 확인 대기함 편집과 각 페이지 직접 편집이 같은 정의를 씀
 import { EXP_CATS } from './brain.js';
+import * as ACT from './acts.js';
 export const EXP_CAT_LIST = [...Object.keys(EXP_CATS), '기타'];
 export const FIELDS = {
   event: [
@@ -109,6 +110,19 @@ export const FIELDS = {
     { k: 'quarter', label: '분기' },
     { k: 'owner', label: '책임자' },
   ],
+  act: [
+    { k: 'title', label: '이름', full: true },
+    { k: 'type', label: '종류', type: 'select', options: ACT.TYPES, default: 'contest' },
+    { k: 'due', label: '마감', type: 'date' },
+    { k: 'link', label: '공고 링크', type: 'url', full: true },
+    { k: 'body', label: '내용', type: 'textarea', rows: 3 },
+    { k: 'part', label: '참가 (개인·팀)', type: 'select', options: ACT.PART, default: '', more: true },
+    { k: 'teamMax', label: '팀 최대 인원', type: 'number', inputmode: 'numeric', more: true },
+    { k: 'who', label: '대상', type: 'select', options: ACT.WHO, default: '', more: true },
+    { k: 'region', label: '지역 제한 (없으면 비워 두기)', more: true },
+    { k: 'host', label: '주최', more: true },
+    { k: 'prize', label: '상금·혜택', more: true },
+  ],
   grant: [
     { k: 'title', label: '사업·공모 이름', full: true },
     { k: 'org', label: '주관 기관' },
@@ -133,6 +147,7 @@ export function describe(kind, d) {
   if (kind === 'timelog') { p.push(`${d.minutes}분`); if (d.project) p.push(d.project); }
   if (kind === 'reference' && d.url) { try { p.push(new URL(d.url).hostname); } catch { } }
   if (kind === 'grant' && d.deadline) p.push('마감 ' + d.deadline);
+  if (kind === 'act') { p.push(ACT.typeName(d.type)); if (d.due) p.push('마감 ' + d.due.slice(5).replace('-', '/')); for (const x of [ACT.partTag(d), ACT.whoTag(d), ACT.regionTag(d), d.host, d.prize]) if (x) p.push(x); }
   if (kind === 'sns') p.push(d.platform);
   if ((kind === 'note' || kind === 'idea') && d.tags?.length) p.push(d.tags.slice(0, 4).map(t => '#' + t).join(' '));
   return p.join(' · ');

@@ -240,6 +240,15 @@ export default {
           wait.remove(); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `${ai ? 'AI가' : '앱 안에서'} 읽고 ${a.summary.length}줄로 줄였어요. 원문은 메모에 넣어 뒀어요.${ai ? '' : ' 설정에서 무료 AI 키를 넣으면 요약이 더 자연스러워져요.'}`, draftIds: [d.id] }), new Map((await store.drafts()).map(x => [x.id, x]))); updateBadge();
         } catch (e) { wait.remove(); await drawMsg(await db.put('chat', { role: 'bot', q: text, text: `이 링크는 읽지 못했어요. 로그인이 필요하거나 막아 둔 사이트일 수 있어요. 내용을 붙여 넣어 주시면 정리해 드릴게요.` }), new Map()); }
         return; } }
+      /* 공모전·서포터즈 공고 링크 → 읽어서 대외활동 임시 항목으로 (이름·마감·인원·자격·포스터). 확정하면 대외활동 화면에 들어가요 */
+      { const um = text.match(/https?:\/\/[^\s<>"']+/); const AC = um ? await import('../js/acts.js') : null;
+        if (um && (AC.isActLink(um[0]) || /(공모전|서포터즈|대외\s*활동|기자단|앰배서더|홍보\s*대사)/.test(text))) {
+          const wait = h('div.bubble.bot', h('span.spin'), ' 공고를 읽고 있어요'); list.append(wait); wait.scrollIntoView({ block: 'end' });
+          const said = text.replace(um[0], ' ').trim(); let data; try { data = await AC.fromLink(um[0], said); } catch { data = { ...AC.parse(said), title: AC.titleOf(said), link: um[0], status: 'want' }; }
+          wait.remove(); const got = !!data.read; delete data.read; if (!data.title) data.title = AC.titleOf(said) || '이름을 적어 주세요';
+          const d = await store.draft('act', data, { source: text, confidence: got ? 0.7 : 0.45, origin });
+          const bits = [data.due ? `마감 ${data.due.slice(5).replace('-', '/')}` : '', AC.partTag(data), AC.whoTag(data), AC.regionTag(data)].filter(Boolean).join(', ');
+          await drawMsg(await db.put('chat', { role: 'bot', q: text, text: got ? `공고를 읽어 대외활동으로 임시로 담았어요.${bits ? ' ' + bits + '.' : ''} 틀린 데가 있으면 고친 뒤 확정해 주세요.` : '이 링크는 내용을 읽지 못해서 주소만 담았어요. 이름과 마감을 적은 뒤 확정해 주세요.', draftIds: [d.id] }), new Map((await store.drafts()).map(x => [x.id, x]))); updateBadge(); return; } }
       let parsed = brain.interpret(text, { projects, people, vendors: vendorNames, project });
       if (aiAdd && parsed.every(p => p.kind === 'query' || p.kind === 'talk')) parsed = [];
       // 키가 연결돼 있으면 Gemini가 먼저 읽음(규칙 초안을 힌트로). 못 읽거나 연결이 없으면 규칙 결과 그대로

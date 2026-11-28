@@ -4,6 +4,7 @@ import * as db from './db.js';
 import * as store from './store.js';
 import { h, ic } from './ui.js';
 import * as SC from './scope.js';
+import * as ACT from './acts.js';
 
 export const DEFAULT = { on: true, lead: 10, tasks: true, taskAt: '09:00', eve: true, eveAt: '20:00', brief: true, briefAt: '08:30', badge: true };
 export const get = async () => ({ ...DEFAULT, ...(await db.kvGet('alarm', {})) });
@@ -25,6 +26,7 @@ export async function plan({ from = new Date(), days = 2, cfg } = {}) {
   const evs = (await db.list('events')).filter(e => e.date && e.kind !== 'focus' && (!e.team || SC.involves(e, meN)));
   const mine = await store.mineFilter();
   const open = (await db.list('tasks')).filter(t => !t.done && t.due && mine(t));
+  const acts = cfg.tasks ? await db.list('acts') : [];
   const out = []; const today = ymd(from);
   for (let i = 0; i < days; i++) {
     const d = new Date(from); d.setDate(d.getDate() + i); const date = ymd(d);
@@ -38,12 +40,16 @@ export async function plan({ from = new Date(), days = 2, cfg } = {}) {
     const due = open.filter(t => t.due === date), late = date === today ? open.filter(t => t.due < date) : [], tomorrow = open.filter(t => t.due === ymd(nd));
     const win = t => new Date(+t + 3 * 36e5);
     if (cfg.tasks && due.length) { const t = at(date, cfg.taskAt); out.push({ id: `due|${date}`, kind: 'task', at: t, until: win(t), title: `오늘 마감 ${due.length}개`, body: names(due), url: '#/tasks' }); }
+    /* 대외활동 마감: 2주 전, 7일 전, 3일 전부터는 매일 아침 한 번. 팀 목표의 오늘·내일 마감은 위의 할 일 알림이 이미 알려 줌. 제출 완료면 안 울림 */
+    { const hit = ACT.alarmsOn(acts, date, meN).filter(x => !(x.a.goal && x.n <= 1)); const tx = ACT.alarmText(hit); if (tx) { const t = at(date, cfg.taskAt); out.push({ id: `act|${date}`, kind: 'task', at: t, until: win(t), title: tx.title, body: tx.body, url: '#/acts' }); } }
     if (cfg.eve && tomorrow.length) { const t = at(date, cfg.eveAt); out.push({ id: `eve|${date}`, kind: 'task', at: t, until: win(t), title: `내일 마감 ${tomorrow.length}개`, body: names(tomorrow), url: '#/tasks' }); }
     if (cfg.brief && (todays.length || due.length || late.length)) {
       const t = at(date, cfg.briefAt); const first = todays.find(e => e.start);
       out.push({ id: `brief|${date}`, kind: 'brief', at: t, until: win(t), title: '오늘 브리핑', body: [todays.length ? `일정 ${todays.length}개${first ? ` (${first.start} ${first.title})` : ''}` : '', due.length ? `오늘 마감 ${due.length}개` : '', late.length ? `밀린 일 ${late.length}개` : ''].filter(Boolean).join(' · '), url: '#/today' });
     }
   }
+  /* 새로 찾은 대외활동 중 우리와 잘 맞는 것: 찾은 날 한 번만 묶어서 */
+  { const an = cfg.tasks ? await db.kvGet('acts:new', null) : null; if (an && an.at) { const t = new Date(an.at); if (+t > +from - 12 * 36e5) out.push({ id: `actnew|${an.date}`, kind: 'bell', at: t, until: new Date(+t + 12 * 36e5), title: `새로 찾은 대외활동 ${an.n}개`, body: `가장 맞는 건 “${String(an.title || '').slice(0, 24)}” (맞음 ${an.pct}%)`, url: '#/acts/rec' }); } }
   for (const s of await db.kvGet(SNOOZE, [])) out.push({ ...s, at: new Date(s.at), until: new Date(s.until) });
   return out.sort((a, b) => a.at - b.at);
 }

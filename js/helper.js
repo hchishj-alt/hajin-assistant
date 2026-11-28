@@ -25,6 +25,7 @@ export const SCREENS = {
   shop: { say: ['이번 달 지출', '받을 돈 얼마야?'], about: '살 물건 목록과 가격을 정리하는 화면' },
   vendors: { say: ['이번 달 지출', '이번 주 일정'], about: '거래하는 업체를 모아 두는 화면' },
   radar: { say: ['이번 주 마감', '프로젝트 진행 상황'], about: '지원사업 공고와 정보를 모아 순위를 보는 화면' },
+  acts: { say: ['이번 주 마감', '○○ 공모전 12월 20일 마감 팀 4명까지', '오늘 할 일'], about: '공모전·서포터즈를 팀이 같이 모아 두고 마감과 단계를 챙기는 화면' },
   startup: { say: ['프로젝트 진행 상황', '이번 주 마감'], about: '사업 계획과 지표를 정리하는 화면' },
   _: { say: ['뭐부터 할까?', '오늘 일정', '밀린 할 일'], about: '' },
 };
@@ -128,7 +129,7 @@ export async function toStudio(id, values = {}) {
 }
 
 // ── 메뉴 줄이기 ──
-const CORE = { all: ['plan', 'meetings', 'talk', 'prompts', 'team', 'settings'], pm: ['board', 'people', 'radar'], art: ['archive', 'figma', 'studio'], make: ['studio', 'archive'], biz: ['money', 'shop', 'vendors', 'radar'], none: ['money', 'archive', 'people'] };
+const CORE = { all: ['plan', 'meetings', 'talk', 'prompts', 'team', 'acts', 'settings'], pm: ['board', 'people', 'radar'], art: ['archive', 'figma', 'studio'], make: ['studio', 'archive'], biz: ['money', 'shop', 'vendors', 'radar'], none: ['money', 'archive', 'people'] };
 // 앞에 둘 메뉴: 역할 기본 + 최근 3주 안에 3번 넘게 연 것, 그리고 직접 고정한 것(끄면 뺌)
 export async function pinned(now = Date.now()) {
   const me = await who(); const use = await db.kvGet('nav:use', {}); const pin = await db.kvGet('nav:pin', {});

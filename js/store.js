@@ -16,6 +16,7 @@ export const KINDS = {
   sns: { col: 'sns', label: 'SNS 콘텐츠', icon: 'film', route: 'studio' },
   okr: { col: 'okrs', label: '목표', icon: 'target', route: 'startup' },
   grant: { col: 'grants', label: '지원사업', icon: 'flag', route: 'startup' },
+  act: { col: 'acts', label: '대외활동', icon: 'award', route: 'acts' },
   vendor: { col: 'vendors', label: '업체', icon: 'briefcase', route: 'vendors' },
   buy: { col: 'buys', label: '살 것', icon: 'cart', route: 'shop' },
   meeting: { col: 'meetings', label: '회의록', icon: 'mic', route: 'meetings' },
@@ -43,6 +44,7 @@ export async function approve(d, edited) {
     if (d.kind === 'idea') payload.type = 'idea';
     if (d.kind === 'note') payload.type = payload.type || 'note';
     if (d.kind === 'task') payload.done = false;
+    if (d.kind === 'act') { delete payload.posters; delete payload.read; payload.stages = payload.stages || []; payload.status = payload.status || 'want'; if (payload.team === undefined) payload.team = (await db.get('team-main')) ? 'team-main' : ''; if (!payload.by) payload.by = await db.kvGet('name', ''); }   /* 대외활동은 팀이 같이 봄 */
     if (d.sourceRef) payload.sourceRef = d.sourceRef;
     // 같은 임시 항목을 두 기기에서 각각 확정해도 기록이 둘 생기지 않게, 만든 기록의 이름표를 임시 항목에서 따옴
     if (d.id && !payload.id && d.kind !== 'vendor') { payload.id = 'ok' + d.id; payload.deleted = false; const old = await db.get(payload.id); if (old && old.deleted) await db.purge(old.id); /* 되돌렸다가 다시 확정: 예전 내용이 섞이지 않게 새로 */ }

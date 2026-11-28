@@ -7,8 +7,8 @@ import * as store from './store.js';
 const FRESH = 30 * 60 * 1000;   // "아니 …"처럼 고치는 말머리가 있을 때
 const NEAR = 10 * 60 * 1000;    // 말머리 없이 "화요일"만 말했을 때
 const fmtD = d => { const x = new Date(d + 'T00:00'); return `${x.getMonth() + 1}/${x.getDate()}(${'일월화수목금토'[x.getDay()]})`; };
-const KWORD = { 일정: 'event', 약속: 'event', '할 일': 'task', 할일: 'task', 투두: 'task', 메모: 'note', 지출: 'expense', 비용: 'expense', 아이디어: 'idea', '받을 돈': 'income', 입금: 'income', 수입: 'income', '살 것': 'buy', 살것: 'buy', 구매: 'buy', 연락처: 'contact', 업체: 'vendor', 거래처: 'vendor', SNS: 'sns', sns: 'sns', 레퍼런스: 'reference', 받을돈: 'income' };
-const KW = '일정|약속|할\\s*일|할일|투두|메모|지출|비용|아이디어|받을\\s*돈|입금|수입|살\\s*것|구매|연락처|업체|거래처|SNS|sns|레퍼런스';
+const KWORD = { 일정: 'event', 약속: 'event', '할 일': 'task', 할일: 'task', 투두: 'task', 메모: 'note', 지출: 'expense', 비용: 'expense', 아이디어: 'idea', '받을 돈': 'income', 입금: 'income', 수입: 'income', '살 것': 'buy', 살것: 'buy', 구매: 'buy', 연락처: 'contact', 업체: 'vendor', 거래처: 'vendor', SNS: 'sns', sns: 'sns', 레퍼런스: 'reference', 받을돈: 'income', 대외활동: 'act', 공모전: 'act', 서포터즈: 'act', 지원사업: 'grant' };
+const KW = '일정|약속|할\\s*일|할일|투두|메모|지출|비용|아이디어|받을\\s*돈|입금|수입|살\\s*것|구매|연락처|업체|거래처|SNS|sns|레퍼런스|대외활동|공모전|서포터즈|지원사업';
 const kindOf = s => KWORD[s.replace(/\s+/g, ' ').trim()] || KWORD[s.replace(/\s+/g, '')] || null;
 
 export async function remember(ids) { if (ids && ids.length) await db.kvSet('chat:last', { ids, at: Date.now() }); }

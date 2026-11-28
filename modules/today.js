@@ -124,6 +124,9 @@ export default {
           h('p.faint.small', { style: { margin: '14px 0 8px', paddingTop: '12px', borderTop: '1px solid var(--line)' } }, '코드가 없으면 이름만 알려 주세요. 이 기기에서 혼자 쓸 수 있어요.'), nameRow));
       }
     }
+    /* 2주 안에 마감인 대외활동 (챙기는 것만) */
+    { const AC = await import('../js/acts.js'); const td = db.dayOf(new Date()); const near = (await db.list('acts')).filter(a => a.kind !== 'profile' && AC.LIVE.has(a.status || 'want')).map(a => ({ a, n: AC.dday(a.due, td) })).filter(x => x.n != null && x.n >= 0 && x.n <= 14).sort((x, y) => x.n - y.n).slice(0, 3);
+      if (near.length) root.append(h('a.card.click.today-acts', { href: '#/acts' }, h('div.card-h', h('h3', ic('award'), '대외활동 마감'), h('span.faint.small', '전체 보기')), near.map(x => h('div.ta-row', h('span', x.a.title), h('span.chip' + (x.n <= 3 ? '.bad' : x.n <= 7 ? '.warn' : ''), AC.ddayText(x.n)))))); }
     root.append(grid);
     if (!grid.children.length) grid.append(h('div.card.home-full', h('div.empty', '메인 화면 카드를 모두 껐어요. 꾸미기 › 메인 화면에서 다시 켤 수 있어요.', h('a.btn.sm', { href: '#/look', style: { marginTop: '10px' } }, '꾸미기 열기'))));
   },

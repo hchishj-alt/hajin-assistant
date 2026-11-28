@@ -167,7 +167,7 @@ export async function enhance(a, text, { today = '', people = [], meeting = fals
 // ── Gemini가 먼저 읽기 ──
 // 규칙이 읽은 초안(parsed)을 같이 주고, AI가 뜻을 보고 고쳐 쓰게 함. 전화·금액·링크처럼 글자 그대로인 건 규칙 값을 믿고,
 // 날짜·종류·제목·누구랑·장소처럼 뜻을 읽어야 하는 건 AI 값을 씀. 실패하면 null → 규칙 결과 그대로
-const KO = { event: '일정', task: '할 일', expense: '지출', income: '받을 돈', contact: '연락처', idea: '아이디어', note: '메모', vendor: '업체', buy: '살 것', reference: '레퍼런스', sns: 'SNS 아이디어', grant: '지원사업' };
+const KO = { event: '일정', task: '할 일', expense: '지출', income: '받을 돈', contact: '연락처', idea: '아이디어', note: '메모', vendor: '업체', buy: '살 것', reference: '레퍼런스', sns: 'SNS 아이디어', grant: '지원사업', act: '대외활동' };
 // AI가 말에 없는 사람을 지어내지 못하게: 말에 실제로 나온 이름만 남긴다(목록 사람은 성 뺀 이름도 인정).
 function whoIn(w, text, people, fallback) {
   const t = String(text).replace(/\s/g, ''); const ok = [];
@@ -197,7 +197,7 @@ ${calendarTable(today)}
 프로젝트: ${projects.slice(0, 20).join(', ') || '없음'}
 업체: ${vendors.slice(0, 30).join(', ') || '없음'}
 
-항목 모양: {"kind":"event|task|expense|income|contact|idea|note|vendor|buy|reference|sns|grant","title":"짧은 명사형 제목(날짜·사람·장소·조사는 뺌)","date":"YYYY-MM-DD","endDate":"여러 날이면 끝 날짜","start":"HH:MM","end":"HH:MM","allDay":false,"who":"같이 하는/맡은 사람","place":"가게·건물·전시 이름","area":"동네·도시","scope":"work|personal","priority":"high|normal","project":"","amount":0,"category":"","memo":"제목에 못 담은 조건","repeat":"daily|weekly|monthly|weekdays 또는 빈칸","phone":"","email":"","org":"","role":"직함","url":"","cat":"업체 분야","prices":[{"item":"품목","price":0,"note":""}]}
+항목 모양: {"kind":"event|task|expense|income|contact|idea|note|vendor|buy|reference|sns|grant|act","title":"짧은 명사형 제목(날짜·사람·장소·조사는 뺌)","date":"YYYY-MM-DD","endDate":"여러 날이면 끝 날짜","start":"HH:MM","end":"HH:MM","allDay":false,"who":"같이 하는/맡은 사람","place":"가게·건물·전시 이름","area":"동네·도시","scope":"work|personal","priority":"high|normal","project":"","amount":0,"category":"","memo":"제목에 못 담은 조건","repeat":"daily|weekly|monthly|weekdays 또는 빈칸","phone":"","email":"","org":"","role":"직함","url":"","cat":"업체 분야","prices":[{"item":"품목","price":0,"note":""}]}
 없는 칸은 빼거나 빈칸으로 둬.
 
 읽는 법:
@@ -218,7 +218,7 @@ ${calendarTable(today)}
 - scope: 가족·친구·개인 볼일은 personal, 나머지는 work.
 - 쉼표도 줄바꿈도 없이 길게 이어 쓴 말(\"~했고 ~해야되고 아 그리고 ~\")은 토막마다 종류를 따로 가려서 항목을 하나씩 만들어. 약속·쓴 돈·받을 돈·살 것·연락처·아이디어·메모가 한 줄에 섞여 있어도 전부 task로 뭉치지 마.
 - 받아야 하는 돈·빌려준 돈·들어올 돈은 expense가 아니라 income. 앞으로 줘야 하는 돈(\"다음주에 줘야함\")은 task.
-- 지원사업·공모전 공고(마감, 최대 얼마)는 grant이고 그 금액은 쓴 돈이 아니야. 살 것(\"사야함\", 장바구니)은 buy, 물건이 여럿이면 하나씩.
+- 공모전·서포터즈·기자단 같은 대외활동 모집 공고는 act(마감일은 date). 정부·기관 지원사업 공고(지원금, 최대 얼마)는 grant이고 그 금액은 쓴 돈이 아니야. 살 것(\"사야함\", 장바구니)은 buy, 물건이 여럿이면 하나씩.
 - 남에게 들은 값·조건·비밀번호·주차 같은 정보(\"시간당 5만원이래\", \"와이파이 비번 …\")는 note. 견적 받은 값은 vendor의 prices.
 - 푸념·감탄·느낌(\"아 정신없다\", \"ㅋㅋ 웃겼음\")은 항목으로 만들지 마.
 - 말에 없는 내용은 지어내지 마. 뭘 만들 말이 아니면(인사, 감탄, 질문) 빈 배열 [].
@@ -244,6 +244,7 @@ ${calendarTable(today)}
     else if (g.kind === 'vendor') data = { ...base, name: title, cat: S(g.cat) || base.cat || '기타', phone: base.phone || S(g.phone), link: base.link || S(g.url), kakao: base.kakao || '', memo: S(g.memo), prices: (base.prices && base.prices.length ? base.prices : (g.prices || []).filter(x => x && x.item).map(x => ({ item: String(x.item).slice(0, 40), price: String(Number(x.price) || ''), note: S(x.note), at: today }))) };
     else if (g.kind === 'buy') data = { ...base, title, url: base.url || S(g.url), price: Number(base.price) || Number(g.amount) || 0, qty: Number(base.qty) || 1, need: 'must' };
     else if (g.kind === 'idea' || g.kind === 'note') data = { ...base, title, body: base.body || (arr.length > 1 ? (S(g.memo) ? `${title}\n${S(g.memo)}` : title) : text), tags: base.tags || [] };
+    else if (g.kind === 'act') data = { ...base, title: base.title || title, type: base.type || (/서포터즈|기자단|앰배서더|홍보\s*대사|체험단/.test(text) ? 'supporters' : 'contest'), due: date || base.due || '', link: base.link || S(g.url), status: base.status || 'want' };
     else if (g.kind === 'grant') data = { ...base, title, deadline: date || base.deadline || '', status: base.status || '검토', amount: base.amount ?? (Number(g.amount) || null), url: base.url || S(g.url) };
     else if (g.kind === 'sns') data = { ...base, title, platform: base.platform || (/유튜브|쇼츠/.test(text) ? '유튜브' : /틱톡/.test(text) ? '틱톡' : /블로그/.test(text) ? '블로그' : /트위터|\bX\b/.test(text) ? 'X' : '인스타그램'), status: base.status || '아이디어', date: date || base.date || '' };
     else data = { ...base, title, url: base.url || S(g.url) };

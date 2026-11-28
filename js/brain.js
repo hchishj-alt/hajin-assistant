@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 import { guess as guessScope } from './scope.js';
+import { parse as actParse, titleOf as actTitle, isActLink } from './acts.js';
 // 하진 비서의 기본 두뇌 (외부 AI 없이 기기 안에서 돌아가는 한국어 분석 로직)
 //  - parseWhen   : "다음 주 화요일 오후 3시" 같은 날짜·시간 인식
 //  - keywords    : 핵심 키워드 추출
@@ -449,6 +450,7 @@ export function interpret(input, ctx = {}) {
   /* 이어 쓴 말은 토막마다 따로 읽음. 예전 읽기가 이미 그만큼 나눠 읽었으면 예전 것을 씀 */
   const whole = interpretParts(input, base, ctx);
   if (ctx._noDump || (whole.length === 1 && /^(query|nav)$/.test(whole[0].kind) && input.length < 40)) return whole;
+  if (whole.length === 1 && whole[0].kind === 'act' && !/\n/.test(input.trim()) && input.length < 160) return whole;   /* 공고 한 줄은 조건(인원·지역)까지 한 항목 */
   let dm = null; try { dm = dump(input, base, ctx); } catch { dm = null; }
   const junk = rs => rs.filter(r => { const tt = String((r.data && (r.data.title || r.data.name)) || ''); return /(니까|는데|다가|[았었였했]고|하고)\s|야됨|야함|했음|었음|그리고|그래서/.test(tt) || tt.length > 30 || (r.kind === 'expense' && tt.replace(/\s/g, '').length <= 2) || r.kind === 'talk'; }).length;
   const fixed = (dm && (dm.strong || dm.length > whole.length || dm.length >= 3 || junk(whole) > junk(dm)) ? dm : whole).flatMap(fixup);
@@ -1071,6 +1073,8 @@ function interpretOne(s, base, ctx) {
     if (/(라고\s*(함|했음|했어|하심|하셨음)|라더라|라던데|이래|래요?)\s*$/.test(t) && /(무료|유료|주차|와이파이|반입|흡연|금연)/.test(t) && money == null && !OBLIG.test(t) && !w.time) return 'note';
     /* "화요일이나 수요일 중에 회의 잡자": 날이 아직 안 정해진 약속은 할 일 */
     if (/[월화수목금토일](요일|욜)\s*(이나|아니면|또는)\s/.test(t) && /(잡자|잡아야|잡기|정하자|정해야|조율)/.test(t)) return 'task';
+    /* 공모전·서포터즈 공고는 대외활동으로. "공모전 기획서 금요일까지 쓰기"처럼 해야 할 일은 그대로 할 일 */
+    if ((/(공모전|서포터즈|기자단|홍보\s*대사|앰배서더|체험단|대외\s*활동|경진\s*대회|콘테스트)/.test(t) || isActLink(t)) && !/(지원사업|창업\s*패키지|바우처|정부지원)/.test(t) && !SPENT.test(t) && !w.time && !ACTION.test(t.replace(/까지|마감|신청|접수|모집|받아|받기/g, '')) && (isActLink(t) || /(마감|접수|모집|공고|떴|올라옴|나가자|나가\s*볼까|나갈까|관심|있대|있음)/.test(t) || /(팀|개인)\s*(만|가능|필수|\d)|\d\s*(명|인)\s*(까지|이내|이하|이상)/.test(t) || !!w.date)) return 'act';
     /* 지원사업 공고: 금액이 있어도 쓴 돈이 아님 */
     if (/(지원사업|공모전|정부지원|창업지원|예비창업|초기창업|액셀러레이터|TIPS|팁스|사관학교|창업\s*패키지|바우처)/i.test(t) && /(마감|접수|모집|최대|선정|공고)/.test(t) && !SPENT.test(t) && !/(입금|들어옴|들어왔|받음|받았)/.test(t) && !w.time && !(dl && ACTION.test(t.replace(/까지|마감|신청|접수/g, '')))) return 'grant';
     if (/(^|\s)사기(\s|$)/.test(t) && /(쿠팡|다이소|이케아|올리브영|컬리|네이버|무신사|오늘의집|알리|테무|마트|편의점|장바구니)/.test(t) && !dl && !w.time) return 'buy';
@@ -1197,6 +1201,7 @@ function interpretOne(s, base, ctx) {
       case 'timelog': { const tw = parseWhen(body, base); const span = tw.time && tw.end ? (+tw.end.slice(0, 2) * 60 + +tw.end.slice(3)) - (+tw.time.slice(0, 2) * 60 + +tw.time.slice(3)) : 0; const m = span > 0 ? span : tw.mins || 60; body = span > 0 ? strip(body, tw.hits).replace(/^(부터|까지)\s*/, '') : body; return { kind, label: '작업 기록', confidence: 0.8, data: { title: strip(body, tw.hits).replace(/\d+\s*(시간|분)\s*(동안)?/g, '').replace(/\s*(작업)?\s*(했음|했다|했어|함|완료)$/, '').trim() || '작업', minutes: m, date: tw.date && tw.date <= ymd(base) ? tw.date : ymd(base), project: projectOf(body, ctx) } }; }
       case 'sns': return { kind, label: 'SNS 아이디어', confidence: 0.75, data: { title: cleanTitle.replace(/(^|\s)올릴\s*(거|것)(?=\s)/, '$1').replace(/^(인스타그램|인스타|틱톡|유튜브|블로그)(에는|에|는|은)\s+/, '').replace(/(^|\s)에(?=\s)/g, ' ').replace(/^((릴스|쇼츠|틱톡|유튜브|인스타)\s*)?아이디어\s*(생각났는데|떠올랐는데|생각난\s*건데|인데)\s*/, '$1').replace(/\s+/g, ' ').trim() || cleanTitle, platform: /(릴스|인스타)/.test(body) ? '인스타그램' : /(쇼츠|유튜브)/.test(body) ? '유튜브' : /틱톡/.test(body) ? '틱톡' : '인스타그램', status: '아이디어', date: bw.date || '', tags } };
       case 'okr': return { kind, label: '목표', confidence: 0.7, data: { title: cleanTitle.replace(/^(이번|다음|올해|\d분기)?\s*(분기|달|연도)?\s*(목표|OKR|okr)\s*(는|은|:|：)?\s*/, '').trim() || cleanTitle, quarter: quarterOf(base), krs: [] } };
+      case 'act': { const ap = actParse(body, base); return { kind, label: '대외활동', confidence: 0.75, data: { title: actTitle(body) || cleanTitle, type: ap.type || 'contest', due: ap.due || bw.date || '', link: parseUrls(body)[0] || '', body: '', part: ap.part || '', teamMin: ap.teamMin || null, teamMax: ap.teamMax || null, who: ap.who || '', whoNote: ap.whoNote || '', region: ap.region || '', host: ap.host || '', prize: ap.prize || '', start: ap.start || '', status: 'want' } }; }
       case 'grant': { const ek = body.match(/(?:최대\s*)?(\d+(?:\.\d+)?)\s*억\s*(?:(\d+)\s*천)?\s*(?:만\s*)?원?/); const amt = ek ? Math.round(parseFloat(ek[1]) * 1e8 + (+(ek[2] || 0)) * 1e7) : parseMoney(body) || null;
         return { kind, label: '지원사업', confidence: 0.7, data: { title: cleanTitle.replace(/(최대\s*)?\d+(\.\d+)?\s*억\s*(\d+\s*천)?\s*(만\s*)?원?/, ' ').replace(/(최대\s*)?\d[\d,]*\s*(천만|백만|만|천)?\s*원/, ' ').replace(/^(지원사업|공모전|공고)\s*(떴다|떴음|뜸|나옴|나왔\S*|올라옴)\s*/, '').replace(/\s*(마감|접수\s*마감|신청\s*마감|지원금|최대)\s*/g, ' ').replace(/\s+/g, ' ').trim() || cleanTitle, deadline: bw.date || '', status: '검토', amount: amt, url: parseUrls(body)[0] || '' } }; }
       default: return { kind: 'note', label: '메모', confidence: 0.5, data: { title: body.slice(0, 60), body, tags } };

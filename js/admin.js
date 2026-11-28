@@ -4,12 +4,12 @@
 // · 팀에 공유된 항목은 누가·언제·무엇을·어떻게 바꿨는지 전부 기록 (관리자 화면에서 봄).
 import * as db from './db.js';
 
-const FREE = new Set(['tasks', 'pollvotes', 'polls', 'leadmarks', 'leadfb', 'vendors', 'events', 'audit', 'drafts', '_kv', 'buys', 'boards', 'dms', 'feedback', 'accts', 'posts', 'devreqs', 'promptlogs', 'bnodes']); // 누구나 고칠 수 있는 공유 항목 (bnodes: 마인드맵은 같이 그리는 것이라 남이 만든 노드도 고치고 옮김)
+const FREE = new Set(['tasks', 'pollvotes', 'polls', 'leadmarks', 'leadfb', 'vendors', 'events', 'audit', 'drafts', '_kv', 'buys', 'boards', 'dms', 'feedback', 'accts', 'posts', 'devreqs', 'promptlogs', 'bnodes', 'acts']); // 누구나 고칠 수 있는 공유 항목 (bnodes: 마인드맵은 같이 그리는 것이라 남이 만든 노드도 고치고 옮김)
 const GUEST_COLS = new Set(['tasks', 'events', 'meetings', 'notes', 'docs', 'refs']);   // 단기 작업자가 팀과 나눌 수 있는 것 (맡은 프로젝트의 것만)
 const ADMIN_ONLY_COLS = new Set(['teams', 'projects', 'reffolders', 'labelsets']);                                   // 만들기부터 관리자만
 const SKIP = new Set(['updatedAt', 'createdAt', 'dirty', 'id', 'col', 'sharedMembers', 'code', 'space']);
 const BIG = new Set(['snap', 'comments', 'versions', 'history', 'transcript', 'body', 'avail', 'summary', 'summaryDraft', 'pages']);
-export const LABEL = { tasks: '할 일', events: '일정', meetings: '회의록', expenses: '비용', incomes: '받을 돈', vendors: '업체', buys: '구매 목록', notes: '메모', docs: '문서', grants: '지원사업', boards: '마인드맵', bnodes: '마인드맵 노드', polls: '시간 조율', teams: '팀', labelsets: '중요도 색', feedback: '피드백', refs: '레퍼런스', contacts: '연락처', reffolders: '하위 폴더', projects: '폴더(프로젝트)', teams: '팀', polls: '시간 조율', pollvotes: '가능 시간', docs: '문서', notes: '메모', figmafiles: '피그마 파일', grants: '지원사업', leads: '랭킹 링크', leadmarks: '찜', labelsets: '중요도 색', buys: '구매 목록', boards: '마인드맵 회의', dms: '메시지', feedback: 'AI 피드백' };
+export const LABEL = { tasks: '할 일', events: '일정', meetings: '회의록', expenses: '비용', incomes: '받을 돈', vendors: '업체', buys: '구매 목록', notes: '메모', docs: '문서', grants: '지원사업', acts: '대외활동', boards: '마인드맵', bnodes: '마인드맵 노드', polls: '시간 조율', teams: '팀', labelsets: '중요도 색', feedback: '피드백', refs: '레퍼런스', contacts: '연락처', reffolders: '하위 폴더', projects: '폴더(프로젝트)', teams: '팀', polls: '시간 조율', pollvotes: '가능 시간', docs: '문서', notes: '메모', figmafiles: '피그마 파일', grants: '지원사업', leads: '랭킹 링크', leadmarks: '찜', labelsets: '중요도 색', buys: '구매 목록', boards: '마인드맵 회의', dms: '메시지', feedback: 'AI 피드백' };
 
 let cache = null;
 export async function who() {
